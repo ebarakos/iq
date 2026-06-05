@@ -4,10 +4,44 @@
 > administers them to **both humans and AI agents**, using a difficulty ladder to
 > separate "human-hard" from "agent-hard" items.
 
-**Status: PLANNING.** No application code yet. The concept and open design
-questions live in [BRAINSTORM.md](BRAINSTORM.md); short-lived task state in
-[TODO.md](TODO.md). Do not scaffold the app or write feature code until the
-design is settled and a plan is approved (plan mode → TODO).
+**Status: MVP PROTOTYPE.** A runnable human-facing test exists (5 relay-generated
+visual puzzles → score + review). The concept and open design questions still
+live in [BRAINSTORM.md](BRAINSTORM.md); short-lived task state in [TODO.md](TODO.md).
+The MVP is a first slice, not the settled design — the agent side, the difficulty
+ladder, and the item format remain open and should go through plan mode → TODO
+before being built out.
+
+### Running the MVP
+
+```bash
+npm install
+npm run dev          # http://localhost:3000
+```
+
+Requires relay env in `.env.local` (see `.env.example`). With the default
+`openrouter` model you must set `OPENROUTER_API_KEY` in `.env.local`; the free
+`groq` alternative needs no key. If generation fails (relay down / rate-limited /
+invalid output after retries), the app falls back to a built-in sample set and
+says so in the UI.
+
+### MVP architecture
+
+- `src/items/schema.ts` — Zod schema. The model emits a **constrained structured
+  spec** per cell (shape, count, rotation, fill, size) + the correct option; it
+  never draws. Covers matrix / sequence / analogy / odd-one-out.
+- `src/items/render.tsx` — deterministic SVG renderer (pure functions of the
+  spec), so the drawn puzzle always matches the generator's declared answer.
+- `src/lib/model.ts` — relay client (`client.chat()` → OpenAI-compatible
+  `/v1/chat/completions`); generates, extracts JSON, validates, and retries with
+  the specific Zod failures fed back to the model.
+- `src/app/api/generate/route.ts` — POST endpoint; falls back to
+  `src/items/fallback.ts` on failure.
+- `src/app/page.tsx` — quiz UI (intro → 5 questions → score + per-item review).
+
+**Known MVP limitation:** answer correctness depends on the generating model — a
+weak model occasionally mis-marks the correct option. A stronger model (the
+OpenRouter default) largely fixes this; a real semantic validator that re-derives
+the answer from the rule is future work (see BRAINSTORM Q4/Q5).
 
 ---
 
@@ -71,12 +105,23 @@ RELAY_MODEL      # required — model name, e.g. llama3.1-8b
   `GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are forwarded as
   `X-User-Api-Key` to bypass the relay's shared quota. `.env` only — never commit.
 
-**When we implement model access, use the `/connect-relay` skill** rather than
-hand-rolling the integration. It copies the battle-tested templates
-(`relay-fetch.ts`, `relay-errors.ts`, and for Next.js `relay-api-helpers.ts` /
-`relay-client.ts`), wires env vars, adds the widget loader, and registers this
-project in `../llm-relay/CONSUMERS.md`. Reference consumers: `aletheia`,
-`crystalball`, `oneiromancer`.
+Model access is wired (via `/connect-relay`) using the battle-tested templates:
+- `src/lib/relay-fetch.ts` — custom fetch: injects provider, intercepts relay 429s.
+- `src/lib/relay-errors.ts` — typed rate-limit parsing (relay vs provider).
+- `src/lib/relay-client.ts` — client widget headers + `apiFetch()` (UI).
+- `src/lib/relay-api-helpers.ts` — `readWidgetOverrides()` + `errorResponse()` (server).
+
+### Widget — per-user model selection
+
+The root layout (`src/app/layout.tsx`) loads the relay **widget** (`/widget.js`,
+derived from `RELAY_BASE_URL`). It gives users an in-browser control to pick
+provider/model and enter a BYO key, persisted to localStorage. `apiFetch()`
+forwards the choice as headers (`X-Relay-Provider`/`X-Relay-Model`/`X-User-Api-Key`),
+`readWidgetOverrides()` reads them server-side, and `generatePuzzles(overrides)`
+uses them over the env defaults (the env BYO key is auto-picked when the chosen
+provider matches). Unlike most relay apps, the widget here is **optional** — aiq
+works on the env default + sample fallback — so a widget load failure is
+non-blocking (console warning, not a full-screen overlay).
 
 ### Relay upstream feedback
 
