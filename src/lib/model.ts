@@ -2,8 +2,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { createRelayFetch } from "./relay-fetch";
 import type { ModelOverrides } from "./relay-api-helpers";
-import { PuzzleSetSchema, type PuzzleSet } from "@/items/schema";
-import { SYSTEM_PROMPT, USER_PROMPT } from "@/items/prompt";
+import { PuzzleSetSchema, shuffleOptions, type PuzzleSet } from "@/items/schema";
+import { checkRule } from "@/items/rules";
+import { SYSTEM_PROMPT, buildUserPrompt } from "@/items/prompt";
+import type { DifficultyLevel } from "@/items/bank";
 
 /**
  * llm-relay client + puzzle generation.
@@ -28,7 +30,7 @@ function requireEnv(name: string): string {
   return v;
 }
 
-function relayModel(overrides?: ModelOverrides) {
+export function relayModel(overrides?: ModelOverrides) {
   const baseURL = requireEnv("RELAY_BASE_URL");
   // Widget overrides (provider/model chosen in the browser) take priority over env defaults.
   const provider = overrides?.provider ?? requireEnv("RELAY_PROVIDER");
@@ -68,18 +70,90 @@ function relayModel(overrides?: ModelOverrides) {
   return { model: client.chat(model), modelId: model, getProviderUsed: () => providerUsed };
 }
 
-/** Extract a JSON array from a raw model response (handles markdown fences / preamble). */
-function extractJsonArray(text: string): string {
+/** Slice from the first '[' to the last ']' — a best-effort array boundary. */
+function bracketSlice(s: string): string | null {
+  const start = s.indexOf("[");
+  const end = s.lastIndexOf("]");
+  return start !== -1 && end > start ? s.slice(start, end + 1) : null;
+}
+
+/**
+ * Parse a JSON array out of a raw model response.
+ *
+ * A naive first-`[`/last-`]` slice mis-extracts when prose contains stray
+ * brackets, so we try an ordered list of candidates — fenced block content, that
+ * content bracket-sliced, the whole body, the whole body bracket-sliced — and
+ * return the first that `JSON.parse`s to an actual array. Returns `null` when no
+ * candidate yields an array (the caller treats that as "not valid JSON").
+ * Exported for unit testing.
+ */
+export function parseJsonArray(text: string): unknown[] | null {
   const trimmed = text.trim();
-  // Strip ```json ... ``` or ``` ... ``` fences
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = (fence ? fence[1] : trimmed).trim();
-  if (body.startsWith("[")) return body;
-  // Greedy: first '[' to last ']'
-  const start = body.indexOf("[");
-  const end = body.lastIndexOf("]");
-  if (start !== -1 && end > start) return body.slice(start, end + 1);
-  return body;
+  const fenced = fence ? fence[1].trim() : null;
+
+  const candidates = [
+    fenced,
+    fenced ? bracketSlice(fenced) : null,
+    trimmed,
+    bracketSlice(trimmed),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate a parsed (unknown) value against PuzzleSetSchema, then run the
+ * semantic `checkRule` validator on every puzzle. Returns ok:true + the typed
+ * PuzzleSet on success; ok:false + a human-readable feedback string (suitable
+ * for feeding back to the model) on any failure.
+ *
+ * Pure — no env access, no side effects. Exported for the Phase B CLI.
+ */
+export function validatePuzzleSet(parsed: unknown): { ok: true; puzzles: PuzzleSet } | { ok: false; feedback: string } {
+  // Step 1: Zod schema validation.
+  const result = PuzzleSetSchema.safeParse(parsed);
+  if (!result.success) {
+    const feedback = result.error.issues
+      .slice(0, 12)
+      .map((i) => `- ${i.path.length ? i.path.join(".") : "(root)"}: ${i.message}`)
+      .join("\n");
+    return { ok: false, feedback };
+  }
+
+  // Step 2: Semantic rule validation — re-derive the correct answer from each
+  // puzzle's declared rule and confirm the marked answerIndex matches.
+  const ruleFailures: string[] = [];
+  for (const puzzle of result.data) {
+    const check = checkRule(puzzle);
+    if (!check.ok) {
+      // Ensure at least one line per failing puzzle survives even if we cap later.
+      const firstIssue = check.issues[0] ?? "rule check failed";
+      ruleFailures.push(`- ${puzzle.id} (${puzzle.type}): ${firstIssue}`);
+      // Append any additional issues for this puzzle (without repeating the header).
+      for (let i = 1; i < check.issues.length; i++) {
+        ruleFailures.push(`  ${check.issues[i]}`);
+      }
+    }
+  }
+
+  if (ruleFailures.length > 0) {
+    // Cap at ~12 lines total, but guarantee at least one line per failing puzzle
+    // by keeping leading lines (each puzzle's primary issue is listed first).
+    const feedback = ruleFailures.slice(0, 12).join("\n");
+    return { ok: false, feedback };
+  }
+
+  return { ok: true, puzzles: result.data };
 }
 
 export interface GenerateResult {
@@ -90,44 +164,57 @@ export interface GenerateResult {
 
 /** Generate a validated 5-puzzle test via the relay. Throws if it cannot.
  *  `overrides` carry the provider/model/key the user picked in the relay widget. */
-export async function generatePuzzles(overrides?: ModelOverrides, maxAttempts = 3): Promise<GenerateResult> {
+export async function generatePuzzles(
+  overrides?: ModelOverrides,
+  maxAttempts = 3,
+  difficulty: DifficultyLevel = "standard",
+): Promise<GenerateResult> {
   const { model, modelId, getProviderUsed } = relayModel(overrides);
   let lastError: unknown;
   let lastFeedback = ""; // specific issues from the previous attempt, fed back to the model
+  // Build the (randomized) prompt once and reuse it across retries, so the Zod
+  // feedback we append stays coherent with the spec the model was first given.
+  const userPrompt = buildUserPrompt(difficulty);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const { text } = await generateText({
         model,
         system: SYSTEM_PROMPT,
-        prompt: attempt === 1 ? USER_PROMPT : `${USER_PROMPT}\n\nYour previous answer was rejected:\n${lastFeedback}\nReturn ONLY a corrected JSON array of 5 objects.`,
+        prompt: attempt === 1 ? userPrompt : `${userPrompt}\n\nYour previous answer was rejected:\n${lastFeedback}\nReturn ONLY a corrected JSON array of 5 objects.`,
         temperature: 0.3, // lower temp → tighter rule-following (fewer mismarked answers)
         maxRetries: 0, // relay handles provider reliability (retries + fallback)
+        abortSignal: AbortSignal.timeout(45_000), // fail fast on a hung relay call
       });
 
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(extractJsonArray(text));
-      } catch {
+      const parsed = parseJsonArray(text);
+      if (parsed === null) {
         lastFeedback = "- The response was not valid JSON.";
         lastError = new Error("response was not valid JSON");
         continue;
       }
 
-      const result = PuzzleSetSchema.safeParse(parsed);
-      if (result.success) {
-        return { puzzles: result.data, providerUsed: getProviderUsed(), modelId };
+      const validation = validatePuzzleSet(parsed);
+      if (validation.ok) {
+        // Shuffle each puzzle's options (remapping answerIndex) to remove the
+        // model's answer-position bias before the test is served. checkRule
+        // remains valid post-shuffle since answerIndex is remapped correctly.
+        const puzzles = validation.puzzles.map(shuffleOptions) as PuzzleSet;
+        return { puzzles, providerUsed: getProviderUsed(), modelId };
       }
-      // Feed the exact failing paths back to the model so it can self-correct.
-      lastFeedback = result.error.issues
-        .slice(0, 12)
-        .map((i) => `- ${i.path.length ? i.path.join(".") : "(root)"}: ${i.message}`)
-        .join("\n");
-      lastError = new Error(`schema validation failed: ${lastFeedback.replace(/\n/g, " ")}`);
+      // Feed schema + rule issues back to the model so it can self-correct.
+      lastFeedback = validation.feedback;
+      lastError = new Error(`validation failed: ${lastFeedback.replace(/\n/g, " ")}`);
     } catch (err) {
       lastError = err;
       // Re-throw relay rate limits immediately — retrying won't help.
       if (typeof err === "object" && err !== null && (err as { statusCode?: number }).statusCode === 429) {
+        throw err;
+      }
+      // A timeout/abort means the relay hung — don't burn the remaining attempts;
+      // throw so the route's fallback kicks in promptly.
+      const name = typeof err === "object" && err !== null ? (err as { name?: string }).name : undefined;
+      if (name === "AbortError" || name === "TimeoutError") {
         throw err;
       }
     }

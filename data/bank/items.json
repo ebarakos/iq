@@ -1,0 +1,6210 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "puzzle": {
+        "id": "an-1c31b9d692",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 2,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "As in the first pair, the count increases by one step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "1c31b9d692",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.256Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-1fa76f9fc1",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 3,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "As in the first pair, the fill decreases by one step (wrapping around).",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "1fa76f9fc1",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.276Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-25a5fc01a5",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 5,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "As in the first pair, the triangle turns a quarter turn clockwise each step and the size flips between small and large.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            },
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "25a5fc01a5",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.266Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-8139faab23",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 1,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "As in the first pair, the fill increases by one step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "fill": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "8139faab23",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.268Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-933726a9ff",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 4,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "As in the first pair, the count increases by one step and the fill decreases by one step (wrapping around).",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            },
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "933726a9ff",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.272Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.6,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.6
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-963ee2725f",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 4,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "As in the first pair, the count increases by one step and the fill decreases by one step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            },
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "963ee2725f",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.263Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-a502c4f064",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 3,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "As in the first pair, the count increases by one step (wrapping around).",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "a502c4f064",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.259Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-aade86ca23",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 1,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "As in the first pair, the size flips between small and large.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "aade86ca23",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.274Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-ad1a0840eb",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 2,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "As in the first pair, the count increases by one step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "ad1a0840eb",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.269Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-ba35de54ba",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 1,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "As in the first pair, the fill decreases by one step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "ba35de54ba",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.250Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-c2332b1bbc",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 5,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "As in the first pair, the count increases by one step (wrapping around) and the triangle turns a quarter turn clockwise each step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            },
+            "rotation": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "c2332b1bbc",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.273Z"
+      },
+      "tags": [
+        "agent-hard"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.4,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.4
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-e661686fd2",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 3,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "As in the first pair, the size flips between small and large.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "size": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "e661686fd2",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.271Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-eb82beb5f9",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 2,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "As in the first pair, the fill increases by one step.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "fill": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "eb82beb5f9",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.275Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-ed64713fca",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 4,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "As in the first pair, the triangle turns a half turn counter-clockwise each step and the fill increases by 2 steps.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": -2,
+              "wrap": true
+            },
+            "fill": {
+              "op": "step",
+              "delta": 2,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "ed64713fca",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.279Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "an-eed0da5271",
+        "type": "analogy",
+        "instruction": "Which option completes the analogy?",
+        "difficulty": 5,
+        "layout": "analogy",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "As in the first pair, the count increases by 2 steps (wrapping around) and the fill increases by 2 steps.",
+        "rule": {
+          "kind": "analogy",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            },
+            "fill": {
+              "op": "step",
+              "delta": 2,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "eed0da5271",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.280Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-127b27c2fe",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 4,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the count increases by 2 steps (wrapping around) and the fill increases by 2 steps (wrapping around).",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            },
+            "fill": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "127b27c2fe",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.260Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-16f6d8d003",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 2,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "In the grid, across each row, the count decreases by one step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": -1,
+              "wrap": false
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "16f6d8d003",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.269Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-27a0319fed",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 3,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "In the grid, across each row, the fill decreases by 2 steps (wrapping around).",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "fill": {
+              "op": "step",
+              "delta": -2,
+              "wrap": true
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "27a0319fed",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.270Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-29b048ba54",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 3,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the count decreases by one step (wrapping around).",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "29b048ba54",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.258Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-36dc9ebe74",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 4,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "In the grid, across each row, the count increases by one step (wrapping around) and the size flips between small and large; down each column, the triangle turns a half turn clockwise each step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            },
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          },
+          "col": {
+            "rotation": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "36dc9ebe74",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.278Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-3eff2976ed",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 2,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the count increases by one step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "3eff2976ed",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.254Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-540ed8cfaf",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 2,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "In the grid, across each row, the fill increases by one step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "fill": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "540ed8cfaf",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.275Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-76ae1cf95d",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 3,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the size flips between small and large.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "size": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "76ae1cf95d",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.276Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-89029042d4",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 5,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 4,
+        "explanation": "In the grid, across each row, the fill increases by one step (wrapping around); down each column, the triangle turns a half turn clockwise each step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "fill": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          },
+          "col": {
+            "rotation": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "89029042d4",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.279Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-9abbb658ea",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 5,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the triangle turns a half turn counter-clockwise each step; down each column, the count decreases by one step (wrapping around).",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "rotation": {
+              "op": "step",
+              "delta": -2,
+              "wrap": true
+            }
+          },
+          "col": {
+            "count": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "9abbb658ea",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.273Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-a167304f6b",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 1,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "In the grid, across each row, the count increases by one step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "a167304f6b",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.274Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-ca33dd211c",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 4,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the shape cycles hexagon → diamond → square and the count increases by 2 steps (wrapping around); down each column, the size flips between small and large.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "shape": {
+              "op": "cycle",
+              "values": [
+                "hexagon",
+                "diamond",
+                "square"
+              ]
+            },
+            "count": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            }
+          },
+          "col": {
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "ca33dd211c",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.271Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-e4b2029557",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 1,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "In the grid, across each row, the fill decreases by one step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": false
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "e4b2029557",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.244Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-ec23668665",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 5,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "In the grid, across each row, the fill decreases by one step (wrapping around); down each column, the shape cycles circle → hexagon → square.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          },
+          "col": {
+            "shape": {
+              "op": "cycle",
+              "values": [
+                "circle",
+                "hexagon",
+                "square"
+              ]
+            }
+          }
+        }
+      },
+      "fingerprint": "ec23668665",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.265Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "mx-efa76a852e",
+        "type": "matrix",
+        "instruction": "Which option completes the grid?",
+        "difficulty": 1,
+        "layout": "grid3x3",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "In the grid, across each row, the count increases by one step.",
+        "rule": {
+          "kind": "matrix",
+          "row": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          },
+          "col": {}
+        }
+      },
+      "fingerprint": "efa76a852e",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.267Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-083c69f237",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 2,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Every other option shares fill \"solid\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "fill",
+          "value": "solid"
+        }
+      },
+      "fingerprint": "083c69f237",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.270Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-0865f265a6",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 5,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Every other option shares rotation 90; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "rotation",
+          "value": 90
+        }
+      },
+      "fingerprint": "0865f265a6",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.274Z"
+      },
+      "tags": [
+        "agent-hard"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-088745bbeb",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 3,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Every other option shares fill \"solid\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "fill",
+          "value": "solid"
+        }
+      },
+      "fingerprint": "088745bbeb",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.278Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-2976e10e24",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 3,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 4,
+        "explanation": "Every other option shares rotation 180; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "rotation",
+          "value": 180
+        }
+      },
+      "fingerprint": "2976e10e24",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.271Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.8,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.8
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-36d36b2b6f",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 1,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Every other option shares rotation 270; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "rotation",
+          "value": 270
+        }
+      },
+      "fingerprint": "36d36b2b6f",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.252Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.6,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.6
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-3aee80c72f",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 5,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 4,
+        "explanation": "Every other option shares size \"l\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "size",
+          "value": "l"
+        }
+      },
+      "fingerprint": "3aee80c72f",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.280Z"
+      },
+      "tags": [
+        "agent-hard"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-437c6bd58b",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 4,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Every other option shares count 4; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "count",
+          "value": 4
+        }
+      },
+      "fingerprint": "437c6bd58b",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.279Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.8,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.8
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-4db49ac2a6",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 1,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Every other option shares count 1; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "count",
+          "value": 1
+        }
+      },
+      "fingerprint": "4db49ac2a6",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.275Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-58b035632c",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 1,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Every other option shares fill \"solid\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "fill",
+          "value": "solid"
+        }
+      },
+      "fingerprint": "58b035632c",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.268Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-65bf39ec8c",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 5,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Every other option shares count 1; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "count",
+          "value": 1
+        }
+      },
+      "fingerprint": "65bf39ec8c",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.267Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.8,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.8
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-68bdfef47f",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 3,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Every other option shares size \"s\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "size",
+          "value": "s"
+        }
+      },
+      "fingerprint": "68bdfef47f",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.260Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.6,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.6
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-8345e7909a",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 4,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Every other option shares fill \"solid\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "fill",
+          "value": "solid"
+        }
+      },
+      "fingerprint": "8345e7909a",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.272Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.6,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.6
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-ab09fcad05",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 2,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Every other option shares fill \"half\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "fill",
+          "value": "half"
+        }
+      },
+      "fingerprint": "ab09fcad05",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.257Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-d3285757ae",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 4,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Every other option shares size \"l\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "size",
+          "value": "l"
+        }
+      },
+      "fingerprint": "d3285757ae",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.263Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "oo-f02d47cb3d",
+        "type": "oddOneOut",
+        "instruction": "Which one does not belong?",
+        "difficulty": 2,
+        "layout": "row",
+        "stem": [],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Every other option shares shape \"circle\"; the odd one breaks it.",
+        "rule": {
+          "kind": "oddOneOut",
+          "dimension": "shape",
+          "value": "circle"
+        }
+      },
+      "fingerprint": "f02d47cb3d",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.276Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-1029445919",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 1,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Along the sequence, the triangle turns a quarter turn counter-clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "1029445919",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.274Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-65c604b777",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 4,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Along the sequence, the triangle turns a half turn clockwise each step and the size flips between small and large.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            },
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "65c604b777",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.272Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-697ba0ef58",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 5,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Along the sequence, the fill increases by 2 steps (wrapping around) and the size flips between small and large.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "fill": {
+              "op": "step",
+              "delta": 2,
+              "wrap": true
+            },
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "697ba0ef58",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.266Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-84a90ec390",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 4,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Along the sequence, the count decreases by 2 steps (wrapping around) and the fill decreases by one step (wrapping around).",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": -2,
+              "wrap": true
+            },
+            "fill": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "84a90ec390",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.279Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-8982cb58fe",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 5,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Along the sequence, the count increases by one step and the triangle turns a quarter turn counter-clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            },
+            "rotation": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "8982cb58fe",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.280Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-8ab02d1c3d",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 3,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Along the sequence, the triangle turns a half turn counter-clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": -2,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "8ab02d1c3d",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.276Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-9188657504",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 3,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Along the sequence, the shape cycles hexagon → triangle.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "shape": {
+              "op": "cycle",
+              "values": [
+                "hexagon",
+                "triangle"
+              ]
+            }
+          }
+        }
+      },
+      "fingerprint": "9188657504",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.270Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-b92df183d0",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 3,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Along the sequence, the count increases by one step (wrapping around).",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "b92df183d0",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.258Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-baa00807c8",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 2,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Along the sequence, the count increases by one step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": false
+            }
+          }
+        }
+      },
+      "fingerprint": "baa00807c8",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.275Z"
+      },
+      "tags": [
+        "agent-mid"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.8,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.8
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-bd83b24436",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 2,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 1,
+        "explanation": "Along the sequence, the triangle turns a quarter turn counter-clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "bd83b24436",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.255Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-cfdf0fc8da",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 4,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Along the sequence, the shape cycles square → star → diamond and the size flips between small and large.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "shape": {
+              "op": "cycle",
+              "values": [
+                "square",
+                "star",
+                "diamond"
+              ]
+            },
+            "size": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "cfdf0fc8da",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.262Z"
+      },
+      "tags": [
+        "agent-hard"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.2,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.2
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-d4390c43c7",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 5,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 4,
+        "explanation": "Along the sequence, the count increases by one step (wrapping around) and the triangle turns a half turn counter-clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "count": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            },
+            "rotation": {
+              "op": "step",
+              "delta": -2,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "d4390c43c7",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.273Z"
+      },
+      "tags": [
+        "agent-hard"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-d68804b9e6",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 1,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 90,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 180,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 270,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Along the sequence, the triangle turns a quarter turn clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "d68804b9e6",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.249Z"
+      },
+      "tags": [
+        "agent-hard"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 0.4,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 0.4
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-efcc8db8d8",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 1,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 180,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Along the sequence, the triangle turns a quarter turn counter-clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": -1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "efcc8db8d8",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.268Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    },
+    {
+      "puzzle": {
+        "id": "sq-f36a1d553d",
+        "type": "sequence",
+        "instruction": "Which option continues the sequence?",
+        "difficulty": 2,
+        "layout": "row",
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 90,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 180,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 270,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Along the sequence, the triangle turns a quarter turn clockwise each step.",
+        "rule": {
+          "kind": "sequence",
+          "transforms": {
+            "rotation": {
+              "op": "step",
+              "delta": 1,
+              "wrap": true
+            }
+          }
+        }
+      },
+      "fingerprint": "f36a1d553d",
+      "provenance": {
+        "source": "procedural",
+        "seed": 7,
+        "createdAt": "2026-06-11T06:02:10.269Z"
+      },
+      "tags": [
+        "agent-easy"
+      ],
+      "calibration": {
+        "attempts": 5,
+        "solveRate": 1,
+        "byModel": {
+          "openrouter/google/gemini-3-flash-preview": {
+            "attempts": 5,
+            "solveRate": 1
+          }
+        },
+        "updatedAt": "2026-06-11T06:08:53.858Z"
+      }
+    }
+  ]
+}

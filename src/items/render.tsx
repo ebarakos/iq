@@ -2,6 +2,14 @@ import React from "react";
 import type { Cell, Panel, Puzzle } from "./schema";
 import { isBlank } from "./schema";
 
+/** Short factual description of a cell for screen readers, e.g. "2 solid medium triangles, rotated 45°". */
+export function describeCell(cell: Cell): string {
+  const countWord = cell.count === 1 ? "1" : String(cell.count);
+  const shapeWord = cell.count === 1 ? cell.shape : `${cell.shape}s`;
+  const rotPart = cell.rotation !== 0 ? `, rotated ${cell.rotation}°` : "";
+  return `${countWord} ${cell.fill} ${cell.size === "s" ? "small" : cell.size === "l" ? "large" : "medium"} ${shapeWord}${rotPart}`;
+}
+
 /**
  * Deterministic SVG renderer. Pure functions of the puzzle data — no LLM, no
  * randomness — so a given Cell always draws identically. This is what guarantees
@@ -30,7 +38,9 @@ function layoutFor(count: number): { pts: Pt[]; baseR: number } {
   }
 }
 
-const SIZE_SCALE: Record<Cell["size"], number> = { s: 0.7, m: 1, l: 1.25 };
+// Legibility doctrine: small vs large must be unmistakable at a glance (the
+// generator only uses "s" and "l"; "m" remains renderable for legacy data).
+const SIZE_SCALE: Record<Cell["size"], number> = { s: 0.55, m: 1, l: 1.3 };
 
 /** Regular n-gon points (vertex pointing up) around (cx, cy) with radius r. */
 function polygon(cx: number, cy: number, r: number, n: number): string {
@@ -92,7 +102,7 @@ export function CellGraphic({ cell, className }: { cell: Cell; className?: strin
   const { pts, baseR } = layoutFor(cell.count);
   const r = baseR * SIZE_SCALE[cell.size];
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-hidden="true">
+    <svg viewBox="0 0 100 100" className={className} role="img" aria-label={describeCell(cell)}>
       {pts.map((p, i) => (
         <Shape key={i} cell={cell} at={p} r={r} />
       ))}
@@ -103,7 +113,7 @@ export function CellGraphic({ cell, className }: { cell: Cell; className?: strin
 /** A blank panel — the cell to be solved. */
 export function BlankGraphic({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="missing cell">
+    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="blank — the cell to solve">
       <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="48" fill="#9ca3af">
         ?
       </text>

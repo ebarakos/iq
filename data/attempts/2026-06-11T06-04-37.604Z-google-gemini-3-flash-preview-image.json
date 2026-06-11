@@ -1,0 +1,2410 @@
+{
+  "runId": "2026-06-11T06-04-37.604Z-google-gemini-3-flash-preview-image",
+  "startedAt": "2026-06-11T06:04:37.604Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3-flash-preview",
+  "channel": "image",
+  "promptVersion": "solver-v1",
+  "attempts": [
+    {
+      "itemId": "an-1fa76f9fc1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2473,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:40.079Z"
+    },
+    {
+      "itemId": "an-1c31b9d692",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 3590,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:41.196Z"
+    },
+    {
+      "itemId": "an-25a5fc01a5",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 3887,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:41.493Z"
+    },
+    {
+      "itemId": "an-8139faab23",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2170,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:42.249Z"
+    },
+    {
+      "itemId": "an-933726a9ff",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1961,
+      "raw": "C",
+      "ts": "2026-06-11T06:04:43.157Z"
+    },
+    {
+      "itemId": "an-963ee2725f",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1844,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:43.337Z"
+    },
+    {
+      "itemId": "an-a502c4f064",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1932,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:44.181Z"
+    },
+    {
+      "itemId": "an-aade86ca23",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2355,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:45.512Z"
+    },
+    {
+      "itemId": "an-ad1a0840eb",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2358,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:45.695Z"
+    },
+    {
+      "itemId": "an-ba35de54ba",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2221,
+      "raw": "C",
+      "ts": "2026-06-11T06:04:46.402Z"
+    },
+    {
+      "itemId": "an-e661686fd2",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1745,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:47.440Z"
+    },
+    {
+      "itemId": "an-c2332b1bbc",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 2456,
+      "raw": "C",
+      "ts": "2026-06-11T06:04:47.968Z"
+    },
+    {
+      "itemId": "an-eb82beb5f9",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1870,
+      "raw": "C",
+      "ts": "2026-06-11T06:04:48.272Z"
+    },
+    {
+      "itemId": "an-ed64713fca",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1753,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:49.193Z"
+    },
+    {
+      "itemId": "an-eed0da5271",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1962,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:49.930Z"
+    },
+    {
+      "itemId": "mx-127b27c2fe",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2404,
+      "raw": "C",
+      "ts": "2026-06-11T06:04:50.676Z"
+    },
+    {
+      "itemId": "mx-16f6d8d003",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1847,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:51.040Z"
+    },
+    {
+      "itemId": "mx-27a0319fed",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2029,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:51.959Z"
+    },
+    {
+      "itemId": "mx-29b048ba54",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1901,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:52.577Z"
+    },
+    {
+      "itemId": "mx-36dc9ebe74",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2153,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:53.193Z"
+    },
+    {
+      "itemId": "mx-3eff2976ed",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1742,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:53.702Z"
+    },
+    {
+      "itemId": "mx-540ed8cfaf",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1743,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:54.320Z"
+    },
+    {
+      "itemId": "mx-76ae1cf95d",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2248,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:55.441Z"
+    },
+    {
+      "itemId": "mx-89029042d4",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 2253,
+      "raw": "D",
+      "ts": "2026-06-11T06:04:55.955Z"
+    },
+    {
+      "itemId": "mx-9abbb658ea",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1773,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:56.093Z"
+    },
+    {
+      "itemId": "mx-a167304f6b",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2022,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:57.463Z"
+    },
+    {
+      "itemId": "mx-ca33dd211c",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1700,
+      "raw": "B",
+      "ts": "2026-06-11T06:04:57.655Z"
+    },
+    {
+      "itemId": "mx-e4b2029557",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2728,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:58.822Z"
+    },
+    {
+      "itemId": "mx-efa76a852e",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1890,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:59.545Z"
+    },
+    {
+      "itemId": "mx-ec23668665",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2083,
+      "raw": "A",
+      "ts": "2026-06-11T06:04:59.546Z"
+    },
+    {
+      "itemId": "oo-083c69f237",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2015,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:00.837Z"
+    },
+    {
+      "itemId": "oo-0865f265a6",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1838,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:01.383Z"
+    },
+    {
+      "itemId": "oo-088745bbeb",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2199,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:01.745Z"
+    },
+    {
+      "itemId": "oo-2976e10e24",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 1775,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:02.612Z"
+    },
+    {
+      "itemId": "oo-36d36b2b6f",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2089,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:03.472Z"
+    },
+    {
+      "itemId": "oo-3aee80c72f",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 2108,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:03.853Z"
+    },
+    {
+      "itemId": "oo-437c6bd58b",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2047,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:04.659Z"
+    },
+    {
+      "itemId": "oo-58b035632c",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2018,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:05.871Z"
+    },
+    {
+      "itemId": "oo-65bf39ec8c",
+      "chosen": 4,
+      "correct": false,
+      "latencyMs": 2602,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:07.261Z"
+    },
+    {
+      "itemId": "oo-68bdfef47f",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2371,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:08.242Z"
+    },
+    {
+      "itemId": "oo-4db49ac2a6",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 8152,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:11.624Z"
+    },
+    {
+      "itemId": "oo-8345e7909a",
+      "chosen": 4,
+      "correct": false,
+      "latencyMs": 4655,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:11.916Z"
+    },
+    {
+      "itemId": "oo-ab09fcad05",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 4469,
+      "raw": "E",
+      "ts": "2026-06-11T06:05:12.711Z"
+    },
+    {
+      "itemId": "oo-d3285757ae",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1837,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:13.461Z"
+    },
+    {
+      "itemId": "oo-f02d47cb3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1833,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:13.749Z"
+    },
+    {
+      "itemId": "sq-1029445919",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1982,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:14.693Z"
+    },
+    {
+      "itemId": "sq-65c604b777",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2254,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:15.715Z"
+    },
+    {
+      "itemId": "sq-84a90ec390",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2049,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:16.742Z"
+    },
+    {
+      "itemId": "sq-8982cb58fe",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1818,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:17.533Z"
+    },
+    {
+      "itemId": "sq-8ab02d1c3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1841,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:18.583Z"
+    },
+    {
+      "itemId": "sq-697ba0ef58",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 5321,
+      "raw": "E",
+      "ts": "2026-06-11T06:05:19.070Z"
+    },
+    {
+      "itemId": "sq-9188657504",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2078,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:19.611Z"
+    },
+    {
+      "itemId": "sq-b92df183d0",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2158,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:20.741Z"
+    },
+    {
+      "itemId": "sq-baa00807c8",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1975,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:21.045Z"
+    },
+    {
+      "itemId": "sq-bd83b24436",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:21.454Z"
+    },
+    {
+      "itemId": "sq-cfdf0fc8da",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1743,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:22.484Z"
+    },
+    {
+      "itemId": "sq-d4390c43c7",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2017,
+      "raw": "F",
+      "ts": "2026-06-11T06:05:23.062Z"
+    },
+    {
+      "itemId": "sq-d68804b9e6",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1789,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:23.244Z"
+    },
+    {
+      "itemId": "sq-efcc8db8d8",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1835,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:24.319Z"
+    },
+    {
+      "itemId": "sq-f36a1d553d",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1669,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:24.731Z"
+    },
+    {
+      "itemId": "an-1c31b9d692",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1999,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:25.243Z"
+    },
+    {
+      "itemId": "an-25a5fc01a5",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1943,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:26.676Z"
+    },
+    {
+      "itemId": "an-1fa76f9fc1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2478,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:26.797Z"
+    },
+    {
+      "itemId": "an-8139faab23",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2047,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:27.291Z"
+    },
+    {
+      "itemId": "an-963ee2725f",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1823,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:28.620Z"
+    },
+    {
+      "itemId": "an-933726a9ff",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2058,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:28.734Z"
+    },
+    {
+      "itemId": "an-a502c4f064",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2761,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:30.052Z"
+    },
+    {
+      "itemId": "an-ad1a0840eb",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1626,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:30.360Z"
+    },
+    {
+      "itemId": "an-aade86ca23",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1839,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:30.459Z"
+    },
+    {
+      "itemId": "an-ba35de54ba",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1949,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:32.001Z"
+    },
+    {
+      "itemId": "an-e661686fd2",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1873,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:32.332Z"
+    },
+    {
+      "itemId": "an-c2332b1bbc",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2154,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:32.514Z"
+    },
+    {
+      "itemId": "an-eb82beb5f9",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2253,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:34.254Z"
+    },
+    {
+      "itemId": "an-eed0da5271",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1953,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:34.468Z"
+    },
+    {
+      "itemId": "an-ed64713fca",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 3662,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:35.994Z"
+    },
+    {
+      "itemId": "mx-127b27c2fe",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2252,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:36.506Z"
+    },
+    {
+      "itemId": "mx-27a0319fed",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2151,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:38.145Z"
+    },
+    {
+      "itemId": "mx-16f6d8d003",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 4001,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:38.469Z"
+    },
+    {
+      "itemId": "mx-29b048ba54",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2182,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:38.688Z"
+    },
+    {
+      "itemId": "mx-36dc9ebe74",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2253,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:40.398Z"
+    },
+    {
+      "itemId": "mx-3eff2976ed",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2141,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:40.610Z"
+    },
+    {
+      "itemId": "mx-540ed8cfaf",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2096,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:40.784Z"
+    },
+    {
+      "itemId": "mx-89029042d4",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 1837,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:42.447Z"
+    },
+    {
+      "itemId": "mx-9abbb658ea",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1868,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:42.652Z"
+    },
+    {
+      "itemId": "mx-76ae1cf95d",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2970,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:43.368Z"
+    },
+    {
+      "itemId": "mx-a167304f6b",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1945,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:44.392Z"
+    },
+    {
+      "itemId": "mx-ca33dd211c",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1935,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:44.588Z"
+    },
+    {
+      "itemId": "mx-e4b2029557",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1844,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:45.212Z"
+    },
+    {
+      "itemId": "mx-efa76a852e",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1811,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:46.399Z"
+    },
+    {
+      "itemId": "mx-ec23668665",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2355,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:46.747Z"
+    },
+    {
+      "itemId": "oo-083c69f237",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1945,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:47.157Z"
+    },
+    {
+      "itemId": "oo-0865f265a6",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2226,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:48.625Z"
+    },
+    {
+      "itemId": "oo-088745bbeb",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2065,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:48.812Z"
+    },
+    {
+      "itemId": "oo-2976e10e24",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 2150,
+      "raw": "E",
+      "ts": "2026-06-11T06:05:49.307Z"
+    },
+    {
+      "itemId": "oo-36d36b2b6f",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 2018,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:50.643Z"
+    },
+    {
+      "itemId": "oo-3aee80c72f",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1832,
+      "raw": "F",
+      "ts": "2026-06-11T06:05:50.644Z"
+    },
+    {
+      "itemId": "oo-437c6bd58b",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1740,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:51.047Z"
+    },
+    {
+      "itemId": "oo-4db49ac2a6",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1841,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:52.484Z"
+    },
+    {
+      "itemId": "oo-58b035632c",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2016,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:52.660Z"
+    },
+    {
+      "itemId": "oo-65bf39ec8c",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1858,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:52.905Z"
+    },
+    {
+      "itemId": "oo-8345e7909a",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1663,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:54.323Z"
+    },
+    {
+      "itemId": "oo-68bdfef47f",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2451,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:54.935Z"
+    },
+    {
+      "itemId": "oo-ab09fcad05",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2337,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:55.242Z"
+    },
+    {
+      "itemId": "oo-d3285757ae",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1821,
+      "raw": "A",
+      "ts": "2026-06-11T06:05:56.144Z"
+    },
+    {
+      "itemId": "oo-f02d47cb3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1848,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:56.783Z"
+    },
+    {
+      "itemId": "sq-1029445919",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1758,
+      "raw": "C",
+      "ts": "2026-06-11T06:05:57.000Z"
+    },
+    {
+      "itemId": "sq-65c604b777",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2170,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:58.314Z"
+    },
+    {
+      "itemId": "sq-697ba0ef58",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1659,
+      "raw": "B",
+      "ts": "2026-06-11T06:05:58.442Z"
+    },
+    {
+      "itemId": "sq-84a90ec390",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2149,
+      "raw": "D",
+      "ts": "2026-06-11T06:05:59.149Z"
+    },
+    {
+      "itemId": "sq-8982cb58fe",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2151,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:00.465Z"
+    },
+    {
+      "itemId": "sq-8ab02d1c3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2275,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:00.717Z"
+    },
+    {
+      "itemId": "sq-9188657504",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1794,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:00.943Z"
+    },
+    {
+      "itemId": "sq-b92df183d0",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1747,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:02.212Z"
+    },
+    {
+      "itemId": "sq-bd83b24436",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1780,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:02.723Z"
+    },
+    {
+      "itemId": "sq-baa00807c8",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2186,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:02.903Z"
+    },
+    {
+      "itemId": "sq-d68804b9e6",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1783,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:04.686Z"
+    },
+    {
+      "itemId": "sq-d4390c43c7",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1964,
+      "raw": "F",
+      "ts": "2026-06-11T06:06:04.687Z"
+    },
+    {
+      "itemId": "sq-cfdf0fc8da",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 2475,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:04.687Z"
+    },
+    {
+      "itemId": "sq-efcc8db8d8",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2136,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:06.822Z"
+    },
+    {
+      "itemId": "an-1c31b9d692",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2288,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:06.975Z"
+    },
+    {
+      "itemId": "sq-f36a1d553d",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2289,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:06.976Z"
+    },
+    {
+      "itemId": "an-25a5fc01a5",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1889,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:08.864Z"
+    },
+    {
+      "itemId": "an-8139faab23",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2399,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:09.375Z"
+    },
+    {
+      "itemId": "an-1fa76f9fc1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 3576,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:10.398Z"
+    },
+    {
+      "itemId": "an-933726a9ff",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1850,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:10.714Z"
+    },
+    {
+      "itemId": "an-963ee2725f",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1846,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:11.221Z"
+    },
+    {
+      "itemId": "an-a502c4f064",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2151,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:12.549Z"
+    },
+    {
+      "itemId": "an-aade86ca23",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1964,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:12.679Z"
+    },
+    {
+      "itemId": "an-ad1a0840eb",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2562,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:13.783Z"
+    },
+    {
+      "itemId": "an-e661686fd2",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2047,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:15.830Z"
+    },
+    {
+      "itemId": "an-eb82beb5f9",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1944,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:17.774Z"
+    },
+    {
+      "itemId": "an-ba35de54ba",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 5411,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:17.960Z"
+    },
+    {
+      "itemId": "an-ed64713fca",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1844,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:19.619Z"
+    },
+    {
+      "itemId": "an-eed0da5271",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1926,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:19.887Z"
+    },
+    {
+      "itemId": "mx-127b27c2fe",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1811,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:21.430Z"
+    },
+    {
+      "itemId": "mx-16f6d8d003",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1770,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:21.657Z"
+    },
+    {
+      "itemId": "an-c2332b1bbc",
+      "chosen": 5,
+      "correct": false,
+      "latencyMs": 9397,
+      "raw": "F",
+      "ts": "2026-06-11T06:06:22.076Z"
+    },
+    {
+      "itemId": "mx-27a0319fed",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1976,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:23.406Z"
+    },
+    {
+      "itemId": "mx-29b048ba54",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1980,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:23.637Z"
+    },
+    {
+      "itemId": "mx-36dc9ebe74",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1855,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:23.931Z"
+    },
+    {
+      "itemId": "mx-3eff2976ed",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2153,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:25.559Z"
+    },
+    {
+      "itemId": "mx-540ed8cfaf",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2113,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:25.750Z"
+    },
+    {
+      "itemId": "mx-76ae1cf95d",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2005,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:25.936Z"
+    },
+    {
+      "itemId": "mx-89029042d4",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 1842,
+      "raw": "E",
+      "ts": "2026-06-11T06:06:27.401Z"
+    },
+    {
+      "itemId": "mx-9abbb658ea",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1850,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:27.600Z"
+    },
+    {
+      "itemId": "mx-a167304f6b",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1877,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:27.813Z"
+    },
+    {
+      "itemId": "mx-ca33dd211c",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2146,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:29.548Z"
+    },
+    {
+      "itemId": "mx-ec23668665",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1846,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:29.659Z"
+    },
+    {
+      "itemId": "mx-e4b2029557",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2561,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:30.161Z"
+    },
+    {
+      "itemId": "oo-083c69f237",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1632,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:31.291Z"
+    },
+    {
+      "itemId": "mx-efa76a852e",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2048,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:31.596Z"
+    },
+    {
+      "itemId": "oo-088745bbeb",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1728,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:33.019Z"
+    },
+    {
+      "itemId": "oo-2976e10e24",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 1759,
+      "raw": "E",
+      "ts": "2026-06-11T06:06:33.355Z"
+    },
+    {
+      "itemId": "oo-0865f265a6",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 3483,
+      "raw": "E",
+      "ts": "2026-06-11T06:06:33.644Z"
+    },
+    {
+      "itemId": "oo-36d36b2b6f",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1750,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:34.769Z"
+    },
+    {
+      "itemId": "oo-3aee80c72f",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1827,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:35.182Z"
+    },
+    {
+      "itemId": "oo-437c6bd58b",
+      "chosen": 4,
+      "correct": false,
+      "latencyMs": 1952,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:35.596Z"
+    },
+    {
+      "itemId": "oo-4db49ac2a6",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1949,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:36.718Z"
+    },
+    {
+      "itemId": "oo-58b035632c",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2151,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:37.333Z"
+    },
+    {
+      "itemId": "oo-65bf39ec8c",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2048,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:37.644Z"
+    },
+    {
+      "itemId": "oo-68bdfef47f",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 2253,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:38.971Z"
+    },
+    {
+      "itemId": "oo-8345e7909a",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1816,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:39.149Z"
+    },
+    {
+      "itemId": "oo-ab09fcad05",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2145,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:39.790Z"
+    },
+    {
+      "itemId": "oo-f02d47cb3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1769,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:40.918Z"
+    },
+    {
+      "itemId": "oo-d3285757ae",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2124,
+      "raw": "E",
+      "ts": "2026-06-11T06:06:41.095Z"
+    },
+    {
+      "itemId": "sq-1029445919",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1742,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:41.533Z"
+    },
+    {
+      "itemId": "sq-65c604b777",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2251,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:43.169Z"
+    },
+    {
+      "itemId": "sq-697ba0ef58",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2402,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:43.497Z"
+    },
+    {
+      "itemId": "sq-84a90ec390",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2355,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:43.888Z"
+    },
+    {
+      "itemId": "sq-8982cb58fe",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1842,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:45.011Z"
+    },
+    {
+      "itemId": "sq-8ab02d1c3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2131,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:45.628Z"
+    },
+    {
+      "itemId": "sq-9188657504",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1927,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:45.815Z"
+    },
+    {
+      "itemId": "sq-b92df183d0",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1871,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:46.882Z"
+    },
+    {
+      "itemId": "sq-bd83b24436",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2371,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:48.187Z"
+    },
+    {
+      "itemId": "sq-baa00807c8",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2963,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:48.591Z"
+    },
+    {
+      "itemId": "sq-cfdf0fc8da",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 2326,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:49.208Z"
+    },
+    {
+      "itemId": "sq-d68804b9e6",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1847,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:50.438Z"
+    },
+    {
+      "itemId": "sq-d4390c43c7",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2371,
+      "raw": "E",
+      "ts": "2026-06-11T06:06:50.558Z"
+    },
+    {
+      "itemId": "sq-efcc8db8d8",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2033,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:51.241Z"
+    },
+    {
+      "itemId": "an-1c31b9d692",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1623,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:52.181Z"
+    },
+    {
+      "itemId": "sq-f36a1d553d",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2460,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:52.898Z"
+    },
+    {
+      "itemId": "an-1fa76f9fc1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2166,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:53.407Z"
+    },
+    {
+      "itemId": "an-25a5fc01a5",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2148,
+      "raw": "B",
+      "ts": "2026-06-11T06:06:54.330Z"
+    },
+    {
+      "itemId": "an-8139faab23",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "A",
+      "ts": "2026-06-11T06:06:54.741Z"
+    },
+    {
+      "itemId": "an-933726a9ff",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2155,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:55.562Z"
+    },
+    {
+      "itemId": "an-a502c4f064",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2250,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:56.992Z"
+    },
+    {
+      "itemId": "an-aade86ca23",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2251,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:57.813Z"
+    },
+    {
+      "itemId": "an-963ee2725f",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 3602,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:57.932Z"
+    },
+    {
+      "itemId": "an-ad1a0840eb",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1847,
+      "raw": "D",
+      "ts": "2026-06-11T06:06:58.839Z"
+    },
+    {
+      "itemId": "an-ba35de54ba",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2150,
+      "raw": "C",
+      "ts": "2026-06-11T06:06:59.964Z"
+    },
+    {
+      "itemId": "an-c2332b1bbc",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2033,
+      "raw": "E",
+      "ts": "2026-06-11T06:06:59.965Z"
+    },
+    {
+      "itemId": "an-e661686fd2",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1712,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:00.552Z"
+    },
+    {
+      "itemId": "an-eb82beb5f9",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:01.807Z"
+    },
+    {
+      "itemId": "an-eed0da5271",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2177,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:02.729Z"
+    },
+    {
+      "itemId": "an-ed64713fca",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2948,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:02.913Z"
+    },
+    {
+      "itemId": "mx-127b27c2fe",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:03.650Z"
+    },
+    {
+      "itemId": "mx-16f6d8d003",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2560,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:05.289Z"
+    },
+    {
+      "itemId": "mx-29b048ba54",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1837,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:05.487Z"
+    },
+    {
+      "itemId": "mx-27a0319fed",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 3192,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:06.105Z"
+    },
+    {
+      "itemId": "mx-36dc9ebe74",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2560,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:07.849Z"
+    },
+    {
+      "itemId": "mx-3eff2976ed",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2547,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:08.034Z"
+    },
+    {
+      "itemId": "mx-540ed8cfaf",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2358,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:08.463Z"
+    },
+    {
+      "itemId": "mx-76ae1cf95d",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:09.692Z"
+    },
+    {
+      "itemId": "mx-89029042d4",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 2478,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:10.512Z"
+    },
+    {
+      "itemId": "mx-9abbb658ea",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2255,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:10.718Z"
+    },
+    {
+      "itemId": "mx-ca33dd211c",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1867,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:12.379Z"
+    },
+    {
+      "itemId": "mx-a167304f6b",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2919,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:12.611Z"
+    },
+    {
+      "itemId": "mx-e4b2029557",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2457,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:13.175Z"
+    },
+    {
+      "itemId": "mx-ec23668665",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1921,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:14.300Z"
+    },
+    {
+      "itemId": "mx-efa76a852e",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1928,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:14.540Z"
+    },
+    {
+      "itemId": "oo-083c69f237",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1737,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:14.912Z"
+    },
+    {
+      "itemId": "oo-0865f265a6",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2249,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:16.549Z"
+    },
+    {
+      "itemId": "oo-2976e10e24",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 2098,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:17.010Z"
+    },
+    {
+      "itemId": "oo-088745bbeb",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2655,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:17.196Z"
+    },
+    {
+      "itemId": "oo-3aee80c72f",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1792,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:18.802Z"
+    },
+    {
+      "itemId": "oo-437c6bd58b",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2574,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:19.770Z"
+    },
+    {
+      "itemId": "oo-4db49ac2a6",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1633,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:20.435Z"
+    },
+    {
+      "itemId": "oo-36d36b2b6f",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 4301,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:20.851Z"
+    },
+    {
+      "itemId": "oo-58b035632c",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2927,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:22.697Z"
+    },
+    {
+      "itemId": "oo-65bf39ec8c",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2427,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:22.862Z"
+    },
+    {
+      "itemId": "oo-68bdfef47f",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 2011,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:22.862Z"
+    },
+    {
+      "itemId": "oo-8345e7909a",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:24.540Z"
+    },
+    {
+      "itemId": "oo-d3285757ae",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1875,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:24.738Z"
+    },
+    {
+      "itemId": "oo-ab09fcad05",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2056,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:24.918Z"
+    },
+    {
+      "itemId": "oo-f02d47cb3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1945,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:26.485Z"
+    },
+    {
+      "itemId": "sq-65c604b777",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1725,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:26.643Z"
+    },
+    {
+      "itemId": "sq-1029445919",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2259,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:26.997Z"
+    },
+    {
+      "itemId": "sq-697ba0ef58",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1744,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:28.229Z"
+    },
+    {
+      "itemId": "sq-84a90ec390",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1991,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:28.635Z"
+    },
+    {
+      "itemId": "sq-8982cb58fe",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1808,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:28.805Z"
+    },
+    {
+      "itemId": "sq-9188657504",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1844,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:30.480Z"
+    },
+    {
+      "itemId": "sq-8ab02d1c3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2433,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:30.662Z"
+    },
+    {
+      "itemId": "sq-b92df183d0",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2007,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:30.812Z"
+    },
+    {
+      "itemId": "sq-bd83b24436",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1661,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:32.323Z"
+    },
+    {
+      "itemId": "sq-baa00807c8",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2038,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:32.518Z"
+    },
+    {
+      "itemId": "sq-cfdf0fc8da",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1860,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:32.672Z"
+    },
+    {
+      "itemId": "sq-d4390c43c7",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2002,
+      "raw": "E",
+      "ts": "2026-06-11T06:07:34.325Z"
+    },
+    {
+      "itemId": "sq-efcc8db8d8",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1815,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:34.487Z"
+    },
+    {
+      "itemId": "sq-d68804b9e6",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2271,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:34.789Z"
+    },
+    {
+      "itemId": "sq-f36a1d553d",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1988,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:36.313Z"
+    },
+    {
+      "itemId": "an-1c31b9d692",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1936,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:36.423Z"
+    },
+    {
+      "itemId": "an-1fa76f9fc1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1734,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:36.523Z"
+    },
+    {
+      "itemId": "an-25a5fc01a5",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1844,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:38.157Z"
+    },
+    {
+      "itemId": "an-933726a9ff",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1744,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:38.267Z"
+    },
+    {
+      "itemId": "an-8139faab23",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1947,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:38.370Z"
+    },
+    {
+      "itemId": "an-963ee2725f",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1949,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:40.106Z"
+    },
+    {
+      "itemId": "an-a502c4f064",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2360,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:40.627Z"
+    },
+    {
+      "itemId": "an-ad1a0840eb",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1848,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:41.954Z"
+    },
+    {
+      "itemId": "an-aade86ca23",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 4427,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:42.797Z"
+    },
+    {
+      "itemId": "an-ba35de54ba",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2170,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:42.797Z"
+    },
+    {
+      "itemId": "an-c2332b1bbc",
+      "chosen": 5,
+      "correct": false,
+      "latencyMs": 1851,
+      "raw": "E",
+      "ts": "2026-06-11T06:07:43.806Z"
+    },
+    {
+      "itemId": "an-eb82beb5f9",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1825,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:44.623Z"
+    },
+    {
+      "itemId": "an-e661686fd2",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2016,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:44.813Z"
+    },
+    {
+      "itemId": "an-ed64713fca",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1935,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:45.741Z"
+    },
+    {
+      "itemId": "an-eed0da5271",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1878,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:46.502Z"
+    },
+    {
+      "itemId": "mx-127b27c2fe",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1876,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:46.689Z"
+    },
+    {
+      "itemId": "mx-16f6d8d003",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1942,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:47.683Z"
+    },
+    {
+      "itemId": "mx-27a0319fed",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1860,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:48.362Z"
+    },
+    {
+      "itemId": "mx-29b048ba54",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1981,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:48.670Z"
+    },
+    {
+      "itemId": "mx-36dc9ebe74",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1947,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:49.630Z"
+    },
+    {
+      "itemId": "mx-3eff2976ed",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1983,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:50.345Z"
+    },
+    {
+      "itemId": "mx-540ed8cfaf",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1844,
+      "raw": "C",
+      "ts": "2026-06-11T06:07:50.514Z"
+    },
+    {
+      "itemId": "mx-76ae1cf95d",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1842,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:51.472Z"
+    },
+    {
+      "itemId": "mx-89029042d4",
+      "chosen": 4,
+      "correct": true,
+      "latencyMs": 1738,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:52.083Z"
+    },
+    {
+      "itemId": "mx-9abbb658ea",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1704,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:52.218Z"
+    },
+    {
+      "itemId": "mx-a167304f6b",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1839,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:53.311Z"
+    },
+    {
+      "itemId": "mx-ca33dd211c",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1746,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:53.829Z"
+    },
+    {
+      "itemId": "mx-e4b2029557",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 2531,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:54.749Z"
+    },
+    {
+      "itemId": "mx-ec23668665",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2355,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:55.666Z"
+    },
+    {
+      "itemId": "mx-efa76a852e",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2029,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:55.858Z"
+    },
+    {
+      "itemId": "oo-083c69f237",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1738,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:56.487Z"
+    },
+    {
+      "itemId": "oo-088745bbeb",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1756,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:57.614Z"
+    },
+    {
+      "itemId": "oo-0865f265a6",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2046,
+      "raw": "A",
+      "ts": "2026-06-11T06:07:57.713Z"
+    },
+    {
+      "itemId": "oo-2976e10e24",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1846,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:58.333Z"
+    },
+    {
+      "itemId": "oo-3aee80c72f",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1748,
+      "raw": "B",
+      "ts": "2026-06-11T06:07:59.461Z"
+    },
+    {
+      "itemId": "oo-36d36b2b6f",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1941,
+      "raw": "D",
+      "ts": "2026-06-11T06:07:59.555Z"
+    },
+    {
+      "itemId": "oo-4db49ac2a6",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:01.304Z"
+    },
+    {
+      "itemId": "oo-58b035632c",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1848,
+      "raw": "A",
+      "ts": "2026-06-11T06:08:01.403Z"
+    },
+    {
+      "itemId": "oo-437c6bd58b",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 3991,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:02.324Z"
+    },
+    {
+      "itemId": "oo-68bdfef47f",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1739,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:03.142Z"
+    },
+    {
+      "itemId": "oo-65bf39ec8c",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1956,
+      "raw": "A",
+      "ts": "2026-06-11T06:08:03.260Z"
+    },
+    {
+      "itemId": "oo-8345e7909a",
+      "chosen": 4,
+      "correct": false,
+      "latencyMs": 1539,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:03.863Z"
+    },
+    {
+      "itemId": "oo-ab09fcad05",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1745,
+      "raw": "C",
+      "ts": "2026-06-11T06:08:04.887Z"
+    },
+    {
+      "itemId": "oo-d3285757ae",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 2037,
+      "raw": "E",
+      "ts": "2026-06-11T06:08:05.297Z"
+    },
+    {
+      "itemId": "oo-f02d47cb3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1710,
+      "raw": "A",
+      "ts": "2026-06-11T06:08:05.573Z"
+    },
+    {
+      "itemId": "sq-1029445919",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2459,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:07.346Z"
+    },
+    {
+      "itemId": "sq-65c604b777",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2235,
+      "raw": "A",
+      "ts": "2026-06-11T06:08:07.532Z"
+    },
+    {
+      "itemId": "sq-84a90ec390",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1945,
+      "raw": "C",
+      "ts": "2026-06-11T06:08:09.291Z"
+    },
+    {
+      "itemId": "sq-8982cb58fe",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1950,
+      "raw": "C",
+      "ts": "2026-06-11T06:08:09.482Z"
+    },
+    {
+      "itemId": "sq-8ab02d1c3d",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1740,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:11.031Z"
+    },
+    {
+      "itemId": "sq-697ba0ef58",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 5639,
+      "raw": "E",
+      "ts": "2026-06-11T06:08:11.212Z"
+    },
+    {
+      "itemId": "sq-9188657504",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1889,
+      "raw": "C",
+      "ts": "2026-06-11T06:08:11.371Z"
+    },
+    {
+      "itemId": "sq-b92df183d0",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:12.874Z"
+    },
+    {
+      "itemId": "sq-baa00807c8",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1827,
+      "raw": "C",
+      "ts": "2026-06-11T06:08:13.039Z"
+    },
+    {
+      "itemId": "sq-bd83b24436",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1821,
+      "raw": "B",
+      "ts": "2026-06-11T06:08:13.192Z"
+    },
+    {
+      "itemId": "sq-cfdf0fc8da",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1741,
+      "raw": "D",
+      "ts": "2026-06-11T06:08:14.615Z"
+    },
+    {
+      "itemId": "sq-d4390c43c7",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1876,
+      "raw": "E",
+      "ts": "2026-06-11T06:08:14.915Z"
+    },
+    {
+      "itemId": "sq-d68804b9e6",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2858,
+      "raw": "A",
+      "ts": "2026-06-11T06:08:16.050Z"
+    },
+    {
+      "itemId": "sq-efcc8db8d8",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1843,
+      "raw": "C",
+      "ts": "2026-06-11T06:08:16.458Z"
+    },
+    {
+      "itemId": "sq-f36a1d553d",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 2876,
+      "raw": "A",
+      "ts": "2026-06-11T06:08:17.791Z"
+    }
+  ]
+}

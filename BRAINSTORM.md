@@ -15,44 +15,40 @@ for people and what's hard for models.
 
 ---
 
-## Open questions (resolve these before designing)
+## Open questions
 
-### Q1 — What does "visibility only" mean exactly?
-Current assumption: **visual-only / language-independent** — image-based puzzles
-(no reading, no language, no cultural knowledge), so the same item is fair for a
-human and for a vision-capable agent. Alternatives to consider:
-- "view-only" (no interaction beyond picking an answer) — likely not the intent.
-- "visual + minimal text" (allow short neutral instructions).
-**→ Confirm with user.**
+Q1–Q5 and Q7 were **resolved 2026-06-10** (plan-mode session with the user); the design
+they feed lives in [docs/plans/rules-bank-agent-calibration.md](docs/plans/rules-bank-agent-calibration.md).
+Q6 (novel formats) remains open.
 
-### Q2 — How are agents shown a *visual* test?
-If items are images, agents must be **multimodal** (vision). Options:
-- Render each item as an image → send to a vision model via the relay.
-- Provide a **structured/symbolic** representation of the same puzzle (e.g. a
-  grid of shape descriptors) so text-only models can attempt it too — but that
-  changes the task and may leak the answer structure.
-- Dual-channel: humans see the image, agents get the image *and/or* a symbolic
-  form, recorded separately. **→ Decide what "fair" means here.**
+### Q1 — What does "visibility only" mean exactly? ✅ RESOLVED
+**Decision: visual + minimal text** — puzzles are purely visual, with a short, fixed,
+neutral instruction allowed ("Which option completes the grid?"). This is the MVP's
+existing behavior; instructions are templated per type so no language skill is tested.
 
-### Q3 — What's the role of llm-relay's model?
-Two distinct jobs, possibly different models:
-- **Generator:** authors/varies items. (Pure procedural generation may be better
-  for matrices; the model adds variety, distractors, and validation.)
-- **Solver/calibrator:** attempts items to estimate agent difficulty → drives the
-  adaptive "if agents ace it, default to humans" routing.
-**→ Which model(s)? Generation likely wants a stronger model; solving wants the
-model(s) we actually want to benchmark.**
+### Q2 — How are agents shown a *visual* test? ✅ RESOLVED
+**Decision: dual-channel, image first.** Render the same SVG a human sees to a PNG →
+vision model via the relay; a symbolic JSON channel (the raw cell spec) is secondary, for
+text-only models. Every attempt records its channel; **only image-channel results count
+for human–agent comparison** (the symbolic channel solves a different task — structure
+partially leaked — so it is diagnostic only).
 
-### Q4 — Procedural generation vs. model generation?
-Matrix/sequence puzzles have clean generative rules (rotation, progression, set
-ops, XOR on shapes). Pros of procedural: guaranteed-correct answers, infinite
-supply, exact difficulty knobs. The relay model could instead/also generate
-*novel rule families* or validate/critique generated items. **→ Hybrid likely.**
+### Q3 — What's the role of llm-relay's model? ✅ RESOLVED
+**Decision: two jobs, freely different models.** Generator = the env default
+(`RELAY_*`) or widget override, as today. Solver/calibrator = per-run CLI flag from the
+vision-capable relay list (gemini-3-flash, gpt-4o-mini, gpt-4.1-mini, llama-4-scout free).
+Mid-tier value models throughout; no flagships.
 
-### Q5 — Difficulty ladder: how is it defined and measured?
-- A priori (number of transformation rules, branching, distractor similarity)?
-- Empirical (item response theory from human + agent attempts)?
-- Both — start a priori, recalibrate from data.
+### Q4 — Procedural generation vs. model generation? ✅ RESOLVED
+**Decision: hybrid, rules as first-class data.** Rules become machine-readable
+(`src/items/rules.ts` DSL); procedural re-derivation of the answer from the rule **is**
+the semantic validator. Procedural generation gives guaranteed-correct items with exact
+difficulty knobs; LLM generation stays for variety and must pass the validator.
+
+### Q5 — Difficulty ladder: how is it defined and measured? ✅ RESOLVED
+**Decision: both.** A priori first — `ruleComplexity(rule)` (non-constant dimensions,
+deltas, wraps, axes) anchors difficulty 1–5 — then recalibrated empirically from agent
+attempt artifacts (and human data once a DB exists).
 
 ### Q6 — Novel format ideas (beyond Mensa)?
 Standard Mensa = Raven's matrices, number/letter sequences, analogies, odd-one-out.
@@ -63,9 +59,11 @@ Brainstorm differentiators (capture freely, no commitment):
 - Time/interaction dimension (animations, interactive transforms).
 - Self-generating difficulty: model probes the frontier where current agents fail.
 
-### Q7 — Scoring & comparability
-Single IQ-like score? Separate human-norm vs agent-norm? Percentile vs raw?
-How to make a human score and an agent score comparable (or explicitly not)?
+### Q7 — Scoring & comparability ✅ RESOLVED
+**Decision: explicitly NOT comparable — no single IQ-like score.** Humans get a plain
+score; agents get pass-rate-by-difficulty-tier per model/channel. The headline product is
+the **divergence**: items that are human-easy/agent-hard and vice versa. Human percentile
+norms are deferred until attempt data persists in a DB.
 
 ---
 

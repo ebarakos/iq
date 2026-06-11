@@ -73,9 +73,13 @@ export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
 
     // Inject provider into request body
     if (options?.body) {
-      const body = JSON.parse(options.body as string);
-      body.provider = opts.provider;
-      options = { ...options, body: JSON.stringify(body) };
+      try {
+        const body = JSON.parse(options.body as string);
+        body.provider = opts.provider;
+        options = { ...options, body: JSON.stringify(body) };
+      } catch {
+        // Body is not JSON — forward the request unchanged (skip provider injection)
+      }
     }
 
     // Forward relay-specific headers
