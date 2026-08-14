@@ -64,7 +64,11 @@ export function fingerprintPuzzle(p: Puzzle): string {
   const stemSigs = p.stem.map((panel) => (isBlank(panel) ? "·" : visualSignature(panel)));
   const optionSigs = p.options.map(visualSignature).sort();
   const answerSig = visualSignature(p.options[p.answerIndex]);
-  const canonical = [p.type, p.layout, stemSigs.join(","), optionSigs.join(","), answerSig].join("|");
+  const base = [p.type, p.layout, stemSigs.join(","), optionSigs.join(","), answerSig];
+  // Preserve every legacy bank fingerprint byte-for-byte; only the new family
+  // appends its visible nominal ordering.
+  if (p.operatorLegend) base.push(p.operatorLegend.shapeCycle.join(">"));
+  const canonical = base.join("|");
   return createHash("sha256").update(canonical).digest("hex").slice(0, 10);
 }
 
@@ -73,6 +77,7 @@ const ID_PREFIX: Record<PuzzleType, string> = {
   sequence: "sq",
   analogy: "an",
   oddOneOut: "oo",
+  operatorInduction: "op",
 };
 
 /** The bank id a puzzle should carry: `<typePrefix>-<fingerprint>`. */

@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   PuzzleSchema,
   PuzzleSetSchema,
+  SHAPES,
   shuffleOptions,
   visualSignature,
   type Cell,
   type Panel,
   type Puzzle,
 } from "./schema";
+import { generatePuzzle } from "./generate";
+import { mulberry32 } from "../lib/rng";
 
 const c = (
   shape: Cell["shape"],
@@ -184,6 +187,24 @@ describe("PuzzleSchema — options and answerIndex", () => {
       options: [c("square", 4, 0, "solid"), c("square", 4, 90, "solid"), c("square", 1, 0, "solid"), c("square", 2, 0, "solid")],
     };
     expect(PuzzleSchema.safeParse(dup).success).toBe(false);
+  });
+});
+
+describe("PuzzleSchema — operator induction", () => {
+  it("accepts the generated triple contract and rejects missing public legend or a misplaced blank", () => {
+    const valid = generatePuzzle("operatorInduction", 4, mulberry32(7));
+    expect(PuzzleSchema.safeParse(valid).success).toBe(true);
+    expect(PuzzleSchema.safeParse({ ...valid, operatorLegend: undefined }).success).toBe(false);
+    expect(PuzzleSchema.safeParse({ ...valid, stem: [{ blank: true }, ...valid.stem.slice(1)] }).success).toBe(false);
+  });
+
+  it("rejects a shape outside the displayed per-item order", () => {
+    const valid = generatePuzzle("operatorInduction", 4, mulberry32(8));
+    const outside = SHAPES.find((shape) => !valid.operatorLegend!.shapeCycle.includes(shape));
+    if (!outside) throw new Error("fixture needs a shape outside the operator cycle");
+    const first = valid.stem[0];
+    if ("blank" in first) throw new Error("operator fixture starts with a cell");
+    expect(PuzzleSchema.safeParse({ ...valid, stem: [{ ...first, shape: outside }, ...valid.stem.slice(1)] }).success).toBe(false);
   });
 });
 

@@ -1,35 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Puzzle } from "@/items/schema";
-import type { AgentStats, DifficultyLevel } from "@/items/bank";
+import type { PublicPuzzle } from "@/items/schema";
+import type { DifficultyLevel } from "@/items/bank";
 import { CellGraphic, StemView, describeCell } from "@/items/render";
 import { apiFetch, formatApiError } from "@/lib/relay-client";
 
-type Source = "bank" | "relay" | "fallback";
+type Source = "procedural" | "fallback";
 
 interface GenerateResponse {
-  puzzles: Puzzle[];
+  puzzles: PublicPuzzle[];
+  quizToken: string;
   source: Source;
-  providerUsed?: string | null;
-  modelId?: string;
+  generatorVersion?: string;
   notice?: string;
-  agentStats?: (AgentStats | null)[];
 }
 
-type Phase = "intro" | "loading" | "result" | "active" | "error";
+interface ReviewResult {
+  id: string;
+  chosen: number | null;
+  answerIndex: number;
+  correct: boolean;
+  explanation: string;
+}
+
+interface SubmitResponse {
+  score: number;
+  total: number;
+  results: ReviewResult[];
+}
+
+type Phase = "intro" | "loading" | "submitting" | "result" | "active" | "error";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
-// Bumped to v2 — persisted shape gains `agentStats`; avoids stale v1 restores.
-const SESSION_KEY = "aiq-test-v2";
+// v3 uses answer-free public puzzles plus an opaque scoring token.
+const SESSION_KEY = "aiq-test-v3";
 
 /** Validate a raw parsed object before restoring session state. */
 function isValidSession(v: unknown): v is {
   phase: "active" | "result";
-  puzzles: Puzzle[];
+  puzzles: PublicPuzzle[];
   answers: (number | null)[];
   current: number;
+  quizToken: string;
+  review?: SubmitResponse;
 } {
   if (!v || typeof v !== "object") return false;
   const s = v as Record<string, unknown>;
@@ -37,24 +52,24 @@ function isValidSession(v: unknown): v is {
   if (!Array.isArray(s.puzzles) || s.puzzles.length === 0) return false;
   if (!Array.isArray(s.answers) || s.answers.length !== s.puzzles.length) return false;
   if (typeof s.current !== "number" || s.current < 0 || s.current >= s.puzzles.length) return false;
+  if (typeof s.quizToken !== "string" || s.quizToken.length === 0) return false;
+  if (s.phase === "result" && (!s.review || typeof s.review !== "object")) return false;
   return true;
 }
 
 export default function Page() {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
+  const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [quizToken, setQuizToken] = useState("");
+  const [review, setReview] = useState<SubmitResponse | null>(null);
   const [current, setCurrent] = useState(0);
   const [meta, setMeta] = useState<{
     source: Source;
-    providerUsed?: string | null;
-    modelId?: string;
+    generatorVersion?: string;
     notice?: string;
-    agentStats?: (AgentStats | null)[];
   } | null>(null);
   const [error, setError] = useState<string>("");
-  // Track whether the loading state is for a fresh (relay) or bank request.
-  const [loadingFresh, setLoadingFresh] = useState(false);
   // Difficulty chosen on the intro screen; also reused by the error-screen retry.
   const [difficulty, setDifficulty] = useState<DifficultyLevel>("standard");
 
@@ -68,16 +83,16 @@ export default function Page() {
       setPhase(parsed.phase);
       setPuzzles(parsed.puzzles);
       setAnswers(parsed.answers);
+      setQuizToken(parsed.quizToken);
+      if (parsed.review) setReview(parsed.review);
       setCurrent(parsed.current);
       if ("meta" in (parsed as Record<string, unknown>) && parsed && typeof parsed === "object") {
         const m = (parsed as Record<string, unknown>).meta;
         if (m && typeof m === "object") {
           setMeta(m as {
             source: Source;
-            providerUsed?: string | null;
-            modelId?: string;
+            generatorVersion?: string;
             notice?: string;
-            agentStats?: (AgentStats | null)[];
           });
         }
       }
@@ -90,36 +105,49 @@ export default function Page() {
   useEffect(() => {
     if (phase !== "active" && phase !== "result") return;
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ phase, puzzles, answers, current, meta }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ phase, puzzles, answers, current, meta, quizToken, review }));
     } catch {
       // Storage quota exceeded or private browsing restriction — ignore.
     }
-  }, [phase, puzzles, answers, current, meta]);
+  }, [phase, puzzles, answers, current, meta, quizToken, review]);
 
-  async function start(fresh = false) {
+  async function start() {
     // Clear any previous session before starting fresh.
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
     setPhase("loading");
-    setLoadingFresh(fresh);
     setError("");
+    setReview(null);
     try {
-      // apiFetch attaches the widget's chosen provider/model/key as headers.
-      const data = await apiFetch<GenerateResponse>("/api/generate", { fresh, difficulty });
+      // Give the loading screen a chance to render before fast-fail paths are surfaced.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const data = await apiFetch<GenerateResponse>("/api/generate", { difficulty });
       if (!Array.isArray(data.puzzles) || data.puzzles.length === 0) throw new Error("No puzzles returned");
+      if (!data.quizToken) throw new Error("No scoring token returned");
       setPuzzles(data.puzzles);
+      setQuizToken(data.quizToken);
       setAnswers(new Array(data.puzzles.length).fill(null));
       setMeta({
         source: data.source,
-        providerUsed: data.providerUsed,
-        modelId: data.modelId,
+        generatorVersion: data.generatorVersion,
         notice: data.notice,
-        // agentStats may be absent on relay path or in old sessions — default to undefined.
-        agentStats: data.agentStats,
       });
       setCurrent(0);
       setPhase("active");
     } catch (err) {
       setError(formatApiError(err, "Something went wrong"));
+      setPhase("error");
+    }
+  }
+
+  async function finish() {
+    setPhase("submitting");
+    setError("");
+    try {
+      const result = await apiFetch<SubmitResponse>("/api/submit", { quizToken, answers });
+      setReview(result);
+      setPhase("result");
+    } catch (err) {
+      setError(formatApiError(err, "Could not score this test"));
       setPhase("error");
     }
   }
@@ -138,22 +166,22 @@ export default function Page() {
     setPhase("intro");
     setPuzzles([]);
     setAnswers([]);
+    setQuizToken("");
+    setReview(null);
     setCurrent(0);
     setMeta(null);
   }
-
-  const score = answers.reduce<number>((acc, a, i) => acc + (a !== null && a === puzzles[i]?.answerIndex ? 1 : 0), 0);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
       <header className="mb-8 flex items-baseline justify-between">
         <h1 className="text-2xl font-bold tracking-tight">
-          aiq <span className="font-normal text-gray-400">· visual IQ test</span>
+          aiq <span className="font-normal text-gray-400">· visual reasoning test</span>
         </h1>
         {(phase === "active" || phase === "result") && (
           <button
             onClick={() => restart(phase === "active")}
-            className="text-sm text-gray-500 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
           >
             Restart
           </button>
@@ -161,8 +189,9 @@ export default function Page() {
       </header>
 
       {phase === "intro" && <Intro difficulty={difficulty} onDifficulty={setDifficulty} onStart={start} />}
-      {phase === "loading" && <Loading fresh={loadingFresh} />}
-      {phase === "error" && <ErrorView message={error} onRetry={() => start()} />}
+      {phase === "loading" && <Loading label="Creating a fresh test…" />}
+      {phase === "submitting" && <Loading label="Scoring your answers…" />}
+      {phase === "error" && <ErrorView message={error} onRetry={start} />}
 
       {phase === "active" && puzzles[current] && (
         <Solver
@@ -176,15 +205,15 @@ export default function Page() {
           onChoose={choose}
           onPrev={() => setCurrent((c) => Math.max(0, c - 1))}
           onNext={() => setCurrent((c) => Math.min(puzzles.length - 1, c + 1))}
-          onFinish={() => setPhase("result")}
+          onFinish={finish}
         />
       )}
 
-      {phase === "result" && (
+      {phase === "result" && review && (
         <Result
           puzzles={puzzles}
           answers={answers}
-          score={score}
+          review={review}
           meta={meta}
           onRestart={restart}
         />
@@ -195,8 +224,8 @@ export default function Page() {
 
 const DIFFICULTY_CHOICES: { level: DifficultyLevel; label: string; blurb: string }[] = [
   { level: "easy", label: "Easy", blurb: "Gentler single-rule patterns to warm up." },
-  { level: "standard", label: "Standard", blurb: "The default ramp, ending in a two-rule grid." },
-  { level: "hard", label: "Hard", blurb: "Tougher multi-rule puzzles from the first question." },
+  { level: "standard", label: "Standard", blurb: "A balanced ramp across all five rule families." },
+  { level: "hard", label: "Hard", blurb: "Composed and conditional rules from the first question." },
 ];
 
 function Intro({
@@ -206,16 +235,19 @@ function Intro({
 }: {
   difficulty: DifficultyLevel;
   onDifficulty: (level: DifficultyLevel) => void;
-  onStart: (fresh?: boolean) => void;
+  onStart: () => void;
 }) {
   const active = DIFFICULTY_CHOICES.find((c) => c.level === difficulty) ?? DIFFICULTY_CHOICES[1];
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-      <h2 className="text-xl font-semibold">Take a 5-question visual IQ test</h2>
+      <h2 className="text-xl font-semibold">Take a fresh 5-question reasoning test</h2>
       <p className="mt-3 text-gray-600">
-        Five language-independent puzzles — matrices, sequences, an analogy, and an odd-one-out — of
-        increasing difficulty. Each is rendered as shapes. Pick the option that fits the pattern;
-        you&apos;ll get a score and a per-question review at the end.
+        Five language-independent puzzles across matrices, sequences, analogies, odd-one-out,
+        and worked visual equations. Pick the option that fits each hidden rule; you&apos;ll get a
+        score and a per-question review at the end.
+      </p>
+      <p className="mt-2 text-sm text-gray-500">
+        This measures performance on fresh visual rules. It is not yet a standardized human IQ score.
       </p>
 
       <div className="mt-6">
@@ -244,38 +276,28 @@ function Intro({
           })}
         </div>
         <p className="mt-1.5 text-xs text-gray-500">{active.blurb}</p>
+        <p className="mt-2 text-xs text-gray-500">
+          Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
+        </p>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
-          onClick={() => onStart(false)}
+          onClick={onStart}
           className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
-          Start test
-        </button>
-        <button
-          onClick={() => onStart(true)}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 transition hover:border-gray-400 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
-        >
-          Generate a fresh test with AI
+          Start a fresh test
         </button>
       </div>
     </section>
   );
 }
 
-function Loading({ fresh }: { fresh: boolean }) {
+function Loading({ label }: { label: string }) {
   return (
     <section className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-      {fresh ? (
-        <>
-          <p className="text-gray-600">Generating your test via llm-relay…</p>
-          <p className="text-sm text-gray-400">Designing 5 puzzles of increasing difficulty.</p>
-        </>
-      ) : (
-        <p className="text-gray-600">Loading your test…</p>
-      )}
+      <p className="text-gray-600">{label}</p>
     </section>
   );
 }
@@ -283,9 +305,12 @@ function Loading({ fresh }: { fresh: boolean }) {
 function ErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <section className="rounded-2xl border border-red-200 bg-red-50 p-8 shadow-sm">
-      <h2 className="text-lg font-semibold text-red-800">Couldn&apos;t start the test</h2>
+      <h2 className="text-lg font-semibold text-red-800">Something went wrong</h2>
       <p className="mt-2 text-red-700">{message}</p>
-      <button onClick={onRetry} className="mt-5 rounded-lg bg-red-700 px-4 py-2 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2">
+      <button
+        onClick={onRetry}
+        className="mt-5 rounded-lg bg-red-700 px-4 py-2 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
+      >
         Try again
       </button>
     </section>
@@ -300,6 +325,10 @@ function DifficultyDots({ level }: { level: number }) {
       ))}
     </span>
   );
+}
+
+function puzzleTypeLabel(type: PublicPuzzle["type"]): string {
+  return type === "operatorInduction" ? "visual equation" : type === "oddOneOut" ? "odd one out" : type;
 }
 
 function FallbackBanner({ notice }: { notice?: string }) {
@@ -322,7 +351,7 @@ function Solver({
   onNext,
   onFinish,
 }: {
-  puzzle: Puzzle;
+  puzzle: PublicPuzzle;
   index: number;
   total: number;
   selected: number | null;
@@ -420,10 +449,14 @@ function Solver({
                 aria-label={`Option ${LETTERS[i]} — ${describeCell(opt)}`}
                 aria-pressed={isSel}
                 className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
-                  isSel ? "border-gray-900 bg-gray-900/[0.03]" : "border-gray-200 hover:border-gray-400"
+                  isSel
+                    ? "border-gray-900 bg-gray-900/[0.08] ring-2 ring-gray-900 ring-offset-2"
+                    : "border-gray-200 hover:border-gray-400 hover:bg-gray-50"
                 }`}
               >
-                <span className={`text-xs font-semibold ${isSel ? "text-gray-900" : "text-gray-400"}`}>{LETTERS[i]}</span>
+                <span className={`text-xs font-semibold ${isSel ? "text-gray-900" : "text-gray-400"}`}>
+                  Option {LETTERS[i]} {isSel ? "· selected" : ""}
+                </span>
                 <CellGraphic cell={opt} className="h-16 w-16" />
               </button>
             );
@@ -432,11 +465,11 @@ function Solver({
 
         {/* Keyboard hint — hidden on mobile to save space. */}
         <p className="mt-3 hidden text-center text-xs text-gray-400 sm:block">
-          Tip: press 1–6 to answer, ← → to navigate, Enter to continue
+          Tip: press 1–6 or A–F to answer, ← → to navigate, Enter to {isLast ? "see results" : "continue"}
         </p>
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
+      <div className="mt-6 flex items-center justify-between pr-14 sm:pr-0">
         <button
           onClick={onPrev}
           disabled={index === 0}
@@ -466,61 +499,35 @@ function Solver({
   );
 }
 
-/** Agent calibration chip — rendered only in ReviewItem (never during solving). */
-function AgentChip({ stats }: { stats: AgentStats }) {
-  if (stats.attempts < 1) return null;
-  const pct = Math.round(stats.solveRate * 100);
-  let label: string;
-  if (stats.solveRate >= 0.9) {
-    label = `AI agents get this right ${pct}% of the time`;
-  } else if (stats.solveRate <= 0.4) {
-    label = "Most AI agents fail this one";
-  } else {
-    label = `AI agents solve this ${pct}% of the time`;
-  }
-  return (
-    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-      {label} · based on {stats.attempts} runs
-    </span>
-  );
-}
-
 function Result({
   puzzles,
   answers,
-  score,
+  review,
   meta,
   onRestart,
 }: {
-  puzzles: Puzzle[];
+  puzzles: PublicPuzzle[];
   answers: (number | null)[];
-  score: number;
+  review: SubmitResponse;
   meta: {
     source: Source;
-    providerUsed?: string | null;
-    modelId?: string;
+    generatorVersion?: string;
     notice?: string;
-    agentStats?: (AgentStats | null)[];
   } | null;
   onRestart: () => void;
 }) {
-  const pct = Math.round((score / puzzles.length) * 100);
+  const pct = Math.round((review.score / review.total) * 100);
 
-  let attribution: string;
-  if (meta?.source === "relay") {
-    attribution = `Generated via llm-relay${meta?.providerUsed ? ` · ${meta.providerUsed}` : ""}${meta?.modelId ? ` · ${meta.modelId}` : ""}`;
-  } else if (meta?.source === "fallback") {
-    attribution = "Item-bank sample (relay unavailable)";
-  } else {
-    attribution = "From the calibrated item bank";
-  }
+  const attribution = meta?.source === "fallback"
+    ? "From the verified reference set"
+    : `Fresh deterministic test${meta?.generatorVersion ? ` · ${meta.generatorVersion}` : ""}`;
 
   return (
     <section>
       <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <p className="text-sm uppercase tracking-wide text-gray-400">Your score</p>
         <p className="mt-1 text-5xl font-bold">
-          {score}
+          {review.score}
           <span className="text-2xl font-normal text-gray-400"> / {puzzles.length}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
@@ -541,7 +548,7 @@ function Result({
             puzzle={p}
             chosen={answers[i]}
             index={i}
-            agentStats={meta?.agentStats?.[i] ?? null}
+            result={review.results[i]}
           />
         ))}
       </div>
@@ -553,14 +560,14 @@ function ReviewItem({
   puzzle,
   chosen,
   index,
-  agentStats,
+  result,
 }: {
-  puzzle: Puzzle;
+  puzzle: PublicPuzzle;
   chosen: number | null;
   index: number;
-  agentStats: AgentStats | null;
+  result: ReviewResult;
 }) {
-  const correct = chosen !== null && chosen === puzzle.answerIndex;
+  const correct = result.correct;
   const optionCount = puzzle.options.length;
   // Match Solver's responsive grid: 4 options → 4-col, 5–6 → 3-col.
   const gridClass = optionCount <= 4
@@ -570,10 +577,9 @@ function ReviewItem({
     <div className={`rounded-xl border bg-white p-5 shadow-sm ${correct ? "border-green-300" : "border-red-200"}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-500">
-          Q{index + 1} · {puzzle.type}
+          Q{index + 1} · {puzzleTypeLabel(puzzle.type)}
         </span>
         <div className="flex flex-wrap items-center gap-2">
-          {agentStats && agentStats.attempts >= 1 && <AgentChip stats={agentStats} />}
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
             {correct ? "Correct" : chosen === null ? "Skipped" : "Incorrect"}
           </span>
@@ -588,7 +594,7 @@ function ReviewItem({
 
       <div className={gridClass}>
         {puzzle.options.map((opt, i) => {
-          const isCorrect = i === puzzle.answerIndex;
+          const isCorrect = i === result.answerIndex;
           const isChosen = i === chosen;
           const status = isCorrect ? "correct answer" : isChosen ? "your incorrect choice" : "";
           return (
@@ -599,7 +605,9 @@ function ReviewItem({
                 isCorrect ? "border-green-400 bg-green-50" : isChosen ? "border-red-400 bg-red-50" : "border-gray-200"
               }`}
             >
-              <span className="text-[10px] font-semibold text-gray-400">{LETTERS[i]}</span>
+              <span className={`text-[10px] font-semibold ${isChosen ? "text-red-700" : "text-gray-600"}`}>
+                {LETTERS[i]}
+              </span>
               <CellGraphic cell={opt} className="h-12 w-12" />
             </div>
           );
@@ -607,7 +615,7 @@ function ReviewItem({
       </div>
 
       <p className="mt-3 text-sm text-gray-600">
-        <span className="font-medium text-gray-800">Why:</span> {puzzle.explanation}
+        <span className="font-medium text-gray-800">Why:</span> {result.explanation}
       </p>
     </div>
   );

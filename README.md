@@ -2,22 +2,21 @@
 
 Visual IQ-style tests for **humans and AI agents** — the same puzzles, two audiences.
 
-Items are purely visual (shapes, patterns, a short neutral instruction, no language skill)
-so they are fair across humans and vision-capable models. Every item carries a
-machine-readable **rule**; the answer is re-derived from the rule in pure code, so a
-generated puzzle can never ship with a mis-marked answer. Difficulty starts a priori (rule
-complexity) and is recalibrated from real agent attempts.
+Items are generated from a fresh random seed after the test starts. Every item carries a
+machine-readable **rule**; pure code re-derives its answer, and the new operator-induction
+family searches its complete bounded rule grammar to reject ambiguous questions. Humans and
+vision models receive the same answer-free visual contract.
 
 **There is deliberately no single IQ score.** Humans get a plain score; agents get
 pass-rate-by-difficulty-tier per model. The product headline is the **divergence** — items
 that are human-easy but agent-hard, and vice versa. (First real data point: a mid-tier
 vision model aces matrices ~93% but fails odd-one-out ~60% of the time.)
 
-> **Status: calibrated-bank prototype.** Quizzes serve instantly from a committed,
-> rule-verified item bank; fresh relay generation is opt-in. A CLI agent harness runs the
-> same items against vision models through the relay and feeds solve rates back into the
-> bank — shown after each question in review ("AI agents get this right N% of the time").
-> Design: [docs/plans/rules-bank-agent-calibration.md](docs/plans/rules-bank-agent-calibration.md).
+> **Status: generated reasoning-test prototype.** Each quiz is produced deterministically
+> from a cryptographically random seed and contains one item from each of five visual-rule
+> families. Answers stay encrypted in an opaque token until server-side submission. This is
+> not yet a standardized human IQ score: generator difficulty needs a human pilot and a
+> stable model panel. Design: [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ---
 
@@ -28,8 +27,9 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-The quiz itself works with **no env at all** — it serves from the committed item bank.
-For fresh relay generation and the agent harness, copy `.env.example` → `.env.local`:
+Local development works without an env file. Production must set a stable
+`QUIZ_TOKEN_SECRET` of at least 32 characters for answer-key encryption. The agent harness
+also needs relay settings; copy `.env.example` → `.env.local`:
 
 ```
 RELAY_BASE_URL=https://llm-relay.ebarakos.workers.dev/v1
@@ -38,45 +38,42 @@ RELAY_MODEL=deepseek/deepseek-chat-v3-0324
 OPENROUTER_API_KEY=sk-or-...   # required for the default openrouter provider
 ```
 
-No API key needed for the free `groq` alternative. If fresh generation fails (relay down,
-rate-limited, invalid output after retries), the app falls back to the item bank and says
-so in the UI.
+No model call is made when a human starts or submits a test. Relay access is used only when
+an agent takes the visual test or during offline model experiments.
 
 ---
 
 ## Architecture
 
 ```
-rule DSL (rules.ts) ──► semantic validator (checkRule)
-        │                        │ gates
-        ▼                        ▼
-procedural generator      relay generation        item bank (data/bank/items.json)
-(generate.ts, seeded)     (model.ts, retry loop)  └─► serves the quiz (route → page.tsx)
-        └──────────► bank topup CLI ◄──────────┘
-                                                  agent harness (scripts/agent-run.ts)
-                                                  └─► attempts (data/attempts/*.json)
-                                                      └─► report CLI → tags back into bank
+fresh seed → versioned procedural generator → rule + uniqueness checks → public puzzle
+                                                          │                 │
+                                                          │                 └─► human UI
+                                                          ▼
+                                                  encrypted answer token
+                                                          │
+                                                          └─► server scoring
+
+public puzzle → agent harness → vision model via relay → bucketed attempt artifacts
 ```
 
-- `src/items/rules.ts` — the rule DSL (step/cycle/constant transforms over ordered
-  dimension domains) + `checkRule`, which re-derives the answer and must explain the
-  whole stem. This is the semantic validator.
-- `src/items/generate.ts` — seeded procedural generator; correct by construction.
+- `src/items/rules.ts` — the rule DSL, semantic validator, bounded operator grammar,
+  and full-grammar uniqueness oracle.
+- `src/items/generate.ts` — seeded, versioned quiz generator; `procedural-v1` remains
+  replayable and `procedural-v2` adds operator induction.
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
-  renderer; the model emits structured specs and **never draws**.
-- `src/items/bank.ts` + `data/bank/items.json` — committed, content-addressed item bank;
-  default serving path. `npm run bank:topup` adds items, `npm run bank:verify` is the
-  local integrity gate.
-- `src/lib/model.ts` — relay client; generate → parse → schema + rule validation → retry
-  with derivation diffs fed back to the model.
+  renderer shared by generated and reference items.
+- `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
+- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — answer-free delivery and
+  authenticated, encrypted server-side scoring.
+- `src/lib/model.ts` — optional offline model item-writer; it is not in the human request path.
 - `src/items/compose-image.tsx` + `src/lib/solver.ts` + `scripts/agent-run.ts` — agent
   mode: render the same SVG a human sees → PNG → vision model via the relay (symbolic JSON
   channel for text-only models; recorded separately, never pooled with image results).
-- `src/lib/calibrate.ts` + `scripts/report.ts` — aggregate attempts into per-item solve
-  rates and tags (`agent-easy` ≥ 90%, `agent-hard` ≤ 40%, `MIN_ATTEMPTS = 5`);
-  `npm run report -- --write` flows them back into the bank.
-- `src/app/api/generate/route.ts` / `src/app/page.tsx` — bank-default API + quiz UI
-  (intro → 5 questions → score + review with agent-stat chips).
+- `src/lib/calibrate.ts` + `scripts/report.ts` — keep legacy item diagnostics and aggregate
+  fresh attempts by stable generator feature bucket and model.
+- `src/app/api/generate/route.ts` / `src/app/page.tsx` — fresh deterministic quiz generation,
+  solving, server scoring, and review.
 
 All model calls go through [llm-relay](../llm-relay). No provider API keys live in this
 repo — configure via `.env.local` only.

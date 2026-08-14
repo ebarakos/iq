@@ -6,7 +6,7 @@ import {
   SHAPES,
   visualSignature,
 } from "./domains";
-import type { Cell, Panel, Puzzle } from "./schema";
+import type { Cell, OperatorLegend, Panel, Puzzle } from "./schema";
 
 /**
  * Rule DSL — the machine-readable pattern behind a puzzle.
@@ -70,6 +70,96 @@ export const DimTransformsSchema = z
   .strict();
 export type DimTransforms = z.infer<typeof DimTransformsSchema>;
 
+// ── Visual operator induction ──────────────────────────────────────────────
+
+/** Dimensions used by operator induction v1. Rotation stays pinned to zero. */
+export const OPERATOR_DIMS = ["shape", "count", "fill", "size"] as const;
+export type OperatorDim = (typeof OPERATOR_DIMS)[number];
+
+export const OperatorBaseSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("left") }),
+  z.object({ op: z.literal("right") }),
+  z.object({ op: z.literal("addMod") }),
+  z.object({ op: z.literal("diffLRMod") }),
+  z.object({ op: z.literal("diffRLMod") }),
+]);
+export type OperatorBase = z.infer<typeof OperatorBaseSchema>;
+
+export const OperatorPredicateSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("equal"), dimension: z.enum(OPERATOR_DIMS) }),
+  z.object({ kind: z.literal("sumCountsEven") }),
+]);
+export type OperatorPredicate = z.infer<typeof OperatorPredicateSchema>;
+
+export const OperatorExpressionSchema = z.union([
+  OperatorBaseSchema,
+  z.object({
+    op: z.literal("if"),
+    predicate: OperatorPredicateSchema,
+    whenTrue: OperatorBaseSchema,
+    whenFalse: OperatorBaseSchema,
+  }),
+]);
+export type OperatorExpression = z.infer<typeof OperatorExpressionSchema>;
+
+/** One bounded expression per output dimension. */
+export const OperatorProgramSchema = z
+  .object({
+    shape: OperatorExpressionSchema,
+    count: OperatorExpressionSchema,
+    fill: OperatorExpressionSchema,
+    size: OperatorExpressionSchema,
+  })
+  .strict()
+  .superRefine((program, ctx) => {
+    let conditionals = 0;
+    for (const dim of OPERATOR_DIMS) {
+      const expr = program[dim];
+      const bases = expr.op === "if" ? [expr.whenTrue, expr.whenFalse] : [expr];
+      if (bases.some((base) => !operatorBaseAllowed(dim, base))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [dim],
+          message: "modular operator arithmetic is supported only for count and shape",
+        });
+      }
+      if (expr.op !== "if") continue;
+      conditionals++;
+      if (JSON.stringify(expr.whenTrue) === JSON.stringify(expr.whenFalse)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [dim],
+          message: "operator conditional branches must differ",
+        });
+      }
+      if (expr.predicate.kind === "equal" && expr.predicate.dimension === dim) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [dim, "predicate"],
+          message: "operator equality must control a different output dimension",
+        });
+      }
+      if (expr.predicate.kind === "sumCountsEven" && dim === "count") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [dim, "predicate"],
+          message: "count parity must control a different output dimension",
+        });
+      }
+    }
+    if (conditionals > 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "operator v1 permits at most one conditional output dimension" });
+    }
+    if (OPERATOR_DIMS.every((dim) => program[dim].op === "left")) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "operator program must do more than copy the left cell" });
+    }
+  });
+export type OperatorProgram = z.infer<typeof OperatorProgramSchema>;
+
+function operatorBaseAllowed(dim: OperatorDim, base: OperatorBase): boolean {
+  return base.op === "left" || base.op === "right" || dim === "shape" || dim === "count";
+}
+
 const CONSTANT: DimTransform = { op: "constant" };
 
 function isNonConstant(t: DimTransform | undefined): t is Exclude<DimTransform, { op: "constant" }> {
@@ -119,8 +209,12 @@ export const RuleSchema = z
     z.object({ kind: z.literal("analogy"), transforms: DimTransformsSchema }),
     // All non-answer options share `value` on `dimension`; the answer breaks it.
     z.object({ kind: z.literal("oddOneOut"), dimension: z.enum(DIMENSIONS), value: z.union([z.string(), z.number()]) }),
+    // Several worked (left, right) -> output examples reveal one bounded
+    // per-dimension program, which is then applied to a query pair.
+    z.object({ kind: z.literal("operatorInduction"), program: OperatorProgramSchema }),
   ])
   .superRefine((rule, ctx) => {
+    if (rule.kind === "operatorInduction") return;
     if (rule.kind === "oddOneOut") {
       if (!DIM_DOMAINS[rule.dimension].includes(rule.value)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["value"], message: `${JSON.stringify(rule.value)} is not a valid ${rule.dimension} (allowed: ${DIM_DOMAINS[rule.dimension].join(", ")})` });
@@ -182,6 +276,332 @@ export function applyTransforms(transforms: DimTransforms, cell: Cell, steps = 1
     next[dim] = v;
   }
   return next as unknown as Cell;
+}
+
+const OPERATOR_BASES: readonly OperatorBase[] = [
+  { op: "left" },
+  { op: "right" },
+  { op: "addMod" },
+  { op: "diffLRMod" },
+  { op: "diffRLMod" },
+];
+
+/** Stable serialization used for enumeration, diagnostics, and fingerprints. */
+export function operatorExpressionKey(expr: OperatorExpression): string {
+  if (expr.op !== "if") return expr.op;
+  const predicate =
+    expr.predicate.kind === "equal" ? `eq:${expr.predicate.dimension}` : expr.predicate.kind;
+  return `if:${predicate}:${expr.whenTrue.op}:${expr.whenFalse.op}`;
+}
+
+export function operatorProgramKey(program: OperatorProgram): string {
+  return OPERATOR_DIMS.map((dim) => `${dim}=${operatorExpressionKey(program[dim])}`).join("|");
+}
+
+function mod(value: number, n: number): number {
+  return ((value % n) + n) % n;
+}
+
+/** Apply one primitive to the corresponding dimension of an input pair. */
+export function applyOperatorBase(
+  base: OperatorBase,
+  dim: OperatorDim,
+  left: Cell,
+  right: Cell,
+  shapeCycle: readonly Cell["shape"][],
+): string | number | null {
+  if (base.op === "left") return left[dim];
+  if (base.op === "right") return right[dim];
+  if (!operatorBaseAllowed(dim, base)) return null;
+
+  if (dim === "count") {
+    // Counts use residues 1,2,3,4 with 4 representing zero. This keeps the
+    // visually natural identity 1 + 1 = 2 while remaining closed.
+    const l = left.count % 4;
+    const r = right.count % 4;
+    const raw = base.op === "addMod" ? l + r : base.op === "diffLRMod" ? l - r : r - l;
+    const residue = mod(raw, 4);
+    return residue === 0 ? 4 : residue;
+  }
+
+  if (dim === "shape") {
+    const l = shapeCycle.indexOf(left.shape);
+    const r = shapeCycle.indexOf(right.shape);
+    if (l === -1 || r === -1) return null;
+    const raw = base.op === "addMod" ? l + r : base.op === "diffLRMod" ? l - r : r - l;
+    return shapeCycle[mod(raw, shapeCycle.length)];
+  }
+
+  return null;
+}
+
+export function operatorPredicateValue(predicate: OperatorPredicate, left: Cell, right: Cell): boolean {
+  if (predicate.kind === "sumCountsEven") return (left.count + right.count) % 2 === 0;
+  return left[predicate.dimension] === right[predicate.dimension];
+}
+
+export function applyOperatorExpression(
+  expr: OperatorExpression,
+  dim: OperatorDim,
+  left: Cell,
+  right: Cell,
+  shapeCycle: readonly Cell["shape"][],
+): string | number | null {
+  const base =
+    expr.op === "if"
+      ? operatorPredicateValue(expr.predicate, left, right)
+        ? expr.whenTrue
+        : expr.whenFalse
+      : expr;
+  return applyOperatorBase(base, dim, left, right, shapeCycle);
+}
+
+/** Apply a complete operator program. Rotation is deliberately absent in v1. */
+export function applyOperatorProgram(
+  program: OperatorProgram,
+  left: Cell,
+  right: Cell,
+  shapeCycle: readonly Cell["shape"][],
+): Cell | null {
+  const output: Partial<Cell> = { rotation: 0 };
+  for (const dim of OPERATOR_DIMS) {
+    const value = applyOperatorExpression(program[dim], dim, left, right, shapeCycle);
+    if (value === null) return null;
+    (output as Record<OperatorDim, string | number>)[dim] = value;
+  }
+  return output as Cell;
+}
+
+function baseSemanticSignature(dim: OperatorDim, base: OperatorBase, shapeCycle: readonly Cell["shape"][]): string {
+  const domain = dim === "shape" ? shapeCycle : DIM_DOMAINS[dim];
+  const dummy = (value: string | number): Cell => ({
+    shape: (dim === "shape" ? value : shapeCycle[0]) as Cell["shape"],
+    count: (dim === "count" ? value : 1) as Cell["count"],
+    rotation: 0,
+    fill: (dim === "fill" ? value : "outline") as Cell["fill"],
+    size: (dim === "size" ? value : "s") as Cell["size"],
+  });
+  const table: (string | number | null)[] = [];
+  for (const left of domain) {
+    for (const right of domain) {
+      table.push(applyOperatorBase(base, dim, dummy(left), dummy(right), shapeCycle));
+    }
+  }
+  return JSON.stringify(table);
+}
+
+function expressionSemanticSignature(
+  dim: OperatorDim,
+  expression: OperatorExpression,
+  shapeCycle: readonly Cell["shape"][],
+): string {
+  const targetDomain = dim === "shape" ? shapeCycle : DIM_DOMAINS[dim];
+  const controlDim =
+    expression.op === "if" && expression.predicate.kind === "equal"
+      ? expression.predicate.dimension
+      : expression.op === "if" && expression.predicate.kind === "sumCountsEven"
+        ? "count"
+        : null;
+  const controlDomain = controlDim
+    ? controlDim === "shape" ? shapeCycle : DIM_DOMAINS[controlDim]
+    : [null];
+  const make = (target: string | number, control: string | number | null): Cell => {
+    const cell: Cell = {
+      shape: shapeCycle[0],
+      count: 1,
+      rotation: 0,
+      fill: "outline",
+      size: "s",
+    };
+    (cell as unknown as Record<OperatorDim, string | number>)[dim] = target;
+    if (controlDim && control !== null) {
+      (cell as unknown as Record<OperatorDim, string | number>)[controlDim] = control;
+    }
+    return cell;
+  };
+  const table: (string | number | null)[] = [];
+  for (const leftTarget of targetDomain) {
+    for (const rightTarget of targetDomain) {
+      for (const leftControl of controlDomain) {
+        for (const rightControl of controlDomain) {
+          table.push(
+            applyOperatorExpression(
+              expression,
+              dim,
+              make(leftTarget, leftControl),
+              make(rightTarget, rightControl),
+              shapeCycle,
+            ),
+          );
+        }
+      }
+    }
+  }
+  return JSON.stringify(table);
+}
+
+const operatorExpressionCache = new Map<string, OperatorExpression[]>();
+
+/**
+ * Enumerate the complete v1 expression grammar for one output dimension.
+ * Difficulty never narrows this list: the uniqueness proof uses every program
+ * a solver could reasonably consider within the published family.
+ */
+export function enumerateOperatorExpressions(
+  dim: OperatorDim,
+  shapeCycle: readonly Cell["shape"][],
+): OperatorExpression[] {
+  // Grammar structure and semantic aliases depend on cycle length, not the
+  // particular shape names or their order. Cache this finite enumeration: the
+  // oracle consults it repeatedly during rejection sampling and sweeps.
+  const cacheKey = `${dim}:${shapeCycle.length}`;
+  const cached = operatorExpressionCache.get(cacheKey);
+  if (cached) return cached;
+
+  const bases: OperatorBase[] = [];
+  const semanticBases = new Set<string>();
+  for (const base of OPERATOR_BASES) {
+    if (!operatorBaseAllowed(dim, base)) continue;
+    const signature = baseSemanticSignature(dim, base, shapeCycle);
+    if (semanticBases.has(signature)) continue;
+    semanticBases.add(signature);
+    bases.push(base);
+  }
+
+  const predicates: OperatorPredicate[] = OPERATOR_DIMS.filter((control) => control !== dim).map(
+    (dimension) => ({ kind: "equal" as const, dimension }),
+  );
+  if (dim !== "count") predicates.push({ kind: "sumCountsEven" });
+
+  const expressions: OperatorExpression[] = [];
+  const semanticExpressions = new Set<string>();
+  const add = (expression: OperatorExpression) => {
+    const signature = expressionSemanticSignature(dim, expression, shapeCycle);
+    if (semanticExpressions.has(signature)) return;
+    semanticExpressions.add(signature);
+    expressions.push(expression);
+  };
+  bases.forEach(add);
+  for (const predicate of predicates) {
+    for (const whenTrue of bases) {
+      for (const whenFalse of bases) {
+        if (baseSemanticSignature(dim, whenTrue, shapeCycle) === baseSemanticSignature(dim, whenFalse, shapeCycle)) {
+          continue;
+        }
+        add({ op: "if", predicate, whenTrue, whenFalse });
+      }
+    }
+  }
+  operatorExpressionCache.set(cacheKey, expressions);
+  return expressions;
+}
+
+export interface OperatorExample {
+  left: Cell;
+  right: Cell;
+  output: Cell;
+}
+
+export interface OperatorNearMiss {
+  cell: Cell;
+  dimension: OperatorDim;
+  expression: OperatorExpression;
+  failedRows: number[];
+}
+
+export interface OperatorAnalysis {
+  ok: boolean;
+  answer: Cell | null;
+  issues: string[];
+  survivors: Record<OperatorDim, OperatorExpression[]>;
+  nearMisses: OperatorNearMiss[];
+}
+
+function emptyOperatorSurvivors(): Record<OperatorDim, OperatorExpression[]> {
+  return { shape: [], count: [], fill: [], size: [] };
+}
+
+/** Decode the triple-encoded operator stem into worked rows and its query pair. */
+export function parseOperatorStem(stem: Panel[]): {
+  examples: OperatorExample[];
+  query: { left: Cell; right: Cell };
+} | null {
+  if (![12, 15, 18].includes(stem.length) || !isBlankPanel(stem[stem.length - 1])) return null;
+  if (stem.slice(0, -1).some(isBlankPanel)) return null;
+  const cells = stem.slice(0, -1) as Cell[];
+  const query = { left: cells[cells.length - 2], right: cells[cells.length - 1] };
+  const examples: OperatorExample[] = [];
+  for (let i = 0; i < cells.length - 2; i += 3) {
+    examples.push({ left: cells[i], right: cells[i + 1], output: cells[i + 2] });
+  }
+  return { examples, query };
+}
+
+/** Full-grammar, per-dimension answer-uniqueness proof and near-miss search. */
+export function analyzeOperatorStem(stem: Panel[], legend: OperatorLegend): OperatorAnalysis {
+  const decoded = parseOperatorStem(stem);
+  const survivors = emptyOperatorSurvivors();
+  if (!decoded) {
+    return { ok: false, answer: null, issues: ["operator stem must contain 3–5 worked triples and one final query triple"], survivors, nearMisses: [] };
+  }
+  const { examples, query } = decoded;
+  const answer: Partial<Cell> = { rotation: 0 };
+  const issues: string[] = [];
+
+  for (const dim of OPERATOR_DIMS) {
+    const all = enumerateOperatorExpressions(dim, legend.shapeCycle);
+    survivors[dim] = all.filter((expr) =>
+      examples.every(
+        ({ left, right, output }) =>
+          applyOperatorExpression(expr, dim, left, right, legend.shapeCycle) === output[dim],
+      ),
+    );
+    const predictions = new Set(
+      survivors[dim].map((expr) => applyOperatorExpression(expr, dim, query.left, query.right, legend.shapeCycle)),
+    );
+    predictions.delete(null);
+    if (survivors[dim].length === 0) {
+      issues.push(`operator: no allowed ${dim} expression explains every worked row`);
+    } else if (predictions.size !== 1) {
+      issues.push(`operator: surviving ${dim} expressions predict ${predictions.size} different query values`);
+    } else {
+      (answer as Record<OperatorDim, string | number>)[dim] = [...predictions][0] as string | number;
+    }
+  }
+
+  if (issues.length) return { ok: false, answer: null, issues, survivors, nearMisses: [] };
+  const resolved = answer as Cell;
+  const nearMissBySignature = new Map<string, OperatorNearMiss>();
+  for (const dim of OPERATOR_DIMS) {
+    for (const expression of enumerateOperatorExpressions(dim, legend.shapeCycle)) {
+      const failedRows = examples
+        .map(({ left, right, output }, index) =>
+          applyOperatorExpression(expression, dim, left, right, legend.shapeCycle) === output[dim] ? -1 : index,
+        )
+        .filter((index) => index >= 0);
+      if (failedRows.length === 0) continue;
+      const value = applyOperatorExpression(expression, dim, query.left, query.right, legend.shapeCycle);
+      if (value === null || value === resolved[dim]) continue;
+      const cell = { ...resolved, [dim]: value } as Cell;
+      const signature = visualSignature(cell);
+      const candidate = { cell, dimension: dim, expression, failedRows };
+      const prior = nearMissBySignature.get(signature);
+      if (
+        !prior ||
+        failedRows.length < prior.failedRows.length ||
+        (failedRows.length === prior.failedRows.length && operatorExpressionKey(expression) < operatorExpressionKey(prior.expression))
+      ) {
+        nearMissBySignature.set(signature, candidate);
+      }
+    }
+  }
+  const nearMisses = [...nearMissBySignature.values()].sort(
+    (a, b) =>
+      a.failedRows.length - b.failedRows.length ||
+      operatorExpressionKey(a.expression).localeCompare(operatorExpressionKey(b.expression)) ||
+      a.dimension.localeCompare(b.dimension),
+  );
+  return { ok: true, answer: resolved, issues: [], survivors, nearMisses };
 }
 
 const isBlankPanel = (p: Panel): p is { blank: true } => "blank" in p;
@@ -340,8 +760,58 @@ function deriveMatrix(rule: Extract<Rule, { kind: "matrix" }>, stem: Panel[]): D
   return { cell: issues.length ? null : derivedCell, issues };
 }
 
+function deriveOperator(
+  rule: Extract<Rule, { kind: "operatorInduction" }>,
+  stem: Panel[],
+  legend: OperatorLegend | undefined,
+): Derivation {
+  if (!legend) return { cell: null, issues: ["operatorInduction needs a visible shapeCycle legend"] };
+  const decoded = parseOperatorStem(stem);
+  if (!decoded) {
+    return { cell: null, issues: ["operator stem must contain 3–5 worked triples and one final query triple"] };
+  }
+
+  const issues: string[] = [];
+  const allCells = decoded.examples.flatMap(({ left, right, output }) => [left, right, output]);
+  allCells.push(decoded.query.left, decoded.query.right);
+  if (allCells.some((cell) => cell.rotation !== 0)) {
+    issues.push("operator v1 pins rotation to zero in every input and output cell");
+  }
+  const allowedShapes = new Set(legend.shapeCycle);
+  if (allCells.some((cell) => !allowedShapes.has(cell.shape))) {
+    issues.push("operator cells must use only shapes shown in the visible shapeCycle");
+  }
+
+  for (let i = 0; i < decoded.examples.length; i++) {
+    const { left, right, output } = decoded.examples[i];
+    const predicted = applyOperatorProgram(rule.program, left, right, legend.shapeCycle);
+    if (!predicted || visualSignature(predicted) !== visualSignature(output)) {
+      issues.push(`operator worked row ${i + 1} does not match the declared program`);
+    }
+  }
+
+  for (const dim of OPERATOR_DIMS) {
+    const expr = rule.program[dim];
+    if (expr.op !== "if") continue;
+    const outcomes = decoded.examples.map(({ left, right }) => operatorPredicateValue(expr.predicate, left, right));
+    const trueCount = outcomes.filter(Boolean).length;
+    const falseCount = outcomes.length - trueCount;
+    if (trueCount < 2 || falseCount < 2) {
+      issues.push(`operator conditional on ${dim} must demonstrate each branch in at least two worked rows`);
+    }
+  }
+
+  const analysis = analyzeOperatorStem(stem, legend);
+  issues.push(...analysis.issues);
+  const declared = applyOperatorProgram(rule.program, decoded.query.left, decoded.query.right, legend.shapeCycle);
+  if (analysis.answer && (!declared || visualSignature(declared) !== visualSignature(analysis.answer))) {
+    issues.push("operator declared program disagrees with the full-grammar uniqueness oracle");
+  }
+  return { cell: issues.length ? null : analysis.answer, issues };
+}
+
 /** Re-derive the expected answer cell from a rule and stem (null for oddOneOut). */
-export function deriveAnswer(rule: Rule, stem: Panel[]): Derivation {
+export function deriveAnswer(rule: Rule, stem: Panel[], operatorLegend?: OperatorLegend): Derivation {
   switch (rule.kind) {
     case "sequence":
       return deriveSequence(rule, stem);
@@ -351,6 +821,8 @@ export function deriveAnswer(rule: Rule, stem: Panel[]): Derivation {
       return deriveMatrix(rule, stem);
     case "oddOneOut":
       return { cell: null, issues: [] };
+    case "operatorInduction":
+      return deriveOperator(rule, stem, operatorLegend);
   }
 }
 
@@ -394,7 +866,7 @@ export function checkRule(puzzle: Puzzle): RuleCheck {
     return issues.length ? { ok: false, issues } : { ok: true, derived: null };
   }
 
-  const { cell, issues } = deriveAnswer(rule, puzzle.stem);
+  const { cell, issues } = deriveAnswer(rule, puzzle.stem, puzzle.operatorLegend);
   if (!cell) {
     return { ok: false, issues: issues.length ? issues : ["the rule could not derive an answer from the stem"] };
   }

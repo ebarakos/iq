@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import React, { type ReactElement } from "react";
-import type { Cell, Puzzle } from "./schema";
+import type { Cell, Puzzle, PublicPuzzle } from "./schema";
 import { isBlank } from "./schema";
 import { CellGraphic } from "./render";
 
@@ -89,7 +89,7 @@ type Piece =
  * Build the horizontal stem strip for non-grid layouts (sequence / analogy /
  * oddOneOut). Returns the row's pieces plus its total width.
  */
-function stemRow(puzzle: Puzzle): { pieces: Piece[]; rowWidth: number } {
+function stemRow(puzzle: Puzzle | PublicPuzzle): { pieces: Piece[]; rowWidth: number } {
   const pieces: Piece[] = [];
 
   if (puzzle.layout === "analogy") {
@@ -129,12 +129,56 @@ function optionGrid(n: number, perRow: number): { cols: number; rows: number } {
  * Compose a puzzle (stem + lettered options) into one self-contained `<svg>`.
  * Target ~800px wide, height auto-derived from content.
  */
-export function PuzzleImage({ puzzle }: { puzzle: Puzzle }): ReactElement {
+export function PuzzleImage({ puzzle }: { puzzle: Puzzle | PublicPuzzle }): ReactElement {
   const elems: ReactElement[] = [];
   let cursorY = PAD;
 
   // ── Stem ──
-  if (puzzle.layout === "grid3x3") {
+  if (puzzle.layout === "operatorTable") {
+    const mini = 54;
+    if (puzzle.operatorLegend) {
+      const legendWidth = puzzle.operatorLegend.shapeCycle.length * mini +
+        (puzzle.operatorLegend.shapeCycle.length - 1) * SEP;
+      let legendX = (WIDTH - legendWidth) / 2;
+      for (let i = 0; i < puzzle.operatorLegend.shapeCycle.length; i++) {
+        if (i > 0) {
+          elems.push(<Separator key={`legend-arrow-${i}`} x={legendX} y={cursorY} text="→" height={mini} />);
+          legendX += SEP;
+        }
+        const shape = puzzle.operatorLegend.shapeCycle[i];
+        elems.push(
+          <CellBox
+            key={`legend-${shape}`}
+            x={legendX}
+            y={cursorY}
+            size={mini}
+            cell={{ shape, count: 1, rotation: 0, fill: "outline", size: "l" }}
+          />,
+        );
+        legendX += mini;
+      }
+      cursorY += mini + GAP;
+    }
+
+    const rowWidth = CELL * 3 + SEP * 2 + GAP * 4;
+    const startX = (WIDTH - rowWidth) / 2;
+    const rows = puzzle.stem.length / 3;
+    for (let row = 0; row < rows; row++) {
+      const [left, right, output] = puzzle.stem.slice(row * 3, row * 3 + 3);
+      let x = startX;
+      elems.push(<CellBox key={`op-${row}-left`} x={x} y={cursorY} cell={left && !isBlank(left) ? left : null} />);
+      x += CELL + GAP;
+      elems.push(<Separator key={`op-${row}-combine`} x={x} y={cursorY} text="◆" height={CELL} />);
+      x += SEP + GAP;
+      elems.push(<CellBox key={`op-${row}-right`} x={x} y={cursorY} cell={right && !isBlank(right) ? right : null} />);
+      x += CELL + GAP;
+      elems.push(<Separator key={`op-${row}-arrow`} x={x} y={cursorY} text="→" height={CELL} />);
+      x += SEP + GAP;
+      elems.push(<CellBox key={`op-${row}-output`} x={x} y={cursorY} cell={output && !isBlank(output) ? output : null} />);
+      cursorY += CELL + GAP;
+    }
+    cursorY -= GAP;
+  } else if (puzzle.layout === "grid3x3") {
     const gridW = CELL * 3 + GAP * 2;
     const startX = (WIDTH - gridW) / 2;
     for (let i = 0; i < 9; i++) {
@@ -218,7 +262,7 @@ export function PuzzleImage({ puzzle }: { puzzle: Puzzle }): ReactElement {
  * never call it. The returned string carries an `xmlns` (added by PuzzleImage)
  * so it is a valid standalone document for resvg.
  */
-export function puzzleToSvg(puzzle: Puzzle): string {
+export function puzzleToSvg(puzzle: Puzzle | PublicPuzzle): string {
   // Synchronous, server-only resolution via createRequire so this module never
   // pulls react-dom/server into a client/edge bundle merely by being imported.
   const require = createRequire(import.meta.url);

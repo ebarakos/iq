@@ -68,6 +68,10 @@ describe("AttemptFileSchema round-trip", () => {
     expect(parsed.attempts).toHaveLength(2);
     expect(parsed.attempts[0].chosen).toBe(2);
     expect(parsed.attempts[1].chosen).toBeNull();
+    // Legacy artifacts remain valid without generation/budget/cost fields.
+    expect(parsed.attempts[0].generation).toBeUndefined();
+    expect(parsed.attempts[0].attemptBudget).toBeUndefined();
+    expect(parsed.attempts[0].costUsd).toBeUndefined();
     // Round-trips through JSON unchanged.
     expect(AttemptFileSchema.parse(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
 
@@ -76,5 +80,46 @@ describe("AttemptFileSchema round-trip", () => {
     // raw over 200 chars is rejected.
     const longRaw = { ...artifact, attempts: [{ ...artifact.attempts[0], raw: "x".repeat(201) }] };
     expect(AttemptFileSchema.safeParse(longRaw).success).toBe(false);
+  });
+
+  it("round-trips optional generator bucket, attempt budget, and actual cost", () => {
+    const artifact = {
+      runId: "2026-08-13T00-00-00.000Z-vision-model-image",
+      startedAt: "2026-08-13T00:00:00.000Z",
+      provider: "provider",
+      model: "vision-model",
+      channel: "image" as const,
+      promptVersion: SOLVER_PROMPT_VERSION,
+      attempts: [{
+        itemId: "gen-sequence-12345678",
+        chosen: 1,
+        correct: true,
+        latencyMs: 500,
+        attemptBudget: 1,
+        costUsd: 0.0012,
+        generation: {
+          generatorVersion: "procedural-v1",
+          familyId: "sequence-transform-v1",
+          programFingerprint: "0123456789abcdef",
+          featureBucket: "procedural-v1|sequence-transform-v1|d3|c2|p1|a-count|w1|near-miss",
+          features: {
+            difficulty: 3,
+            ruleComplexity: 2,
+            programDepth: 1,
+            activeDimensions: ["count"],
+            usesWrap: true,
+            distractorStrategy: "near-miss",
+          },
+        },
+        raw: "B",
+        ts: "2026-08-13T00:00:01.000Z",
+      }],
+    };
+
+    expect(AttemptFileSchema.parse(artifact)).toEqual(artifact);
+    expect(AttemptFileSchema.safeParse({
+      ...artifact,
+      attempts: [{ ...artifact.attempts[0], costUsd: -1 }],
+    }).success).toBe(false);
   });
 });

@@ -31,6 +31,9 @@ coverage/
 test-results/
 playwright-report/
 
+# qa runner logs
+qa/runs/
+
 # os / editor
 .DS_Store
 Thumbs.db

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { FILLS, isInstantlyDistinct, ORIENTABLE_SHAPES, ROTATIONS, SHAPES, SIZES } from "./domains";
-import { RuleSchema } from "./rules";
+import { DIMENSIONS, RuleSchema } from "./rules";
 
 /**
  * Visual puzzle schema — the contract between the generator (llm-relay model)
@@ -45,12 +45,45 @@ export const PanelSchema = z.union([
 ]);
 export type Panel = z.infer<typeof PanelSchema>;
 
-export const PUZZLE_TYPES = ["matrix", "sequence", "analogy", "oddOneOut"] as const;
+export const PUZZLE_TYPES = ["matrix", "sequence", "analogy", "oddOneOut", "operatorInduction"] as const;
 export type PuzzleType = (typeof PUZZLE_TYPES)[number];
 
 /** How the stem panels are arranged on screen. */
-export const LAYOUTS = ["grid3x3", "row", "analogy"] as const;
+export const LAYOUTS = ["grid3x3", "row", "analogy", "operatorTable"] as const;
 export type Layout = (typeof LAYOUTS)[number];
+
+/** Public visual legend for the per-item nominal shape order used by an operator puzzle. */
+export const OperatorLegendSchema = z.object({
+  shapeCycle: z
+    .array(z.enum(SHAPES))
+    .min(3)
+    .max(6)
+    .refine((values) => new Set(values).size === values.length, {
+      message: "operator shapeCycle values must be distinct",
+    }),
+});
+export type OperatorLegend = z.infer<typeof OperatorLegendSchema>;
+
+/** Stable, compact features used to calibrate generated puzzle buckets. */
+export const GenerationFeatureVectorSchema = z.object({
+  difficulty: z.number().int().min(1).max(5),
+  ruleComplexity: z.number().int().nonnegative(),
+  programDepth: z.number().int().positive(),
+  activeDimensions: z.array(z.enum(DIMENSIONS)).max(DIMENSIONS.length),
+  usesWrap: z.boolean(),
+  distractorStrategy: z.enum(["near-miss", "coherent-outlier"]),
+}).strict();
+export type GenerationFeatureVector = z.infer<typeof GenerationFeatureVectorSchema>;
+
+/** Internal generator provenance. Explicit public DTOs below omit this object. */
+export const GenerationMetadataSchema = z.object({
+  generatorVersion: z.string().min(1),
+  familyId: z.string().min(1),
+  programFingerprint: z.string().regex(/^[a-f0-9]{16}$/),
+  featureBucket: z.string().min(1),
+  features: GenerationFeatureVectorSchema,
+}).strict();
+export type GenerationMetadata = z.infer<typeof GenerationMetadataSchema>;
 
 export const PuzzleSchema = z
   .object({
@@ -61,6 +94,8 @@ export const PuzzleSchema = z
     /** 1 (easiest) … 5 (hardest). */
     difficulty: z.number().int().min(1).max(5),
     layout: z.enum(LAYOUTS),
+    /** Visible ordering for nominal shape arithmetic; never contains answer data. */
+    operatorLegend: OperatorLegendSchema.optional(),
     /**
      * The question, as a list of panels.
      *  - matrix:    9 panels (grid3x3) with exactly one { blank: true }
@@ -75,6 +110,8 @@ export const PuzzleSchema = z
     answerIndex: z.number().int().min(0),
     /** One-line reason the answer is correct (shown in review, not during solving). */
     explanation: z.string().min(3).max(240),
+    /** Present on deterministic runtime items; absent on legacy/authored items. */
+    generation: GenerationMetadataSchema.optional(),
     /**
      * Machine-readable rule the puzzle follows (see rules.ts). Optional escape
      * hatch: items without a rule are "unvalidated" — renderable and servable,
@@ -112,6 +149,41 @@ export const PuzzleSchema = z
       if (p.layout !== "row" || p.stem.length !== 0) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "oddOneOut must have layout 'row' and an empty stem" });
       }
+    } else if (p.type === "operatorInduction") {
+      // Consecutive triples encode (left, right) -> output. There are 3–5
+      // worked triples followed by one query triple whose output is the blank.
+      const validLength = p.stem.length === 12 || p.stem.length === 15 || p.stem.length === 18;
+      const lastIsBlank = p.stem.length > 0 && isBlank(p.stem[p.stem.length - 1]);
+      if (p.layout !== "operatorTable" || !validLength || blanks !== 1 || !lastIsBlank) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "operatorInduction must be 3–5 worked triples plus one query triple, with its only blank last",
+        });
+      }
+      if (!p.operatorLegend) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["operatorLegend"], message: "operatorInduction needs a visible shapeCycle legend" });
+      } else {
+        const allowed = new Set(p.operatorLegend.shapeCycle);
+        const cells = [
+          ...p.stem.filter((panel): panel is Cell => !isBlank(panel)),
+          ...p.options,
+        ];
+        if (cells.some((cell) => !allowed.has(cell.shape))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["operatorLegend", "shapeCycle"],
+            message: "every operatorInduction cell shape must appear in its visible shapeCycle",
+          });
+        }
+      }
+    }
+
+    if (p.type !== "operatorInduction" && p.operatorLegend !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["operatorLegend"],
+        message: "operatorLegend is only valid for operatorInduction puzzles",
+      });
     }
 
     // Legibility doctrine: every pair of options must be INSTANTLY tellable
@@ -150,6 +222,30 @@ export const PuzzleSchema = z
 
 export type Puzzle = z.infer<typeof PuzzleSchema>;
 
+/**
+ * Answer-free puzzle contract served before a quiz is submitted.
+ *
+ * Keep this as an explicit schema rather than relying on TypeScript's `Omit`:
+ * types disappear at runtime, while this schema also strips unknown private
+ * fields if an internal puzzle is passed to it.
+ */
+export const PublicPuzzleSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(PUZZLE_TYPES),
+  instruction: z.string().min(3).max(140),
+  difficulty: z.number().int().min(1).max(5),
+  layout: z.enum(LAYOUTS),
+  operatorLegend: OperatorLegendSchema.optional(),
+  stem: z.array(PanelSchema),
+  options: z.array(CellSchema).min(4).max(6),
+});
+export type PublicPuzzle = z.infer<typeof PublicPuzzleSchema>;
+
+/** Strip the answer key and authoring metadata at the server boundary. */
+export function toPublicPuzzle(puzzle: Puzzle): PublicPuzzle {
+  return PublicPuzzleSchema.parse(puzzle);
+}
+
 /** A full test is exactly 5 puzzles for the MVP, each with a distinct id. */
 export const PuzzleSetSchema = z
   .array(PuzzleSchema)
@@ -158,6 +254,19 @@ export const PuzzleSetSchema = z
     message: "puzzle ids must be unique across the set",
   });
 export type PuzzleSet = z.infer<typeof PuzzleSetSchema>;
+
+export const PublicPuzzleSetSchema = z
+  .array(PublicPuzzleSchema)
+  .length(5)
+  .refine((set) => new Set(set.map((p) => p.id)).size === set.length, {
+    message: "puzzle ids must be unique across the set",
+  });
+export type PublicPuzzleSet = z.infer<typeof PublicPuzzleSetSchema>;
+
+/** Strip private fields from a complete five-question quiz. */
+export function toPublicPuzzleSet(puzzles: PuzzleSet): PublicPuzzleSet {
+  return PublicPuzzleSetSchema.parse(puzzles);
+}
 
 /** Type guard: is this panel a blank placeholder? */
 export function isBlank(panel: Panel): panel is { blank: true } {

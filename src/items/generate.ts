@@ -1,18 +1,39 @@
+import { createHash } from "node:crypto";
 import { isInstantlyDistinct, ORIENTABLE_SHAPES, SHAPES, type Shape } from "./domains";
-import { pick, randInt, shuffled, type Rng } from "../lib/rng";
+import { pick, randInt, seededRng, shuffled, type Rng, type Seed } from "../lib/rng";
 import {
+  analyzeOperatorStem,
+  applyOperatorProgram,
   applyTransform,
   applyTransforms,
   checkRule,
   deriveAnswer,
   DIM_DOMAINS,
   DIMENSIONS,
+  enumerateOperatorExpressions,
+  operatorPredicateValue,
+  OPERATOR_DIMS,
   type Dim,
   type DimTransform,
   type DimTransforms,
+  type OperatorDim,
+  type OperatorExpression,
+  type OperatorPredicate,
+  type OperatorProgram,
   type Rule,
 } from "./rules";
-import { PuzzleSchema, type Cell, type Panel, type PuzzleType, type Puzzle } from "./schema";
+import {
+  PUZZLE_TYPES,
+  PuzzleSchema,
+  PuzzleSetSchema,
+  type Cell,
+  type GenerationMetadata,
+  type OperatorLegend,
+  type Panel,
+  type PuzzleType,
+  type Puzzle,
+  type PuzzleSet,
+} from "./schema";
 
 /**
  * Procedural puzzle generator — items correct by construction.
@@ -27,6 +48,29 @@ import { PuzzleSchema, type Cell, type Panel, type PuzzleType, type Puzzle } fro
  */
 
 const MAX_ATTEMPTS = 100;
+
+/** Change this value whenever deterministic quiz-generation semantics change. */
+export const CURRENT_GENERATOR_VERSION = "procedural-v2" as const;
+export type GeneratorVersion = "procedural-v1" | typeof CURRENT_GENERATOR_VERSION;
+
+const LEGACY_PUZZLE_TYPES = ["matrix", "sequence", "analogy", "oddOneOut"] as const;
+
+/** The same user-facing profiles used by the existing bank-backed quiz. */
+export type QuizProfile = "easy" | "standard" | "hard";
+
+const FAMILY_IDS: Record<PuzzleType, string> = {
+  matrix: "matrix-axis-transform-v1",
+  sequence: "sequence-transform-v1",
+  analogy: "analogy-transform-v1",
+  oddOneOut: "odd-one-out-v1",
+  operatorInduction: "operator-induction-v1",
+};
+
+const QUIZ_DIFFICULTY_RAMPS: Record<QuizProfile, readonly (1 | 2 | 3 | 4 | 5)[]> = {
+  easy: [1, 1, 2, 2, 3],
+  standard: [2, 2, 3, 3, 5],
+  hard: [3, 4, 4, 5, 5],
+};
 
 /** Non-shape dims a step transform can govern. Shape is nominal (cycle only). */
 const STEP_DIMS = ["count", "rotation", "fill", "size"] as const;
@@ -410,11 +454,132 @@ function buildOddOneOut(
   return { options: shuffledOpts, answerIndex: order.indexOf(options.length - 1) };
 }
 
+// ── Visual operator induction ──────────────────────────────────────────────
+
+function operatorCell(rng: Rng, legend: OperatorLegend): Cell {
+  return {
+    shape: pick(rng, legend.shapeCycle),
+    count: pick(rng, DIM_DOMAINS.count as readonly Cell["count"][]),
+    rotation: 0,
+    fill: pick(rng, DIM_DOMAINS.fill as readonly Cell["fill"][]),
+    size: pick(rng, DIM_DOMAINS.size as readonly Cell["size"][]),
+  };
+}
+
+function sampleBaseExpression(dim: OperatorDim, rng: Rng, preferArithmetic: boolean): OperatorExpression {
+  const bases = enumerateOperatorExpressions(dim, SHAPES.slice(0, 4)).filter((expr) => expr.op !== "if");
+  const arithmetic = bases.filter((expr) => expr.op !== "left" && expr.op !== "right");
+  return pick(rng, preferArithmetic && arithmetic.length ? arithmetic : bases);
+}
+
+function availablePredicates(dim: OperatorDim): OperatorPredicate[] {
+  const predicates: OperatorPredicate[] = OPERATOR_DIMS.filter((control) => control !== dim).map(
+    (dimension) => ({ kind: "equal" as const, dimension }),
+  );
+  if (dim !== "count") predicates.push({ kind: "sumCountsEven" });
+  return predicates;
+}
+
+function sampleConditionalExpression(dim: OperatorDim, rng: Rng): OperatorExpression {
+  const bases = enumerateOperatorExpressions(dim, SHAPES.slice(0, 4)).filter(
+    (expr): expr is Exclude<OperatorExpression, { op: "if" }> => expr.op !== "if",
+  );
+  const whenTrue = pick(rng, bases);
+  const alternatives = bases.filter((base) => base.op !== whenTrue.op);
+  return {
+    op: "if",
+    predicate: pick(rng, availablePredicates(dim)),
+    whenTrue,
+    whenFalse: pick(rng, alternatives),
+  };
+}
+
+function sampleOperatorProgram(difficulty: 1 | 2 | 3 | 4 | 5, rng: Rng): OperatorProgram {
+  const conditionalDim = difficulty >= 4 ? pick(rng, OPERATOR_DIMS) : null;
+  const arithmeticDims = shuffled(rng, ["shape", "count"] as const).slice(0, difficulty >= 3 ? 2 : 1);
+  const program = {} as OperatorProgram;
+  for (const dim of OPERATOR_DIMS) {
+    program[dim] =
+      dim === conditionalDim
+        ? sampleConditionalExpression(dim, rng)
+        : sampleBaseExpression(dim, rng, arithmeticDims.includes(dim as "shape" | "count"));
+  }
+  // The arithmetic preference guarantees a non-trivial program at every level.
+  return program;
+}
+
+function branchCoverage(
+  program: OperatorProgram,
+  examples: { left: Cell; right: Cell }[],
+): boolean {
+  for (const dim of OPERATOR_DIMS) {
+    const expression = program[dim];
+    if (expression.op !== "if") continue;
+    const outcomes = examples.map(({ left, right }) => operatorPredicateValue(expression.predicate, left, right));
+    const trueCount = outcomes.filter(Boolean).length;
+    if (trueCount < 2 || outcomes.length - trueCount < 2) return false;
+  }
+  return true;
+}
+
+function buildOperatorPuzzleParts(
+  difficulty: 1 | 2 | 3 | 4 | 5,
+  rng: Rng,
+): { rule: Extract<Rule, { kind: "operatorInduction" }>; legend: OperatorLegend; stem: Panel[]; options: Cell[]; answerIndex: number } | null {
+  const legend: OperatorLegend = { shapeCycle: shuffled(rng, SHAPES).slice(0, difficulty >= 3 ? 4 : 3) };
+  const program = sampleOperatorProgram(difficulty, rng);
+  const workedCount = difficulty >= 4 ? 5 : 4;
+  const inputRows = Array.from({ length: workedCount + 1 }, () => ({
+    left: operatorCell(rng, legend),
+    right: operatorCell(rng, legend),
+  }));
+  if (!branchCoverage(program, inputRows.slice(0, workedCount))) return null;
+
+  const worked = inputRows.slice(0, workedCount).map(({ left, right }) => ({
+    left,
+    right,
+    output: applyOperatorProgram(program, left, right, legend.shapeCycle),
+  }));
+  if (worked.some(({ output }) => output === null)) return null;
+  const query = inputRows[workedCount];
+  const stem: Panel[] = [
+    ...worked.flatMap(({ left, right, output }) => [left, right, output!] as Cell[]),
+    query.left,
+    query.right,
+    { blank: true },
+  ];
+
+  const analysis = analyzeOperatorStem(stem, legend);
+  if (!analysis.ok || !analysis.answer) return null;
+  const distractors: Cell[] = [];
+  for (const nearMiss of analysis.nearMisses) {
+    if (!isInstantlyDistinct(nearMiss.cell, analysis.answer)) continue;
+    if (distractors.some((cell) => !isInstantlyDistinct(cell, nearMiss.cell))) continue;
+    distractors.push(nearMiss.cell);
+    if (distractors.length === 3) break;
+  }
+  if (distractors.length < 3) return null;
+
+  const all = [analysis.answer, ...distractors];
+  const order = shuffled(rng, all.map((_, index) => index));
+  return {
+    rule: { kind: "operatorInduction", program },
+    legend,
+    stem,
+    options: order.map((index) => all[index]),
+    answerIndex: order.indexOf(0),
+  };
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /** Sample a rule for `type` whose complexity matches `difficulty` (visibility honoured). */
 export function sampleRule(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, rng: Rng): Rule {
   const budget = budgetFor(difficulty);
+
+  if (type === "operatorInduction") {
+    return { kind: "operatorInduction", program: sampleOperatorProgram(difficulty, rng) };
+  }
 
   if (type === "oddOneOut") {
     // Difficulty drives distractor proximity, not rule shape; pick any dimension/value.
@@ -481,6 +646,7 @@ function shapeConstraint(transforms: DimTransforms): { shape?: Shape; cycle?: (s
 /** Build a stem the rule explains (anchors chosen so every step stays in-domain). [] for oddOneOut. */
 export function generateStem(rule: Rule, rng: Rng): Panel[] {
   if (rule.kind === "oddOneOut") return [];
+  if (rule.kind === "operatorInduction") return [];
   if (rule.kind === "sequence") {
     const { shape, cycle } = shapeConstraint(rule.transforms);
     const drawn = randInt(rng, 3, 5);
@@ -502,7 +668,7 @@ export function generateStem(rule: Rule, rng: Rng): Panel[] {
  * Returns visualSignature-distinct cells excluding the answer.
  */
 export function generateDistractors(rule: Rule, answer: Cell, stem: Panel[], difficulty: number, rng: Rng): Cell[] {
-  if (rule.kind === "oddOneOut") return []; // oddOneOut builds its own option set
+  if (rule.kind === "oddOneOut" || rule.kind === "operatorInduction") return []; // these build their own option sets
   const want = difficulty >= 5 && rng() < 0.5 ? randInt(rng, 4, 5) : 3;
   return generateDerivedDistractors(answer, stem, difficulty, rng, want) ?? [];
 }
@@ -512,6 +678,7 @@ const INSTRUCTIONS: Record<PuzzleType, string> = {
   sequence: "Which option continues the sequence?",
   analogy: "Which option completes the analogy?",
   oddOneOut: "Which one does not belong?",
+  operatorInduction: "Infer the visual operation. Which output completes the last row?",
 };
 
 const LAYOUTS: Record<PuzzleType, Puzzle["layout"]> = {
@@ -519,6 +686,7 @@ const LAYOUTS: Record<PuzzleType, Puzzle["layout"]> = {
   sequence: "row",
   analogy: "analogy",
   oddOneOut: "row",
+  operatorInduction: "operatorTable",
 };
 
 /** Plain-words description of a single transform, for the auto-written explanation. */
@@ -558,6 +726,8 @@ function explain(rule: Rule): string {
     }
     case "oddOneOut":
       return `Every other option shares ${rule.dimension} ${JSON.stringify(rule.value)}; the odd one breaks it.`;
+    case "operatorInduction":
+      return "The same visual operation combines each pair; applying it to the final pair gives the answer.";
   }
 }
 
@@ -568,6 +738,96 @@ function hexId(rng: Rng): string {
   return s;
 }
 
+/** JSON with recursively sorted object keys, used only for stable fingerprints. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function activeDimensions(rule: Rule): Dim[] {
+  if (rule.kind === "oddOneOut") return [rule.dimension];
+  if (rule.kind === "operatorInduction") {
+    return OPERATOR_DIMS.filter((dim) => rule.program[dim].op !== "left");
+  }
+  if (rule.kind === "matrix") {
+    return DIMENSIONS.filter((dim) => {
+      const row = rule.row[dim];
+      const col = rule.col[dim];
+      return (row !== undefined && row.op !== "constant") || (col !== undefined && col.op !== "constant");
+    });
+  }
+  return DIMENSIONS.filter((dim) => {
+    const transform = rule.transforms[dim];
+    return transform !== undefined && transform.op !== "constant";
+  });
+}
+
+function transformsFor(rule: Rule): DimTransforms[] {
+  if (rule.kind === "oddOneOut" || rule.kind === "operatorInduction") return [];
+  return rule.kind === "matrix" ? [rule.row, rule.col] : [rule.transforms];
+}
+
+/** Derive stable provenance without storing the quiz seed or exposing the rule. */
+function generationMetadata(
+  puzzle: Puzzle,
+  generatorVersion: string,
+): GenerationMetadata {
+  if (!puzzle.rule) throw new Error(`generated puzzle ${puzzle.id} is missing its rule`);
+  const rule = puzzle.rule;
+  const dimensions = activeDimensions(rule);
+  const maps = transformsFor(rule);
+  const usesWrap = maps.some((transforms) => DIMENSIONS.some((dim) => {
+    const transform = transforms[dim];
+    return transform?.op === "step" && (transform.wrap || dim === "rotation");
+  }));
+  const activeAxes = rule.kind === "operatorInduction"
+    ? OPERATOR_DIMS.some((dim) => rule.program[dim].op === "if") ? 2 : 1
+    : rule.kind === "matrix"
+    ? [rule.row, rule.col].filter((transforms) => DIMENSIONS.some((dim) => {
+      const transform = transforms[dim];
+      return transform !== undefined && transform.op !== "constant";
+    })).length
+    : 1;
+  const complexity = ruleComplexity(rule);
+  const strategy = rule.kind === "oddOneOut" ? "coherent-outlier" : "near-miss";
+  const familyId = FAMILY_IDS[puzzle.type];
+  const dimensionKey = dimensions.join("+") || "none";
+  const featureBucket = [
+    generatorVersion,
+    familyId,
+    `d${puzzle.difficulty}`,
+    `c${complexity}`,
+    `p${activeAxes}`,
+    `a-${dimensionKey}`,
+    `w${usesWrap ? 1 : 0}`,
+    strategy,
+  ].join("|");
+
+  return {
+    generatorVersion,
+    familyId,
+    programFingerprint: createHash("sha256")
+      .update(`aiq-program-v1\0${canonicalJson(rule)}`)
+      .digest("hex")
+      .slice(0, 16),
+    featureBucket,
+    features: {
+      difficulty: puzzle.difficulty,
+      ruleComplexity: complexity,
+      programDepth: activeAxes,
+      activeDimensions: dimensions,
+      usesWrap,
+      distractorStrategy: strategy,
+    },
+  };
+}
+
 /**
  * Generate a puzzle correct by construction: it passes PuzzleSchema.parse AND
  * checkRule. Rejection-samples (sample rule → stem → derive → options → validate)
@@ -576,13 +836,20 @@ function hexId(rng: Rng): string {
  */
 export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, rng: Rng): Puzzle {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const rule = sampleRule(type, difficulty, rng);
+    let rule = sampleRule(type, difficulty, rng);
 
     let options: Cell[];
     let answerIndex: number;
     let stem: Panel[];
+    let operatorLegend: OperatorLegend | undefined;
 
-    if (rule.kind === "oddOneOut") {
+    if (type === "operatorInduction") {
+      const built = buildOperatorPuzzleParts(difficulty, rng);
+      if (!built) continue;
+      ({ options, answerIndex, stem } = built);
+      operatorLegend = built.legend;
+      rule = built.rule;
+    } else if (rule.kind === "oddOneOut") {
       stem = [];
       const built = buildOddOneOut(rule, difficulty, rng);
       if (!built) continue;
@@ -607,6 +874,7 @@ export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, 
       instruction: INSTRUCTIONS[type],
       difficulty,
       layout: LAYOUTS[type],
+      operatorLegend,
       stem,
       options,
       answerIndex,
@@ -623,12 +891,58 @@ export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, 
 }
 
 /**
+ * Generate a complete reproducible quiz from the current procedural families.
+ *
+ * Each slot has its own named random stream, so rejection sampling or a future
+ * change in one family cannot perturb the remaining slots without a generator
+ * version change. procedural-v1 retains its four-family layout for exact replay;
+ * procedural-v2 has exactly one item from each of the five current families.
+ */
+export function generateQuiz(seed: Seed, generatorVersion: string, profile: QuizProfile): PuzzleSet {
+  if (generatorVersion !== "procedural-v1" && generatorVersion !== CURRENT_GENERATOR_VERSION) {
+    throw new Error(`unsupported generator version: ${generatorVersion}`);
+  }
+
+  const difficulties = QUIZ_DIFFICULTY_RAMPS[profile];
+  if (!difficulties) throw new Error(`unsupported quiz profile: ${String(profile)}`);
+
+  const layoutRng = seededRng(seed, `${generatorVersion}:layout`);
+  const familyOrder = shuffled(
+    layoutRng,
+    generatorVersion === "procedural-v1" ? LEGACY_PUZZLE_TYPES : PUZZLE_TYPES,
+  );
+  const types: PuzzleType[] =
+    generatorVersion === "procedural-v1"
+      ? [...familyOrder, pick(layoutRng, familyOrder)]
+      : [...familyOrder];
+  const puzzles = difficulties.map((difficulty, index) => {
+    const type = types[index];
+    const rng = seededRng(seed, `${generatorVersion}:${profile}:slot-${index}:${type}:d${difficulty}`);
+    const puzzle = generatePuzzle(type, difficulty, rng);
+    return PuzzleSchema.parse({
+      ...puzzle,
+      generation: generationMetadata(puzzle, generatorVersion),
+    });
+  });
+
+  return PuzzleSetSchema.parse(puzzles);
+}
+
+/**
  * A-priori difficulty anchor (Q5): a small integer scoring a rule's intrinsic
  * complexity. Higher = harder. Recalibrated empirically from attempt data later
  * (Phase D); for now it orders procedurally generated items before any data.
  */
 export function ruleComplexity(rule: Rule): number {
   if (rule.kind === "oddOneOut") return 1; // proximity is the lever, not rule shape
+  if (rule.kind === "operatorInduction") {
+    return OPERATOR_DIMS.reduce((score, dim) => {
+      const expression = rule.program[dim];
+      if (expression.op === "left") return score;
+      if (expression.op === "if") return score + 3;
+      return score + (expression.op === "right" ? 1 : 2);
+    }, 0);
+  }
   const score = (transforms: DimTransforms): number => {
     let s = 0;
     for (const dim of DIMENSIONS) {

@@ -226,6 +226,18 @@ function printByModelTable(rollups: ItemRollup[]): void {
   }
 }
 
+function printBucketTable(rollups: CalibrationReport["imageBucketRollups"]): void {
+  printHeader("By generated feature bucket  [image channel]");
+  if (rollups.length === 0) {
+    console.log("  (no generated-item attempts with bucket metadata)");
+    return;
+  }
+  for (const row of rollups) {
+    console.log(`  ${row.featureBucket}`);
+    console.log(`    attempts=${row.attempts}  solveRate=${pct(row.solveRate)}`);
+  }
+}
+
 function printDivergenceSection(divergence: CalibrationReport["divergence"]): void {
   printHeader("Divergence: a-priori difficulty × agent calibration tag");
   console.log("  NOTE: Until a DB exists, a-priori puzzle difficulty is the human-difficulty proxy.");
@@ -284,6 +296,7 @@ function printReport(files: AttemptFile[], bank: BankItem[], versionLabel?: stri
   printItemTable(report.imageRollups, bank, "Per-item results  [image channel — headline]");
   printTierTable(report.byTier);
   printTypeTable(report.byType);
+  printBucketTable(report.imageBucketRollups);
   printByModelTable(report.imageRollups);
   printDivergenceSection(report.divergence);
 

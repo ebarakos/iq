@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import type { Puzzle } from "@/items/schema";
+import type { Puzzle, PublicPuzzle } from "@/items/schema";
 import type { Channel } from "./attempts";
 import { relayModel } from "./model";
 import { puzzleToSvg } from "@/items/compose-image";
@@ -78,7 +78,7 @@ export function parseAnswerLetter(raw: string, optionCount: number): number | nu
  * answerIndex, explanation and rule are stripped so a text model cannot read
  * the answer off the JSON.
  */
-function symbolicPayload(puzzle: Puzzle): string {
+function symbolicPayload(puzzle: Puzzle | PublicPuzzle): string {
   const body = {
     instruction: puzzle.instruction,
     layout: puzzle.layout,
@@ -89,7 +89,7 @@ function symbolicPayload(puzzle: Puzzle): string {
 }
 
 /** Render a puzzle's composed SVG to PNG bytes via resvg (lazily imported). */
-async function renderPng(puzzle: Puzzle): Promise<Uint8Array> {
+async function renderPng(puzzle: Puzzle | PublicPuzzle): Promise<Uint8Array> {
   // Dynamic import keeps the native @resvg/resvg-js module out of the dependency
   // graph when solver.ts is imported in vitest (symbolic-only / parser tests).
   const { Resvg } = await import("@resvg/resvg-js");
@@ -104,7 +104,7 @@ async function renderPng(puzzle: Puzzle): Promise<Uint8Array> {
  * multimodal `messages` content parts. maxRetries: 0 — the relay handles
  * provider reliability; we want one clean attempt per call.
  */
-export async function solveItem(puzzle: Puzzle, channel: Channel, opts?: SolverOpts): Promise<SolveOutcome> {
+export async function solveItem(puzzle: Puzzle | PublicPuzzle, channel: Channel, opts?: SolverOpts): Promise<SolveOutcome> {
   const { model } = relayModel({ provider: opts?.provider, model: opts?.model, apiKey: opts?.apiKey });
   const abortSignal = AbortSignal.timeout(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const optionCount = puzzle.options.length;

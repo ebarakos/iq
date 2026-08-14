@@ -4,12 +4,12 @@
 > administers them to **both humans and AI agents**, using a difficulty ladder to
 > separate "human-hard" from "agent-hard" items.
 
-**Status: MVP PROTOTYPE.** A runnable human-facing test exists (5 relay-generated
-visual puzzles → score + review). The concept and open design questions still
-live in [BRAINSTORM.md](BRAINSTORM.md); short-lived task state in [TODO.md](TODO.md).
-The MVP is a first slice, not the settled design — the agent side, the difficulty
-ladder, and the item format remain open and should go through plan mode → TODO
-before being built out.
+**Status: GENERATED REASONING-TEST PROTOTYPE.** Each five-item test is generated
+from a fresh seed, validated in pure code, served without answers, and scored
+server-side. The fifth family, visual operator induction, accepts an item only
+when every program consistent with its examples predicts the same answer. Human
+and model calibration by generator bucket remains open; this is not yet a
+standardized IQ score. See [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ### Running the MVP
 
@@ -18,30 +18,26 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Requires relay env in `.env.local` (see `.env.example`). With the default
-`openrouter` model you must set `OPENROUTER_API_KEY` in `.env.local`; the free
-`groq` alternative needs no key. If generation fails (relay down / rate-limited /
-invalid output after retries), the app falls back to a built-in sample set and
-says so in the UI.
+Production requires `QUIZ_TOKEN_SECRET` for encrypted answer tokens. Relay env is
+needed only for the agent harness and offline model experiments; human tests do
+not make model calls. See `.env.example`.
 
-### MVP architecture
+### Current architecture
 
-- `src/items/schema.ts` — Zod schema. The model emits a **constrained structured
-  spec** per cell (shape, count, rotation, fill, size) + the correct option; it
-  never draws. Covers matrix / sequence / analogy / odd-one-out.
-- `src/items/render.tsx` — deterministic SVG renderer (pure functions of the
-  spec), so the drawn puzzle always matches the generator's declared answer.
-- `src/lib/model.ts` — relay client (`client.chat()` → OpenAI-compatible
-  `/v1/chat/completions`); generates, extracts JSON, validates, and retries with
-  the specific Zod failures fed back to the model.
-- `src/app/api/generate/route.ts` — POST endpoint; falls back to
-  `src/items/fallback.ts` on failure.
-- `src/app/page.tsx` — quiz UI (intro → 5 questions → score + per-item review).
-
-**Known MVP limitation:** answer correctness depends on the generating model — a
-weak model occasionally mis-marks the correct option. A stronger model (the
-OpenRouter default) largely fixes this; a real semantic validator that re-derives
-the answer from the rule is future work (see BRAINSTORM Q4/Q5).
+- `src/items/schema.ts` — internal puzzle schema plus the explicit answer-free
+  public contract.
+- `src/items/rules.ts` — rule DSL, semantic validator, bounded operator grammar,
+  and full-grammar uniqueness oracle.
+- `src/items/generate.ts` — versioned seeded generator. `procedural-v1` is
+  replayable; `procedural-v2` produces one item from each of five families.
+- `src/items/render.tsx` / `src/items/compose-image.tsx` — deterministic human
+  and agent renderers over the same visible data.
+- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
+  token and server-side scoring.
+- `src/lib/solver.ts` / `scripts/agent-run.ts` — relay-backed vision-model
+  harness using the same answer-free public puzzle.
+- `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by
+  generator feature bucket; exact-item results remain diagnostics.
 
 ---
 

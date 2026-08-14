@@ -20,7 +20,7 @@ import { parseArgs } from "node:util";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { loadBank, type BankItem } from "../src/items/bank";
-import { shuffleOptions, visualSignature, type Puzzle, type PuzzleType } from "../src/items/schema";
+import { shuffleOptions, toPublicPuzzle, visualSignature, type Puzzle, type PuzzleType } from "../src/items/schema";
 import { solveItem, SOLVER_PROMPT_VERSION } from "../src/lib/solver";
 import { AttemptFileSchema, type Attempt, type AttemptFile, type Channel } from "../src/lib/attempts";
 import { isRateLimitError } from "../src/lib/relay-errors";
@@ -114,7 +114,9 @@ async function main() {
       const canonical = item.puzzle;
       const shuffled = shuffleOptions(canonical);
       try {
-        const outcome = await solveItem(shuffled, channel, { provider, model });
+        // The solver receives the same answer-free contract as a browser. The
+        // canonical puzzle stays local only for scoring and artifact metadata.
+        const outcome = await solveItem(toPublicPuzzle(shuffled), channel, { provider, model });
         const chosen = canonicalIndex(canonical, shuffled, outcome.chosen);
         const correct = chosen !== null && chosen === canonical.answerIndex;
         attempts.push({
@@ -122,6 +124,8 @@ async function main() {
           chosen,
           correct,
           latencyMs: outcome.latencyMs,
+          generation: canonical.generation,
+          attemptBudget: 1,
           raw: outcome.raw.slice(0, 200),
           ts: new Date().toISOString(),
         });
@@ -138,6 +142,8 @@ async function main() {
           chosen: null,
           correct: false,
           latencyMs: 0,
+          generation: canonical.generation,
+          attemptBudget: 1,
           raw: (err instanceof Error ? err.message : String(err)).slice(0, 200),
           ts: new Date().toISOString(),
         });

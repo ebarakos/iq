@@ -1,5 +1,5 @@
 import React from "react";
-import type { Cell, Panel, Puzzle } from "./schema";
+import type { Cell, Panel, Puzzle, PublicPuzzle } from "./schema";
 import { isBlank } from "./schema";
 
 /** Short factual description of a cell for screen readers, e.g. "2 solid medium triangles, rotated 45°". */
@@ -134,12 +134,46 @@ function PanelBox({ panel }: { panel: Panel }) {
 }
 
 /** Render a puzzle's stem (the question) according to its layout. */
-export function StemView({ puzzle }: { puzzle: Puzzle }) {
+export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
   if (puzzle.layout === "grid3x3") {
     return (
       <div className="mx-auto grid w-full max-w-[280px] grid-cols-3 gap-2">
         {puzzle.stem.map((panel, i) => (
           <PanelBox key={i} panel={panel} />
+        ))}
+      </div>
+    );
+  }
+
+  if (puzzle.layout === "operatorTable") {
+    const rows = Array.from({ length: puzzle.stem.length / 3 }, (_, index) =>
+      puzzle.stem.slice(index * 3, index * 3 + 3),
+    );
+    return (
+      <div className="mx-auto flex w-full max-w-[390px] flex-col items-center gap-3">
+        {puzzle.operatorLegend && (
+          <div className="flex items-center justify-center gap-1" aria-label="Shape order">
+            {puzzle.operatorLegend.shapeCycle.map((shape, index) => (
+              <React.Fragment key={shape}>
+                {index > 0 && <span className="text-gray-400">→</span>}
+                <div className="w-8">
+                  <CellGraphic
+                    cell={{ shape, count: 1, rotation: 0, fill: "outline", size: "l" }}
+                    className="h-full w-full"
+                  />
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+        {rows.map(([left, right, output], index) => (
+          <div key={index} className="flex w-full items-center justify-center gap-2">
+            <div className="w-16">{left && <PanelBox panel={left} />}</div>
+            <span className="text-xl font-semibold text-gray-400" aria-label="combined with">◆</span>
+            <div className="w-16">{right && <PanelBox panel={right} />}</div>
+            <span className="text-xl font-semibold text-gray-400">→</span>
+            <div className="w-16">{output && <PanelBox panel={output} />}</div>
+          </div>
         ))}
       </div>
     );

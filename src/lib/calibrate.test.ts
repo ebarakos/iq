@@ -17,6 +17,7 @@ import {
 } from "./calibrate";
 import { loadBank, type BankItem } from "@/items/bank";
 import type { AttemptFile } from "./attempts";
+import type { GenerationMetadata } from "@/items/schema";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -42,7 +43,7 @@ function makeFile(
     channel?: "image" | "symbolic";
     promptVersion?: string;
   },
-  attempts: Array<{ itemId: string; correct: boolean }>,
+  attempts: Array<{ itemId: string; correct: boolean; generation?: GenerationMetadata }>,
 ): AttemptFile {
   return {
     runId: opts.runId ?? "run-1",
@@ -51,15 +52,31 @@ function makeFile(
     model: opts.model ?? "model-a",
     channel: opts.channel ?? "image",
     promptVersion: opts.promptVersion ?? "solver-v1",
-    attempts: attempts.map(({ itemId, correct }, idx) => ({
+    attempts: attempts.map(({ itemId, correct, generation }, idx) => ({
       itemId,
       chosen: correct ? 0 : 1,
       correct,
       latencyMs: 100,
+      generation,
       ts: `2026-06-10T00:00:${String(idx).padStart(2, "0")}.000Z`,
     })),
   };
 }
+
+const GENERATED: GenerationMetadata = {
+  generatorVersion: "procedural-v1",
+  familyId: "sequence-transform-v1",
+  programFingerprint: "0123456789abcdef",
+  featureBucket: "procedural-v1|sequence-transform-v1|d3|c2|p1|a-count|w1|near-miss",
+  features: {
+    difficulty: 3,
+    ruleComplexity: 2,
+    programDepth: 1,
+    activeDimensions: ["count"],
+    usesWrap: true,
+    distractorStrategy: "near-miss",
+  },
+};
 
 // ---------------------------------------------------------------------------
 // agentTag thresholds
@@ -190,6 +207,61 @@ describe("byModel split", () => {
     expect(r!.byModel["openai/gpt-4o-mini"]).toBeDefined();
     expect(r!.byModel["openai/gpt-4o-mini"].attempts).toBe(2);
     expect(r!.byModel["openai/gpt-4o-mini"].solveRate).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Generator feature buckets
+// ---------------------------------------------------------------------------
+
+describe("generator feature bucket rollups", () => {
+  it("pools distinct generated items by bucket while preserving per-model rates", () => {
+    const modelA = makeFile({ provider: "openrouter", model: "model-a" }, [
+      { itemId: "generated-1", correct: true, generation: GENERATED },
+      { itemId: "generated-2", correct: false, generation: { ...GENERATED, programFingerprint: "fedcba9876543210" } },
+    ]);
+    const modelB = makeFile({ runId: "run-2", provider: "openai", model: "model-b" }, [
+      { itemId: "generated-3", correct: true, generation: { ...GENERATED, programFingerprint: "1111111111111111" } },
+    ]);
+
+    const report = buildReport([modelA, modelB], [B_EASY, B_HARD]);
+    expect(report.imageBucketRollups).toEqual([{
+      featureBucket: GENERATED.featureBucket,
+      attempts: 3,
+      solveRate: 2 / 3,
+      byModel: {
+        "openrouter/model-a": { attempts: 2, solveRate: 0.5 },
+        "openai/model-b": { attempts: 1, solveRate: 1 },
+      },
+    }]);
+    // Exact-item rollups remain available as diagnostics.
+    expect(report.imageRollups.map((rollup) => rollup.itemId)).toEqual([
+      "generated-1",
+      "generated-2",
+      "generated-3",
+    ]);
+  });
+
+  it("keeps image and symbolic buckets separate", () => {
+    const image = makeFile({ channel: "image" }, [
+      { itemId: "generated-image", correct: true, generation: GENERATED },
+    ]);
+    const symbolic = makeFile({ runId: "symbolic", channel: "symbolic" }, [
+      { itemId: "generated-symbolic", correct: false, generation: GENERATED },
+    ]);
+
+    const report = buildReport([image, symbolic], [B_EASY, B_HARD]);
+    expect(report.imageBucketRollups[0]).toMatchObject({ attempts: 1, solveRate: 1 });
+    expect(report.symbolicBucketRollups[0]).toMatchObject({ attempts: 1, solveRate: 0 });
+  });
+
+  it("keeps legacy attempts valid but excludes them from bucket rollups", () => {
+    const legacy = makeFile({}, [{ itemId: "item-easy", correct: true }]);
+    const report = buildReport([legacy], [B_EASY, B_HARD]);
+
+    expect(report.imageRollups).toHaveLength(1);
+    expect(report.imageBucketRollups).toEqual([]);
+    expect(report.symbolicBucketRollups).toEqual([]);
   });
 });
 

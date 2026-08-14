@@ -7,7 +7,7 @@
  * arrives (calibrate.ts gains a data source, not a rewrite).
  */
 
-import type { AttemptFile } from "./attempts";
+import type { Attempt, AttemptFile } from "./attempts";
 import type { BankItem } from "@/items/bank";
 
 // ---------------------------------------------------------------------------
@@ -42,6 +42,15 @@ export interface ItemRollup {
   tag: AgentTag | null;
 }
 
+/** Generator feature-bucket rollup for one channel. Exact items remain separate diagnostics. */
+export interface BucketRollup {
+  featureBucket: string;
+  attempts: number;
+  solveRate: number;
+  /** Per-model breakdown — models are never silently pooled here. */
+  byModel: Record<string, { attempts: number; solveRate: number }>;
+}
+
 /** Difficulty × tag matrix cell */
 export interface DifficultyTagMatrix {
   matrix: Record<number, Record<AgentTag | "untagged", number>>;
@@ -68,6 +77,10 @@ export interface CalibrationReport {
   imageRollups: ItemRollup[];
   /** Secondary/diagnostic rollups: channel === "symbolic". */
   symbolicRollups: ItemRollup[];
+  /** Generated-item calibration grouped by stable feature bucket, image channel. */
+  imageBucketRollups: BucketRollup[];
+  /** Generated-item calibration grouped by stable feature bucket, symbolic channel. */
+  symbolicBucketRollups: BucketRollup[];
   /** Per-difficulty-tier aggregate: attempts and solve rate (image channel). */
   byTier: { difficulty: number; attempts: number; solveRate: number }[];
   /** Per-type aggregate: attempts and solve rate (image channel). */
@@ -103,21 +116,30 @@ export function agentTag(solveRate: number): AgentTag {
 // ---------------------------------------------------------------------------
 
 /** Tally attempts and correct count per model, per item, for one channel. */
+type AggregateEntry = {
+  totalAttempts: number;
+  totalCorrect: number;
+  byModel: Map<string, { attempts: number; correct: number }>;
+};
+
 function aggregateByChannel(
   files: AttemptFile[],
   channel: "image" | "symbolic",
-): Map<string, { totalAttempts: number; totalCorrect: number; byModel: Map<string, { attempts: number; correct: number }> }> {
-  const map = new Map<string, { totalAttempts: number; totalCorrect: number; byModel: Map<string, { attempts: number; correct: number }> }>();
+  keyOf: (attempt: Attempt) => string | undefined = (attempt) => attempt.itemId,
+): Map<string, AggregateEntry> {
+  const map = new Map<string, AggregateEntry>();
 
   for (const file of files) {
     if (file.channel !== channel) continue;
     const modelKey = `${file.provider}/${file.model}`;
 
     for (const attempt of file.attempts) {
-      let entry = map.get(attempt.itemId);
+      const key = keyOf(attempt);
+      if (key === undefined) continue;
+      let entry = map.get(key);
       if (!entry) {
         entry = { totalAttempts: 0, totalCorrect: 0, byModel: new Map() };
-        map.set(attempt.itemId, entry);
+        map.set(key, entry);
       }
 
       entry.totalAttempts += 1;
@@ -138,7 +160,7 @@ function aggregateByChannel(
 
 /** Convert the aggregated map to a list of ItemRollups. */
 function toRollups(
-  agg: Map<string, { totalAttempts: number; totalCorrect: number; byModel: Map<string, { attempts: number; correct: number }> }>,
+  agg: Map<string, AggregateEntry>,
 ): ItemRollup[] {
   const rollups: ItemRollup[] = [];
 
@@ -166,6 +188,27 @@ function toRollups(
   return rollups.sort((a, b) => a.itemId.localeCompare(b.itemId));
 }
 
+/** Convert bucket aggregates without applying per-item calibration tags. */
+function toBucketRollups(agg: Map<string, AggregateEntry>): BucketRollup[] {
+  const rollups: BucketRollup[] = [];
+  for (const [featureBucket, data] of agg) {
+    const byModel: BucketRollup["byModel"] = {};
+    for (const [model, modelData] of data.byModel) {
+      byModel[model] = {
+        attempts: modelData.attempts,
+        solveRate: modelData.attempts > 0 ? modelData.correct / modelData.attempts : 0,
+      };
+    }
+    rollups.push({
+      featureBucket,
+      attempts: data.totalAttempts,
+      solveRate: data.totalAttempts > 0 ? data.totalCorrect / data.totalAttempts : 0,
+      byModel,
+    });
+  }
+  return rollups.sort((a, b) => a.featureBucket.localeCompare(b.featureBucket));
+}
+
 // ---------------------------------------------------------------------------
 // buildReport
 // ---------------------------------------------------------------------------
@@ -190,6 +233,12 @@ export function buildReport(files: AttemptFile[], bank: BankItem[]): Calibration
 
   const imageRollups = toRollups(imageAgg);
   const symbolicRollups = toRollups(symbolicAgg);
+  const imageBucketRollups = toBucketRollups(
+    aggregateByChannel(files, "image", (attempt) => attempt.generation?.featureBucket),
+  );
+  const symbolicBucketRollups = toBucketRollups(
+    aggregateByChannel(files, "symbolic", (attempt) => attempt.generation?.featureBucket),
+  );
 
   // --- orphan detection ---
   const bankIds = new Set(bank.map((item) => item.puzzle.id));
@@ -311,6 +360,8 @@ export function buildReport(files: AttemptFile[], bank: BankItem[]): Calibration
     promptVersions,
     imageRollups,
     symbolicRollups,
+    imageBucketRollups,
+    symbolicBucketRollups,
     byTier,
     byType,
     divergence: { matrix, mismatches },

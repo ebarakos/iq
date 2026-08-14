@@ -40,7 +40,16 @@ interface RelayWidgetState {
   customUrl?: string;
 }
 function relayWidget(): RelayWidget | undefined {
-  return (window as unknown as { llmRelay?: RelayWidget }).llmRelay;
+  return typeof window === "undefined" ? undefined : (window as unknown as { llmRelay?: RelayWidget }).llmRelay;
+}
+
+function browserStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 /** Read widget state and build headers for API requests.
@@ -51,7 +60,7 @@ export function getWidgetHeaders(): Record<string, string> {
     let state = relayWidget()?.getState?.();
     if (!state) {
       // Widget script not loaded yet — read directly from localStorage
-      const raw = localStorage.getItem("llmRelay");
+      const raw = browserStorage()?.getItem("llmRelay") ?? null;
       if (!raw) return {};
       state = JSON.parse(raw) as RelayWidgetState;
       // Resolve active API key the same way the widget does:
@@ -91,6 +100,11 @@ export class RateLimitError extends Error {
  * - Other errors → throws plain Error with the server's message
  */
 export async function apiFetch<T = unknown>(url: string, body: unknown): Promise<T & { modelId?: string }> {
+  type FetchResponse = T & {
+    fallback?: { provider: string; model: string };
+    modelId?: string;
+  };
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getWidgetHeaders() },
@@ -98,9 +112,8 @@ export async function apiFetch<T = unknown>(url: string, body: unknown): Promise
   });
 
   if (res.status === 429) {
-    const raw = await res.json();
-    // Relay wraps in { error: { message, source, ... } }; unwrap if needed
-    const info: RateLimitInfo = raw?.error ?? raw;
+    const raw = await parseResponseBody(res);
+    const info = normalizeRateLimitPayload(raw);
     // Notify the relay widget — prepend provider name if missing
     const relay = relayWidget();
     if (relay?.notify) {
@@ -116,11 +129,12 @@ export async function apiFetch<T = unknown>(url: string, body: unknown): Promise
   }
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? `Request failed (${res.status})`);
+    const data = await parseResponseBody(res);
+    const message = parseErrorMessage(data) ?? `Request failed (${res.status})`;
+    throw new Error(message);
   }
 
-  const data = await res.json();
+  const data = (await parseResponseBody(res)) as FetchResponse;
 
   // When the relay fell back to a different provider, update the widget
   // so subsequent requests go directly to the working provider.
@@ -138,6 +152,76 @@ export async function apiFetch<T = unknown>(url: string, body: unknown): Promise
   }
 
   return data;
+}
+
+/** Parse a fetch response body without assuming JSON; fallback to raw text. */
+async function parseResponseBody(res: Response): Promise<unknown> {
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/** Normalize Relay/provider payloads into a concrete RateLimitInfo object. */
+function normalizeRateLimitPayload(raw: unknown): RateLimitInfo {
+  const payload = unwrapErrorEnvelope(raw);
+  const message =
+    typeof payload.message === "string"
+      ? payload.message
+      : typeof payload.error === "string"
+        ? payload.error
+        : "Rate limit reached. Please wait and try again.";
+
+  return {
+    source: payload.source === "relay" ? "relay" : "provider",
+    limitType: payload.limitType === "minute" || payload.limitType === "daily" ? payload.limitType : null,
+    message,
+    retryAfter: typeof payload.retryAfter === "string" ? payload.retryAfter : null,
+  };
+}
+
+/** Unwrap common `{ error: {...} }` envelopes and keep string responses parseable. */
+function unwrapErrorEnvelope(raw: unknown): Record<string, unknown> {
+  if (typeof raw === "string") return { message: raw };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const wrapped = raw as Record<string, unknown>;
+  if (wrapped.error && typeof wrapped.error === "object" && !Array.isArray(wrapped.error)) {
+    return wrapped.error as Record<string, unknown>;
+  }
+  return wrapped;
+}
+
+/** Extract a readable message from common error payloads. */
+function parseErrorMessage(raw: unknown): string | undefined {
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+
+  const root = raw as Record<string, unknown>;
+  if (typeof root.error === "string") return root.error;
+  if (root.message && typeof root.message === "string") return root.message;
+  const nested = root.error;
+  if (
+    nested &&
+    typeof nested === "object" &&
+    !Array.isArray(nested) &&
+    typeof (nested as { message?: unknown }).message === "string"
+  ) {
+    return (nested as { message: string }).message;
+  }
+
+  return undefined;
 }
 
 /**

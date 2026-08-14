@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { applyTransform, checkRule, deriveAnswer, RuleSchema, type DimTransform, type Rule } from "./rules";
+import {
+  analyzeOperatorStem,
+  applyOperatorBase,
+  applyOperatorExpression,
+  applyTransform,
+  checkRule,
+  deriveAnswer,
+  enumerateOperatorExpressions,
+  operatorExpressionKey,
+  RuleSchema,
+  type DimTransform,
+  type Rule,
+} from "./rules";
 import { PuzzleSchema, type Cell, type Panel, type Puzzle } from "./schema";
 
 const c = (
@@ -334,5 +346,50 @@ describe("legibility doctrine", () => {
     const res = PuzzleSchema.safeParse(p);
     expect(res.success).toBe(false);
     if (!res.success) expect(JSON.stringify(res.error.issues)).toMatch(/instantly distinguishable/);
+  });
+});
+
+describe("operator induction v1", () => {
+  const cycle = ["circle", "square", "triangle"] as const;
+  const cell = (shape: Cell["shape"], count: Cell["count"]): Cell =>
+    ({ shape, count, rotation: 0, fill: "outline", size: "s" });
+
+  it("applies closed modular count and visible-cycle shape arithmetic", () => {
+    expect(applyOperatorBase({ op: "addMod" }, "count", cell("circle", 3), cell("square", 2), cycle)).toBe(1);
+    expect(applyOperatorBase({ op: "diffLRMod" }, "shape", cell("triangle", 1), cell("square", 1), cycle)).toBe("square");
+    expect(applyOperatorExpression({ op: "right" }, "fill", cell("circle", 1), { ...cell("square", 1), fill: "solid" }, cycle)).toBe("solid");
+  });
+
+  it("enumerates a stable semantic-deduped grammar", () => {
+    const first = enumerateOperatorExpressions("shape", cycle);
+    const replay = enumerateOperatorExpressions("shape", cycle);
+    expect(replay.map(operatorExpressionKey)).toEqual(first.map(operatorExpressionKey));
+    expect(new Set(first.map(operatorExpressionKey)).size).toBe(first.length);
+    expect(enumerateOperatorExpressions("size", cycle).every((expr) =>
+      expr.op === "if" ? [expr.whenTrue.op, expr.whenFalse.op].every((op) => op === "left" || op === "right") : expr.op === "left" || expr.op === "right",
+    )).toBe(true);
+  });
+
+  it("rejects worked rows whose surviving programs disagree on the query", () => {
+    const rows: Panel[] = [
+      cell("circle", 1), cell("square", 2), cell("circle", 1),
+      cell("circle", 1), cell("triangle", 3), cell("circle", 1),
+      cell("square", 2), cell("triangle", 3), cell("square", 2),
+      cell("circle", 1), cell("circle", 1), BLANK,
+    ];
+    const analysis = analyzeOperatorStem(rows, { shapeCycle: [...cycle] });
+    expect(analysis.ok).toBe(false);
+    expect(analysis.issues.join(" ")).toMatch(/predict/);
+  });
+
+  it("produces witness-backed near misses for a generated unique item", async () => {
+    const { generatePuzzle } = await import("./generate");
+    const { mulberry32 } = await import("../lib/rng");
+    const puzzle = generatePuzzle("operatorInduction", 5, mulberry32(91));
+    const analysis = analyzeOperatorStem(puzzle.stem, puzzle.operatorLegend!);
+    expect(analysis.ok).toBe(true);
+    expect(analysis.answer).toEqual(puzzle.options[puzzle.answerIndex]);
+    expect(analysis.nearMisses.length).toBeGreaterThanOrEqual(3);
+    expect(analysis.nearMisses.every((miss) => miss.failedRows.length >= 1)).toBe(true);
   });
 });

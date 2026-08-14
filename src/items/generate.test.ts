@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mulberry32 } from "../lib/rng";
+import { createHash } from "node:crypto";
+import { mulberry32, seededRng } from "../lib/rng";
 import { checkRule, DIMENSIONS, type Rule } from "./rules";
-import { generatePuzzle, ruleComplexity } from "./generate";
-import { PuzzleSchema, PUZZLE_TYPES, type Cell, type PuzzleType } from "./schema";
+import { CURRENT_GENERATOR_VERSION, generatePuzzle, generateQuiz, ruleComplexity } from "./generate";
+import { PuzzleSchema, PuzzleSetSchema, PUZZLE_TYPES, type Cell, type PuzzleType } from "./schema";
 
 type Difficulty = 1 | 2 | 3 | 4 | 5;
 const DIFFICULTIES: Difficulty[] = [1, 2, 3, 4, 5];
@@ -56,6 +57,75 @@ describe("generatePuzzle — determinism", () => {
         expect(a).toEqual(b);
       }
     }
+  });
+});
+
+describe("generateQuiz", () => {
+  it("returns the same valid full quiz for identical inputs", () => {
+    const first = generateQuiz("4a3d9414f6824e1c8952d98c93fd12b6", CURRENT_GENERATOR_VERSION, "standard");
+    const replay = generateQuiz("4a3d9414f6824e1c8952d98c93fd12b6", CURRENT_GENERATOR_VERSION, "standard");
+
+    expect(replay).toEqual(first);
+    expect(PuzzleSetSchema.safeParse(first).success).toBe(true);
+    expect(new Set(first.map((p) => p.type))).toEqual(new Set(PUZZLE_TYPES));
+    expect(first.map((p) => p.difficulty)).toEqual([2, 2, 3, 3, 5]);
+    for (const puzzle of first) {
+      expect(checkRule(puzzle).ok).toBe(true);
+      expect(puzzle.generation).toMatchObject({
+        generatorVersion: CURRENT_GENERATOR_VERSION,
+        familyId: expect.stringMatching(/-v1$/),
+        programFingerprint: expect.stringMatching(/^[a-f0-9]{16}$/),
+        featureBucket: expect.stringContaining(CURRENT_GENERATOR_VERSION),
+        features: {
+          difficulty: puzzle.difficulty,
+          ruleComplexity: expect.any(Number),
+          programDepth: expect.any(Number),
+          activeDimensions: expect.any(Array),
+          usesWrap: expect.any(Boolean),
+          distractorStrategy: expect.stringMatching(/^(near-miss|coherent-outlier)$/),
+        },
+      });
+    }
+  });
+
+  it("keeps v1 puzzle semantics stable and separates seed streams", () => {
+    const quiz = generateQuiz("v1-golden-seed", "procedural-v1", "hard");
+    // Provenance was added after the v1 semantic golden was established. Strip
+    // that supplemental field so this guard still catches visual/rule drift.
+    const core = quiz.map((puzzle) => {
+      const copy = { ...puzzle };
+      delete copy.generation;
+      return copy;
+    });
+    const digest = createHash("sha256").update(JSON.stringify(core)).digest("hex");
+    expect(digest).toBe("bcd378b4bbaf738ac82c2589172e82b526ab70e8899abb49d8a8fa68486cb75d");
+
+    expect(generateQuiz("another-seed", "procedural-v1", "hard")).not.toEqual(quiz);
+    expect(seededRng("same-seed", "a")()).not.toBe(seededRng("same-seed", "b")());
+  });
+
+  it("assigns the same program fingerprint to the same hidden rule", () => {
+    const quiz = generateQuiz("program-fingerprint-seed", CURRENT_GENERATOR_VERSION, "standard");
+    for (const puzzle of quiz) {
+      const replay = generateQuiz("program-fingerprint-seed", CURRENT_GENERATOR_VERSION, "standard")
+        .find((candidate) => candidate.id === puzzle.id);
+      expect(replay?.generation).toEqual(puzzle.generation);
+    }
+  });
+
+  it("rejects unknown versions, profiles, and invalid seeds", () => {
+    expect(() => generateQuiz("seed", "procedural-v3", "standard")).toThrow(/unsupported generator version/);
+    expect(() => generateQuiz("seed", CURRENT_GENERATOR_VERSION, "expert" as never)).toThrow(/unsupported quiz profile/);
+    expect(() => generateQuiz("", CURRENT_GENERATOR_VERSION, "standard")).toThrow(/seed must be/);
+  });
+
+  it("honours each difficulty profile", () => {
+    expect(generateQuiz("profile-seed", CURRENT_GENERATOR_VERSION, "easy").map((p) => p.difficulty)).toEqual([
+      1, 1, 2, 2, 3,
+    ]);
+    expect(generateQuiz("profile-seed", CURRENT_GENERATOR_VERSION, "hard").map((p) => p.difficulty)).toEqual([
+      3, 4, 4, 5, 5,
+    ]);
   });
 });
 

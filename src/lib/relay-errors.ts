@@ -1,4 +1,4 @@
-// @relay-template: relay-errors@4
+// @relay-template: relay-errors@5
 
 /**
  * Typed rate-limit error handling for llm-relay consumers.
@@ -29,10 +29,11 @@ export function isRateLimitError(err: unknown): boolean {
   if (e.statusCode === 429 || e.status === 429) return true;
   const msg = typeof e.message === "string" ? e.message.toLowerCase() : "";
   if (msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("429")) return true;
-  // Check the response body — the relay's error: "rate_limited" field is the
-  // most reliable signal when status codes get transformed through error wrappers.
+  // Check the response body — extractResponseBody already unwraps the
+  // { error: {...} } envelope via unwrapError(), so the discriminator lives
+  // at the top level as `type`, not nested under `error`.
   const body = extractResponseBody(err);
-  if (body?.error === "rate_limited") return true;
+  if (body?.type === "rate_limited") return true;
   return false;
 }
 

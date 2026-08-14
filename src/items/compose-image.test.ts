@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { loadBank } from "./bank";
 import { puzzleToSvg } from "./compose-image";
+import { generatePuzzle } from "./generate";
+import { mulberry32 } from "../lib/rng";
 import { PUZZLE_TYPES, type Puzzle, type PuzzleType } from "./schema";
 
 /**
@@ -15,8 +17,7 @@ const bank = loadBank();
 
 function firstOfType(type: PuzzleType): Puzzle {
   const item = bank.find((i) => i.puzzle.type === type);
-  if (!item) throw new Error(`no bank item of type ${type}`);
-  return item.puzzle;
+  return item?.puzzle ?? generatePuzzle(type, 4, mulberry32(42));
 }
 
 describe("puzzleToSvg", () => {
@@ -67,5 +68,14 @@ describe("puzzleToSvg", () => {
     // Tailwind layout classes leak into the standalone markup.
     expect(svg).not.toContain("flex");
     expect(svg).not.toContain("grid-cols");
+  });
+
+  it("renders operator worked rows, query, and public shape-order legend", () => {
+    const puzzle = firstOfType("operatorInduction");
+    const svg = puzzleToSvg(puzzle);
+    expect(svg.match(/>◆<\/text>/g)).toHaveLength(puzzle.stem.length / 3);
+    expect(svg.match(/>→<\/text>/g)?.length).toBeGreaterThanOrEqual(puzzle.stem.length / 3);
+    expect(svg).toContain(">?</text>");
+    expect(puzzle.operatorLegend?.shapeCycle.length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -17,9 +17,10 @@ for people and what's hard for models.
 
 ## Open questions
 
-Q1–Q5 and Q7 were **resolved 2026-06-10** (plan-mode session with the user); the design
-they feed lives in [docs/plans/rules-bank-agent-calibration.md](docs/plans/rules-bank-agent-calibration.md).
-Q6 (novel formats) remains open.
+Q1–Q5 and Q7 were resolved 2026-06-10. Q3–Q6 were refined on 2026-08-13 after
+the procedural generator and first agent calibration exposed the limits of live
+model-authored items. The current decision lives in
+[docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ### Q1 — What does "visibility only" mean exactly? ✅ RESOLVED
 **Decision: visual + minimal text** — puzzles are purely visual, with a short, fixed,
@@ -33,31 +34,31 @@ text-only models. Every attempt records its channel; **only image-channel result
 for human–agent comparison** (the symbolic channel solves a different task — structure
 partially leaked — so it is diagnostic only).
 
-### Q3 — What's the role of llm-relay's model? ✅ RESOLVED
-**Decision: two jobs, freely different models.** Generator = the env default
-(`RELAY_*`) or widget override, as today. Solver/calibrator = per-run CLI flag from the
-vision-capable relay list (gemini-3-flash, gpt-4o-mini, gpt-4.1-mini, llama-4-scout free).
-Mid-tier value models throughout; no flagships.
+### Q3 — What's the role of llm-relay's model? ✅ REVISED 2026-08-13
+**Decision: models solve and calibrate; they do not write live tests.** The normal
+test path uses no model call. A live call happens only when an agent is asked to take
+an already-generated test. Offline model panels calibrate generator families; models may
+also suggest or red-team rule ideas, but code owns ground truth.
 
-### Q4 — Procedural generation vs. model generation? ✅ RESOLVED
-**Decision: hybrid, rules as first-class data.** Rules become machine-readable
-(`src/items/rules.ts` DSL); procedural re-derivation of the answer from the rule **is**
-the semantic validator. Procedural generation gives guaranteed-correct items with exact
-difficulty knobs; LLM generation stays for variety and must pass the validator.
+### Q4 — Procedural generation vs. model generation? ✅ REVISED 2026-08-13
+**Decision: deterministic procedural generation at runtime.** A fresh cryptographic seed
+feeds a versioned pure generator. The same seed reproduces the same test; program search
+checks that the shown evidence forces one answer. The committed bank becomes a regression
+and reference corpus, not the default source of supposedly fresh tests.
 
-### Q5 — Difficulty ladder: how is it defined and measured? ✅ RESOLVED
-**Decision: both.** A priori first — `ruleComplexity(rule)` (non-constant dimensions,
-deltas, wraps, axes) anchors difficulty 1–5 — then recalibrated empirically from agent
-attempt artifacts (and human data once a DB exists).
+### Q5 — Difficulty ladder: how is it defined and measured? ✅ REVISED 2026-08-13
+**Decision: calibrate generator buckets, not ephemeral items.** Program features provide a
+provisional ordering. Repeated human and agent attempts are pooled by generator version,
+family, composition depth, and other declared features. Human and agent rates remain
+separate; agent failure alone never makes an item human-hard.
 
-### Q6 — Novel format ideas (beyond Mensa)?
-Standard Mensa = Raven's matrices, number/letter sequences, analogies, odd-one-out.
-Brainstorm differentiators (capture freely, no commitment):
-- Puzzles designed to **maximize human–agent divergence** (easy for one, hard for
-  the other) — the gap is the product.
-- Compositional / multi-step visual reasoning that resists pattern-matching.
-- Time/interaction dimension (animations, interactive transforms).
-- Self-generating difficulty: model probes the frontier where current agents fail.
+### Q6 — Novel format ideas (beyond Mensa)? ✅ RESOLVED 2026-08-13
+**Decision: build one example-driven visual operator family.** Several worked rows show
+the same hidden operation over two visual cells; the final row asks for the output. Rules
+compose bounded operators and may change by visual context. A mechanical search accepts a
+puzzle only when every program consistent with the examples predicts the same answer.
+Animations, interactive worlds, and multiple new formats stay out until this family proves
+useful with people and agents.
 
 ### Q7 — Scoring & comparability ✅ RESOLVED
 **Decision: explicitly NOT comparable — no single IQ-like score.** Humans get a plain
@@ -90,6 +91,3 @@ norms are deferred until attempt data persists in a DB.
 ## Parking lot (ideas, not yet evaluated)
 
 - Public leaderboard: human vs frontier-model percentile over time.
-- Item bank as data (JSON) so generation and presentation are decoupled.
-- "Agent eval mode" that runs a batch of items against a relay model and reports
-  pass rate by difficulty tier (drives Q5 calibration).
