@@ -19,6 +19,7 @@ import {
   type OperatorDim,
   type OperatorExpression,
   type OperatorPredicate,
+  type OperatorBase,
   type OperatorProgram,
   type Rule,
 } from "./rules";
@@ -711,6 +712,48 @@ function describeTransforms(transforms: DimTransforms): string {
   return parts.join(" and ");
 }
 
+function describeOperatorBase(base: OperatorBase, dim: OperatorDim): string {
+  if (base.op === "left") return `copy the left ${dim}`;
+  if (base.op === "right") return `copy the right ${dim}`;
+  if (dim === "count") {
+    if (base.op === "addMod") return "add counts (mod 4)";
+    return base.op === "diffLRMod" ? "left minus right (mod 4)" : "right minus left (mod 4)";
+  }
+
+  if (dim === "shape") {
+    if (base.op === "addMod") return "move left-shape forward in the shape order";
+    return base.op === "diffLRMod"
+      ? "move left-shape backward in the shape order"
+      : "move right-shape backward in the shape order";
+  }
+
+  return `copy the ${base.op === "addMod" ? "right" : "left"} ${dim}`;
+}
+
+function describeOperatorPredicate(predicate: OperatorPredicate, dim: OperatorDim): string {
+  if (predicate.kind === "sumCountsEven") return "if left and right count total is even";
+  return `if left and right ${dim} match`;
+}
+
+function describeOperatorExpression(expr: OperatorExpression, dim: OperatorDim): string {
+  if (expr.op === "if") {
+    return `${describeOperatorPredicate(expr.predicate, dim)}, then ${describeOperatorBase(expr.whenTrue, dim)}, otherwise ${describeOperatorBase(
+      expr.whenFalse,
+      dim,
+    )}`;
+  }
+  return describeOperatorBase(expr, dim);
+}
+
+function describeOperatorRule(program: OperatorProgram): string {
+  return [
+    `shape=${describeOperatorExpression(program.shape, "shape")}`,
+    `count=${describeOperatorExpression(program.count, "count")}`,
+    `fill=${describeOperatorExpression(program.fill, "fill")}`,
+    `size=${describeOperatorExpression(program.size, "size")}`,
+  ].join("; ");
+}
+
 /** Auto-write a plain-language explanation from the rule. */
 function explain(rule: Rule): string {
   switch (rule.kind) {
@@ -727,7 +770,9 @@ function explain(rule: Rule): string {
     case "oddOneOut":
       return `Every other option shares ${rule.dimension} ${JSON.stringify(rule.value)}; the odd one breaks it.`;
     case "operatorInduction":
-      return "The same visual operation combines each pair; applying it to the final pair gives the answer.";
+      return `Use one fixed rule for every worked row: combine left and right to get output.`
+        + ` Rules: ${describeOperatorRule(rule.program)}.`
+        + " Apply that same rule to the last pair, then choose the option that matches.";
   }
 }
 

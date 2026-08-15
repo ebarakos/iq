@@ -18,6 +18,8 @@ export function describeCell(cell: Cell): string {
 
 const STROKE = "#111827"; // gray-900
 const HALF_FILL = "#9ca3af"; // gray-400 — the "half" (shaded) state
+export const CELL_VIEWBOX = 100;
+export const CELL_CANVAS_PADDING = 6;
 
 type Pt = { x: number; y: number };
 
@@ -81,7 +83,9 @@ function Shape({ cell, at, r }: { cell: Cell; at: Pt; r: number }) {
     case "circle":
       return <circle cx={at.x} cy={at.y} r={r} {...fp} />;
     case "square": {
-      const s = r * 0.86;
+      // Match the circumradius used by every polygon so nominal sizes have the
+      // same maximum extent. For a square, half-side = radius / sqrt(2).
+      const s = r / Math.SQRT2;
       return <rect x={at.x - s} y={at.y - s} width={s * 2} height={s * 2} rx={2} {...common} />;
     }
     case "triangle":
@@ -102,7 +106,7 @@ export function CellGraphic({ cell, className }: { cell: Cell; className?: strin
   const { pts, baseR } = layoutFor(cell.count);
   const r = baseR * SIZE_SCALE[cell.size];
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label={describeCell(cell)}>
+    <svg viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`} className={className} role="img" aria-label={describeCell(cell)}>
       {pts.map((p, i) => (
         <Shape key={i} cell={cell} at={p} r={r} />
       ))}
@@ -123,7 +127,10 @@ export function BlankGraphic({ className }: { className?: string }) {
 
 function PanelBox({ panel }: { panel: Panel }) {
   return (
-    <div className="flex aspect-square items-center justify-center rounded-md border border-gray-200 bg-white p-1.5">
+    <div
+      className="flex aspect-square items-center justify-center rounded-md border border-gray-200 bg-white"
+      style={{ padding: `${CELL_CANVAS_PADDING}px`, boxSizing: "border-box" }}
+    >
       {isBlank(panel) ? (
         <BlankGraphic className="h-full w-full" />
       ) : (

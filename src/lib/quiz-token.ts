@@ -48,15 +48,16 @@ export class QuizTokenError extends Error {
   }
 }
 
-let developmentSecret: string | undefined;
 let warnedAboutDevelopmentSecret = false;
+const FALLBACK_DEVELOPMENT_SECRET =
+  "aiq-development-quiz-token-secret-do-not-use-in-production";
 
 /**
  * Resolve the server-only token secret.
  *
- * Production fails closed if QUIZ_TOKEN_SECRET is absent or weak. Development
- * uses a random, process-local key: it remains confidential, but a dev-server
- * restart invalidates outstanding quizzes.
+ * Production fails closed if QUIZ_TOKEN_SECRET is absent or weak.
+ * Development uses a stable fallback key so restarting the test does not
+ * invalidate local tokens.
  */
 export function resolveQuizTokenSecret(
   env: { QUIZ_TOKEN_SECRET?: string; NODE_ENV?: string } = process.env,
@@ -76,14 +77,14 @@ export function resolveQuizTokenSecret(
     throw new QuizTokenError("configuration", "QUIZ_TOKEN_SECRET is required in production");
   }
 
-  developmentSecret ??= randomBytes(32).toString("base64url");
   if (!warnedAboutDevelopmentSecret) {
     console.warn(
-      "QUIZ_TOKEN_SECRET is not set; using a process-local development key. Quiz tokens will expire when the server restarts.",
+      "QUIZ_TOKEN_SECRET is not set; using a stable development fallback key. " +
+        "Set QUIZ_TOKEN_SECRET in .env for production-like behavior.",
     );
     warnedAboutDevelopmentSecret = true;
   }
-  return developmentSecret;
+  return FALLBACK_DEVELOPMENT_SECRET;
 }
 
 function encryptionKey(secret: string): Buffer {

@@ -24,7 +24,7 @@ function allow(ip: string): boolean {
 }
 
 function profile(value: unknown): QuizProfile {
-  return value === "easy" || value === "hard" ? value : "standard";
+  return value === "easy" || value === "standard" || value === "hard" ? value : "hard";
 }
 
 /** POST /api/generate — create a fresh, reproducible, answer-safe quiz. */

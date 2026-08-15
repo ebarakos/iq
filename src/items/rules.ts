@@ -826,6 +826,169 @@ export function deriveAnswer(rule: Rule, stem: Panel[], operatorLegend?: Operato
   }
 }
 
+type DerivedRule = Extract<Rule, { kind: "sequence" | "analogy" | "matrix" }>;
+
+export type DerivedNearMissProgram =
+  | { kind: "sequence" | "analogy"; transforms: DimTransforms }
+  | { kind: "matrix"; row: DimTransforms; col: DimTransforms };
+
+export interface DerivedNearMissWitness {
+  program: DerivedNearMissProgram;
+  changedDimensions: Dim[];
+  failedEvidence: { dimension: Dim; transitions: number[] }[];
+}
+
+type TransformSlot = "transforms" | "row" | "col";
+
+interface DimensionEvidence {
+  slot: TransformSlot;
+  querySource: string | number;
+  querySteps: number;
+  transitions: { from: string | number; to: string | number; index: number }[];
+}
+
+const transformCandidateCache = new Map<Dim, DimTransform[]>();
+
+/** Finite transform grammar used to reconstruct a competing derived-family program. */
+function transformCandidates(dim: Dim): DimTransform[] {
+  const cached = transformCandidateCache.get(dim);
+  if (cached) return cached;
+
+  const candidates: DimTransform[] = [{ op: "constant" }];
+  if (dim !== "shape") {
+    for (const delta of [-3, -2, -1, 1, 2, 3]) {
+      candidates.push({ op: "step", delta, wrap: false }, { op: "step", delta, wrap: true });
+    }
+  }
+
+  const domain = [...DIM_DOMAINS[dim]];
+  const addCycles = (prefix: (string | number)[], remaining: (string | number)[]) => {
+    if (prefix.length >= 2) candidates.push({ op: "cycle", values: [...prefix] });
+    for (let i = 0; i < remaining.length; i++) {
+      addCycles([...prefix, remaining[i]], [...remaining.slice(0, i), ...remaining.slice(i + 1)]);
+    }
+  };
+  addCycles([], domain);
+  transformCandidateCache.set(dim, candidates);
+  return candidates;
+}
+
+function dimensionEvidence(rule: DerivedRule, stem: Panel[], dim: Dim): DimensionEvidence | null {
+  if (rule.kind === "sequence") {
+    const cells = stem.slice(0, -1);
+    if (cells.length === 0 || cells.some(isBlankPanel)) return null;
+    const drawn = cells as Cell[];
+    return {
+      slot: "transforms",
+      querySource: drawn[drawn.length - 1][dim],
+      querySteps: 1,
+      transitions: drawn.slice(0, -1).map((cell, index) => ({
+        from: cell[dim],
+        to: drawn[index + 1][dim],
+        index,
+      })),
+    };
+  }
+
+  if (rule.kind === "analogy") {
+    if (stem.length !== 3 || stem.some(isBlankPanel)) return null;
+    const [a, b, query] = stem as Cell[];
+    return {
+      slot: "transforms",
+      querySource: query[dim],
+      querySteps: 1,
+      transitions: [{ from: a[dim], to: b[dim], index: 0 }],
+    };
+  }
+
+  if (stem.length !== 9 || stem.filter(isBlankPanel).length !== 1) return null;
+  const blankAt = stem.findIndex(isBlankPanel);
+  const blankRow = Math.floor(blankAt / 3);
+  const blankCol = blankAt % 3;
+  const slot: "row" | "col" = isNonConstant(rule.row[dim])
+    ? "row"
+    : isNonConstant(rule.col[dim])
+      ? "col"
+      : "row";
+  const grid = (row: number, col: number): Cell | null => {
+    const panel = stem[row * 3 + col];
+    return isBlankPanel(panel) ? null : panel;
+  };
+  const queryAxis = slot === "row" ? blankCol : blankRow;
+  const sourceAxis = [0, 1, 2].find((axis) => {
+    if (axis === queryAxis) return false;
+    return slot === "row" ? grid(blankRow, axis) !== null : grid(axis, blankCol) !== null;
+  });
+  if (sourceAxis === undefined) return null;
+  const source = slot === "row" ? grid(blankRow, sourceAxis) : grid(sourceAxis, blankCol);
+  if (!source) return null;
+
+  const transitions: DimensionEvidence["transitions"] = [];
+  let transitionIndex = 0;
+  for (let line = 0; line < 3; line++) {
+    for (let position = 0; position < 2; position++) {
+      const from = slot === "row" ? grid(line, position) : grid(position, line);
+      const to = slot === "row" ? grid(line, position + 1) : grid(position + 1, line);
+      if (from && to) transitions.push({ from: from[dim], to: to[dim], index: transitionIndex });
+      transitionIndex++;
+    }
+  }
+  return {
+    slot,
+    querySource: source[dim],
+    querySteps: queryAxis - sourceAxis,
+    transitions,
+  };
+}
+
+/**
+ * Reconstruct a concrete competing transform program for a derived-family
+ * distractor. Every changed dimension must predict the distractor at the query
+ * while failing at least one visible transition, so the option is a rule-space
+ * near miss rather than an arbitrary visual perturbation.
+ */
+export function findDerivedNearMissWitness(
+  rule: DerivedRule,
+  stem: Panel[],
+  distractor: Cell,
+): DerivedNearMissWitness | null {
+  const derivation = deriveAnswer(rule, stem);
+  if (!derivation.cell || visualSignature(derivation.cell) === visualSignature(distractor)) return null;
+
+  const changedDimensions = DIMENSIONS.filter((dim) => derivation.cell![dim] !== distractor[dim]);
+  if (changedDimensions.length === 0) return null;
+  const program: DerivedNearMissProgram = rule.kind === "matrix"
+    ? { kind: "matrix", row: { ...rule.row }, col: { ...rule.col } }
+    : { kind: rule.kind, transforms: { ...rule.transforms } };
+  const failedEvidence: DerivedNearMissWitness["failedEvidence"] = [];
+
+  for (const dim of changedDimensions) {
+    const evidence = dimensionEvidence(rule, stem, dim);
+    if (!evidence) return null;
+    let match: { transform: DimTransform; transitions: number[] } | null = null;
+    for (const transform of transformCandidates(dim)) {
+      if (applyTransform(dim, transform, evidence.querySource, evidence.querySteps) !== distractor[dim]) continue;
+      const transitions = evidence.transitions
+        .filter(({ from, to }) => applyTransform(dim, transform, from) !== to)
+        .map(({ index }) => index);
+      if (transitions.length === 0) continue;
+      match = { transform, transitions };
+      break;
+    }
+    if (!match) return null;
+
+    if (program.kind === "matrix") {
+      if (evidence.slot === "transforms") return null;
+      program[evidence.slot][dim] = match.transform;
+    } else {
+      program.transforms[dim] = match.transform;
+    }
+    failedEvidence.push({ dimension: dim, transitions: match.transitions });
+  }
+
+  return { program, changedDimensions, failedEvidence };
+}
+
 export type RuleCheck =
   | { ok: true; derived: Cell | null } // null for oddOneOut (the rule selects an index, not a cell)
   | { ok: false; issues: string[] };

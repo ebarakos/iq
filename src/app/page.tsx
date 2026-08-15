@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PublicPuzzle } from "@/items/schema";
-import type { DifficultyLevel } from "@/items/bank";
 import { CellGraphic, StemView, describeCell } from "@/items/render";
 import { apiFetch, formatApiError } from "@/lib/relay-client";
 
@@ -31,6 +30,7 @@ interface SubmitResponse {
 }
 
 type Phase = "intro" | "loading" | "submitting" | "result" | "active" | "error";
+const START_TIMEOUT_MS = 20000;
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -70,8 +70,28 @@ export default function Page() {
     notice?: string;
   } | null>(null);
   const [error, setError] = useState<string>("");
-  // Difficulty chosen on the intro screen; also reused by the error-screen retry.
-  const [difficulty, setDifficulty] = useState<DifficultyLevel>("standard");
+  const startRequestId = useRef(0);
+
+  function clearStoredSession() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Session storage failures are non-fatal; in-memory recovery still works.
+    }
+  }
+
+  function resetLocalTestState() {
+    setPuzzles([]);
+    setAnswers([]);
+    setQuizToken("");
+    setReview(null);
+    setCurrent(0);
+    setMeta(null);
+  }
+
+  function isTokenFailureMessage(message: string): boolean {
+    return message.startsWith("This quiz has expired") || message.startsWith("This quiz token is invalid");
+  }
 
   // Restore in-progress session on mount (client-only; avoids hydration mismatch).
   useEffect(() => {
@@ -112,15 +132,25 @@ export default function Page() {
   }, [phase, puzzles, answers, current, meta, quizToken, review]);
 
   async function start() {
-    // Clear any previous session before starting fresh.
-    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
-    setPhase("loading");
+    if (phase === "loading" || phase === "submitting") return;
+
+    const requestId = ++startRequestId.current;
+    clearStoredSession();
+    resetLocalTestState();
+
     setError("");
-    setReview(null);
+    setPhase("loading");
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error("Starting the test is taking longer than expected. Please try again."));
+      }, START_TIMEOUT_MS);
+    });
+
     try {
-      // Give the loading screen a chance to render before fast-fail paths are surfaced.
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const data = await apiFetch<GenerateResponse>("/api/generate", { difficulty });
+      const data = await Promise.race([apiFetch<GenerateResponse>("/api/generate", {}), timeout]);
+      if (startRequestId.current !== requestId) return;
       if (!Array.isArray(data.puzzles) || data.puzzles.length === 0) throw new Error("No puzzles returned");
       if (!data.quizToken) throw new Error("No scoring token returned");
       setPuzzles(data.puzzles);
@@ -134,8 +164,11 @@ export default function Page() {
       setCurrent(0);
       setPhase("active");
     } catch (err) {
+      if (startRequestId.current !== requestId) return;
       setError(formatApiError(err, "Something went wrong"));
       setPhase("error");
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
 
@@ -147,7 +180,12 @@ export default function Page() {
       setReview(result);
       setPhase("result");
     } catch (err) {
-      setError(formatApiError(err, "Could not score this test"));
+      const message = formatApiError(err, "Could not score this test");
+      if (isTokenFailureMessage(message)) {
+        clearStoredSession();
+        resetLocalTestState();
+      }
+      setError(message);
       setPhase("error");
     }
   }
@@ -162,14 +200,9 @@ export default function Page() {
 
   function restart(requireConfirm = false) {
     if (requireConfirm && !window.confirm("Discard your current test and start over?")) return;
-    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    clearStoredSession();
+    resetLocalTestState();
     setPhase("intro");
-    setPuzzles([]);
-    setAnswers([]);
-    setQuizToken("");
-    setReview(null);
-    setCurrent(0);
-    setMeta(null);
   }
 
   return (
@@ -188,7 +221,7 @@ export default function Page() {
         )}
       </header>
 
-      {phase === "intro" && <Intro difficulty={difficulty} onDifficulty={setDifficulty} onStart={start} />}
+      {phase === "intro" && <Intro onStart={start} />}
       {phase === "loading" && <Loading label="Creating a fresh test…" />}
       {phase === "submitting" && <Loading label="Scoring your answers…" />}
       {phase === "error" && <ErrorView message={error} onRetry={start} />}
@@ -222,22 +255,7 @@ export default function Page() {
   );
 }
 
-const DIFFICULTY_CHOICES: { level: DifficultyLevel; label: string; blurb: string }[] = [
-  { level: "easy", label: "Easy", blurb: "Gentler single-rule patterns to warm up." },
-  { level: "standard", label: "Standard", blurb: "A balanced ramp across all five rule families." },
-  { level: "hard", label: "Hard", blurb: "Composed and conditional rules from the first question." },
-];
-
-function Intro({
-  difficulty,
-  onDifficulty,
-  onStart,
-}: {
-  difficulty: DifficultyLevel;
-  onDifficulty: (level: DifficultyLevel) => void;
-  onStart: () => void;
-}) {
-  const active = DIFFICULTY_CHOICES.find((c) => c.level === difficulty) ?? DIFFICULTY_CHOICES[1];
+function Intro({ onStart }: { onStart: () => void }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
       <h2 className="text-xl font-semibold">Take a fresh 5-question reasoning test</h2>
@@ -247,35 +265,11 @@ function Intro({
         score and a per-question review at the end.
       </p>
       <p className="mt-2 text-sm text-gray-500">
-        This measures performance on fresh visual rules. It is not yet a standardized human IQ score.
+        This test always starts at the hard ramp (3, 4, 4, 5, 5). It measures performance on
+        fresh visual rules. It is not yet a standardized human IQ score.
       </p>
 
       <div className="mt-6">
-        <span id="difficulty-label" className="text-sm font-medium text-gray-700">
-          Difficulty
-        </span>
-        <div
-          role="group"
-          aria-labelledby="difficulty-label"
-          className="mt-2 inline-flex rounded-lg border border-gray-300 bg-gray-50 p-0.5"
-        >
-          {DIFFICULTY_CHOICES.map(({ level, label }) => {
-            const isActive = level === difficulty;
-            return (
-              <button
-                key={level}
-                onClick={() => onDifficulty(level)}
-                aria-pressed={isActive}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
-                  isActive ? "bg-gray-900 text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-1.5 text-xs text-gray-500">{active.blurb}</p>
         <p className="mt-2 text-xs text-gray-500">
           Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
         </p>
@@ -283,6 +277,7 @@ function Intro({
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
+          type="button"
           onClick={onStart}
           className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
@@ -303,6 +298,7 @@ function Loading({ label }: { label: string }) {
 }
 
 function ErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const isTokenError = message.includes("quiz token");
   return (
     <section className="rounded-2xl border border-red-200 bg-red-50 p-8 shadow-sm">
       <h2 className="text-lg font-semibold text-red-800">Something went wrong</h2>
@@ -311,19 +307,9 @@ function ErrorView({ message, onRetry }: { message: string; onRetry: () => void 
         onClick={onRetry}
         className="mt-5 rounded-lg bg-red-700 px-4 py-2 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
       >
-        Try again
+        {isTokenError ? "Start a fresh test" : "Try again"}
       </button>
     </section>
-  );
-}
-
-function DifficultyDots({ level }: { level: number }) {
-  return (
-    <span className="inline-flex items-center gap-1" title={`Difficulty ${level} / 5`}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} className={`h-1.5 w-1.5 rounded-full ${i < level ? "bg-gray-800" : "bg-gray-300"}`} />
-      ))}
-    </span>
   );
 }
 
@@ -424,7 +410,6 @@ function Solver({
         <span>
           Question {index + 1} of {total}
         </span>
-        <DifficultyDots level={puzzle.difficulty} />
       </div>
       <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
         <div className="h-full bg-gray-900 transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
@@ -569,6 +554,7 @@ function ReviewItem({
 }) {
   const correct = result.correct;
   const optionCount = puzzle.options.length;
+  const [showExplanation, setShowExplanation] = useState(false);
   // Match Solver's responsive grid: 4 options → 4-col, 5–6 → 3-col.
   const gridClass = optionCount <= 4
     ? "grid grid-cols-4 gap-2"
@@ -614,9 +600,17 @@ function ReviewItem({
         })}
       </div>
 
-      <p className="mt-3 text-sm text-gray-600">
-        <span className="font-medium text-gray-800">Why:</span> {result.explanation}
-      </p>
+      <button
+        onClick={() => setShowExplanation((value) => !value)}
+        className="mt-3 text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
+      >
+        {showExplanation ? "Hide explanation" : "Show explanation"}
+      </button>
+      {showExplanation && (
+        <p className="mt-2 text-sm text-gray-600">
+          <span className="font-medium text-gray-800">Why:</span> {result.explanation}
+        </p>
+      )}
     </div>
   );
 }

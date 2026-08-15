@@ -1,27 +1,38 @@
 # Handoff
-from: codex → to: claude
-stage: review→fix
-updated: 2026-06-11
-branch: main · plan: docs/plans/rules-bank-agent-calibration.md · tasks: TODO.md
+from: claude → to: codex
+stage: plan→implement
+updated: 2026-08-14
+branch: main · plan: docs/plans/deterministic-novel-tests.md · tasks: TODO.md
 
 ## Just did
-- Reviewed the current uncommitted rules/bank/agent-calibration/difficulty-selector work; no code fixes made.
-- Local verify is green: lint, typecheck, tests, bank verify, and production build all pass.
-- Main findings: remote CI violates repo policy; report write path can pool prompt versions; bank topup count semantics are off; fresh-AI fallback UI leaks raw provider errors.
-- Existing UI QA artifacts also point to fresh-failure banner persistence, hover/selection ambiguity, and mobile widget/button overlap.
+- Reviewed every open TODO item against the code. No code changed this session — only `TODO.md`.
+- Three items described work that already exists, and were rewritten to name the real gap:
+  the two renderers already share `CellGraphic`; the operator grammar already has conditionals;
+  near-miss distractors already exist in both the operator and derived families.
+- Marked the 2026-08-13 bucket-aggregation item done — it shipped in `src/lib/calibrate.ts`.
+- Added the missing prerequisite for the human pilot: no human attempt is stored anywhere today.
+- Flagged the micro-grid matrix item as a decision, not a task, and recommended deferring it.
 
 ## State
-- diff: `git diff` — 13 tracked files, 6671 insertions / 4025 deletions; plus 264 status entries incl. new bank/data/QA/scripts/tests.
-- key files: `.github/workflows/ci.yml`, `scripts/report.ts`, `scripts/bank-topup.ts`, `src/app/api/generate/route.ts`, `src/app/page.tsx`.
-- tests: pass — run: `npm run lint && npm run typecheck && npm test && npm run bank:verify && npm run build`.
-- blockers: none; review findings need fix/triage.
+- diff: `git diff` — 1 file (`TODO.md`); documentation only.
+- tests: pass — 143 tests, 12 files. Run: `npx vitest run`.
+- blockers: two items in `TODO.md` need a human decision before anyone implements them —
+  the micro-grid matrix go/no-go, and the sequencing conflict on the hard-item gate.
 
 ## You next
-- Remove `.github/workflows/ci.yml` and scrub CI references from README/TODO/plan docs per global no-GitHub-CI rule.
-- Fix `scripts/report.ts --write` so it refuses multiple prompt versions or requires an explicit version; do not write pooled cross-version tags.
-- Fix `scripts/bank-topup.ts` so `--source model --count N` actually respects count, and `both` does not exceed the requested total.
-- Sanitize fresh-generation fallback messaging in `src/app/api/generate/route.ts` / `src/app/page.tsx`; consider showing one concise banner only on Q1.
-- verify: `npm run lint && npm run typecheck && npm test && npm run bank:verify && npm run build`.
+- Start with the first `TODO.md` item: remove the easy/standard/hard choice and the difficulty
+  dots, leaving one public mode pinned to `QUIZ_DIFFICULTY_RAMPS.hard`. It is self-contained and
+  blocks nothing else.
+- Then the geometry regression tests, which are also independent of the open decisions.
+- Do not start the hard-item eligibility gate yet: `generateQuiz` fills five slots with one item
+  per family, and the gate would disqualify `oddOneOut` and `analogy` outright, leaving the quiz
+  unable to fill five slots.
+- If you take the operator grammar item, measure the uniqueness oracle's runtime first —
+  `enumerateOperatorExpressions` runs inside the live request path.
+- verify: `npx vitest run && npm run typecheck && npm run build`.
 
 ## Open questions
-- Should the large `docs/qa/2026-06-10T2030/` artifact set be committed as project history, or kept local and ignored?
+- Micro-grid matrix family: go ahead with its own plan doc, or defer? It needs a `Cell` that is
+  a set of marks, so it changes the schema, both renderers, and the legibility rules.
+- Should `POST /api/generate` keep accepting a `difficulty` field for calibration scripts once
+  the browser stops sending one?

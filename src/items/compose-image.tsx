@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import React, { type ReactElement } from "react";
 import type { Cell, Puzzle, PublicPuzzle } from "./schema";
 import { isBlank } from "./schema";
-import { CellGraphic } from "./render";
+import { CELL_CANVAS_PADDING, CELL_VIEWBOX, CellGraphic } from "./render";
 
 /**
  * Pure-SVG composition of a whole puzzle into ONE self-contained `<svg>` for the
@@ -35,15 +35,33 @@ const SECTION_GAP = 56; // vertical gap between stem and options row
 const STROKE = "#111827"; // gray-900 — matches render.tsx
 const BORDER = "#9ca3af"; // gray-400 — cell borders / "?" glyph
 const WIDTH = 800;
+const CELL_FRAME_STROKE = 2;
 
 /** A bordered box that draws one cell (or a "?" for a blank) at (x, y). */
 function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Cell | null; size?: number }) {
+  const innerOffset = CELL_CANVAS_PADDING;
+  const innerSize = Math.max(0, size - innerOffset * 2);
   return (
     <g>
-      <rect x={x} y={y} width={size} height={size} rx={6} fill="#ffffff" stroke={BORDER} strokeWidth={2} />
+      <rect
+        x={x}
+        y={y}
+        width={size}
+        height={size}
+        rx={6}
+        fill="#ffffff"
+        stroke={BORDER}
+        strokeWidth={CELL_FRAME_STROKE}
+      />
       {cell ? (
-        // Nested SVG: CellGraphic owns viewBox 0 0 100 100; position + scale it here.
-        <svg x={x + 6} y={y + 6} width={size - 12} height={size - 12} viewBox="0 0 100 100">
+        // Nested SVG: CellGraphic owns viewBox based on CELL_VIEWBOX; this keeps the icon geometry exact.
+        <svg
+          x={x + innerOffset}
+          y={y + innerOffset}
+          width={innerSize}
+          height={innerSize}
+          viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`}
+        >
           <CellGraphic cell={cell} />
         </svg>
       ) : (
