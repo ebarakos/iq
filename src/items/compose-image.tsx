@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
 import React, { type ReactElement } from "react";
-import type { Cell, Puzzle, PublicPuzzle } from "./schema";
+import type { Puzzle, PublicPuzzle, Visual } from "./schema";
 import { isBlank } from "./schema";
-import { CELL_CANVAS_PADDING, CELL_VIEWBOX, CellGraphic } from "./render";
+import { CELL_CANVAS_PADDING, CELL_VIEWBOX, VisualGraphic } from "./render";
 
 /**
  * Pure-SVG composition of a whole puzzle into ONE self-contained `<svg>` for the
@@ -11,12 +11,10 @@ import { CELL_CANVAS_PADDING, CELL_VIEWBOX, CellGraphic } from "./render";
  * Unlike `StemView` (which lays out with Tailwind-classed `<div>`s that mean
  * nothing outside the app's CSS), this renders the stem + lettered options into
  * a single standalone SVG using inline attributes only — no CSS classes carry
- * any styling. `CellGraphic` is reusable here because it draws with explicit
- * `fill`/`stroke` attributes (see render.tsx `fillProps`), not color classes, so
- * nesting it inside a positioned `<svg x y width height viewBox="0 0 100 100">`
- * reproduces exactly the cell a human sees. The `className` it accepts is left
- * undefined; even if set, class attributes on SVG elements are inert in a
- * standalone document where no stylesheet targets them.
+ * any styling. `VisualGraphic` is shared by both paths and draws with explicit
+ * geometry, fill, and stroke attributes, so nesting it in a positioned SVG
+ * reproduces exactly what a human sees. Its `className` is left undefined; even
+ * if set, class attributes are inert without a stylesheet.
  *
  * This module is used by scripts and tests only (it pulls in
  * `react-dom/server`), never by the Next client.
@@ -38,7 +36,7 @@ const WIDTH = 800;
 const CELL_FRAME_STROKE = 2;
 
 /** A bordered box that draws one cell (or a "?" for a blank) at (x, y). */
-function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Cell | null; size?: number }) {
+function CellBox({ x, y, cell, size = CELL, gate = false }: { x: number; y: number; cell: Visual | null; size?: number; gate?: boolean }) {
   const innerOffset = CELL_CANVAS_PADDING;
   const innerSize = Math.max(0, size - innerOffset * 2);
   return (
@@ -48,13 +46,14 @@ function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Cell
         y={y}
         width={size}
         height={size}
-        rx={6}
+        rx={gate ? 18 : 6}
         fill="#ffffff"
-        stroke={BORDER}
-        strokeWidth={CELL_FRAME_STROKE}
+        stroke={gate ? STROKE : BORDER}
+        strokeWidth={gate ? 3 : CELL_FRAME_STROKE}
+        strokeDasharray={gate ? "8 5" : undefined}
       />
       {cell ? (
-        // Nested SVG: CellGraphic owns viewBox based on CELL_VIEWBOX; this keeps the icon geometry exact.
+        // Nested SVG: VisualGraphic owns the shared 100x100 geometry used by the browser.
         <svg
           x={x + innerOffset}
           y={y + innerOffset}
@@ -62,7 +61,7 @@ function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Cell
           height={innerSize}
           viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`}
         >
-          <CellGraphic cell={cell} />
+          <VisualGraphic visual={cell} />
         </svg>
       ) : (
         <text
@@ -100,14 +99,14 @@ function Separator({ x, y, text, height }: { x: number; y: number; text: string;
 }
 
 type Piece =
-  | { kind: "cell"; cell: Cell | null }
+  | { kind: "cell"; cell: Visual | null }
   | { kind: "sep"; text: string };
 
 /**
  * Build the horizontal stem strip for non-grid layouts (sequence / analogy /
  * oddOneOut). Returns the row's pieces plus its total width.
  */
-function stemRow(puzzle: Puzzle | PublicPuzzle): { pieces: Piece[]; rowWidth: number } {
+function stemRow(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): { pieces: Piece[]; rowWidth: number } {
   const pieces: Piece[] = [];
 
   if (puzzle.layout === "analogy") {
@@ -147,12 +146,42 @@ function optionGrid(n: number, perRow: number): { cols: number; rows: number } {
  * Compose a puzzle (stem + lettered options) into one self-contained `<svg>`.
  * Target ~800px wide, height auto-derived from content.
  */
-export function PuzzleImage({ puzzle }: { puzzle: Puzzle | PublicPuzzle }): ReactElement {
+export function PuzzleImage({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Visual> }): ReactElement {
   const elems: ReactElement[] = [];
   let cursorY = PAD;
 
   // ── Stem ──
-  if (puzzle.layout === "operatorTable") {
+  if (puzzle.layout === "conceptGroups") {
+    const rowWidth = SEP + GAP + CELL * 3 + GAP * 2;
+    const startX = (WIDTH - rowWidth) / 2;
+    const groups = [puzzle.stem.slice(0, 3), puzzle.stem.slice(3, 6)];
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      let x = startX;
+      elems.push(
+        <Separator
+          key={`concept-label-${groupIndex}`}
+          x={x}
+          y={cursorY}
+          text={groupIndex === 0 ? "✓" : "×"}
+          height={CELL}
+        />,
+      );
+      x += SEP + GAP;
+      groups[groupIndex].forEach((panel, panelIndex) => {
+        elems.push(
+          <CellBox
+            key={`concept-${groupIndex}-${panelIndex}`}
+            x={x}
+            y={cursorY}
+            cell={panel && !isBlank(panel) ? panel : null}
+          />,
+        );
+        x += CELL + GAP;
+      });
+      cursorY += CELL + GAP;
+    }
+    cursorY -= GAP;
+  } else if (puzzle.layout === "operatorTable") {
     const mini = 54;
     if (puzzle.operatorLegend) {
       const legendWidth = puzzle.operatorLegend.shapeCycle.length * mini +
@@ -193,6 +222,25 @@ export function PuzzleImage({ puzzle }: { puzzle: Puzzle | PublicPuzzle }): Reac
       elems.push(<Separator key={`op-${row}-arrow`} x={x} y={cursorY} text="→" height={CELL} />);
       x += SEP + GAP;
       elems.push(<CellBox key={`op-${row}-output`} x={x} y={cursorY} cell={output && !isBlank(output) ? output : null} />);
+      cursorY += CELL + GAP;
+    }
+    cursorY -= GAP;
+  } else if (puzzle.layout === "machineTable") {
+    const rowWidth = CELL * 3 + SEP * 2 + GAP * 4;
+    const startX = (WIDTH - rowWidth) / 2;
+    const rows = puzzle.stem.length / 3;
+    for (let row = 0; row < rows; row++) {
+      const [input, gate, output] = puzzle.stem.slice(row * 3, row * 3 + 3);
+      let x = startX;
+      elems.push(<CellBox key={`machine-${row}-input`} x={x} y={cursorY} cell={input && !isBlank(input) ? input : null} />);
+      x += CELL + GAP;
+      elems.push(<Separator key={`machine-${row}-arrow-a`} x={x} y={cursorY} text="→" height={CELL} />);
+      x += SEP + GAP;
+      elems.push(<CellBox key={`machine-${row}-gate`} x={x} y={cursorY} cell={gate && !isBlank(gate) ? gate : null} gate />);
+      x += CELL + GAP;
+      elems.push(<Separator key={`machine-${row}-arrow-b`} x={x} y={cursorY} text="→" height={CELL} />);
+      x += SEP + GAP;
+      elems.push(<CellBox key={`machine-${row}-output`} x={x} y={cursorY} cell={output && !isBlank(output) ? output : null} />);
       cursorY += CELL + GAP;
     }
     cursorY -= GAP;
@@ -280,7 +328,7 @@ export function PuzzleImage({ puzzle }: { puzzle: Puzzle | PublicPuzzle }): Reac
  * never call it. The returned string carries an `xmlns` (added by PuzzleImage)
  * so it is a valid standalone document for resvg.
  */
-export function puzzleToSvg(puzzle: Puzzle | PublicPuzzle): string {
+export function puzzleToSvg(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): string {
   // Synchronous, server-only resolution via createRequire so this module never
   // pulls react-dom/server into a client/edge bundle merely by being imported.
   const require = createRequire(import.meta.url);

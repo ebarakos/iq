@@ -12,10 +12,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bank:topup": "node --env-file=.env.local --import tsx scripts/bank-topup.ts",
-    "bank:verify": "tsx scripts/bank-verify.ts",
+    "bank:verify": "node --import tsx scripts/bank-verify.ts",
     "agent:smoke": "node --env-file=.env.local --import tsx scripts/agent-smoke.ts",
     "agent:run": "node --env-file=.env.local --import tsx scripts/agent-run.ts",
     "render:item": "tsx scripts/render-item.ts",
+    "families:verify": "node --import tsx scripts/scene-family-verify.ts",
+    "experiment:llm-rules": "node --env-file=.env.local --import tsx scripts/llm-rule-experiment.ts",
     "report": "tsx scripts/report.ts"
   },
   "engines": {

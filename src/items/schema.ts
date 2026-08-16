@@ -7,10 +7,10 @@ import { DIMENSIONS, RuleSchema } from "./rules";
  * and the deterministic SVG renderer.
  *
  * The model never draws anything. It emits a compact, constrained description of
- * each cell (shape, count, rotation, fill, size). The app renders identical SVG
- * from that description, so the displayed puzzle and the marked answer are always
- * internally consistent — even with a weak model. This keeps items "visual-only"
- * (language-independent) while making generation feasible for a text model.
+ * each visual. Compact cells retain shape/count/rotation/fill/size; richer scenes
+ * use bounded board positions, containment, and edge connections. The app renders
+ * identical SVG from that description, so the displayed puzzle and the marked
+ * answer are always internally consistent — even with a weak model.
  *
  * Dimension domains and render-identity helpers live in domains.ts (re-exported
  * here); the machine-readable rule DSL + semantic validator live in rules.ts.
@@ -38,19 +38,145 @@ export const CellSchema = z
   });
 export type Cell = z.infer<typeof CellSchema>;
 
-/** A stem panel is either a drawn cell or an explicit blank (the "?" to solve). */
-export const PanelSchema = z.union([
-  CellSchema,
-  z.object({ blank: z.literal(true) }),
-]);
-export type Panel = z.infer<typeof PanelSchema>;
+/** Cardinal board edges, kept in this order so one tile has one canonical encoding. */
+export const CONNECTION_EDGES = ["north", "east", "south", "west"] as const;
+export type ConnectionEdge = (typeof CONNECTION_EDGES)[number];
+
+const SceneTokenFields = {
+  kind: z.literal("token"),
+  shape: z.enum(SHAPES),
+  rotation: z.number().int().refine((r) => (ROTATIONS as readonly number[]).includes(r), {
+    message: "rotation must be one of 0,90,180,270 (quarter turns)",
+  }),
+  fill: z.enum(FILLS),
+  size: z.enum(SIZES).refine((size) => size !== "s", {
+    message: "scene tokens must be medium or large enough to read at answer-option size",
+  }),
+} as const;
+
+/** One independently drawable token in a scene. Counts come from separate placements. */
+export const SceneTokenSchema = z
+  .object(SceneTokenFields)
+  .strict()
+  .refine((token) => token.rotation === 0 || (ORIENTABLE_SHAPES as readonly string[]).includes(token.shape), {
+    message: "only triangles may be rotated",
+    path: ["rotation"],
+  });
+export type SceneToken = z.infer<typeof SceneTokenSchema>;
+
+/**
+ * A visible outline containing one or two tokens. Scene tokens deliberately
+ * exclude the small size at the shared token schema: at answer-option size it
+ * would turn containment into a visual-acuity test.
+ */
+export const SceneContainerSchema = z.object({
+  kind: z.literal("container"),
+  shape: z.enum(["circle", "square", "diamond", "hexagon"]),
+  contents: z.array(SceneTokenSchema).min(1).max(2),
+}).strict();
+export type SceneContainer = z.infer<typeof SceneContainerSchema>;
+
+export const SceneObjectSchema = z.union([SceneTokenSchema, SceneContainerSchema]);
+export type SceneObject = z.infer<typeof SceneObjectSchema>;
+
+export const ScenePlacementSchema = z.object({
+  row: z.number().int().min(0),
+  column: z.number().int().min(0),
+  object: SceneObjectSchema,
+}).strict();
+export type ScenePlacement = z.infer<typeof ScenePlacementSchema>;
+
+export const ConnectionTileSchema = z.object({
+  row: z.number().int().min(0),
+  column: z.number().int().min(0),
+  edges: z
+    .array(z.enum(CONNECTION_EDGES))
+    .min(1)
+    .max(CONNECTION_EDGES.length)
+    .refine((edges) => new Set(edges).size === edges.length, {
+      message: "connection edges must be distinct",
+    })
+    .refine(
+      (edges) => edges.every((edge, index) => index === 0 ||
+        CONNECTION_EDGES.indexOf(edges[index - 1]) < CONNECTION_EDGES.indexOf(edge)),
+      { message: "connection edges must use north, east, south, west order" },
+    ),
+}).strict();
+export type ConnectionTile = z.infer<typeof ConnectionTileSchema>;
+
+/** A centred dashed fold guide. It is visually distinct from connection paths. */
+export const SceneGuideSchema = z.object({
+  kind: z.literal("crease"),
+  axis: z.enum(["horizontal", "vertical"]),
+  direction: z.enum(["leftToRight", "rightToLeft", "topToBottom", "bottomToTop"]),
+}).strict().refine((guide) => guide.axis === "vertical"
+  ? guide.direction === "leftToRight" || guide.direction === "rightToLeft"
+  : guide.direction === "topToBottom" || guide.direction === "bottomToTop", {
+  message: "fold direction must cross the declared crease axis",
+  path: ["direction"],
+});
+export type SceneGuide = z.infer<typeof SceneGuideSchema>;
+
+/**
+ * A small categorical board shared by relational, constraint, and topology
+ * families. Coordinates are zero-based and validated against the declared board.
+ */
+export const SceneSchema = z.object({
+  kind: z.literal("scene"),
+  rows: z.number().int().min(2).max(3),
+  columns: z.number().int().min(2).max(3),
+  objects: z.array(ScenePlacementSchema).max(9).default([]),
+  tiles: z.array(ConnectionTileSchema).max(9).default([]),
+  guides: z.array(SceneGuideSchema).max(2).optional(),
+}).strict().superRefine((scene, ctx) => {
+  if (scene.objects.length + scene.tiles.length + (scene.guides?.length ?? 0) === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a scene must contain at least one object or connection tile" });
+  }
+
+  if (scene.guides && new Set(scene.guides.map((guide) => `${guide.kind}:${guide.axis}:${guide.direction}`)).size !== scene.guides.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["guides"], message: "scene guides must be distinct" });
+  }
+
+  const occupied = new Set<string>();
+  for (const [collection, entries] of [["objects", scene.objects], ["tiles", scene.tiles]] as const) {
+    entries.forEach((entry, index) => {
+      if (entry.row >= scene.rows || entry.column >= scene.columns) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [collection, index],
+          message: `position (${entry.row}, ${entry.column}) is outside the ${scene.rows}x${scene.columns} board`,
+        });
+      }
+      const key = `${entry.row}:${entry.column}`;
+      if (occupied.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [collection, index],
+          message: `board position (${entry.row}, ${entry.column}) may contain only one visible primitive`,
+        });
+      }
+      occupied.add(key);
+    });
+  }
+});
+export type Scene = z.infer<typeof SceneSchema>;
+
+/** Current compact cells and richer board scenes share one renderer contract. */
+export const VisualSchema = z.union([CellSchema, SceneSchema]);
+export type Visual = z.infer<typeof VisualSchema>;
+
+/** A stem panel is either a visual or an explicit blank (the "?" to solve). */
+export const PanelSchema = z.union([VisualSchema, z.object({ blank: z.literal(true) }).strict()]);
+export type Panel<V extends Visual = Cell> = V | { blank: true };
 
 export const PUZZLE_TYPES = ["matrix", "sequence", "analogy", "oddOneOut", "operatorInduction"] as const;
 export type PuzzleType = (typeof PUZZLE_TYPES)[number];
 
 /** How the stem panels are arranged on screen. */
-export const LAYOUTS = ["grid3x3", "row", "analogy", "operatorTable"] as const;
+export const LAYOUTS = ["grid3x3", "row", "analogy", "operatorTable", "machineTable", "conceptGroups", "singleScene"] as const;
 export type Layout = (typeof LAYOUTS)[number];
+export const REASONING_BANDS = ["warmup", "composition", "constraint-spatial", "induction-transfer"] as const;
+export type ReasoningBand = (typeof REASONING_BANDS)[number];
 
 /** Public visual legend for the per-item nominal shape order used by an operator puzzle. */
 export const OperatorLegendSchema = z.object({
@@ -85,7 +211,7 @@ export const GenerationMetadataSchema = z.object({
 }).strict();
 export type GenerationMetadata = z.infer<typeof GenerationMetadataSchema>;
 
-export const PuzzleSchema = z
+const RuntimePuzzleSchema = z
   .object({
     id: z.string().min(1),
     type: z.enum(PUZZLE_TYPES),
@@ -94,22 +220,25 @@ export const PuzzleSchema = z
     /** 1 (easiest) … 5 (hardest). */
     difficulty: z.number().int().min(1).max(5),
     layout: z.enum(LAYOUTS),
+    /** Versioned reasoning-family identity for family-aware results and calibration. */
+    familyId: z.string().min(1).optional(),
+    band: z.enum(REASONING_BANDS).optional(),
     /** Visible ordering for nominal shape arithmetic; never contains answer data. */
     operatorLegend: OperatorLegendSchema.optional(),
     /**
      * The question, as a list of panels.
      *  - matrix:    9 panels (grid3x3) with exactly one { blank: true }
      *  - sequence:  4–6 panels (row) with exactly one trailing { blank: true }
-     *  - analogy:   exactly [A, B, C] cells (layout "analogy"); renderer adds ":" "::" "?"
+     *  - analogy:   exactly [A, B, C] visuals (layout "analogy"); renderer adds ":" "::" "?"
      *  - oddOneOut: empty [] — the options ARE the items; pick the one that doesn't belong
      */
     stem: z.array(PanelSchema),
-    /** Multiple-choice options (drawn cells). */
-    options: z.array(CellSchema).min(4).max(6),
+    /** Multiple-choice options rendered through the shared visual contract. */
+    options: z.array(VisualSchema).min(4).max(6),
     /** 0-based index into `options` of the single correct answer. */
     answerIndex: z.number().int().min(0),
-    /** One-line reason the answer is correct (shown in review, not during solving). */
-    explanation: z.string().min(3).max(240),
+    /** Detailed answer reasoning, shown only in the completed-test review. */
+    explanation: z.string().min(3).max(800),
     /** Present on deterministic runtime items; absent on legacy/authored items. */
     generation: GenerationMetadataSchema.optional(),
     /**
@@ -130,8 +259,13 @@ export const PuzzleSchema = z
 
     const blanks = p.stem.filter(isBlank).length;
     if (p.type === "matrix") {
-      if (p.layout !== "grid3x3" || p.stem.length !== 9 || blanks !== 1) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be grid3x3 with 9 panels and exactly 1 blank" });
+      const grid = p.layout === "grid3x3" && p.stem.length === 9 && blanks === 1;
+      const board = p.layout === "singleScene" && p.stem.length === 1 && blanks === 0 &&
+        !isBlank(p.stem[0]) && isScene(p.stem[0]);
+      const machine = p.layout === "machineTable" && (p.stem.length === 9 || p.stem.length === 12) && blanks === 1 &&
+        isBlank(p.stem[p.stem.length - 1]);
+      if (!grid && !board && !machine) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid, one incomplete scene, or a three- or four-row machine table" });
       }
     } else if (p.type === "sequence") {
       // 4–6 panels total: 3–5 drawn cells + exactly one trailing blank. Variable
@@ -145,9 +279,15 @@ export const PuzzleSchema = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "analogy must be layout 'analogy' with exactly 3 cells and no blank" });
       }
     } else if (p.type === "oddOneOut") {
-      // Option count is already constrained to >=4 by the array schema.
-      if (p.layout !== "row" || p.stem.length !== 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "oddOneOut must have layout 'row' and an empty stem" });
+      // Classic outliers use options only. Scene concept induction reuses the
+      // same choose-one answer shape with three positive and three negative examples.
+      const classic = p.layout === "row" && p.stem.length === 0;
+      const concept = p.layout === "conceptGroups" && p.stem.length === 6 && blanks === 0 &&
+        p.stem.every((panel) => !isBlank(panel) && isScene(panel));
+      const repair = p.layout === "singleScene" && p.stem.length === 1 && blanks === 0 &&
+        !isBlank(p.stem[0]) && isScene(p.stem[0]);
+      if (!classic && !concept && !repair) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "oddOneOut must be an empty row, six conceptGroups examples, or one singleScene repair prompt" });
       }
     } else if (p.type === "operatorInduction") {
       // Consecutive triples encode (left, right) -> output. There are 3–5
@@ -164,15 +304,15 @@ export const PuzzleSchema = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["operatorLegend"], message: "operatorInduction needs a visible shapeCycle legend" });
       } else {
         const allowed = new Set(p.operatorLegend.shapeCycle);
-        const cells = [
-          ...p.stem.filter((panel): panel is Cell => !isBlank(panel)),
-          ...p.options,
-        ];
-        if (cells.some((cell) => !allowed.has(cell.shape))) {
+        const visuals: Visual[] = [...p.options];
+        for (const panel of p.stem) {
+          if (!isBlank(panel)) visuals.push(panel);
+        }
+        if (visuals.some((visual) => !isCell(visual) || !allowed.has(visual.shape))) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["operatorLegend", "shapeCycle"],
-            message: "every operatorInduction cell shape must appear in its visible shapeCycle",
+            message: "operatorInduction supports compact cells only, and every shape must appear in its visible shapeCycle",
           });
         }
       }
@@ -186,6 +326,26 @@ export const PuzzleSchema = z
       });
     }
 
+    const optionKinds = new Set(p.options.map((visual) => isScene(visual) ? "scene" : "cell"));
+    if (optionKinds.size > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["options"],
+        message: "all answer options must use the same visual vocabulary",
+      });
+    }
+    for (const [index, panel] of p.stem.entries()) {
+      if (isBlank(panel)) continue;
+      const kind = isScene(panel) ? "scene" : "cell";
+      if (optionKinds.size === 1 && !optionKinds.has(kind)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stem", index],
+          message: "stem visuals and answer options must use the same visual vocabulary",
+        });
+      }
+    }
+
     // Legibility doctrine: every pair of options must be INSTANTLY tellable
     // apart (different shape, count, or fill; small-vs-large; or triangles
     // pointing different ways). Subtle pairs make the item a visual-acuity
@@ -193,11 +353,18 @@ export const PuzzleSchema = z
     // renders — both are rejected here.
     for (let i = 0; i < p.options.length; i++) {
       for (let j = i + 1; j < p.options.length; j++) {
-        if (!isInstantlyDistinct(p.options[i], p.options[j])) {
+        const left = p.options[i];
+        const right = p.options[j];
+        const indistinct = isCell(left) && isCell(right)
+          ? !isInstantlyDistinct(left, right)
+          : isScene(left) && isScene(right)
+            ? !areScenesCategoricallyDistinct(left, right)
+            : false;
+        if (indistinct) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["options"],
-            message: `options ${i} and ${j} are not instantly distinguishable — every pair must differ obviously: different shape, count, or fill; size "s" vs "l"; or triangles pointing different directions`,
+            message: `options ${i} and ${j} are not instantly distinguishable — compact cells must differ obviously, and scene options must differ in a categorical board feature`,
           });
         }
       }
@@ -207,20 +374,30 @@ export const PuzzleSchema = z
       // Group coherence: the NON-answer options must form a coherent "group"
       // that the answer breaks — at least one dimension on which every
       // non-answer shares a value AND the answer differs.
-      const answer = p.options[p.answerIndex];
-      const others = p.options.filter((_, i) => i !== p.answerIndex);
-      const dims = ["shape", "count", "rotation", "fill", "size"] as const;
-      const hasBreak = others.length > 0 && dims.some((d) => {
-        const shared = others.every((o) => o[d] === others[0][d]);
-        return shared && answer[d] !== others[0][d];
-      });
-      if (!hasBreak) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "oddOneOut: the 3+ non-answer options must all share a value on at least one dimension (shape/count/rotation/fill/size) that the answer breaks" });
+      if (p.options.every(isCell)) {
+        const answer = p.options[p.answerIndex];
+        const others = p.options.filter((_, i) => i !== p.answerIndex);
+        const dims = ["shape", "count", "rotation", "fill", "size"] as const;
+        const hasBreak = others.length > 0 && dims.some((d) => {
+          const shared = others.every((o) => o[d] === others[0][d]);
+          return shared && answer[d] !== others[0][d];
+        });
+        if (!hasBreak) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "oddOneOut: the 3+ non-answer compact cells must all share a value on at least one dimension (shape/count/rotation/fill/size) that the answer breaks" });
+        }
       }
     }
   });
 
-export type Puzzle = z.infer<typeof PuzzleSchema>;
+type RuntimePuzzle = z.infer<typeof RuntimePuzzleSchema>;
+export type Puzzle<V extends Visual = Cell> = Omit<RuntimePuzzle, "stem" | "options"> & {
+  stem: Panel<V>[];
+  options: V[];
+};
+
+/** Existing generators stay cell-typed; new scene families opt into the visual-wide schema. */
+export const PuzzleSchema = RuntimePuzzleSchema as z.ZodType<Puzzle>;
+export const VisualPuzzleSchema = RuntimePuzzleSchema as z.ZodType<Puzzle<Visual>>;
 
 /**
  * Answer-free puzzle contract served before a quiz is submitted.
@@ -229,48 +406,125 @@ export type Puzzle = z.infer<typeof PuzzleSchema>;
  * types disappear at runtime, while this schema also strips unknown private
  * fields if an internal puzzle is passed to it.
  */
-export const PublicPuzzleSchema = z.object({
+const RuntimePublicPuzzleSchema = z.object({
   id: z.string().min(1),
   type: z.enum(PUZZLE_TYPES),
   instruction: z.string().min(3).max(140),
   difficulty: z.number().int().min(1).max(5),
   layout: z.enum(LAYOUTS),
+  familyId: z.string().min(1).optional(),
+  band: z.enum(REASONING_BANDS).optional(),
   operatorLegend: OperatorLegendSchema.optional(),
   stem: z.array(PanelSchema),
-  options: z.array(CellSchema).min(4).max(6),
+  options: z.array(VisualSchema).min(4).max(6),
 });
-export type PublicPuzzle = z.infer<typeof PublicPuzzleSchema>;
+type RuntimePublicPuzzle = z.infer<typeof RuntimePublicPuzzleSchema>;
+export type PublicPuzzle<V extends Visual = Cell> = Omit<RuntimePublicPuzzle, "stem" | "options"> & {
+  stem: Panel<V>[];
+  options: V[];
+};
+export const PublicPuzzleSchema = RuntimePublicPuzzleSchema as z.ZodType<PublicPuzzle>;
+export const VisualPublicPuzzleSchema = RuntimePublicPuzzleSchema as z.ZodType<PublicPuzzle<Visual>>;
 
 /** Strip the answer key and authoring metadata at the server boundary. */
-export function toPublicPuzzle(puzzle: Puzzle): PublicPuzzle {
-  return PublicPuzzleSchema.parse(puzzle);
+export function toPublicPuzzle<V extends Visual>(puzzle: Puzzle<V>): PublicPuzzle<V> {
+  return VisualPublicPuzzleSchema.parse(puzzle) as PublicPuzzle<V>;
 }
 
-/** A full test is exactly 5 puzzles for the MVP, each with a distinct id. */
-export const PuzzleSetSchema = z
-  .array(PuzzleSchema)
-  .length(5)
+/** Replay supports legacy five-item tests and current twelve-item tests. */
+const RuntimePuzzleSetSchema = z
+  .array(VisualPuzzleSchema)
+  .refine((set) => set.length === 5 || set.length === 12, {
+    message: "a puzzle set must contain exactly 5 legacy items or 12 current items",
+  })
   .refine((set) => new Set(set.map((p) => p.id)).size === set.length, {
     message: "puzzle ids must be unique across the set",
   });
-export type PuzzleSet = z.infer<typeof PuzzleSetSchema>;
+export type PuzzleSet<V extends Visual = Cell> = Puzzle<V>[];
+export const PuzzleSetSchema = RuntimePuzzleSetSchema as z.ZodType<PuzzleSet>;
+export const VisualPuzzleSetSchema = RuntimePuzzleSetSchema as z.ZodType<PuzzleSet<Visual>>;
 
-export const PublicPuzzleSetSchema = z
-  .array(PublicPuzzleSchema)
-  .length(5)
+const RuntimePublicPuzzleSetSchema = z
+  .array(VisualPublicPuzzleSchema)
+  .refine((set) => set.length === 5 || set.length === 12, {
+    message: "a public puzzle set must contain exactly 5 legacy items or 12 current items",
+  })
   .refine((set) => new Set(set.map((p) => p.id)).size === set.length, {
     message: "puzzle ids must be unique across the set",
   });
-export type PublicPuzzleSet = z.infer<typeof PublicPuzzleSetSchema>;
+export type PublicPuzzleSet<V extends Visual = Cell> = PublicPuzzle<V>[];
+export const PublicPuzzleSetSchema = RuntimePublicPuzzleSetSchema as z.ZodType<PublicPuzzleSet>;
+export const VisualPublicPuzzleSetSchema = RuntimePublicPuzzleSetSchema as z.ZodType<PublicPuzzleSet<Visual>>;
 
-/** Strip private fields from a complete five-question quiz. */
-export function toPublicPuzzleSet(puzzles: PuzzleSet): PublicPuzzleSet {
-  return PublicPuzzleSetSchema.parse(puzzles);
+/** Strip private fields from a complete legacy or current quiz. */
+export function toPublicPuzzleSet<V extends Visual>(puzzles: PuzzleSet<V>): PublicPuzzleSet<V> {
+  return VisualPublicPuzzleSetSchema.parse(puzzles) as PublicPuzzleSet<V>;
 }
 
 /** Type guard: is this panel a blank placeholder? */
-export function isBlank(panel: Panel): panel is { blank: true } {
+export function isBlank(panel: Panel<Visual>): panel is { blank: true } {
   return "blank" in panel;
+}
+
+/** Type guards used by both renderer paths and legacy rule code. */
+export function isScene(visual: Visual): visual is Scene {
+  return "kind" in visual && visual.kind === "scene";
+}
+
+export function isCell(visual: Visual): visual is Cell {
+  return !isScene(visual);
+}
+
+/** Canonical signature for exact visual-scene duplicate rejection. */
+export function sceneSignature(scene: Scene): string {
+  const objects = [...scene.objects].sort((a, b) => a.row - b.row || a.column - b.column);
+  const tiles = [...scene.tiles].sort((a, b) => a.row - b.row || a.column - b.column);
+  const guides = [...(scene.guides ?? [])].sort((a, b) => a.axis.localeCompare(b.axis));
+  return JSON.stringify({ rows: scene.rows, columns: scene.columns, objects, tiles, guides });
+}
+
+function sceneObjectIsDistinct(left: SceneObject, right: SceneObject): boolean {
+  if (left.kind !== right.kind) return true;
+  if (left.kind === "token" && right.kind === "token") {
+    return isInstantlyDistinct({ ...left, count: 1 }, { ...right, count: 1 });
+  }
+  if (left.kind === "container" && right.kind === "container") {
+    if (left.shape !== right.shape || left.contents.length !== right.contents.length) return true;
+    return left.contents.some((token, index) =>
+      isInstantlyDistinct({ ...token, count: 1 }, { ...right.contents[index], count: 1 }));
+  }
+  return true;
+}
+
+/**
+ * Scene-option legibility mirrors compact-cell legibility: board position,
+ * containment, edge topology, shape, fill, count, or a clearly separated size
+ * must differ. Medium-vs-large alone is intentionally not enough.
+ */
+export function areScenesCategoricallyDistinct(left: Scene, right: Scene): boolean {
+  if (left.rows !== right.rows || left.columns !== right.columns) return true;
+
+  const leftObjects = new Map(left.objects.map((entry) => [`${entry.row}:${entry.column}`, entry.object]));
+  const rightObjects = new Map(right.objects.map((entry) => [`${entry.row}:${entry.column}`, entry.object]));
+  if (leftObjects.size !== rightObjects.size) return true;
+  for (const [position, object] of leftObjects) {
+    const other = rightObjects.get(position);
+    if (!other || sceneObjectIsDistinct(object, other)) return true;
+  }
+
+  const tileKey = (tile: ConnectionTile) => `${tile.row}:${tile.column}:${tile.edges.join(",")}`;
+  const leftTiles = new Set(left.tiles.map(tileKey));
+  const rightTiles = new Set(right.tiles.map(tileKey));
+  if (leftTiles.size !== rightTiles.size) return true;
+  if ([...leftTiles].some((tile) => !rightTiles.has(tile))) return true;
+
+  const leftGuides = new Set((left.guides ?? []).map((guide) => `${guide.kind}:${guide.axis}:${guide.direction}`));
+  const rightGuides = new Set((right.guides ?? []).map((guide) => `${guide.kind}:${guide.axis}:${guide.direction}`));
+  return leftGuides.size !== rightGuides.size || [...leftGuides].some((guide) => !rightGuides.has(guide));
+}
+
+export function visualElementSignature(visual: Visual): string {
+  return isScene(visual) ? `scene:${sceneSignature(visual)}` : `cell:${JSON.stringify(visual)}`;
 }
 
 /**
@@ -278,7 +532,7 @@ export function isBlank(panel: Panel): panel is { blank: true } {
  * cell stays correct. Returns a new puzzle (does not mutate the input). Used to
  * remove the generating model's answer-position bias before the test is served.
  */
-export function shuffleOptions(puzzle: Puzzle): Puzzle {
+export function shuffleOptions<V extends Visual>(puzzle: Puzzle<V>): Puzzle<V> {
   const order = puzzle.options.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

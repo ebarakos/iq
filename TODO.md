@@ -1,56 +1,12 @@
 # TODO
 
-Short-lived task/checklist state. Design lives in [BRAINSTORM.md](BRAINSTORM.md)
-(ideation) and `docs/plans/<slug>.md` (once formalized).
+One ordered implementation pass for one agent. Work from top to bottom; there is
+no second active backlog. Design: [deterministic novel tests](docs/plans/deterministic-novel-tests.md).
 
-## 2026-08-14 — one genuinely hard test
-- [ ] Make the visual-equation puzzles require deeper reasoning.
-  - First decide how a second operation uses the result of the first operation. This must be clear
-    before the code is changed.
-  - Then allow two operations in a row and allow more than one part of the answer to depend on an
-    "if" rule.
-  - Every puzzle must show examples of both outcomes of each "if" rule.
-  - Files: `src/items/rules.ts`, `src/items/generate.ts`, `src/items/schema.ts`
-  - Keep generation fast enough for the start button. Set and measure a maximum generation time.
-  - Done means the same seed still creates the same valid puzzle, generation stays within the
-    time limit, and every rule that fits the examples gives the same answer.
-- [ ] Extend near-miss distractors to the remaining families and prove the property with tests.
-  Operator induction already builds its options from near-miss programs, and the derived
-  families already use `generateDerivedDistractors` for single-dimension near-misses; neither
-  has a test that each distractor traces back to a specific competing rule.
-  - Files: `src/items/generate.ts`, `src/items/rules.ts`
-  - Verify: tests show each distractor is produced by a near-miss program, is instantly distinct
-    from every other option, and cannot also satisfy the complete evidence.
-- [ ] Decide whether matrix cells should contain small grids of marks.
-  - This would allow rules such as combining marks, keeping only shared marks, reflecting marks,
-  and moving marks between positions.
-  - It would require a new puzzle format and changes throughout generation, drawing, and answer
-  checking. Recommendation: do not build it yet; deepen visual equations first.
-  - If approved, write a separate plan before changing code.
+## 2026-08-15 — broaden the test into varied, deep visual reasoning
 
-- [ ] Only serve puzzles that require more than one simple step.
-  - Files: `src/items/generate.ts`, `src/items/bank.ts`, `src/items/schema.ts`
-  - First decide whether a five-question test must still contain one puzzle of every type. The
-  current odd-one-out and analogy puzzles are too simple for this rule, so keeping one of every
-    type would make it impossible to build a full test.
-  - Done means every served puzzle records why it counts as deep enough, and a test rejects any
-    puzzle that only needs one simple step.
-- [ ] Save human answers and timing on the server.
-  - First choose permanent storage. Files written by the deployed app would be temporary and are
-    not a safe place for human results.
-  - Save the chosen option, whether it was correct, time spent, and the kind of generated puzzle.
-  - Files: `src/app/api/submit/route.ts`, `src/lib/attempts.ts`, `src/lib/quiz-token.ts`
-  - Done means each completed test saves one safe record per question without sending secret
-    answers or generation seeds to the browser.
-- [ ] Decide what counts as a good hard puzzle for people.
-  - Before collecting results, choose the target success rate and the largest acceptable number
-    of people who may report that a puzzle was unclear.
-  - Writing these numbers first prevents changing the goal after seeing the results.
-  - Files: `docs/plans/deterministic-novel-tests.md`
-- [ ] Test the puzzles with a small group of people and a fixed group of vision models.
-  - Report human accuracy and time separately from model accuracy. Group results by puzzle kind
-    and rule difficulty instead of by individual randomly generated puzzle.
-  - Files: `src/lib/calibrate.ts`, `scripts/report.ts`
-  - Keep only puzzle groups that are hard for the intended reason and are still clear to people.
-    Keep calling the product a visual reasoning test until there is enough human evidence to call
-    it an IQ test.
+- [ ] Run the desktop and mobile human-solvability pilot for every candidate family and difficulty, promoting only family/band pairs that meet the thresholds in the design plan.
+- [ ] Promote the preview-only transformation-machine replacement after it passes the human gate; keep hidden arithmetic out of the compact test.
+- [ ] Enable the deterministic 12-question runtime only after eligible families and a matching fallback bank pass both gates; until then keep the verified rising-difficulty preview development-only.
+- [ ] Run and evaluate the flagged LLM rule-proposal experiment for acceptance, latency, cost, novelty, and pilot quality; retain pure-code validation and deterministic fallback.
+- [ ] Finish expanded-test verification with mobile visual regression and real human pilots; remove or redesign trivial or confusing families.

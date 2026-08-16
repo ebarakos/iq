@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bankIdFor, fingerprintPuzzle, loadBank, sampleQuiz } from "./bank";
-import { PuzzleSetSchema, shuffleOptions } from "./schema";
+import { PUZZLE_TYPES, PuzzleSetSchema, shuffleOptions } from "./schema";
 import { checkRule } from "./rules";
 
 describe("fingerprintPuzzle", () => {
@@ -40,6 +40,7 @@ describe("sampleQuiz", () => {
       const { puzzles, items } = sampleQuiz();
       const parsed = PuzzleSetSchema.safeParse(puzzles);
       expect(parsed.success, JSON.stringify(parsed.success ? "" : parsed.error.issues)).toBe(true);
+      expect(puzzles).toHaveLength(5);
 
       for (let i = 1; i < puzzles.length; i++) {
         expect(puzzles[i].difficulty).toBeGreaterThanOrEqual(puzzles[i - 1].difficulty);
@@ -65,6 +66,13 @@ describe("sampleQuiz", () => {
       expect(Math.min(...hard.puzzles.map((p) => p.difficulty))).toBeGreaterThanOrEqual(3);
       expect(hard.puzzles.filter((p) => p.difficulty >= 4).length).toBeGreaterThanOrEqual(3);
       expect(PuzzleSetSchema.safeParse(hard.puzzles).success).toBe(true);
+    }
+  });
+
+  it("enforces full family coverage in hard fallback quizzes when all families are present", () => {
+    for (let run = 0; run < 80; run++) {
+      const { items } = sampleQuiz(loadBank(), 5, "hard");
+      expect(new Set(items.map((item) => item.puzzle.type)).size).toBe(PUZZLE_TYPES.length);
     }
   });
 });

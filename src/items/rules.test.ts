@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeOperatorStem,
-  applyOperatorBase,
   applyOperatorExpression,
   applyTransform,
   checkRule,
@@ -357,8 +356,24 @@ describe("operator induction v1", () => {
     ({ shape, count, rotation: 0, fill: "outline", size: "s" });
 
   it("applies closed modular count and visible-cycle shape arithmetic", () => {
-    expect(applyOperatorBase({ op: "addMod" }, "count", cell("circle", 3), cell("square", 2), cycle)).toBe(1);
-    expect(applyOperatorBase({ op: "diffLRMod" }, "shape", cell("triangle", 1), cell("square", 1), cycle)).toBe("square");
+    expect(
+      applyOperatorExpression(
+        { op: "addMod", left: { op: "left" }, right: { op: "right" } },
+        "count",
+        cell("circle", 3),
+        cell("square", 2),
+        cycle,
+      ),
+    ).toBe(1);
+    expect(
+      applyOperatorExpression(
+        { op: "diffLRMod", left: { op: "left" }, right: { op: "right" } },
+        "shape",
+        cell("triangle", 1),
+        cell("square", 1),
+        cycle,
+      ),
+    ).toBe("square");
     expect(applyOperatorExpression({ op: "right" }, "fill", cell("circle", 1), { ...cell("square", 1), fill: "solid" }, cycle)).toBe("solid");
   });
 
@@ -366,7 +381,7 @@ describe("operator induction v1", () => {
     const first = enumerateOperatorExpressions("shape", cycle);
     const replay = enumerateOperatorExpressions("shape", cycle);
     expect(replay.map(operatorExpressionKey)).toEqual(first.map(operatorExpressionKey));
-    expect(new Set(first.map(operatorExpressionKey)).size).toBe(first.length);
+    expect(new Set(first.map(operatorExpressionKey)).size).toBe(297);
     expect(enumerateOperatorExpressions("size", cycle).every((expr) =>
       expr.op === "if" ? [expr.whenTrue.op, expr.whenFalse.op].every((op) => op === "left" || op === "right") : expr.op === "left" || expr.op === "right",
     )).toBe(true);

@@ -1,7 +1,15 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CELL_CANVAS_PADDING, CELL_VIEWBOX, CellGraphic } from "./render";
+import {
+  CELL_CANVAS_PADDING,
+  CELL_VIEWBOX,
+  SCENE_BOARD_INSET,
+  SCENE_CONNECTION_STROKE,
+  SceneGraphic,
+  CellGraphic,
+  StemView,
+} from "./render";
 import { generatePuzzle } from "./generate";
 import { loadBank } from "./bank";
 import {
@@ -10,6 +18,9 @@ import {
   type Puzzle,
   type PublicPuzzle,
   type PuzzleType,
+  type Scene,
+  type SceneToken,
+  type Visual,
   SHAPES,
   FILLS,
   SIZES,
@@ -23,12 +34,53 @@ function renderCell(cell: Cell): string {
   return renderToStaticMarkup(createElement(CellGraphic, { cell }));
 }
 
+function sceneToken(shape: SceneToken["shape"] = "circle", fill: SceneToken["fill"] = "solid"): SceneToken {
+  return { kind: "token", shape, rotation: 0, fill, size: "l" };
+}
+
+const representativeScene: Scene = {
+  kind: "scene",
+  rows: 2,
+  columns: 2,
+  objects: [
+    { row: 0, column: 1, object: sceneToken("triangle", "half") },
+    {
+      row: 1,
+      column: 0,
+      object: { kind: "container", shape: "circle", contents: [{ ...sceneToken("star"), size: "m" }] },
+    },
+  ],
+  tiles: [{ row: 1, column: 1, edges: ["north", "west"] }],
+};
+
+function sceneAt(row: number, column: number, shape: SceneToken["shape"] = "circle"): Scene {
+  return {
+    kind: "scene",
+    rows: 2,
+    columns: 2,
+    objects: [{ row, column, object: sceneToken(shape) }],
+    tiles: [],
+  };
+}
+
+const scenePuzzle: Puzzle<Visual> = {
+  id: "scene-renderer",
+  type: "sequence",
+  instruction: "What comes next?",
+  difficulty: 3,
+  layout: "row",
+  stem: [sceneAt(0, 0), representativeScene, sceneAt(1, 0, "square"), { blank: true }],
+  options: [sceneAt(0, 1), sceneAt(1, 1), sceneAt(0, 0, "diamond"), representativeScene],
+  answerIndex: 0,
+  explanation: "The token moves to the next board position.",
+};
+
 function firstOfType(type: PuzzleType): Puzzle {
   const bankHit = loadBank().find((item) => item.puzzle.type === type);
   return bankHit?.puzzle ?? generatePuzzle(type, 4, mulberry32(42));
 }
 
-async function puzzleToSvg(puzzle: Puzzle | PublicPuzzle) {
+async function puzzleToSvg(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>) {
   const { puzzleToSvg } = await import("./compose-image");
   return puzzleToSvg(puzzle);
 }
@@ -220,19 +272,74 @@ describe("CellGraphic geometry lock", () => {
   });
 });
 
+describe("SceneGraphic geometry and composition", () => {
+  it("uses the exact same scene markup in the browser and standalone-image paths", async () => {
+    const direct = renderToStaticMarkup(createElement(SceneGraphic, { scene: representativeScene }));
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: scenePuzzle }));
+    const composed = await puzzleToSvg(scenePuzzle);
+
+    expect(composed).toContain(direct);
+    expect(browser).toContain('data-scene-kind="token"');
+    expect(browser).toContain('data-scene-kind="container"');
+    expect(browser).toContain('data-scene-kind="connection"');
+    expect(direct).toContain('data-scene-kind="token"');
+    expect(direct).toContain('data-scene-kind="container"');
+    expect(direct).toContain('data-scene-kind="connection"');
+  });
+
+  it("maps positions and connection edges to explicit board geometry", () => {
+    const svg = renderToStaticMarkup(createElement(SceneGraphic, { scene: representativeScene }));
+    const boardSize = CELL_VIEWBOX - SCENE_BOARD_INSET * 2;
+    const slot = boardSize / 2;
+    const tileCenter = {
+      x: SCENE_BOARD_INSET + 1.5 * slot,
+      y: SCENE_BOARD_INSET + 1.5 * slot,
+    };
+
+    const north = /<line data-connection-edge="north"([^>]*)(?:\/>|><\/line>)/.exec(svg);
+    const west = /<line data-connection-edge="west"([^>]*)(?:\/>|><\/line>)/.exec(svg);
+    expect(north).not.toBeNull();
+    expect(west).not.toBeNull();
+    const northAttrs = parseAttributes(north?.[1] ?? "");
+    const westAttrs = parseAttributes(west?.[1] ?? "");
+
+    expect(Number(northAttrs.x1)).toBeCloseTo(tileCenter.x, 6);
+    expect(Number(northAttrs.y1)).toBeCloseTo(tileCenter.y, 6);
+    expect(Number(northAttrs.x2)).toBeCloseTo(tileCenter.x, 6);
+    expect(Number(northAttrs.y2)).toBeCloseTo(SCENE_BOARD_INSET + slot, 6);
+    expect(Number(westAttrs.x2)).toBeCloseTo(SCENE_BOARD_INSET + slot, 6);
+    expect(Number(westAttrs.y2)).toBeCloseTo(tileCenter.y, 6);
+  });
+
+  it("keeps medium board tokens and path strokes legible at the 80px solve and 64px review sizes", () => {
+    const smallestSlot = (CELL_VIEWBOX - SCENE_BOARD_INSET * 2) / 3;
+    for (const displayedSize of [80, 64]) {
+      const optionScale = displayedSize / CELL_VIEWBOX;
+      const mediumTokenDiameter = smallestSlot * 0.3 * 2 * optionScale;
+      const pathStroke = SCENE_CONNECTION_STROKE * optionScale;
+      expect(mediumTokenDiameter).toBeGreaterThan(10);
+      expect(pathStroke).toBeGreaterThan(3.5);
+    }
+  });
+});
+
 describe("compose-image layout invariants", () => {
   it("renders every embedded CellGraphic with the shared inner inset", async () => {
     const puzzle = firstOfType("operatorInduction");
     const svg = await puzzleToSvg(puzzle);
-    const re = /<rect\b([^>]*?)\/>\s*<svg\b([^>]*?)>/g;
+    const groups = Array.from(svg.matchAll(/<g\b[^>]*>([\s\S]*?)<\/g>/g));
 
     let hasCell = false;
-    let match: RegExpExecArray | null;
-    while ((match = re.exec(svg)) !== null) {
-      const rectAttrs = parseAttributes(match[1]);
-      const nestedAttrs = parseAttributes(match[2]);
-
+    for (const [, inner] of groups) {
+      const rectMatch = /<rect\b([^>]*?)(?:\/>|>[\s\S]*?<\/rect>)/.exec(inner);
+      if (!rectMatch) continue;
+      const rectAttrs = parseAttributes(rectMatch[1]);
       if (rectAttrs.fill !== "#ffffff" || rectAttrs.stroke !== "#9ca3af") continue;
+
+      const tail = inner.slice((rectMatch.index ?? 0) + rectMatch[0].length);
+      const nestedMatch = /<svg\b([^>]*?)>/.exec(tail);
+      if (!nestedMatch) continue;
+      const nestedAttrs = parseAttributes(nestedMatch[1]);
       if (nestedAttrs.viewBox !== `0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`) continue;
 
       hasCell = true;
@@ -262,7 +369,7 @@ describe("compose-image layout invariants", () => {
     const rowCount = puzzle.stem.length / 3;
     const svg = await puzzleToSvg(puzzle);
 
-    const framedCells = Array.from(svg.matchAll(/<rect\b([^>]*?)\/>/g))
+    const framedCells = Array.from(svg.matchAll(/<rect\b([^>]*?)(?:\/>|>[\s\S]*?<\/rect>)/g))
       .map((match) => parseAttributes(match[1]))
       .filter((rect) => rect.fill === "#ffffff" && rect.stroke === "#9ca3af")
       .map((rect) => ({
@@ -312,17 +419,17 @@ describe("compose-image layout invariants", () => {
 });
 
 describe("compose-image composition contract", () => {
-  it("draws every stem and option cell by calling render.CellGraphic", async () => {
-    const calls: Cell[] = [];
+  it("draws every stem and option through render.VisualGraphic", async () => {
+    const calls: Visual[] = [];
 
     vi.resetModules();
-    vi.doMock<typeof import("./render")>("./render", async () => {
+    vi.doMock("./render", async () => {
       const actual = await vi.importActual<typeof import("./render")>("./render");
       return {
         ...actual,
-        CellGraphic: vi.fn((props: { cell: Cell; className?: string }) => {
-          calls.push({ ...props.cell });
-          return actual.CellGraphic(props);
+        VisualGraphic: vi.fn((props: { visual: Visual; className?: string }) => {
+          calls.push(props.visual);
+          return actual.VisualGraphic(props);
         }),
       };
     });

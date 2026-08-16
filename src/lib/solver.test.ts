@@ -45,7 +45,7 @@ describe("parseAnswerLetter", () => {
   });
 
   it("exposes a stable prompt version", () => {
-    expect(SOLVER_PROMPT_VERSION).toBe("solver-v1");
+    expect(SOLVER_PROMPT_VERSION).toBe("solver-v2");
   });
 });
 

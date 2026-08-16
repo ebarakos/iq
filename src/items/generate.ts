@@ -11,6 +11,7 @@ import {
   DIM_DOMAINS,
   DIMENSIONS,
   enumerateOperatorExpressions,
+  findDerivedNearMissWitness,
   operatorPredicateValue,
   OPERATOR_DIMS,
   type Dim,
@@ -19,7 +20,6 @@ import {
   type OperatorDim,
   type OperatorExpression,
   type OperatorPredicate,
-  type OperatorBase,
   type OperatorProgram,
   type Rule,
 } from "./rules";
@@ -45,14 +45,15 @@ import {
  * uses, and surround it with near-miss distractors. Generation rejection-samples
  * (bounded retries) and the invariant-sweep test proves exhaustion never bites.
  * Difficulty drives rule complexity (Q5 a-priori anchor; ruleComplexity scores
- * it). Design: docs/plans/rules-bank-agent-calibration.md (Phase A).
+ * it). The implemented foundation is recorded in
+ * docs/plans/rules-bank-agent-calibration.md.
  */
 
 const MAX_ATTEMPTS = 100;
 
 /** Change this value whenever deterministic quiz-generation semantics change. */
-export const CURRENT_GENERATOR_VERSION = "procedural-v2" as const;
-export type GeneratorVersion = "procedural-v1" | typeof CURRENT_GENERATOR_VERSION;
+export const CURRENT_GENERATOR_VERSION = "procedural-v3" as const;
+export type GeneratorVersion = "procedural-v1" | "procedural-v2" | typeof CURRENT_GENERATOR_VERSION;
 
 const LEGACY_PUZZLE_TYPES = ["matrix", "sequence", "analogy", "oddOneOut"] as const;
 
@@ -67,7 +68,7 @@ const FAMILY_IDS: Record<PuzzleType, string> = {
   operatorInduction: "operator-induction-v1",
 };
 
-const QUIZ_DIFFICULTY_RAMPS: Record<QuizProfile, readonly (1 | 2 | 3 | 4 | 5)[]> = {
+const LEGACY_QUIZ_DIFFICULTY_RAMPS: Record<QuizProfile, readonly (1 | 2 | 3 | 4 | 5)[]> = {
   easy: [1, 1, 2, 2, 3],
   standard: [2, 2, 3, 3, 5],
   hard: [3, 4, 4, 5, 5],
@@ -357,11 +358,15 @@ function twoDimPerturbations(answer: Cell, rng: Rng): Cell[] {
 /**
  * Distractors for a derived-answer puzzle: near-misses in RULE space (single-dim
  * perturbations, the "forgot the final step" trap, two-dim perturbations at low
- * difficulty) that are always BOLD in visual space — every kept cell must be
- * instantly distinguishable from the answer and from every other option.
+ * difficulty — but each option is still backed by a concrete competing rule.
+ * Every distractor must both fail at least one visible transition and predict the
+ * same query output, so the option is a rule-space near miss rather than an
+ * arbitrary visual perturbation.
  * Difficulty never tightens perceptual proximity; only the rule gets harder.
  */
-function generateDerivedDistractors(answer: Cell, stem: Panel[], difficulty: number, rng: Rng, want: number): Cell[] | null {
+type DerivedRule = Extract<Rule, { kind: "sequence" | "analogy" | "matrix" }>;
+
+function generateDerivedDistractorsLegacy(answer: Cell, stem: Panel[], difficulty: number, rng: Rng, want: number): Cell[] | null {
   const pool: Cell[] = [...singleDimPerturbations(answer, rng)];
   // The last drawn stem value is a classic "forgot the final step" trap.
   const drawn = stem.filter((p): p is Cell => !("blank" in p));
@@ -375,6 +380,61 @@ function generateDerivedDistractors(answer: Cell, stem: Panel[], difficulty: num
     out.push(cell);
     if (out.length === want) break;
   }
+
+  return out.length === want ? out : null;
+}
+
+function generateDerivedDistractors(
+  rule: DerivedRule,
+  answer: Cell,
+  stem: Panel[],
+  difficulty: number,
+  rng: Rng,
+  want: number,
+): Cell[] | null {
+  const pool: Cell[] = [...singleDimPerturbations(answer, rng)];
+  // The last drawn stem value is a classic "forgot the final step" trap.
+  const drawn = stem.filter((p): p is Cell => !("blank" in p));
+  if (drawn.length) pool.push(drawn[drawn.length - 1]);
+  if (difficulty <= 2) pool.push(...twoDimPerturbations(answer, rng));
+
+  // Extra fallback candidates keep witness search stable if perturbations are too
+  // strict for a particular sampled stem shape.
+  for (const dim of DIMENSIONS) {
+    if (dim === "shape") {
+      for (const shape of SHAPES.filter((s) => s !== answer.shape)) {
+        pool.push(legalize({ ...answer, shape }));
+      }
+    } else if (dim === "rotation") {
+      if (!(ORIENTABLE_SHAPES as readonly string[]).includes(answer.shape)) continue;
+      for (const rotation of DIM_DOMAINS.rotation) {
+        if (rotation !== answer.rotation) pool.push({ ...answer, rotation } as Cell);
+      }
+    } else {
+      for (const candidate of DIM_DOMAINS[dim]) {
+        if (candidate === answer[dim]) continue;
+        pool.push(legalize({ ...answer, [dim]: candidate } as Cell));
+      }
+    }
+  }
+
+  const out: Cell[] = [];
+  const seen = new Set<string>();
+
+  const ordered = shuffled(rng, pool);
+  for (const cell of ordered) {
+    const key = JSON.stringify(cell);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!isInstantlyDistinct(cell, answer)) continue;
+    if (out.some((o) => !isInstantlyDistinct(cell, o))) continue;
+    if (!findDerivedNearMissWitness(rule, stem, cell)) {
+      continue;
+    }
+    out.push(cell);
+    if (out.length === want) break;
+  }
+
   return out.length === want ? out : null;
 }
 
@@ -467,8 +527,13 @@ function operatorCell(rng: Rng, legend: OperatorLegend): Cell {
   };
 }
 
-function sampleBaseExpression(dim: OperatorDim, rng: Rng, preferArithmetic: boolean): OperatorExpression {
-  const bases = enumerateOperatorExpressions(dim, SHAPES.slice(0, 4)).filter((expr) => expr.op !== "if");
+function sampleBaseExpression(
+  dim: OperatorDim,
+  rng: Rng,
+  preferArithmetic: boolean,
+  shapeCycle: readonly Shape[] = SHAPES.slice(0, 4),
+): OperatorExpression {
+  const bases = enumerateOperatorExpressions(dim, shapeCycle).filter((expr) => expr.op !== "if");
   const arithmetic = bases.filter((expr) => expr.op !== "left" && expr.op !== "right");
   return pick(rng, preferArithmetic && arithmetic.length ? arithmetic : bases);
 }
@@ -481,8 +546,12 @@ function availablePredicates(dim: OperatorDim): OperatorPredicate[] {
   return predicates;
 }
 
-function sampleConditionalExpression(dim: OperatorDim, rng: Rng): OperatorExpression {
-  const bases = enumerateOperatorExpressions(dim, SHAPES.slice(0, 4)).filter(
+function sampleConditionalExpression(
+  dim: OperatorDim,
+  rng: Rng,
+  shapeCycle: readonly Shape[] = SHAPES.slice(0, 4),
+): OperatorExpression {
+  const bases = enumerateOperatorExpressions(dim, shapeCycle).filter(
     (expr): expr is Exclude<OperatorExpression, { op: "if" }> => expr.op !== "if",
   );
   const whenTrue = pick(rng, bases);
@@ -495,15 +564,20 @@ function sampleConditionalExpression(dim: OperatorDim, rng: Rng): OperatorExpres
   };
 }
 
-function sampleOperatorProgram(difficulty: 1 | 2 | 3 | 4 | 5, rng: Rng): OperatorProgram {
-  const conditionalDim = difficulty >= 4 ? pick(rng, OPERATOR_DIMS) : null;
+function sampleOperatorProgram(
+  difficulty: 1 | 2 | 3 | 4 | 5,
+  rng: Rng,
+  shapeCycle: readonly Shape[] = SHAPES.slice(0, 4),
+): OperatorProgram {
+  const conditionalCount = difficulty >= 4 ? 1 : 0;
+  const conditionalDims = new Set(shuffled(rng, OPERATOR_DIMS).slice(0, conditionalCount));
   const arithmeticDims = shuffled(rng, ["shape", "count"] as const).slice(0, difficulty >= 3 ? 2 : 1);
   const program = {} as OperatorProgram;
   for (const dim of OPERATOR_DIMS) {
     program[dim] =
-      dim === conditionalDim
-        ? sampleConditionalExpression(dim, rng)
-        : sampleBaseExpression(dim, rng, arithmeticDims.includes(dim as "shape" | "count"));
+      conditionalDims.has(dim)
+        ? sampleConditionalExpression(dim, rng, shapeCycle)
+        : sampleBaseExpression(dim, rng, arithmeticDims.includes(dim as "shape" | "count"), shapeCycle);
   }
   // The arithmetic preference guarantees a non-trivial program at every level.
   return program;
@@ -528,48 +602,81 @@ function buildOperatorPuzzleParts(
   rng: Rng,
 ): { rule: Extract<Rule, { kind: "operatorInduction" }>; legend: OperatorLegend; stem: Panel[]; options: Cell[]; answerIndex: number } | null {
   const legend: OperatorLegend = { shapeCycle: shuffled(rng, SHAPES).slice(0, difficulty >= 3 ? 4 : 3) };
-  const program = sampleOperatorProgram(difficulty, rng);
   const workedCount = difficulty >= 4 ? 5 : 4;
-  const inputRows = Array.from({ length: workedCount + 1 }, () => ({
-    left: operatorCell(rng, legend),
-    right: operatorCell(rng, legend),
-  }));
-  if (!branchCoverage(program, inputRows.slice(0, workedCount))) return null;
-
-  const worked = inputRows.slice(0, workedCount).map(({ left, right }) => ({
-    left,
-    right,
-    output: applyOperatorProgram(program, left, right, legend.shapeCycle),
-  }));
-  if (worked.some(({ output }) => output === null)) return null;
-  const query = inputRows[workedCount];
-  const stem: Panel[] = [
-    ...worked.flatMap(({ left, right, output }) => [left, right, output!] as Cell[]),
-    query.left,
-    query.right,
-    { blank: true },
-  ];
-
-  const analysis = analyzeOperatorStem(stem, legend);
-  if (!analysis.ok || !analysis.answer) return null;
-  const distractors: Cell[] = [];
-  for (const nearMiss of analysis.nearMisses) {
-    if (!isInstantlyDistinct(nearMiss.cell, analysis.answer)) continue;
-    if (distractors.some((cell) => !isInstantlyDistinct(cell, nearMiss.cell))) continue;
-    distractors.push(nearMiss.cell);
-    if (distractors.length === 3) break;
+  const workedCells: Cell[] = [];
+  for (const shape of legend.shapeCycle) {
+    for (const count of DIM_DOMAINS.count) {
+      for (const fill of DIM_DOMAINS.fill) {
+        for (const size of DIM_DOMAINS.size) {
+          workedCells.push({
+            shape,
+            count: count as Cell["count"],
+            fill: fill as Cell["fill"],
+            rotation: 0,
+            size: size as Cell["size"],
+          });
+        }
+      }
+    }
   }
-  if (distractors.length < 3) return null;
+  const queryAttempts = 80;
+  const workedAttempts = 80;
 
-  const all = [analysis.answer, ...distractors];
-  const order = shuffled(rng, all.map((_, index) => index));
-  return {
-    rule: { kind: "operatorInduction", program },
-    legend,
-    stem,
-    options: order.map((index) => all[index]),
-    answerIndex: order.indexOf(0),
-  };
+  for (let attempt = 0; attempt < workedAttempts; attempt++) {
+    const program = sampleOperatorProgram(difficulty, rng, legend.shapeCycle);
+    const inputRows = Array.from({ length: workedCount + 1 }, () => ({
+      left: operatorCell(rng, legend),
+      right: operatorCell(rng, legend),
+    }));
+    if (!branchCoverage(program, inputRows.slice(0, workedCount))) continue;
+
+    const worked = inputRows.slice(0, workedCount).map(({ left, right }) => ({
+      left,
+      right,
+      output: applyOperatorProgram(program, left, right, legend.shapeCycle),
+    }));
+    if (worked.some(({ output }) => output === null)) continue;
+
+    const candidates: { left: Cell; right: Cell }[] = [];
+    candidates.push(inputRows[workedCount]);
+    for (let i = 0; i < queryAttempts; i++) {
+      const leftIndex = Math.floor(rng() * workedCells.length);
+      const rightIndex = Math.floor(rng() * workedCells.length);
+      candidates.push({ left: workedCells[leftIndex], right: workedCells[rightIndex] });
+    }
+
+    for (const query of candidates) {
+      const stem: Panel[] = [
+        ...worked.flatMap(({ left, right, output }) => [left, right, output!] as Cell[]),
+        query.left,
+        query.right,
+        { blank: true },
+      ];
+
+      const analysis = analyzeOperatorStem(stem, legend);
+      if (!analysis.ok || !analysis.answer) continue;
+      const distractors: Cell[] = [];
+      for (const nearMiss of analysis.nearMisses) {
+        if (!isInstantlyDistinct(nearMiss.cell, analysis.answer)) continue;
+        if (distractors.some((cell) => !isInstantlyDistinct(cell, nearMiss.cell))) continue;
+        distractors.push(nearMiss.cell);
+        if (distractors.length === 3) break;
+      }
+      if (distractors.length < 3) continue;
+
+      const all = [analysis.answer, ...distractors];
+      const order = shuffled(rng, all.map((_, index) => index));
+      return {
+        rule: { kind: "operatorInduction", program },
+        legend,
+        stem,
+        options: order.map((index) => all[index]),
+        answerIndex: order.indexOf(0),
+      };
+    }
+  }
+
+  return null;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -669,9 +776,25 @@ export function generateStem(rule: Rule, rng: Rng): Panel[] {
  * Returns visualSignature-distinct cells excluding the answer.
  */
 export function generateDistractors(rule: Rule, answer: Cell, stem: Panel[], difficulty: number, rng: Rng): Cell[] {
+  return generateDistractorsByVersion(rule, answer, stem, difficulty, rng, CURRENT_GENERATOR_VERSION);
+}
+
+function generateDistractorsByVersion(
+  rule: Rule,
+  answer: Cell,
+  stem: Panel[],
+  difficulty: number,
+  rng: Rng,
+  generatorVersion: GeneratorVersion,
+): Cell[] {
   if (rule.kind === "oddOneOut" || rule.kind === "operatorInduction") return []; // these build their own option sets
   const want = difficulty >= 5 && rng() < 0.5 ? randInt(rng, 4, 5) : 3;
-  return generateDerivedDistractors(answer, stem, difficulty, rng, want) ?? [];
+  if (rule.kind === "matrix" || rule.kind === "sequence" || rule.kind === "analogy") {
+    return generatorVersion === "procedural-v1"
+      ? generateDerivedDistractorsLegacy(answer, stem, difficulty, rng, want) ?? []
+      : generateDerivedDistractors(rule, answer, stem, difficulty, rng, want) ?? [];
+  }
+  return [];
 }
 
 const INSTRUCTIONS: Record<PuzzleType, string> = {
@@ -712,67 +835,83 @@ function describeTransforms(transforms: DimTransforms): string {
   return parts.join(" and ");
 }
 
-function describeOperatorBase(base: OperatorBase, dim: OperatorDim): string {
-  if (base.op === "left") return `copy the left ${dim}`;
-  if (base.op === "right") return `copy the right ${dim}`;
-  if (dim === "count") {
-    if (base.op === "addMod") return "add counts (mod 4)";
-    return base.op === "diffLRMod" ? "left minus right (mod 4)" : "right minus left (mod 4)";
-  }
-
-  if (dim === "shape") {
-    if (base.op === "addMod") return "move left-shape forward in the shape order";
-    return base.op === "diffLRMod"
-      ? "move left-shape backward in the shape order"
-      : "move right-shape backward in the shape order";
-  }
-
-  return `copy the ${base.op === "addMod" ? "right" : "left"} ${dim}`;
-}
-
-function describeOperatorPredicate(predicate: OperatorPredicate, dim: OperatorDim): string {
-  if (predicate.kind === "sumCountsEven") return "if left and right count total is even";
-  return `if left and right ${dim} match`;
-}
-
-function describeOperatorExpression(expr: OperatorExpression, dim: OperatorDim): string {
+/** Keep procedural-v2 replay text stable after retiring this family from v3. */
+function describeLegacyOperatorExpression(expr: OperatorExpression, dim: OperatorDim): string {
   if (expr.op === "if") {
-    return `${describeOperatorPredicate(expr.predicate, dim)}, then ${describeOperatorBase(expr.whenTrue, dim)}, otherwise ${describeOperatorBase(
-      expr.whenFalse,
-      dim,
-    )}`;
+    const predicate = expr.predicate.kind === "sumCountsEven"
+      ? "whether the count sum is even"
+      : `whether the ${expr.predicate.dimension} values match`;
+    return `${predicate}? then ${describeLegacyOperatorExpression(expr.whenTrue, dim)} else ${describeLegacyOperatorExpression(expr.whenFalse, dim)}`;
   }
-  return describeOperatorBase(expr, dim);
+  if (expr.op === "addMod" || expr.op === "diffLRMod" || expr.op === "diffRLMod") {
+    const operation = expr.op === "addMod"
+      ? "sum"
+      : expr.op === "diffLRMod" ? "left minus right" : "right minus left";
+    return `${operation} ${describeLegacyOperatorExpression(expr.left, dim)} and ${describeLegacyOperatorExpression(expr.right, dim)}${dim === "count" ? " modulo 4" : ""}`;
+  }
+  return expr.op === "left" ? `left ${dim}` : `right ${dim}`;
 }
 
-function describeOperatorRule(program: OperatorProgram): string {
-  return [
-    `shape=${describeOperatorExpression(program.shape, "shape")}`,
-    `count=${describeOperatorExpression(program.count, "count")}`,
-    `fill=${describeOperatorExpression(program.fill, "fill")}`,
-    `size=${describeOperatorExpression(program.size, "size")}`,
-  ].join("; ");
+function describeLegacyOperatorRule(program: OperatorProgram): string {
+  return OPERATOR_DIMS.map((dim) =>
+    `${dim}=${describeLegacyOperatorExpression(program[dim], dim)}`).join("; ");
+}
+
+function describeOperatorOutcome(
+  rule: Extract<Rule, { kind: "operatorInduction" }>,
+  stem: readonly Panel[],
+  legend: OperatorLegend | undefined,
+): string | null {
+  if (!legend || stem.length < 3) return null;
+  const left = stem.at(-3);
+  const right = stem.at(-2);
+  if (!left || !right || "blank" in left || "blank" in right) return null;
+  const output = applyOperatorProgram(rule.program, left, right, legend.shapeCycle);
+  if (!output) return null;
+  const size = output.size === "s" ? "small" : output.size === "m" ? "medium" : "large";
+  const shape = output.count === 1 ? output.shape : `${output.shape}s`;
+  return `${output.count} ${size}, ${output.fill} ${shape}`;
 }
 
 /** Auto-write a plain-language explanation from the rule. */
-function explain(rule: Rule): string {
+function explain(
+  rule: Rule,
+  stem: readonly Panel[],
+  operatorLegend: OperatorLegend | undefined,
+  generatorVersion: GeneratorVersion,
+): string {
   switch (rule.kind) {
     case "sequence":
-      return `Along the sequence, ${describeTransforms(rule.transforms)}.`;
+      if (generatorVersion !== CURRENT_GENERATOR_VERSION) {
+        return `Along the sequence, ${describeTransforms(rule.transforms)}.`;
+      }
+      return `Read the panels from left to right. The repeated step is: ${describeTransforms(rule.transforms)}. Every visual property not named by that rule stays unchanged. Applying the same step once more to the final shown panel produces the highlighted option; the alternatives change the wrong property or use the wrong step.`;
     case "analogy":
-      return `As in the first pair, ${describeTransforms(rule.transforms)}.`;
+      if (generatorVersion !== CURRENT_GENERATOR_VERSION) {
+        return `As in the first pair, ${describeTransforms(rule.transforms)}.`;
+      }
+      return `The first pair demonstrates one complete transformation: ${describeTransforms(rule.transforms)}. Shape and every other property not named by that rule are preserved. Applying the identical transformation to the third panel produces the highlighted option; the distractors copy the input or change a property that the worked pair keeps fixed.`;
     case "matrix": {
       const row = describeTransforms(rule.row);
       const col = describeTransforms(rule.col);
       const clauses = [row && `across each row, ${row}`, col && `down each column, ${col}`].filter(Boolean);
-      return `In the grid, ${clauses.join("; ")}.`;
+      if (generatorVersion !== CURRENT_GENERATOR_VERSION) {
+        return `In the grid, ${clauses.join("; ")}.`;
+      }
+      return `The same relationships must hold throughout the 3×3 grid: ${clauses.join("; ")}. Any visual property not assigned to a row or column rule stays constant along that direction. Extending both patterns into the empty corner produces the highlighted option; each distractor violates at least one complete row or column.`;
     }
     case "oddOneOut":
-      return `Every other option shares ${rule.dimension} ${JSON.stringify(rule.value)}; the odd one breaks it.`;
-    case "operatorInduction":
-      return `Use one fixed rule for every worked row: combine left and right to get output.`
-        + ` Rules: ${describeOperatorRule(rule.program)}.`
-        + " Apply that same rule to the last pair, then choose the option that matches.";
+      if (generatorVersion !== CURRENT_GENERATOR_VERSION) {
+        return `Every other option shares ${rule.dimension} ${JSON.stringify(rule.value)}; the odd one breaks it.`;
+      }
+      return `Compare the options by one categorical visual property rather than their overall appearance. Every non-highlighted option has ${rule.dimension} ${JSON.stringify(rule.value)}. The highlighted option is the only one that breaks that shared property; the other differences do not isolate a single alternative.`;
+    case "operatorInduction": {
+      if (generatorVersion === "procedural-v2") {
+        return `Apply this fixed row rule: ${describeLegacyOperatorRule(rule.program)}.`;
+      }
+      const outcome = describeOperatorOutcome(rule, stem, operatorLegend);
+      return `This legacy item treats shapes as positions in the displayed loop, while counts wrap after 4. Applying the same row rule to the last pair${outcome ? ` gives ${outcome}` : " gives the highlighted answer"}. This hidden arithmetic is excluded from the new preview.`;
+    }
   }
 }
 
@@ -832,7 +971,7 @@ function generationMetadata(
     return transform?.op === "step" && (transform.wrap || dim === "rotation");
   }));
   const activeAxes = rule.kind === "operatorInduction"
-    ? OPERATOR_DIMS.some((dim) => rule.program[dim].op === "if") ? 2 : 1
+    ? Math.max(1, OPERATOR_DIMS.reduce((depth, dim) => Math.max(depth, operatorExpressionDepth(rule.program[dim])), 0))
     : rule.kind === "matrix"
     ? [rule.row, rule.col].filter((transforms) => DIMENSIONS.some((dim) => {
       const transform = transforms[dim];
@@ -879,9 +1018,14 @@ function generationMetadata(
  * up to MAX_ATTEMPTS; throws on exhaustion (the invariant sweep proves it never
  * happens in practice).
  */
-export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, rng: Rng): Puzzle {
+export function generatePuzzle(
+  type: PuzzleType,
+  difficulty: 1 | 2 | 3 | 4 | 5,
+  rng: Rng,
+  generatorVersion: GeneratorVersion = CURRENT_GENERATOR_VERSION,
+): Puzzle {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    let rule = sampleRule(type, difficulty, rng);
+    let rule: Rule;
 
     let options: Cell[];
     let answerIndex: number;
@@ -894,23 +1038,26 @@ export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, 
       ({ options, answerIndex, stem } = built);
       operatorLegend = built.legend;
       rule = built.rule;
-    } else if (rule.kind === "oddOneOut") {
-      stem = [];
-      const built = buildOddOneOut(rule, difficulty, rng);
-      if (!built) continue;
-      ({ options, answerIndex } = built);
     } else {
-      stem = generateStem(rule, rng);
-      if (stem.length === 0) continue;
-      const { cell } = deriveAnswer(rule, stem);
-      if (!cell) continue;
-      const distractors = generateDistractors(rule, cell, stem, difficulty, rng);
-      if (distractors.length < 3) continue;
-      // Place the answer at a random index among the options.
-      const all = [cell, ...distractors];
-      const order = shuffled(rng, all.map((_, i) => i));
-      options = order.map((i) => all[i]);
-      answerIndex = order.indexOf(0);
+      rule = sampleRule(type, difficulty, rng);
+      if (rule.kind === "oddOneOut") {
+        stem = [];
+        const built = buildOddOneOut(rule, difficulty, rng);
+        if (!built) continue;
+        ({ options, answerIndex } = built);
+      } else {
+        stem = generateStem(rule, rng);
+        if (stem.length === 0) continue;
+        const { cell } = deriveAnswer(rule, stem);
+        if (!cell) continue;
+        const distractors = generateDistractorsByVersion(rule, cell, stem, difficulty, rng, generatorVersion);
+        if (distractors.length < 3) continue;
+        // Place the answer at a random index among the options.
+        const all = [cell, ...distractors];
+        const order = shuffled(rng, all.map((_, i) => i));
+        options = order.map((i) => all[i]);
+        answerIndex = order.indexOf(0);
+      }
     }
 
     const candidate: Puzzle = {
@@ -923,7 +1070,7 @@ export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, 
       stem,
       options,
       answerIndex,
-      explanation: explain(rule),
+      explanation: explain(rule, stem, operatorLegend, generatorVersion),
       rule,
     };
 
@@ -941,29 +1088,33 @@ export function generatePuzzle(type: PuzzleType, difficulty: 1 | 2 | 3 | 4 | 5, 
  * Each slot has its own named random stream, so rejection sampling or a future
  * change in one family cannot perturb the remaining slots without a generator
  * version change. procedural-v1 retains its four-family layout for exact replay;
- * procedural-v2 has exactly one item from each of the five current families.
+ * procedural-v2 has exactly one item from each of the five original families.
+ * procedural-v3 retires opaque operator arithmetic and repeats one of the four
+ * readable compact families while the scene replacement is being piloted.
+ * The gated 12-item scene profile is assembled separately by expanded-quiz.ts.
  */
 export function generateQuiz(seed: Seed, generatorVersion: string, profile: QuizProfile): PuzzleSet {
-  if (generatorVersion !== "procedural-v1" && generatorVersion !== CURRENT_GENERATOR_VERSION) {
+  if (
+    generatorVersion !== "procedural-v1" &&
+    generatorVersion !== "procedural-v2" &&
+    generatorVersion !== CURRENT_GENERATOR_VERSION
+  ) {
     throw new Error(`unsupported generator version: ${generatorVersion}`);
   }
 
-  const difficulties = QUIZ_DIFFICULTY_RAMPS[profile];
+  const difficulties = LEGACY_QUIZ_DIFFICULTY_RAMPS[profile];
   if (!difficulties) throw new Error(`unsupported quiz profile: ${String(profile)}`);
 
   const layoutRng = seededRng(seed, `${generatorVersion}:layout`);
-  const familyOrder = shuffled(
-    layoutRng,
-    generatorVersion === "procedural-v1" ? LEGACY_PUZZLE_TYPES : PUZZLE_TYPES,
-  );
-  const types: PuzzleType[] =
-    generatorVersion === "procedural-v1"
-      ? [...familyOrder, pick(layoutRng, familyOrder)]
-      : [...familyOrder];
+  const familyPool = generatorVersion === "procedural-v2" ? PUZZLE_TYPES : LEGACY_PUZZLE_TYPES;
+  const familyOrder = shuffled(layoutRng, familyPool);
+  const types: PuzzleType[] = generatorVersion === "procedural-v2"
+    ? [...familyOrder]
+    : [...familyOrder, pick(layoutRng, familyOrder)];
   const puzzles = difficulties.map((difficulty, index) => {
     const type = types[index];
     const rng = seededRng(seed, `${generatorVersion}:${profile}:slot-${index}:${type}:d${difficulty}`);
-    const puzzle = generatePuzzle(type, difficulty, rng);
+    const puzzle = generatePuzzle(type, difficulty, rng, generatorVersion);
     return PuzzleSchema.parse({
       ...puzzle,
       generation: generationMetadata(puzzle, generatorVersion),
@@ -984,8 +1135,7 @@ export function ruleComplexity(rule: Rule): number {
     return OPERATOR_DIMS.reduce((score, dim) => {
       const expression = rule.program[dim];
       if (expression.op === "left") return score;
-      if (expression.op === "if") return score + 3;
-      return score + (expression.op === "right" ? 1 : 2);
+      return score + operatorExpressionComplexity(expression);
     }, 0);
   }
   const score = (transforms: DimTransforms): number => {
@@ -1008,4 +1158,21 @@ export function ruleComplexity(rule: Rule): number {
     return score(rule.row) + score(rule.col) + (rowActive && colActive ? 1 : 0);
   }
   return score(rule.transforms);
+}
+
+function operatorExpressionDepth(expr: OperatorExpression): number {
+  if (expr.op === "left" || expr.op === "right") return 0;
+  if (expr.op === "if") {
+    return 1 + Math.max(operatorExpressionDepth(expr.whenTrue), operatorExpressionDepth(expr.whenFalse));
+  }
+  return 1 + Math.max(operatorExpressionDepth(expr.left), operatorExpressionDepth(expr.right));
+}
+
+function operatorExpressionComplexity(expr: OperatorExpression): number {
+  if (expr.op === "left") return 0;
+  if (expr.op === "right") return 1;
+  if (expr.op === "if") {
+    return 3 + Math.max(operatorExpressionComplexity(expr.whenTrue), operatorExpressionComplexity(expr.whenFalse));
+  }
+  return 2 + Math.max(operatorExpressionComplexity(expr.left), operatorExpressionComplexity(expr.right));
 }

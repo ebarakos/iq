@@ -4606,6 +4606,2019 @@
     },
     {
       "puzzle": {
+        "id": "op-03cfda3eef",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 4,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "triangle",
+            "circle",
+            "hexagon",
+            "diamond"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Apply this fixed row rule: shape=+(L,L); count=+(R,+(R,R)); fill=if(size==size)?R:L; size=L.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "addMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "left"
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "right"
+              },
+              "right": {
+                "op": "addMod",
+                "left": {
+                  "op": "right"
+                },
+                "right": {
+                  "op": "right"
+                }
+              }
+            },
+            "fill": {
+              "op": "if",
+              "predicate": {
+                "kind": "equal",
+                "dimension": "size"
+              },
+              "whenTrue": {
+                "op": "right"
+              },
+              "whenFalse": {
+                "op": "left"
+              }
+            },
+            "size": {
+              "op": "left"
+            }
+          }
+        }
+      },
+      "fingerprint": "03cfda3eef",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202602,
+        "createdAt": "2026-08-15T13:21:20.629Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-0a7d5105d0",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 5,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "circle",
+            "diamond",
+            "square",
+            "star"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Apply this fixed row rule: shape=if(sumCountsEvenshape)?+(+(L,L),+(R,R)):-(R,L); count=if(fill==fill)?+(L,-(L,R)):R; fill=R; size=R.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "if",
+              "predicate": {
+                "kind": "sumCountsEven"
+              },
+              "whenTrue": {
+                "op": "addMod",
+                "left": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "left"
+                  },
+                  "right": {
+                    "op": "left"
+                  }
+                },
+                "right": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "right"
+                  },
+                  "right": {
+                    "op": "right"
+                  }
+                }
+              },
+              "whenFalse": {
+                "op": "diffLRMod",
+                "left": {
+                  "op": "right"
+                },
+                "right": {
+                  "op": "left"
+                }
+              }
+            },
+            "count": {
+              "op": "if",
+              "predicate": {
+                "kind": "equal",
+                "dimension": "fill"
+              },
+              "whenTrue": {
+                "op": "addMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "diffLRMod",
+                  "left": {
+                    "op": "left"
+                  },
+                  "right": {
+                    "op": "right"
+                  }
+                }
+              },
+              "whenFalse": {
+                "op": "right"
+              }
+            },
+            "fill": {
+              "op": "right"
+            },
+            "size": {
+              "op": "right"
+            }
+          }
+        }
+      },
+      "fingerprint": "0a7d5105d0",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202603,
+        "createdAt": "2026-08-15T13:21:21.296Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-37c0778921",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 3,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "diamond",
+            "triangle",
+            "hexagon",
+            "square"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Apply this fixed row rule: shape=+(R,R); count=+(L,L); fill=L; size=R.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "addMod",
+              "left": {
+                "op": "right"
+              },
+              "right": {
+                "op": "right"
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "left"
+              }
+            },
+            "fill": {
+              "op": "left"
+            },
+            "size": {
+              "op": "right"
+            }
+          }
+        }
+      },
+      "fingerprint": "37c0778921",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202601,
+        "createdAt": "2026-08-15T13:21:20.005Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-67ef5f3d57",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 3,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "circle",
+            "star",
+            "hexagon",
+            "diamond"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Apply this fixed row rule: shape=+(L,+(L,R)); count=+(L,L); fill=R; size=L.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "addMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "addMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "right"
+                }
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "left"
+              }
+            },
+            "fill": {
+              "op": "right"
+            },
+            "size": {
+              "op": "left"
+            }
+          }
+        }
+      },
+      "fingerprint": "67ef5f3d57",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202601,
+        "createdAt": "2026-08-15T13:21:19.994Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-91caf6b329",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 4,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "hexagon",
+            "square",
+            "triangle",
+            "diamond"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "diamond",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 3,
+        "explanation": "Apply this fixed row rule: shape=+(L,-(L,R)); count=+(R,R); fill=L; size=if(fill==fill)?R:L.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "addMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "diffLRMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "right"
+                }
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "right"
+              },
+              "right": {
+                "op": "right"
+              }
+            },
+            "fill": {
+              "op": "left"
+            },
+            "size": {
+              "op": "if",
+              "predicate": {
+                "kind": "equal",
+                "dimension": "fill"
+              },
+              "whenTrue": {
+                "op": "right"
+              },
+              "whenFalse": {
+                "op": "left"
+              }
+            }
+          }
+        }
+      },
+      "fingerprint": "91caf6b329",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202602,
+        "createdAt": "2026-08-15T13:21:20.613Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-b07005a8c1",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 5,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "star",
+            "triangle",
+            "diamond",
+            "square"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "diamond",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Apply this fixed row rule: shape=if(fill==fill)?+(+(L,L),+(R,R)):L; count=+(L,R); fill=L; size=if(fill==fill)?L:R.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "if",
+              "predicate": {
+                "kind": "equal",
+                "dimension": "fill"
+              },
+              "whenTrue": {
+                "op": "addMod",
+                "left": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "left"
+                  },
+                  "right": {
+                    "op": "left"
+                  }
+                },
+                "right": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "right"
+                  },
+                  "right": {
+                    "op": "right"
+                  }
+                }
+              },
+              "whenFalse": {
+                "op": "left"
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "right"
+              }
+            },
+            "fill": {
+              "op": "left"
+            },
+            "size": {
+              "op": "if",
+              "predicate": {
+                "kind": "equal",
+                "dimension": "fill"
+              },
+              "whenTrue": {
+                "op": "left"
+              },
+              "whenFalse": {
+                "op": "right"
+              }
+            }
+          }
+        }
+      },
+      "fingerprint": "b07005a8c1",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202603,
+        "createdAt": "2026-08-15T13:21:21.268Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-d003718877",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 5,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "circle",
+            "star",
+            "hexagon",
+            "square"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Apply this fixed row rule: shape=if(sumCountsEvenshape)?+(+(L,L),+(R,R)):R; count=if(fill==fill)?R:+(+(L,L),-(L,R)); fill=R; size=L.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "if",
+              "predicate": {
+                "kind": "sumCountsEven"
+              },
+              "whenTrue": {
+                "op": "addMod",
+                "left": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "left"
+                  },
+                  "right": {
+                    "op": "left"
+                  }
+                },
+                "right": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "right"
+                  },
+                  "right": {
+                    "op": "right"
+                  }
+                }
+              },
+              "whenFalse": {
+                "op": "right"
+              }
+            },
+            "count": {
+              "op": "if",
+              "predicate": {
+                "kind": "equal",
+                "dimension": "fill"
+              },
+              "whenTrue": {
+                "op": "right"
+              },
+              "whenFalse": {
+                "op": "addMod",
+                "left": {
+                  "op": "addMod",
+                  "left": {
+                    "op": "left"
+                  },
+                  "right": {
+                    "op": "left"
+                  }
+                },
+                "right": {
+                  "op": "diffLRMod",
+                  "left": {
+                    "op": "left"
+                  },
+                  "right": {
+                    "op": "right"
+                  }
+                }
+              }
+            },
+            "fill": {
+              "op": "right"
+            },
+            "size": {
+              "op": "left"
+            }
+          }
+        }
+      },
+      "fingerprint": "d003718877",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202603,
+        "createdAt": "2026-08-15T13:21:21.253Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-d68b7831ff",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 4,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "square",
+            "hexagon",
+            "circle",
+            "triangle"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 1,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "triangle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "hexagon",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "triangle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 0,
+        "explanation": "Apply this fixed row rule: shape=-(L,R); count=+(R,+(R,R)); fill=if(sumCountsEvenfill)?L:R; size=L.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "diffLRMod",
+              "left": {
+                "op": "left"
+              },
+              "right": {
+                "op": "right"
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "right"
+              },
+              "right": {
+                "op": "addMod",
+                "left": {
+                  "op": "right"
+                },
+                "right": {
+                  "op": "right"
+                }
+              }
+            },
+            "fill": {
+              "op": "if",
+              "predicate": {
+                "kind": "sumCountsEven"
+              },
+              "whenTrue": {
+                "op": "left"
+              },
+              "whenFalse": {
+                "op": "right"
+              }
+            },
+            "size": {
+              "op": "left"
+            }
+          }
+        }
+      },
+      "fingerprint": "d68b7831ff",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202602,
+        "createdAt": "2026-08-15T13:21:20.592Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
+        "id": "op-dfa62356c5",
+        "type": "operatorInduction",
+        "instruction": "Infer the visual operation. Which output completes the last row?",
+        "difficulty": 3,
+        "layout": "operatorTable",
+        "operatorLegend": {
+          "shapeCycle": [
+            "circle",
+            "hexagon",
+            "star",
+            "square"
+          ]
+        },
+        "stem": [
+          {
+            "shape": "circle",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "square",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "circle",
+            "count": 3,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 1,
+            "rotation": 0,
+            "fill": "half",
+            "size": "s"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 4,
+            "rotation": 0,
+            "fill": "outline",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 4,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "solid",
+            "size": "s"
+          },
+          {
+            "blank": true
+          }
+        ],
+        "options": [
+          {
+            "shape": "square",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "hexagon",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "circle",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          },
+          {
+            "shape": "star",
+            "count": 2,
+            "rotation": 0,
+            "fill": "half",
+            "size": "l"
+          }
+        ],
+        "answerIndex": 2,
+        "explanation": "Apply this fixed row rule: shape=+(+(L,L),-(L,R)); count=+(+(L,L),-(L,R)); fill=L; size=L.",
+        "rule": {
+          "kind": "operatorInduction",
+          "program": {
+            "shape": {
+              "op": "addMod",
+              "left": {
+                "op": "addMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "left"
+                }
+              },
+              "right": {
+                "op": "diffLRMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "right"
+                }
+              }
+            },
+            "count": {
+              "op": "addMod",
+              "left": {
+                "op": "addMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "left"
+                }
+              },
+              "right": {
+                "op": "diffLRMod",
+                "left": {
+                  "op": "left"
+                },
+                "right": {
+                  "op": "right"
+                }
+              }
+            },
+            "fill": {
+              "op": "left"
+            },
+            "size": {
+              "op": "left"
+            }
+          }
+        }
+      },
+      "fingerprint": "dfa62356c5",
+      "provenance": {
+        "source": "procedural",
+        "seed": 202601,
+        "createdAt": "2026-08-15T13:21:19.973Z"
+      },
+      "tags": []
+    },
+    {
+      "puzzle": {
         "id": "sq-1029445919",
         "type": "sequence",
         "instruction": "Which option continues the sequence?",

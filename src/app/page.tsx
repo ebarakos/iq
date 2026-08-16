@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PublicPuzzle } from "@/items/schema";
-import { CellGraphic, StemView, describeCell } from "@/items/render";
+import type { PublicPuzzle, Visual } from "@/items/schema";
+import { StemView, VisualGraphic, describeVisual } from "@/items/render";
 import { apiFetch, formatApiError } from "@/lib/relay-client";
 
-type Source = "procedural" | "fallback";
+type Source = "procedural" | "experimental" | "fallback";
+type QuizMode = "current" | "expanded-preview";
 
 interface GenerateResponse {
-  puzzles: PublicPuzzle[];
+  puzzles: PublicPuzzle<Visual>[];
   quizToken: string;
   source: Source;
   generatorVersion?: string;
@@ -21,26 +22,34 @@ interface ReviewResult {
   answerIndex: number;
   correct: boolean;
   explanation: string;
+  familyId?: string;
+  band?: string;
 }
 
 interface SubmitResponse {
   score: number;
   total: number;
   results: ReviewResult[];
+  breakdown?: {
+    bands: Array<{ key: string; correct: number; attempted: number }>;
+    families: Array<{ key: string; correct: number; attempted: number }>;
+  };
 }
 
 type Phase = "intro" | "loading" | "submitting" | "result" | "active" | "error";
 const START_TIMEOUT_MS = 20000;
+const SHOW_EXPANDED_PREVIEW = process.env.NODE_ENV !== "production";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
-// v3 uses answer-free public puzzles plus an opaque scoring token.
-const SESSION_KEY = "aiq-test-v3";
+// Bump when the default test shape changes so an old in-progress quiz cannot
+// hide the new start experience after a reload.
+const SESSION_KEY = "aiq-test-v4";
 
 /** Validate a raw parsed object before restoring session state. */
 function isValidSession(v: unknown): v is {
   phase: "active" | "result";
-  puzzles: PublicPuzzle[];
+  puzzles: PublicPuzzle<Visual>[];
   answers: (number | null)[];
   current: number;
   quizToken: string;
@@ -59,7 +68,7 @@ function isValidSession(v: unknown): v is {
 
 export default function Page() {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
+  const [puzzles, setPuzzles] = useState<PublicPuzzle<Visual>[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [quizToken, setQuizToken] = useState("");
   const [review, setReview] = useState<SubmitResponse | null>(null);
@@ -71,6 +80,7 @@ export default function Page() {
   } | null>(null);
   const [error, setError] = useState<string>("");
   const startRequestId = useRef(0);
+  const requestedMode = useRef<QuizMode>(SHOW_EXPANDED_PREVIEW ? "expanded-preview" : "current");
 
   function clearStoredSession() {
     try {
@@ -131,10 +141,11 @@ export default function Page() {
     }
   }, [phase, puzzles, answers, current, meta, quizToken, review]);
 
-  async function start() {
+  async function start(mode: QuizMode) {
     if (phase === "loading" || phase === "submitting") return;
 
     const requestId = ++startRequestId.current;
+    requestedMode.current = mode;
     clearStoredSession();
     resetLocalTestState();
 
@@ -149,7 +160,10 @@ export default function Page() {
     });
 
     try {
-      const data = await Promise.race([apiFetch<GenerateResponse>("/api/generate", {}), timeout]);
+      const data = await Promise.race([
+        apiFetch<GenerateResponse>("/api/generate", mode === "expanded-preview" ? { mode } : {}),
+        timeout,
+      ]);
       if (startRequestId.current !== requestId) return;
       if (!Array.isArray(data.puzzles) || data.puzzles.length === 0) throw new Error("No puzzles returned");
       if (!data.quizToken) throw new Error("No scoring token returned");
@@ -221,10 +235,10 @@ export default function Page() {
         )}
       </header>
 
-      {phase === "intro" && <Intro onStart={start} />}
+      {phase === "intro" && <Intro onStart={start} showExpandedPreview={SHOW_EXPANDED_PREVIEW} />}
       {phase === "loading" && <Loading label="Creating a fresh test…" />}
       {phase === "submitting" && <Loading label="Scoring your answers…" />}
-      {phase === "error" && <ErrorView message={error} onRetry={start} />}
+      {phase === "error" && <ErrorView message={error} onRetry={() => start(requestedMode.current)} />}
 
       {phase === "active" && puzzles[current] && (
         <Solver
@@ -234,7 +248,9 @@ export default function Page() {
           selected={answers[current]}
           // One concise banner on Q1 only — repeating it on every question reads
           // as a new warning each time (ui-qa finding).
-          notice={current === 0 && meta?.source === "fallback" ? meta?.notice : undefined}
+          notice={current === 0 && (meta?.source === "fallback" || meta?.source === "experimental")
+            ? meta?.notice
+            : undefined}
           onChoose={choose}
           onPrev={() => setCurrent((c) => Math.max(0, c - 1))}
           onNext={() => setCurrent((c) => Math.min(puzzles.length - 1, c + 1))}
@@ -255,7 +271,47 @@ export default function Page() {
   );
 }
 
-function Intro({ onStart }: { onStart: () => void }) {
+function Intro({
+  onStart,
+  showExpandedPreview,
+}: {
+  onStart: (mode: QuizMode) => void;
+  showExpandedPreview: boolean;
+}) {
+  if (showExpandedPreview) {
+    return (
+      <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+        <h2 className="text-xl font-semibold">Try the varied 12-question preview</h2>
+        <p className="mt-3 text-gray-600">
+          This version moves from two visual warmups into composition, spatial constraints,
+          and rule transfer. It uses the new visual families and leaves out the opaque shape-and-count equation.
+        </p>
+        <p className="mt-2 text-sm text-amber-700">
+          Experimental: every answer passes the code checks, but the notation and difficulty are still being tested with people.
+        </p>
+        <p className="mt-4 text-xs text-gray-500">
+          Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onStart("expanded-preview")}
+            className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+          >
+            Start the 12-question preview
+          </button>
+          <button
+            type="button"
+            onClick={() => onStart("current")}
+            className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+          >
+            Use the compact 5-question test
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
       <h2 className="text-xl font-semibold">Take a fresh 5-question reasoning test</h2>
@@ -278,7 +334,7 @@ function Intro({ onStart }: { onStart: () => void }) {
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={onStart}
+          onClick={() => onStart("current")}
           className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
           Start a fresh test
@@ -313,11 +369,34 @@ function ErrorView({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
-function puzzleTypeLabel(type: PublicPuzzle["type"]): string {
-  return type === "operatorInduction" ? "visual equation" : type === "oddOneOut" ? "odd one out" : type;
+function puzzleTypeLabel(puzzle: PublicPuzzle<Visual>): string {
+  const familyLabels: Record<string, string> = {
+    "relational-sequence-v1": "relational sequence",
+    "compositional-analogy-v1": "compositional analogy",
+    "containment-analogy-v1": "containment analogy",
+    "relational-outlier-v1": "relational outlier",
+    "relational-matrix-v1": "relational matrix",
+    "visual-set-algebra-v1": "visual set algebra",
+    "constraint-mosaic-v1": "constraint mosaic",
+    "topology-path-v1": "path completion",
+    "spatial-transform-v1": "spatial transformation",
+    "transformation-machine-v2": "transformation machine",
+    "rule-switching-v1": "rule switching",
+    "concept-induction-v1": "concept induction",
+    "fold-punch-v1": "fold and punch",
+    "inverse-fold-punch-v1": "inverse fold and punch",
+    "interleaved-sequence-v1": "interleaved sequence",
+    "second-order-sequence-v1": "second-order sequence",
+    "inverse-analogy-v1": "inverse analogy",
+    "minimal-repair-v1": "minimal repair",
+  };
+  if (puzzle.familyId && familyLabels[puzzle.familyId]) return familyLabels[puzzle.familyId];
+  return puzzle.type === "operatorInduction"
+    ? "visual equation"
+    : puzzle.type === "oddOneOut" ? "odd one out" : puzzle.type;
 }
 
-function FallbackBanner({ notice }: { notice?: string }) {
+function NoticeBanner({ notice }: { notice?: string }) {
   if (!notice) return null;
   return (
     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
@@ -337,7 +416,7 @@ function Solver({
   onNext,
   onFinish,
 }: {
-  puzzle: PublicPuzzle;
+  puzzle: PublicPuzzle<Visual>;
   index: number;
   total: number;
   selected: number | null;
@@ -405,7 +484,7 @@ function Solver({
 
   return (
     <section>
-      <FallbackBanner notice={notice} />
+      <NoticeBanner notice={notice} />
       <div className="mb-3 flex items-center justify-between text-sm text-gray-500">
         <span>
           Question {index + 1} of {total}
@@ -416,10 +495,8 @@ function Solver({
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <p className="mb-5 text-center text-gray-700">{puzzle.instruction}</p>
-
         {puzzle.stem.length > 0 && (
-          <div className="mb-6 rounded-xl bg-gray-50 p-4">
+          <div className="mb-6 rounded-xl bg-gray-50 p-4" aria-label="Puzzle diagram">
             <StemView puzzle={puzzle} />
           </div>
         )}
@@ -431,7 +508,7 @@ function Solver({
               <button
                 key={i}
                 onClick={() => onChoose(i)}
-                aria-label={`Option ${LETTERS[i]} — ${describeCell(opt)}`}
+                aria-label={`Option ${LETTERS[i]} — ${describeVisual(opt)}`}
                 aria-pressed={isSel}
                 className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
                   isSel
@@ -442,7 +519,7 @@ function Solver({
                 <span className={`text-xs font-semibold ${isSel ? "text-gray-900" : "text-gray-400"}`}>
                   Option {LETTERS[i]} {isSel ? "· selected" : ""}
                 </span>
-                <CellGraphic cell={opt} className="h-16 w-16" />
+                <VisualGraphic visual={opt} className="h-20 w-20" />
               </button>
             );
           })}
@@ -491,7 +568,7 @@ function Result({
   meta,
   onRestart,
 }: {
-  puzzles: PublicPuzzle[];
+  puzzles: PublicPuzzle<Visual>[];
   answers: (number | null)[];
   review: SubmitResponse;
   meta: {
@@ -505,7 +582,9 @@ function Result({
 
   const attribution = meta?.source === "fallback"
     ? "From the verified reference set"
-    : `Fresh deterministic test${meta?.generatorVersion ? ` · ${meta.generatorVersion}` : ""}`;
+    : meta?.source === "experimental"
+      ? `Experimental scene preview${meta?.generatorVersion ? ` · ${meta.generatorVersion}` : ""}`
+      : `Fresh deterministic test${meta?.generatorVersion ? ` · ${meta.generatorVersion}` : ""}`;
 
   return (
     <section>
@@ -524,6 +603,27 @@ function Result({
           Take another test
         </button>
       </div>
+
+      {review.breakdown && (review.breakdown.bands.length > 0 || review.breakdown.families.length > 0) && (
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {[
+            ["By band", review.breakdown.bands],
+            ["By reasoning family", review.breakdown.families],
+          ].map(([title, rows]) => (
+            <div key={title as string} className="rounded-xl border border-gray-200 bg-white p-4 text-left">
+              <h3 className="text-sm font-semibold text-gray-800">{title as string}</h3>
+              <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                {(rows as Array<{ key: string; correct: number; attempted: number }>).map((row) => (
+                  <li key={row.key} className="flex justify-between gap-3">
+                    <span>{row.key.replaceAll("-", " ")}</span>
+                    <span>{row.correct} / {row.attempted}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h3 className="mb-3 mt-8 text-lg font-semibold">Review</h3>
       <div className="space-y-4">
@@ -547,14 +647,13 @@ function ReviewItem({
   index,
   result,
 }: {
-  puzzle: PublicPuzzle;
+  puzzle: PublicPuzzle<Visual>;
   chosen: number | null;
   index: number;
   result: ReviewResult;
 }) {
   const correct = result.correct;
   const optionCount = puzzle.options.length;
-  const [showExplanation, setShowExplanation] = useState(false);
   // Match Solver's responsive grid: 4 options → 4-col, 5–6 → 3-col.
   const gridClass = optionCount <= 4
     ? "grid grid-cols-4 gap-2"
@@ -563,7 +662,7 @@ function ReviewItem({
     <div className={`rounded-xl border bg-white p-5 shadow-sm ${correct ? "border-green-300" : "border-red-200"}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-500">
-          Q{index + 1} · {puzzleTypeLabel(puzzle.type)}
+          Q{index + 1} · {puzzleTypeLabel(puzzle)}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
@@ -586,7 +685,7 @@ function ReviewItem({
           return (
             <div
               key={i}
-              aria-label={`Option ${LETTERS[i]} — ${describeCell(opt)}${status ? ` (${status})` : ""}`}
+              aria-label={`Option ${LETTERS[i]} — ${describeVisual(opt)}${status ? ` (${status})` : ""}`}
               className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 ${
                 isCorrect ? "border-green-400 bg-green-50" : isChosen ? "border-red-400 bg-red-50" : "border-gray-200"
               }`}
@@ -594,23 +693,16 @@ function ReviewItem({
               <span className={`text-[10px] font-semibold ${isChosen ? "text-red-700" : "text-gray-600"}`}>
                 {LETTERS[i]}
               </span>
-              <CellGraphic cell={opt} className="h-12 w-12" />
+              <VisualGraphic visual={opt} className="h-16 w-16" />
             </div>
           );
         })}
       </div>
 
-      <button
-        onClick={() => setShowExplanation((value) => !value)}
-        className="mt-3 text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900"
-      >
-        {showExplanation ? "Hide explanation" : "Show explanation"}
-      </button>
-      {showExplanation && (
-        <p className="mt-2 text-sm text-gray-600">
-          <span className="font-medium text-gray-800">Why:</span> {result.explanation}
-        </p>
-      )}
+      <div className="mt-4 rounded-lg bg-gray-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Explanation</p>
+        <p className="mt-2 text-sm leading-6 text-gray-700">{result.explanation}</p>
+      </div>
     </div>
   );
 }

@@ -49,8 +49,27 @@ export async function POST(req: Request) {
       answerIndex: item.answerIndex,
       correct: chosen === item.answerIndex,
       explanation: item.explanation,
+      familyId: item.familyId,
+      band: item.band,
     };
   });
   const score = results.filter((result) => result.correct).length;
-  return NextResponse.json({ score, total: results.length, results });
+  const summarize = (field: "familyId" | "band") => {
+    const groups = new Map<string, { correct: number; attempted: number }>();
+    for (const result of results) {
+      const key = result[field];
+      if (!key) continue;
+      const group = groups.get(key) ?? { correct: 0, attempted: 0 };
+      group.attempted++;
+      group.correct += Number(result.correct);
+      groups.set(key, group);
+    }
+    return [...groups].map(([key, value]) => ({ key, ...value }));
+  };
+  return NextResponse.json({
+    score,
+    total: results.length,
+    results,
+    breakdown: { bands: summarize("band"), families: summarize("familyId") },
+  });
 }

@@ -1,7 +1,7 @@
 # Deterministic novel tests
 
-Status: **design decided 2026-08-13**. Implementation tasks live in
-[TODO.md](../../TODO.md) under the matching dated heading.
+Status: **design decided 2026-08-13; core generator implemented**. The current
+reliability and reasoning-depth pass lives in [TODO.md](../../TODO.md).
 
 This plan supersedes the earlier choice to use an LLM as a live item writer. The
 existing rule validator, renderer, item bank, and agent harness remain useful.
@@ -20,7 +20,7 @@ Use LLM calls for three jobs only:
    items. Pure code still defines the rule, derives the answer, and decides
    whether an item is valid.
 
-The first deeper puzzle family will be **visual operator induction**. It shows
+The first deeper puzzle family is **visual operator induction**. It shows
 several worked visual examples of the same hidden operation, followed by a new
 input pair and a missing output. The test-taker must infer the operation and
 apply it. This reuses the existing cell vocabulary and renderer while adding the
@@ -57,8 +57,8 @@ Novelty has three separate levels:
 
 1. **Fresh instance.** A 128-bit seed is created after the model weights are
    fixed. It produces a new visual instance, checked against the other items in
-   the quiz and the static regression corpus. This is the next implementation
-   target.
+   the quiz and the static regression corpus. This is the current runtime
+   baseline.
 2. **Fresh composition.** The item combines known primitives in a program and
    parameter arrangement not present in the reference corpus. The generator
    records a canonical program fingerprint so this can be measured.
@@ -98,6 +98,216 @@ sends the answer in its JSON is not a benchmark.
 The deterministic generator becomes the default and fresh path. The static bank
 stays as a regression suite and emergency fallback. It is not described as a
 fresh test.
+
+## Expanded 12-question test architecture
+
+The next test profile is a fixed 12-question assessment. It is a design target,
+not a description of the current five-question generator. Its shape is part of
+the versioned generation contract: a generator version may change the families
+or their weights, but it must not silently change the number or order of bands.
+
+### Presentation contract
+
+The solving screen shows only the visual evidence and answer options. It must
+not name the family, describe the hidden relationship, or provide a
+puzzle-specific instruction. Every item shows at least two worked scenes or
+stages so the relationship is learned from a sequence rather than inferred from
+one unexplained board. After the full test is submitted, the review shows a rich
+plain-language explanation of the evidence, operations, and answer.
+
+Difficulty must rise across the test. The development preview uses 12 distinct
+families, does not decrease from difficulty 2 through 5, and reserves the last
+questions for rule switching and composed visible transformations. It remains
+development-only until the human-solvability gate and representative fallback
+bank are complete.
+
+### Four fixed difficulty bands
+
+| Positions | Band | Item count | What the band tests | Intended time |
+|---|---|---:|---|---:|
+| 1–2 | Relational warmup | 2 | Notice one clear relation and apply it without hidden notation. | 2 minutes |
+| 3–6 | Composition | 4 | Combine, reverse, or interleave two demonstrated relations or transformations. | 6 minutes |
+| 7–10 | Constraint or spatial reasoning | 4 | Satisfy interacting board, set, geometry, or connectivity constraints. | 8 minutes |
+| 11–12 | Induction or transfer | 2 | Infer a demonstrated system or carry the same structure into a changed representation. | 4 minutes |
+
+The maximum intended completion time is **20 minutes**. This is a design budget,
+not an automatic failure deadline: the product records elapsed time and still
+accepts a later submission. Pilot data must show that a representative user can
+normally complete the full profile within the budget. If a band consistently
+exceeds its share, simplify or remove its families instead of extending the test
+or making the visuals denser.
+
+Difficulty comes from the reasoning operation, not from smaller marks, more
+answer choices, unexplained symbols, or a larger board. Each item carries one
+primary reasoning-family tag matching its band and may carry secondary tags for
+diagnostics. The primary tag owns its score so one item is never counted twice.
+
+### Family eligibility by band
+
+This table defines where a family may appear after it passes the correctness and
+human-solvability gates below. A blank means that the family is not eligible for
+that band, even if its generator could produce an item at a superficially similar
+difficulty.
+
+| Family or query mode | Warmup | Composition | Constraint / spatial | Induction / transfer |
+|---|:---:|:---:|:---:|:---:|
+| Simple first-order sequence | yes |  |  |  |
+| Interleaved or relational sequence | yes | yes |  |  |
+| Simple property outlier | yes |  |  |  |
+| Relational outlier | yes | yes |  |  |
+| Compositional or inverse analogy |  | yes |  | yes |
+| Relational matrix |  | yes | yes |  |
+| Visual set algebra |  | yes | yes |  |
+| Constraint mosaic |  |  | yes |  |
+| Topology or path completion |  |  | yes |  |
+| Transformation machine |  | yes |  | yes |
+| Fold, punch, reflection, or rotation |  |  | yes | yes |
+| Visual concept induction |  |  |  | yes |
+| Minimal repair |  |  | yes |  |
+| Rule switching or rule transfer |  |  |  | yes |
+
+The current modular visual-operator family is not eligible for this expanded
+profile. Its hidden shape indexes and parity conditions are implementation
+conventions rather than visibly learned operations. The transformation-machine
+replacement becomes eligible only after its gates pass; until then, the
+expanded profile remains unavailable rather than filling its final band with a
+weaker substitute.
+
+An eligibility registry is the single assembly input. Each entry contains a
+versioned family id, allowed bands, primary reasoning-family tag, enabled status,
+validated difficulty buckets, per-item time budget, and fallback availability.
+Changing any of these generation semantics requires a new generator version.
+
+### Deterministic assembly and coverage
+
+`generateQuiz(seed, generatorVersion, expandedProfile)` must reproduce the same
+canonical 12 items, option order, and family order on every machine. Assembly
+uses stable child seeds for the schedule, each slot, candidate retries, and
+option shuffling. One family's rejection count must therefore not perturb later
+questions.
+
+Assembly happens in this order:
+
+1. Filter the registry to families enabled for each band and difficulty bucket.
+2. Use the schedule child seed to choose all 12 family ids before generating any
+   item.
+3. Enforce the band counts and coverage rules on that schedule.
+4. Generate each slot from its own child seed with a bounded retry budget.
+5. Reject duplicate program fingerprints, duplicate visual fingerprints, and
+   adjacent items with the same family or rule structure.
+6. Shuffle choices from an item-specific child seed after the canonical answer
+   is fixed.
+
+Every generated test must satisfy all of these coverage rules:
+
+- exactly 2 warmup, 4 composition, 4 constraint/spatial, and 2
+  induction/transfer items;
+- at least 6 distinct family ids overall;
+- no family may supply more than 2 questions;
+- the 2 warmups come from different families;
+- each four-item middle band contains at least 3 distinct families;
+- the 2 induction/transfer items come from different families; and
+- adjacent questions may not share a family or canonical rule structure.
+
+The assembler chooses a quota-valid family schedule first; it does not pool all
+accepted candidates and take whichever generators finish first. If a selected
+family exhausts its retry budget, use a validated fallback from the same family
+and band. If none exists, fail the expanded-profile request visibly. Do not
+silently substitute a more permissive family or return a narrower test. The
+emergency bank must obey the same band and coverage contract.
+
+### Scoring and reporting
+
+The canonical overall score is the number correct out of 12. Also report the
+four band subtotals and one `correct / attempted` subtotal for every primary
+reasoning family present in that test. Family results are meaningful even when
+the denominator is small, but they are descriptive and must not be presented as
+a standardized IQ subscore. Elapsed time is reported overall and by band; it
+does not change correctness.
+
+Human and agent results remain separate datasets and separate result views:
+
+- human results record correctness, elapsed time, band, family, generator
+  bucket, and anonymous pilot or attempt cohort;
+- agent results record those fields plus model, prompt version, input channel,
+  attempt budget, latency, and cost; and
+- image and symbolic agent runs remain separate conditions.
+
+Do not pool human and agent accuracy, normalize one population against the
+other, or collapse family results into one claimed IQ number. Comparisons use
+the same generator buckets and report the human–agent gap per reasoning family
+as well as overall.
+
+## Shared correctness contract for every family
+
+A family may enter the eligibility registry only when every served candidate
+satisfies the same contract:
+
+1. **Seeded replay.** A versioned generator and seed reproduce the canonical
+   item, including its hidden rule, answer, and unshuffled choices.
+2. **Pure-code meaning.** A bounded rule, transformation, constraint system, or
+   geometry program defines every meaningful visual element. An LLM never owns
+   ground truth.
+3. **Mechanical derivation.** Pure code derives the answer from that program;
+   it does not trust an authored answer index or explanation.
+4. **Complete uniqueness check.** Exhaustive enumeration, a complete bounded
+   solver, or an equivalent proof keeps only candidates for which every allowed
+   interpretation consistent with the evidence predicts the same visible
+   answer.
+5. **Witnessed distractors.** Every wrong choice is the prediction of a concrete
+   failed rule, omitted step, reversed operation, or violated constraint. Tests
+   retain the failure witness.
+6. **Visual integrity.** Choices are distinct in rendered meaning, no two
+   choices render identically, meaningful cues are visible at normal desktop and
+   mobile sizes, and decorative or unused cues are rejected.
+7. **Shared presentation.** Human and image-agent renderers expose the same
+   information. The public puzzle omits answers, rules, explanations, seeds, and
+   other ground-truth fields; scoring remains server-side.
+8. **Invariant sweep.** A many-seed local sweep covers every enabled family and
+   bucket, proves bounded generation, replays exact output, and rechecks the
+   preceding invariants.
+
+A code-valid family is still only a candidate. Mechanical uniqueness proves the
+answer within the declared grammar; it does not prove that a person can discover
+the notation or that another human interpretation is unreasonable.
+
+## Human-solvability promotion gate
+
+Families move through four states: **prototype → code-valid → pilot → enabled**.
+Only `enabled` family/band pairs may enter the expanded profile. Promotion is per
+band because a clear introductory form does not establish that a denser or
+composed form is readable.
+
+For an initial pilot, prepare at least three representative items from every
+band in which the family seeks eligibility. Each item is attempted by at least
+eight people without the hidden rule or answer. Include both desktop and mobile
+attempts for any family whose spatial layout changes between those viewports.
+Immediately after answering and before revealing the rule, ask the participant
+to explain the relationship or constraint in plain language and to mark any
+symbol or visual distinction they did not understand.
+
+Promote a family/band pair only when all of the following hold:
+
+- every pilot item still passes the shared correctness contract;
+- at least 75% of attempts describe the intended relationship, allowing plain
+  wording rather than implementation terms;
+- no more than 20% of attempts report misunderstanding the notation, encoding,
+  or a required visual distinction;
+- no repeated alternative interpretation produces a different defensible
+  answer; any such interpretation returns the family to correctness design;
+- median solve time fits the band's per-item budget: 1 minute for warmup, 90
+  seconds for composition, and 2 minutes for constraint/spatial or
+  induction/transfer; and
+- the observed ordering supports the intended curve: the promoted warmup bucket
+  is easier and faster than the family's later promoted bucket. Do not infer a
+  curve from provisional generator complexity alone.
+
+Wrong answers caused by an understood but difficult rule are calibration data.
+Wrong answers caused by hidden numeric encodings, unfamiliar conventions,
+ambiguous diagrams, or details that disappear at normal size fail the gate.
+Store only aggregate results by versioned family and difficulty bucket. After a
+material renderer, notation, or rule-grammar change, return the affected pair to
+`pilot` and repeat the gate.
 
 ## Visual operator induction v1
 
@@ -171,6 +381,20 @@ The useful result is their gap. Do not collapse them into one IQ number.
 
 This split gives the normal human path instant, cheap, reproducible tests. Model
 spend measures agents instead of subsidizing puzzle authorship.
+
+### Development-only LLM proposal experiment
+
+The optional experiment lets a model propose only a program in a strict,
+bounded, versioned grammar. Pure code constructs the visuals, derives the
+answer, enumerates competing rules, and verifies every distractor. Each proposal
+gets at most two attempts with an eight-second timeout; provenance, token use,
+acceptance, latency, and deterministic fallback are recorded.
+
+Compare its cost, visual variety, rule-structure novelty, and human pilot quality
+with direct procedural sampling. Do not put it in the normal test path unless it
+adds meaningful validated variety that deterministic generation cannot provide
+more cheaply and reliably. The runner is built, but relay measurements and
+human pilot results have not yet been collected.
 
 ## Evaluation protocol
 

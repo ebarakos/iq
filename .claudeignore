@@ -1,3 +1,11 @@
 node_modules/
 .next/
 package-lock.json
+*.tsbuildinfo
+qa/runs/
+
+# Raw browser-QA evidence; keep the small Markdown findings visible.
+docs/qa/**/shots/
+docs/qa/**/*.png
+docs/qa/**/*.jsonl
+docs/qa/**/*.zip

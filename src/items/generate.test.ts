@@ -67,7 +67,9 @@ describe("generateQuiz", () => {
 
     expect(replay).toEqual(first);
     expect(PuzzleSetSchema.safeParse(first).success).toBe(true);
-    expect(new Set(first.map((p) => p.type))).toEqual(new Set(PUZZLE_TYPES));
+    expect(new Set(first.map((p) => p.type)).size).toBe(4);
+    expect(first.some((puzzle) => puzzle.type === "operatorInduction")).toBe(false);
+    expect(first).toHaveLength(5);
     expect(first.map((p) => p.difficulty)).toEqual([2, 2, 3, 3, 5]);
     for (const puzzle of first) {
       expect(checkRule(puzzle).ok).toBe(true);
@@ -104,6 +106,24 @@ describe("generateQuiz", () => {
     expect(seededRng("same-seed", "a")()).not.toBe(seededRng("same-seed", "b")());
   });
 
+  it("keeps v2 five-family puzzle semantics stable", () => {
+    const quiz = generateQuiz("v2-golden-seed", "procedural-v2", "hard");
+    const core = quiz.map((puzzle) => {
+      const copy = { ...puzzle };
+      delete copy.generation;
+      return copy;
+    });
+    const digest = createHash("sha256").update(JSON.stringify(core)).digest("hex");
+    expect(quiz).toHaveLength(5);
+    expect(digest).toBe("ba82b218b68db96e2e38cd58df0b616870d9661a7d019615b8d0ca4255cdc406");
+  });
+
+  it("does not dump the operator syntax into current explanations", () => {
+    const puzzle = generatePuzzle("operatorInduction", 5, mulberry32(91), CURRENT_GENERATOR_VERSION);
+    expect(puzzle.explanation).toMatch(/hidden arithmetic is excluded/);
+    expect(puzzle.explanation).not.toMatch(/shape=|count=|modulo 4|\? then/);
+  });
+
   it("assigns the same program fingerprint to the same hidden rule", () => {
     const quiz = generateQuiz("program-fingerprint-seed", CURRENT_GENERATOR_VERSION, "standard");
     for (const puzzle of quiz) {
@@ -114,7 +134,7 @@ describe("generateQuiz", () => {
   });
 
   it("rejects unknown versions, profiles, and invalid seeds", () => {
-    expect(() => generateQuiz("seed", "procedural-v3", "standard")).toThrow(/unsupported generator version/);
+    expect(() => generateQuiz("seed", "procedural-v4", "standard")).toThrow(/unsupported generator version/);
     expect(() => generateQuiz("seed", CURRENT_GENERATOR_VERSION, "expert" as never)).toThrow(/unsupported quiz profile/);
     expect(() => generateQuiz("", CURRENT_GENERATOR_VERSION, "standard")).toThrow(/seed must be/);
   });

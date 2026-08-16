@@ -16,7 +16,8 @@ import type { Cell, OperatorLegend, Panel, Puzzle } from "./schema";
  * verifies the whole puzzle against it; this is the semantic validator that
  * closes the "model mis-marks the answer" reliability gap. The same DSL drives
  * the procedural generator (generate.ts), whose items are correct by
- * construction. Design: docs/plans/rules-bank-agent-calibration.md (Phase A).
+ * construction. The implemented foundation is recorded in
+ * docs/plans/rules-bank-agent-calibration.md.
  *
  * Not expressible in v1 (escape hatch — items simply omit `rule` and are
  * excluded from the calibrated bank): multiplicative count rules, shape-changing
@@ -76,14 +77,15 @@ export type DimTransforms = z.infer<typeof DimTransformsSchema>;
 export const OPERATOR_DIMS = ["shape", "count", "fill", "size"] as const;
 export type OperatorDim = (typeof OPERATOR_DIMS)[number];
 
+const OPERATOR_MAX_ARITHMETIC_DEPTH = 2;
+
 export const OperatorBaseSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("left") }),
   z.object({ op: z.literal("right") }),
-  z.object({ op: z.literal("addMod") }),
-  z.object({ op: z.literal("diffLRMod") }),
-  z.object({ op: z.literal("diffRLMod") }),
 ]);
 export type OperatorBase = z.infer<typeof OperatorBaseSchema>;
+export const OperatorArithmeticOpSchema = z.enum(["addMod", "diffLRMod", "diffRLMod"] as const);
+export type OperatorArithmeticOp = z.infer<typeof OperatorArithmeticOpSchema>;
 
 export const OperatorPredicateSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("equal"), dimension: z.enum(OPERATOR_DIMS) }),
@@ -91,16 +93,43 @@ export const OperatorPredicateSchema = z.discriminatedUnion("kind", [
 ]);
 export type OperatorPredicate = z.infer<typeof OperatorPredicateSchema>;
 
-export const OperatorExpressionSchema = z.union([
-  OperatorBaseSchema,
-  z.object({
-    op: z.literal("if"),
-    predicate: OperatorPredicateSchema,
-    whenTrue: OperatorBaseSchema,
-    whenFalse: OperatorBaseSchema,
-  }),
-]);
-export type OperatorExpression = z.infer<typeof OperatorExpressionSchema>;
+export type OperatorArithmeticExpression = {
+  op: OperatorArithmeticOp;
+  left: OperatorNonConditionalExpression;
+  right: OperatorNonConditionalExpression;
+};
+type OperatorConditionalExpression = {
+  op: "if";
+  predicate: OperatorPredicate;
+  whenTrue: OperatorNonConditionalExpression;
+  whenFalse: OperatorNonConditionalExpression;
+};
+
+type OperatorNonConditionalExpression = OperatorBase | OperatorArithmeticExpression;
+export type OperatorExpression = OperatorBase | OperatorArithmeticExpression | OperatorConditionalExpression;
+
+const OperatorNonConditionalExpressionSchema: z.ZodType<OperatorNonConditionalExpression> = z.lazy(() =>
+  z.union([
+    OperatorBaseSchema,
+    z.object({
+      op: OperatorArithmeticOpSchema,
+      left: OperatorNonConditionalExpressionSchema,
+      right: OperatorNonConditionalExpressionSchema,
+    }),
+  ]),
+);
+
+export const OperatorExpressionSchema: z.ZodType<OperatorExpression> = z.lazy(() =>
+  z.union([
+    OperatorNonConditionalExpressionSchema,
+    z.object({
+      op: z.literal("if"),
+      predicate: OperatorPredicateSchema,
+      whenTrue: OperatorNonConditionalExpressionSchema,
+      whenFalse: OperatorNonConditionalExpressionSchema,
+    }),
+  ]),
+);
 
 /** One bounded expression per output dimension. */
 export const OperatorProgramSchema = z
@@ -113,51 +142,92 @@ export const OperatorProgramSchema = z
   .strict()
   .superRefine((program, ctx) => {
     let conditionals = 0;
+    let hasNonTrivial = false;
     for (const dim of OPERATOR_DIMS) {
       const expr = program[dim];
-      const bases = expr.op === "if" ? [expr.whenTrue, expr.whenFalse] : [expr];
-      if (bases.some((base) => !operatorBaseAllowed(dim, base))) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [dim],
-          message: "modular operator arithmetic is supported only for count and shape",
-        });
+      if (expressionSemanticSignature(dim, expr, SHAPES) !== baseSemanticSignature(dim, { op: "left" }, SHAPES)) {
+        hasNonTrivial = true;
       }
-      if (expr.op !== "if") continue;
-      conditionals++;
-      if (JSON.stringify(expr.whenTrue) === JSON.stringify(expr.whenFalse)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [dim],
-          message: "operator conditional branches must differ",
-        });
-      }
-      if (expr.predicate.kind === "equal" && expr.predicate.dimension === dim) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [dim, "predicate"],
-          message: "operator equality must control a different output dimension",
-        });
-      }
-      if (expr.predicate.kind === "sumCountsEven" && dim === "count") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [dim, "predicate"],
-          message: "count parity must control a different output dimension",
-        });
-      }
+      validateOperatorExpression(dim, expr, [dim], () => {
+        conditionals++;
+      }, ctx);
     }
-    if (conditionals > 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "operator v1 permits at most one conditional output dimension" });
+
+    if (conditionals > 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "operator-v1 allows at most two conditional output dimensions",
+      });
     }
-    if (OPERATOR_DIMS.every((dim) => program[dim].op === "left")) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "operator program must do more than copy the left cell" });
+
+    if (!hasNonTrivial) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "operator program must do more than copy the left cell",
+      });
     }
   });
 export type OperatorProgram = z.infer<typeof OperatorProgramSchema>;
 
-function operatorBaseAllowed(dim: OperatorDim, base: OperatorBase): boolean {
-  return base.op === "left" || base.op === "right" || dim === "shape" || dim === "count";
+function validateOperatorExpression(
+  dim: OperatorDim,
+  candidate: OperatorExpression,
+  path: string[],
+  onConditional: () => void,
+  ctx: z.RefinementCtx,
+): void {
+  if (candidate.op === "if") {
+    if (JSON.stringify(candidate.whenTrue) === JSON.stringify(candidate.whenFalse)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path,
+        message: "operator conditionals must differ between branches",
+      });
+    }
+    if (candidate.predicate.kind === "equal" && candidate.predicate.dimension === dim) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [...path, "predicate"],
+        message: "operator equality must control a different output dimension",
+      });
+    }
+    if (candidate.predicate.kind === "sumCountsEven" && dim === "count") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [...path, "predicate"],
+        message: "count parity must control a different output dimension",
+      });
+    }
+
+    onConditional();
+    validateOperatorExpression(dim, candidate.whenTrue, [...path, "whenTrue"], onConditional, ctx);
+    validateOperatorExpression(dim, candidate.whenFalse, [...path, "whenFalse"], onConditional, ctx);
+    return;
+  }
+
+  if (!operatorExpressionAllowedForDimension(dim, candidate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path,
+      message: "modular operator arithmetic is supported only for shape and count",
+    });
+  }
+
+  if (arithmeticDepth(candidate) > OPERATOR_MAX_ARITHMETIC_DEPTH) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path,
+      message: `operator arithmetic tree is deeper than ${OPERATOR_MAX_ARITHMETIC_DEPTH} levels for ${dim}`,
+    });
+  }
+}
+
+function arithmeticDepth(expr: OperatorExpression): number {
+  if (expr.op === "left" || expr.op === "right") return 0;
+  if (expr.op === "if") {
+    return Math.max(arithmeticDepth(expr.whenTrue), arithmeticDepth(expr.whenFalse));
+  }
+  return 1 + Math.max(arithmeticDepth(expr.left), arithmeticDepth(expr.right));
 }
 
 const CONSTANT: DimTransform = { op: "constant" };
@@ -278,20 +348,54 @@ export function applyTransforms(transforms: DimTransforms, cell: Cell, steps = 1
   return next as unknown as Cell;
 }
 
-const OPERATOR_BASES: readonly OperatorBase[] = [
-  { op: "left" },
-  { op: "right" },
-  { op: "addMod" },
-  { op: "diffLRMod" },
-  { op: "diffRLMod" },
-];
+const OPERATOR_BASES: readonly OperatorBase[] = [{ op: "left" }, { op: "right" }];
+const OPERATOR_ARITHMETIC_OPS: readonly OperatorArithmeticOp[] = ["addMod", "diffLRMod", "diffRLMod"];
 
 /** Stable serialization used for enumeration, diagnostics, and fingerprints. */
 export function operatorExpressionKey(expr: OperatorExpression): string {
-  if (expr.op !== "if") return expr.op;
-  const predicate =
-    expr.predicate.kind === "equal" ? `eq:${expr.predicate.dimension}` : expr.predicate.kind;
-  return `if:${predicate}:${expr.whenTrue.op}:${expr.whenFalse.op}`;
+  if (expr.op === "if") {
+    const predicate =
+      expr.predicate.kind === "equal" ? `eq:${expr.predicate.dimension}` : expr.predicate.kind;
+    return `if:${predicate}:${operatorExpressionKey(expr.whenTrue)}:${operatorExpressionKey(expr.whenFalse)}`;
+  }
+  if (expr.op !== "left" && expr.op !== "right") {
+    return `${expr.op}(${operatorExpressionKey(expr.left)},${operatorExpressionKey(expr.right)})`;
+  }
+  return expr.op;
+}
+
+function applyOperatorArithmetic(
+  op: OperatorArithmeticOp,
+  left: string | number,
+  right: string | number,
+  dim: OperatorDim,
+  shapeCycle: readonly Cell["shape"][],
+): string | number | null {
+  if (left === null || right === null) return null;
+  if (dim === "count") {
+    if (typeof left !== "number" || typeof right !== "number") return null;
+    const l = left % 4;
+    const r = right % 4;
+    const raw = op === "addMod" ? l + r : op === "diffLRMod" ? l - r : r - l;
+    const residue = mod(raw, 4);
+    return residue === 0 ? 4 : residue;
+  }
+  if (dim === "shape") {
+    const l = shapeCycle.indexOf(left as Cell["shape"]);
+    const r = shapeCycle.indexOf(right as Cell["shape"]);
+    if (l === -1 || r === -1) return null;
+    const raw = op === "addMod" ? l + r : op === "diffLRMod" ? l - r : r - l;
+    return shapeCycle[mod(raw, shapeCycle.length)];
+  }
+  return null;
+}
+
+function operatorExpressionAllowedForDimension(dim: OperatorDim, expr: OperatorExpression): boolean {
+  if (expr.op === "if") {
+    return operatorExpressionAllowedForDimension(dim, expr.whenTrue) && operatorExpressionAllowedForDimension(dim, expr.whenFalse);
+  }
+  if (expr.op === "left" || expr.op === "right") return true;
+  return dim === "shape" || dim === "count";
 }
 
 export function operatorProgramKey(program: OperatorProgram): string {
@@ -308,30 +412,9 @@ export function applyOperatorBase(
   dim: OperatorDim,
   left: Cell,
   right: Cell,
-  shapeCycle: readonly Cell["shape"][],
 ): string | number | null {
   if (base.op === "left") return left[dim];
   if (base.op === "right") return right[dim];
-  if (!operatorBaseAllowed(dim, base)) return null;
-
-  if (dim === "count") {
-    // Counts use residues 1,2,3,4 with 4 representing zero. This keeps the
-    // visually natural identity 1 + 1 = 2 while remaining closed.
-    const l = left.count % 4;
-    const r = right.count % 4;
-    const raw = base.op === "addMod" ? l + r : base.op === "diffLRMod" ? l - r : r - l;
-    const residue = mod(raw, 4);
-    return residue === 0 ? 4 : residue;
-  }
-
-  if (dim === "shape") {
-    const l = shapeCycle.indexOf(left.shape);
-    const r = shapeCycle.indexOf(right.shape);
-    if (l === -1 || r === -1) return null;
-    const raw = base.op === "addMod" ? l + r : base.op === "diffLRMod" ? l - r : r - l;
-    return shapeCycle[mod(raw, shapeCycle.length)];
-  }
-
   return null;
 }
 
@@ -347,13 +430,17 @@ export function applyOperatorExpression(
   right: Cell,
   shapeCycle: readonly Cell["shape"][],
 ): string | number | null {
-  const base =
-    expr.op === "if"
-      ? operatorPredicateValue(expr.predicate, left, right)
-        ? expr.whenTrue
-        : expr.whenFalse
-      : expr;
-  return applyOperatorBase(base, dim, left, right, shapeCycle);
+  if (expr.op === "if") {
+    const branch = operatorPredicateValue(expr.predicate, left, right) ? expr.whenTrue : expr.whenFalse;
+    return applyOperatorExpression(branch, dim, left, right, shapeCycle);
+  }
+  if (expr.op === "left" || expr.op === "right") {
+    return applyOperatorBase(expr, dim, left, right);
+  }
+  const leftValue = applyOperatorExpression(expr.left, dim, left, right, shapeCycle);
+  const rightValue = applyOperatorExpression(expr.right, dim, left, right, shapeCycle);
+  if (leftValue === null || rightValue === null) return null;
+  return applyOperatorArithmetic(expr.op, leftValue, rightValue, dim, shapeCycle);
 }
 
 /** Apply a complete operator program. Rotation is deliberately absent in v1. */
@@ -372,7 +459,11 @@ export function applyOperatorProgram(
   return output as Cell;
 }
 
-function baseSemanticSignature(dim: OperatorDim, base: OperatorBase, shapeCycle: readonly Cell["shape"][]): string {
+function baseSemanticSignature(
+  dim: OperatorDim,
+  base: OperatorBase,
+  shapeCycle: readonly Cell["shape"][],
+): string {
   const domain = dim === "shape" ? shapeCycle : DIM_DOMAINS[dim];
   const dummy = (value: string | number): Cell => ({
     shape: (dim === "shape" ? value : shapeCycle[0]) as Cell["shape"],
@@ -384,7 +475,7 @@ function baseSemanticSignature(dim: OperatorDim, base: OperatorBase, shapeCycle:
   const table: (string | number | null)[] = [];
   for (const left of domain) {
     for (const right of domain) {
-      table.push(applyOperatorBase(base, dim, dummy(left), dummy(right), shapeCycle));
+      table.push(applyOperatorBase(base, dim, dummy(left), dummy(right)));
     }
   }
   return JSON.stringify(table);
@@ -458,42 +549,90 @@ export function enumerateOperatorExpressions(
   const cached = operatorExpressionCache.get(cacheKey);
   if (cached) return cached;
 
-  const bases: OperatorBase[] = [];
+  const byDepth: OperatorNonConditionalExpression[][] = [];
+  const expressionByDepth = (depth: number): OperatorNonConditionalExpression[] =>
+    byDepth[depth] ?? [];
+
+  const baseExpressions: OperatorNonConditionalExpression[] = [];
+  const semanticExpressions = new Set<string>();
   const semanticBases = new Set<string>();
   for (const base of OPERATOR_BASES) {
-    if (!operatorBaseAllowed(dim, base)) continue;
     const signature = baseSemanticSignature(dim, base, shapeCycle);
     if (semanticBases.has(signature)) continue;
     semanticBases.add(signature);
-    bases.push(base);
+    baseExpressions.push(base);
   }
-
+  const addExpression = (bag: OperatorExpression[], expression: OperatorExpression) => {
+    const signature = expressionSemanticSignature(dim, expression, shapeCycle);
+    if (semanticExpressions.has(signature)) return;
+    semanticExpressions.add(signature);
+    bag.push(expression);
+  };
+  const addNonConditionalExpression = (bag: OperatorNonConditionalExpression[], expression: OperatorNonConditionalExpression) => {
+    addExpression(bag, expression);
+  };
   const predicates: OperatorPredicate[] = OPERATOR_DIMS.filter((control) => control !== dim).map(
     (dimension) => ({ kind: "equal" as const, dimension }),
   );
   if (dim !== "count") predicates.push({ kind: "sumCountsEven" });
 
-  const expressions: OperatorExpression[] = [];
-  const semanticExpressions = new Set<string>();
-  const add = (expression: OperatorExpression) => {
-    const signature = expressionSemanticSignature(dim, expression, shapeCycle);
-    if (semanticExpressions.has(signature)) return;
-    semanticExpressions.add(signature);
-    expressions.push(expression);
-  };
-  bases.forEach(add);
+  byDepth[0] = [];
+  baseExpressions.forEach((expression) => addNonConditionalExpression(byDepth[0], expression));
+
+  // Arithmetic trees: depth means the max chain length. For depth d, both operands
+  // may reach depth d-1; this guarantees exact depth growth and terminates.
+  for (let depth = 1; depth <= OPERATOR_MAX_ARITHMETIC_DEPTH; depth++) {
+    const level: OperatorNonConditionalExpression[] = [];
+    for (const op of OPERATOR_ARITHMETIC_OPS) {
+      for (let leftDepth = 0; leftDepth < depth; leftDepth++) {
+        const rightDepth = depth - 1;
+        for (const left of expressionByDepth(leftDepth)) {
+          for (const right of expressionByDepth(rightDepth)) {
+          const expression = { op, left: left as OperatorNonConditionalExpression, right: right as OperatorNonConditionalExpression };
+          if (!operatorExpressionAllowedForDimension(dim, expression)) continue;
+          addNonConditionalExpression(level, expression);
+          }
+        }
+        if (leftDepth !== rightDepth) {
+          for (const right of expressionByDepth(leftDepth)) {
+            for (const left of expressionByDepth(rightDepth)) {
+            const expression = { op, left: left as OperatorNonConditionalExpression, right: right as OperatorNonConditionalExpression };
+            if (!operatorExpressionAllowedForDimension(dim, expression)) continue;
+            addNonConditionalExpression(level, expression);
+          }
+        }
+      }
+    }
+    }
+    byDepth.push(level);
+  }
+
+  const nonIfExpressions = byDepth.flat();
+
+  const all: OperatorExpression[] = [...nonIfExpressions];
   for (const predicate of predicates) {
-    for (const whenTrue of bases) {
-      for (const whenFalse of bases) {
-        if (baseSemanticSignature(dim, whenTrue, shapeCycle) === baseSemanticSignature(dim, whenFalse, shapeCycle)) {
+    for (const whenTrue of nonIfExpressions) {
+      for (const whenFalse of nonIfExpressions) {
+        if (
+          expressionSemanticSignature(dim, whenTrue, shapeCycle) ===
+          expressionSemanticSignature(dim, whenFalse, shapeCycle)
+        ) {
+          // Not a true branch split in this output dimension.
           continue;
         }
-        add({ op: "if", predicate, whenTrue, whenFalse });
+        const expression = {
+          op: "if",
+          predicate,
+          whenTrue,
+          whenFalse,
+        } as OperatorExpression;
+        addExpression(all, expression);
       }
     }
   }
-  operatorExpressionCache.set(cacheKey, expressions);
-  return expressions;
+
+  operatorExpressionCache.set(cacheKey, all);
+  return all;
 }
 
 export interface OperatorExample {

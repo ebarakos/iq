@@ -18,7 +18,7 @@ import { puzzleToSvg } from "@/items/compose-image";
  * prompt revisions (see AttemptFile.promptVersion).
  */
 
-export const SOLVER_PROMPT_VERSION = "solver-v1";
+export const SOLVER_PROMPT_VERSION = "solver-v2";
 
 /** Fixed neutral instruction — identical across channels and models. */
 const SOLVER_PROMPT =
@@ -80,7 +80,6 @@ export function parseAnswerLetter(raw: string, optionCount: number): number | nu
  */
 function symbolicPayload(puzzle: Puzzle | PublicPuzzle): string {
   const body = {
-    instruction: puzzle.instruction,
     layout: puzzle.layout,
     stem: puzzle.stem,
     options: puzzle.options.map((cell, i) => ({ label: LETTERS[i], ...cell })),

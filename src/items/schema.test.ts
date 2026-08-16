@@ -1,13 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
+  ConnectionTileSchema,
+  PublicPuzzleSetSchema,
   PuzzleSchema,
   PuzzleSetSchema,
+  SceneSchema,
   SHAPES,
+  VisualPuzzleSchema,
   shuffleOptions,
+  toPublicPuzzle,
   visualSignature,
   type Cell,
   type Panel,
   type Puzzle,
+  type Scene,
+  type SceneToken,
+  type Visual,
 } from "./schema";
 import { generatePuzzle } from "./generate";
 import { mulberry32 } from "../lib/rng";
@@ -21,6 +29,20 @@ const c = (
 ): Cell => ({ shape, count, rotation, fill, size });
 
 const BLANK: Panel = { blank: true };
+
+const token = (
+  shape: SceneToken["shape"] = "circle",
+  fill: SceneToken["fill"] = "solid",
+  size: SceneToken["size"] = "l",
+): SceneToken => ({ kind: "token", shape, rotation: 0, fill, size });
+
+const scene = (column: number, object: Scene["objects"][number]["object"] = token()): Scene => ({
+  kind: "scene",
+  rows: 2,
+  columns: 2,
+  objects: [{ row: 0, column, object }],
+  tiles: [],
+});
 
 /** Minimal valid puzzle per type; tests mutate copies of these. */
 const validMatrix: Puzzle = {
@@ -95,6 +117,110 @@ describe("visualSignature", () => {
     expect(visualSignature({ ...base, fill: "half" })).not.toBe(visualSignature(base));
     expect(visualSignature({ ...base, size: "l" })).not.toBe(visualSignature(base));
     expect(visualSignature({ ...base, shape: "diamond" })).not.toBe(visualSignature(base));
+  });
+});
+
+describe("SceneSchema", () => {
+  it("accepts positioned tokens, contained tokens, and categorical edge connections", () => {
+    const fixture: Scene = {
+      kind: "scene",
+      rows: 3,
+      columns: 3,
+      objects: [
+        { row: 0, column: 2, object: token("triangle", "half", "l") },
+        {
+          row: 2,
+          column: 0,
+          object: { kind: "container", shape: "square", contents: [token("star", "solid", "m")] },
+        },
+      ],
+      tiles: [{ row: 1, column: 1, edges: ["north", "east", "south"] }],
+      guides: [{ kind: "crease", axis: "vertical", direction: "rightToLeft" }],
+    };
+
+    expect(SceneSchema.safeParse(fixture).success).toBe(true);
+    expect(SceneSchema.safeParse({ ...fixture, guides: [...fixture.guides!, fixture.guides![0]] }).success).toBe(false);
+    expect(SceneSchema.safeParse({ ...fixture, guides: [{ kind: "crease", axis: "vertical", direction: "topToBottom" }] }).success).toBe(false);
+  });
+
+  it("rejects out-of-bounds and overlapping board geometry", () => {
+    expect(SceneSchema.safeParse({ ...scene(0), objects: [{ row: 2, column: 0, object: token() }] }).success).toBe(false);
+    expect(SceneSchema.safeParse({
+      ...scene(0),
+      tiles: [{ row: 0, column: 0, edges: ["north"] }],
+    }).success).toBe(false);
+  });
+
+  it("rejects ambiguous connection aliases and illegibly small contained tokens", () => {
+    expect(ConnectionTileSchema.safeParse({ row: 0, column: 0, edges: ["east", "north"] }).success).toBe(false);
+    expect(ConnectionTileSchema.safeParse({ row: 0, column: 0, edges: ["north", "north"] }).success).toBe(false);
+    expect(SceneSchema.safeParse({
+      kind: "scene",
+      rows: 2,
+      columns: 2,
+      tiles: [],
+      objects: [{
+        row: 0,
+        column: 0,
+        object: {
+          kind: "container",
+          shape: "circle",
+          contents: [{ kind: "token", shape: "diamond", rotation: 0, fill: "solid", size: "s" }],
+        },
+      }],
+    }).success).toBe(false);
+  });
+});
+
+describe("VisualPuzzleSchema", () => {
+  it("accepts scenes in both stem panels and answer options without changing legacy cells", () => {
+    const visualPuzzle: Puzzle<Visual> = {
+      ...validSequence,
+      id: "scene-sequence",
+      stem: [scene(0), scene(1), scene(0, token("square")), BLANK],
+      options: [
+        scene(1, token("square")),
+        scene(0, token("triangle")),
+        scene(1, { kind: "container", shape: "circle", contents: [token("star", "solid", "m")] }),
+        { kind: "scene", rows: 2, columns: 2, objects: [], tiles: [{ row: 0, column: 0, edges: ["east", "south"] }] },
+      ],
+    };
+
+    expect(VisualPuzzleSchema.safeParse(visualPuzzle).success).toBe(true);
+    expect(PuzzleSchema.safeParse(validSequence).success).toBe(true);
+  });
+
+  it("rejects render-identical scenes even when placement arrays use a different order", () => {
+    const first: Scene = {
+      kind: "scene",
+      rows: 2,
+      columns: 2,
+      objects: [
+        { row: 0, column: 0, object: token("circle") },
+        { row: 1, column: 1, object: token("square") },
+      ],
+      tiles: [],
+    };
+    const reordered: Scene = { ...first, objects: [...first.objects].reverse() };
+    const visualPuzzle: Puzzle<Visual> = {
+      ...validSequence,
+      stem: [first, scene(1), scene(0, token("triangle")), BLANK],
+      options: [first, reordered, scene(1), scene(0, token("star"))],
+    };
+
+    expect(VisualPuzzleSchema.safeParse(visualPuzzle).success).toBe(false);
+  });
+
+  it("rejects scene options distinguished only by a subtle medium-to-large size change", () => {
+    const medium = scene(0, { ...token("circle"), size: "m" });
+    const large = scene(0, { ...token("circle"), size: "l" });
+    const visualPuzzle: Puzzle<Visual> = {
+      ...validSequence,
+      stem: [scene(0), scene(1), scene(0, token("triangle")), BLANK],
+      options: [medium, large, scene(1), scene(0, token("star"))],
+    };
+
+    expect(VisualPuzzleSchema.safeParse(visualPuzzle).success).toBe(false);
   });
 });
 
@@ -190,6 +316,42 @@ describe("PuzzleSchema — options and answerIndex", () => {
   });
 });
 
+describe("PuzzleSchema — scene-specific layouts", () => {
+  const sceneOptions = [
+    scene(0, token("circle")),
+    scene(1, token("circle")),
+    scene(0, token("square")),
+    scene(1, token("triangle")),
+  ];
+
+  it("accepts one incomplete board and a three-row transformation machine", () => {
+    const singleBoard: Puzzle<Visual> = {
+      ...validMatrix,
+      id: "single-board",
+      layout: "singleScene",
+      stem: [scene(0)],
+      options: sceneOptions,
+    };
+    const machine: Puzzle<Visual> = {
+      ...validMatrix,
+      id: "machine-table",
+      layout: "machineTable",
+      stem: [scene(0), scene(1), scene(0, token("square")), scene(1), scene(0), scene(1, token("square")), scene(0), scene(1), { blank: true }],
+      options: sceneOptions,
+    };
+    expect(VisualPuzzleSchema.safeParse(singleBoard).success).toBe(true);
+    expect(VisualPuzzleSchema.safeParse(machine).success).toBe(true);
+    expect(VisualPuzzleSchema.safeParse({ ...machine, stem: machine.stem.slice(0, 8) }).success).toBe(false);
+  });
+
+  it("keeps the reasoning family in the answer-free public contract", () => {
+    const publicPuzzle = toPublicPuzzle({ ...validSequence, familyId: "relational-sequence-v1" });
+    expect(publicPuzzle.familyId).toBe("relational-sequence-v1");
+    expect(publicPuzzle).not.toHaveProperty("answerIndex");
+    expect(publicPuzzle).not.toHaveProperty("explanation");
+  });
+});
+
 describe("PuzzleSchema — operator induction", () => {
   it("accepts the generated triple contract and rejects missing public legend or a misplaced blank", () => {
     const valid = generatePuzzle("operatorInduction", 4, mulberry32(7));
@@ -210,14 +372,19 @@ describe("PuzzleSchema — operator induction", () => {
 
 describe("PuzzleSetSchema", () => {
   const five = [validMatrix, validSequence, validAnalogy, validOddOneOut, { ...validMatrix, id: "t-matrix-2" }];
+  const twelve = Array.from({ length: 12 }, (_, index) => ({ ...validMatrix, id: `t-matrix-${index + 1}` }));
 
-  it("accepts 5 puzzles with unique ids", () => {
+  it("accepts replayable 5-item and current 12-item sets with unique ids", () => {
     expect(PuzzleSetSchema.safeParse(five).success).toBe(true);
+    expect(PuzzleSetSchema.safeParse(twelve).success).toBe(true);
+    expect(PublicPuzzleSetSchema.safeParse(five.map(toPublicPuzzle)).success).toBe(true);
+    expect(PublicPuzzleSetSchema.safeParse(twelve.map(toPublicPuzzle)).success).toBe(true);
   });
 
   it("rejects duplicate ids and wrong set sizes", () => {
     expect(PuzzleSetSchema.safeParse([...five.slice(0, 4), { ...validMatrix }]).success).toBe(false);
     expect(PuzzleSetSchema.safeParse(five.slice(0, 4)).success).toBe(false);
+    expect(PuzzleSetSchema.safeParse([...five, { ...validMatrix, id: "sixth" }]).success).toBe(false);
   });
 });
 

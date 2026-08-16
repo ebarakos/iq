@@ -3,20 +3,32 @@
 Visual IQ-style tests for **humans and AI agents** — the same puzzles, two audiences.
 
 Items are generated from a fresh random seed after the test starts. Every item carries a
-machine-readable **rule**; pure code re-derives its answer, and the new operator-induction
-family searches its complete bounded rule grammar to reject ambiguous questions. Humans and
-vision models receive the same answer-free visual contract.
+machine-readable **rule** or constraint witness, and pure code re-derives its answer. Humans
+and vision models receive the same answer-free visual contract.
 
 **There is deliberately no single IQ score.** Humans get a plain score; agents get
 pass-rate-by-difficulty-tier per model. The product headline is the **divergence** — items
-that are human-easy but agent-hard, and vice versa. (First real data point: a mid-tier
-vision model aces matrices ~93% but fails odd-one-out ~60% of the time.)
+that are human-easy but agent-hard, and vice versa. The first 300-attempt model run scored
+87.7% overall, including 100% on matrices and 74.7% on odd-one-out; it is directional data
+from one model, not a benchmark norm.
 
-> **Status: generated reasoning-test prototype.** Each quiz is produced deterministically
-> from a cryptographically random seed and contains one item from each of five visual-rule
-> families. Answers stay encrypted in an opaque token until server-side submission. This is
-> not yet a standardized human IQ score: generator difficulty needs a human pilot and a
-> stable model panel. Design: [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
+> **Status: generated reasoning-test prototype.** Development builds lead with an explicitly
+> labelled 12-question preview across the new visual families; the compact five-question path
+> remains available without the retired hidden-arithmetic equation. Answers stay encrypted
+> until server-side submission. This is not yet a standardized human IQ score: the new notation
+> and difficulty still need a human pilot and a stable model panel. Design:
+> [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
+
+### Hard quiz generation latency (deterministic probe)
+
+Current hard-ramp probe (`bench-seed-1`…`bench-seed-120`) measured on `2026-08-15`:
+
+- deterministic attempt ceiling: `100` attempts per slot (`MAX_ATTEMPTS` in `generate.ts`)
+- median generation time: `12.34 ms` for 5 questions
+- 95th-percentile generation time: `35.87 ms` for 5 questions
+- maximum generation time: `169.27 ms` for 5 questions
+
+This remains within start-button latency expectations for local runs.
 
 ---
 
@@ -59,8 +71,11 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
 
 - `src/items/rules.ts` — the rule DSL, semantic validator, bounded operator grammar,
   and full-grammar uniqueness oracle.
-- `src/items/generate.ts` — seeded, versioned quiz generator; `procedural-v1` remains
-  replayable and `procedural-v2` adds operator induction.
+- `src/items/generate.ts` — seeded, versioned compact quiz generator; `procedural-v1`
+  and `procedural-v2` remain replayable, while `procedural-v3` removes the opaque
+  operator equation from the current compact test.
+- `src/items/expanded-quiz.ts` — strict promotion-gated 12-question assembler plus
+  an explicitly labelled development preview of the code-valid scene families.
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
   renderer shared by generated and reference items.
 - `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
@@ -102,4 +117,6 @@ npm run render:item  # PNG fixtures of bank items (data/fixtures/)
 ```
 
 See [CLAUDE.md](CLAUDE.md) for full project context, [BRAINSTORM.md](BRAINSTORM.md) for
-the design history, and [docs/plans/](docs/plans/) for the roadmap.
+deferred ideas, [TODO.md](TODO.md) for the single active pass, and
+[docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md) for the
+current design.

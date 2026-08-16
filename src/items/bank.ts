@@ -3,6 +3,7 @@ import { z } from "zod";
 import bankFile from "../../data/bank/items.json";
 import {
   PuzzleSchema,
+  PUZZLE_TYPES,
   isBlank,
   shuffleOptions,
   visualSignature,
@@ -14,11 +15,11 @@ import {
 /**
  * The item bank — validated puzzles as data (data/bank/items.json, committed).
  *
- * The bank is the default serving path (instant quiz start; live generation is
- * the opt-in variety path) and the failure fallback. Loaded via a static JSON
- * import so it works identically on Vercel serverless with zero fs/tracing
- * config. Items are stored in canonical (unshuffled) option order for stable
- * diffs; `shuffleOptions` runs at serve time. Bank invariant (enforced by
+ * The bank is the deterministic generator's emergency fallback and regression
+ * corpus. Loaded via a static JSON import so it works identically on Vercel
+ * serverless with zero fs/tracing config. Items are stored in canonical
+ * (unshuffled) option order for stable diffs; `shuffleOptions` runs at serve
+ * time. Bank invariant (enforced by
  * scripts/bank-verify.ts and the topup CLI, not at runtime): every item has a
  * `rule` and passes `checkRule`.
  */
@@ -125,7 +126,7 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/** User-selectable difficulty profile for a quiz (chosen on the intro screen). */
+/** Internal difficulty profile used by generation, calibration, and fallback sampling. */
 export type DifficultyLevel = "easy" | "standard" | "hard";
 
 /**
@@ -139,9 +140,16 @@ export const DIFFICULTY_RAMPS: Record<DifficultyLevel, readonly number[]> = {
   hard: [3, 4, 4, 5, 5],
 };
 
+export const EXPANDED_DIFFICULTY_RAMPS: Record<DifficultyLevel, readonly number[]> = {
+  easy: [1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4],
+  standard: [2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5],
+  hard: [3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
+};
+
 /**
  * Sample a quiz from the bank: one item per ramp slot at the nearest available
- * difficulty, preferring types not yet covered (≥3 types with today's bank),
+ * difficulty, preferring types not yet covered (and enforcing full family coverage
+ * for hard mode when five families are available),
  * ascending difficulty order, serve-time option shuffle. Content-addressed ids
  * make uniqueness automatic.
  */
@@ -153,25 +161,44 @@ export function sampleQuiz(
   if (items.length < n) {
     throw new Error(`bank has ${items.length} items — need at least ${n} to sample a quiz`);
   }
-  const ramp = DIFFICULTY_RAMPS[level].slice(0, n);
+  const rampSource = n === 12 ? EXPANDED_DIFFICULTY_RAMPS : DIFFICULTY_RAMPS;
+  const ramp = rampSource[level].slice(0, n);
   while (ramp.length < n) ramp.push(ramp[ramp.length - 1] ?? 3);
+  const forceAllTypes = level === "hard" && n >= PUZZLE_TYPES.length;
+  const requiredTypes = forceAllTypes ? [...PUZZLE_TYPES] : [];
 
   const used = new Set<string>();
   const typesCovered = new Set<PuzzleType>();
+  const typeCounts = new Map<PuzzleType, number>();
   const chosen: BankItem[] = [];
   for (const target of ramp) {
     // Nearest available difficulty, widening the spread only when a bucket is exhausted.
+    const requiredType = requiredTypes.length > 0 ? requiredTypes.shift() : null;
     let pool: BankItem[] = [];
     for (let spread = 0; pool.length === 0 && spread <= 4; spread++) {
       pool = items.filter((i) => !used.has(i.fingerprint) && Math.abs(i.puzzle.difficulty - target) <= spread);
+      if (requiredType) {
+        const typed = pool.filter((i) => i.puzzle.type === requiredType);
+        if (typed.length > 0) {
+          pool = typed;
+          break;
+        }
+      }
     }
     if (pool.length === 0) {
       throw new Error(`bank cannot satisfy the "${level}" difficulty profile`);
     }
     const uncovered = pool.filter((i) => !typesCovered.has(i.puzzle.type));
-    const item = pickRandom(uncovered.length > 0 ? uncovered : pool);
+    const diversityPool = uncovered.length > 0
+      ? uncovered
+      : pool.filter((item) => {
+          const least = Math.min(...new Set(pool.map((candidate) => typeCounts.get(candidate.puzzle.type) ?? 0)));
+          return (typeCounts.get(item.puzzle.type) ?? 0) === least;
+        });
+    const item = pickRandom(diversityPool);
     used.add(item.fingerprint);
     typesCovered.add(item.puzzle.type);
+    typeCounts.set(item.puzzle.type, (typeCounts.get(item.puzzle.type) ?? 0) + 1);
     chosen.push(item);
   }
 

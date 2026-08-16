@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { PuzzleSet, PublicPuzzleSet } from "@/items/schema";
-import { GenerationMetadataSchema, toPublicPuzzleSet } from "@/items/schema";
+import type { PuzzleSet, PublicPuzzleSet, Visual } from "@/items/schema";
+import { GenerationMetadataSchema, REASONING_BANDS, toPublicPuzzleSet } from "@/items/schema";
 
 const TOKEN_VERSION = "v1";
 const TOKEN_AAD = Buffer.from("aiq.quiz-token.v1", "utf8");
@@ -14,7 +14,9 @@ const TokenItemSchema = z.object({
   id: z.string().min(1),
   answerIndex: z.number().int().min(0),
   optionCount: z.number().int().min(1),
-  explanation: z.string().min(3).max(240),
+  explanation: z.string().min(3).max(800),
+  familyId: z.string().min(1).optional(),
+  band: z.enum(REASONING_BANDS).optional(),
   /** Kept server-side for future human calibration by generator bucket. */
   generation: GenerationMetadataSchema.optional(),
 }).refine((item) => item.answerIndex < item.optionCount, {
@@ -26,7 +28,10 @@ export const QuizTokenPayloadSchema = z.object({
   version: z.literal(1),
   issuedAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().positive(),
-  items: z.array(TokenItemSchema).length(5),
+  // Five-item v1/v2 replays remain valid while current tests contain twelve.
+  items: z.array(TokenItemSchema).refine((items) => items.length === 5 || items.length === 12, {
+    message: "quiz token must contain 5 legacy items or 12 current items",
+  }),
 }).refine((payload) => payload.expiresAt > payload.issuedAt, {
   message: "expiresAt must be after issuedAt",
   path: ["expiresAt"],
@@ -34,7 +39,7 @@ export const QuizTokenPayloadSchema = z.object({
 export type QuizTokenPayload = z.infer<typeof QuizTokenPayloadSchema>;
 
 export type QuizDelivery = {
-  puzzles: PublicPuzzleSet;
+  puzzles: PublicPuzzleSet<Visual>;
   quizToken: string;
 };
 
@@ -159,7 +164,7 @@ export function openQuizToken(
 
 /** Build the public response and opaque answer key for a generated quiz. */
 export function createQuizDelivery(
-  puzzles: PuzzleSet,
+  puzzles: PuzzleSet<Visual>,
   options: { secret?: string; nowSeconds?: number; ttlSeconds?: number } = {},
 ): QuizDelivery {
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
@@ -176,6 +181,8 @@ export function createQuizDelivery(
       answerIndex: puzzle.answerIndex,
       optionCount: puzzle.options.length,
       explanation: puzzle.explanation,
+      familyId: puzzle.familyId,
+      band: puzzle.band,
       generation: puzzle.generation,
     })),
   };
