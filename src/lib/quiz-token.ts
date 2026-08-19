@@ -10,6 +10,17 @@ const TAG_BYTES = 16;
 const DEFAULT_TTL_SECONDS = 2 * 60 * 60;
 const MIN_SECRET_LENGTH = 32;
 
+/** The flat time budget: one countdown of 60 seconds per question. */
+export const SECONDS_PER_QUESTION = 60;
+
+/**
+ * How late a submission may be and still count as ordinary.
+ *
+ * This absorbs the round trip of the automatic submission and small clock
+ * differences between the browser and the server, and nothing else.
+ */
+export const GRACE_WINDOW_SECONDS = 10;
+
 const TokenItemSchema = z.object({
   id: z.string().min(1),
   answerIndex: z.number().int().min(0),
@@ -24,24 +35,68 @@ const TokenItemSchema = z.object({
   path: ["answerIndex"],
 });
 
+/** Lengths a token may hold: 5 and 30 are current, 12 is the retired profile. */
+export const ACCEPTED_ITEM_COUNTS = [5, 12, 30] as const;
+
 export const QuizTokenPayloadSchema = z.object({
   version: z.literal(1),
   issuedAt: z.number().int().nonnegative(),
+  /** When the answer key stops opening at all. Never the same thing as the deadline. */
   expiresAt: z.number().int().positive(),
-  // Five-item v1/v2 replays remain valid while current tests contain twelve.
-  items: z.array(TokenItemSchema).refine((items) => items.length === 5 || items.length === 12, {
-    message: "quiz token must contain 5 legacy items or 12 current items",
-  }),
+  /**
+   * When the test is over. Optional only so tokens issued before deadlines
+   * existed still open; those are scored without a late marker.
+   */
+  answerDeadline: z.number().int().positive().optional(),
+  // The two public lengths are 5 and 30. Twelve is the retired preview profile:
+  // tokens issued before the change must still open, replay, and score.
+  items: z.array(TokenItemSchema).refine(
+    (items) => (ACCEPTED_ITEM_COUNTS as readonly number[]).includes(items.length),
+    { message: "quiz token must contain 5, 12, or 30 items" },
+  ),
 }).refine((payload) => payload.expiresAt > payload.issuedAt, {
   message: "expiresAt must be after issuedAt",
   path: ["expiresAt"],
+}).refine((payload) => payload.answerDeadline === undefined ||
+  (payload.answerDeadline > payload.issuedAt && payload.answerDeadline <= payload.expiresAt), {
+  message: "answerDeadline must fall between issuedAt and expiresAt",
+  path: ["answerDeadline"],
 });
 export type QuizTokenPayload = z.infer<typeof QuizTokenPayloadSchema>;
 
 export type QuizDelivery = {
   puzzles: PublicPuzzleSet<Visual>;
   quizToken: string;
+  /**
+   * The same deadline the token seals, in plain epoch seconds, so the browser
+   * can run a countdown without reading token contents. The sealed copy is the
+   * one scoring trusts.
+   */
+  answerDeadline: number;
 };
+
+/** How a submission stands against the deadline the server issued. */
+export interface SubmissionTiming {
+  late: boolean;
+  secondsLate: number;
+}
+
+/**
+ * Judge a submission's timing on the server clock.
+ *
+ * Inside the grace window a submission is ordinary. Past it, it is still scored
+ * — throwing away a finished test over a slow network would be worse — but it
+ * carries a marker, and a marked result never enters calibration data.
+ */
+export function submissionTiming(
+  payload: QuizTokenPayload,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): SubmissionTiming {
+  if (payload.answerDeadline === undefined) return { late: false, secondsLate: 0 };
+  const past = nowSeconds - payload.answerDeadline;
+  if (past <= GRACE_WINDOW_SECONDS) return { late: false, secondsLate: 0 };
+  return { late: true, secondsLate: past };
+}
 
 export class QuizTokenError extends Error {
   constructor(
@@ -165,17 +220,28 @@ export function openQuizToken(
 /** Build the public response and opaque answer key for a generated quiz. */
 export function createQuizDelivery(
   puzzles: PuzzleSet<Visual>,
-  options: { secret?: string; nowSeconds?: number; ttlSeconds?: number } = {},
+  options: {
+    secret?: string;
+    nowSeconds?: number;
+    ttlSeconds?: number;
+    secondsPerQuestion?: number;
+  } = {},
 ): QuizDelivery {
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
   const ttl = options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
   if (!Number.isInteger(ttl) || ttl <= 0) {
     throw new Error("ttlSeconds must be a positive integer");
   }
+  const perQuestion = options.secondsPerQuestion ?? SECONDS_PER_QUESTION;
+  const answerDeadline = now + perQuestion * puzzles.length;
+  if (answerDeadline > now + ttl) {
+    throw new Error("the answer deadline must fall inside the token lifetime");
+  }
   const payload: QuizTokenPayload = {
     version: 1,
     issuedAt: now,
     expiresAt: now + ttl,
+    answerDeadline,
     items: puzzles.map((puzzle) => ({
       id: puzzle.id,
       answerIndex: puzzle.answerIndex,
@@ -189,5 +255,6 @@ export function createQuizDelivery(
   return {
     puzzles: toPublicPuzzleSet(puzzles),
     quizToken: sealQuizToken(payload, options.secret),
+    answerDeadline,
   };
 }

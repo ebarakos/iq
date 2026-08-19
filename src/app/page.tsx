@@ -6,11 +6,22 @@ import { StemView, VisualGraphic, describeVisual } from "@/items/render";
 import { apiFetch, formatApiError } from "@/lib/relay-client";
 
 type Source = "procedural" | "experimental" | "fallback";
-type QuizMode = "current" | "expanded-preview";
+
+/** The two public test lengths. Both are built from the expanded family pool. */
+type TestProfile = "short-5" | "long-30";
+
+const PROFILE_LABELS: Record<TestProfile, string> = {
+  "short-5": "5-question sample",
+  "long-30": "30-question test",
+};
 
 interface GenerateResponse {
   puzzles: PublicPuzzle<Visual>[];
   quizToken: string;
+  profile?: TestProfile;
+  /** Server-issued end of the test, in epoch seconds. The browser only displays it. */
+  answerDeadline?: number;
+  secondsPerQuestion?: number;
   source: Source;
   generatorVersion?: string;
   notice?: string;
@@ -30,6 +41,8 @@ interface SubmitResponse {
   score: number;
   total: number;
   results: ReviewResult[];
+  late?: boolean;
+  secondsLate?: number;
   breakdown?: {
     bands: Array<{ key: string; correct: number; attempted: number }>;
     families: Array<{ key: string; correct: number; attempted: number }>;
@@ -38,13 +51,22 @@ interface SubmitResponse {
 
 type Phase = "intro" | "loading" | "submitting" | "result" | "active" | "error";
 const START_TIMEOUT_MS = 20000;
-const SHOW_EXPANDED_PREVIEW = process.env.NODE_ENV !== "production";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
+/** Warn in the last tenth of the budget, and never later than the last 30 seconds. */
+function lowTimeThreshold(totalSeconds: number): number {
+  return Math.max(30, Math.round(totalSeconds / 10));
+}
+
+function formatClock(seconds: number): string {
+  const safe = Math.max(0, seconds);
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+}
+
 // Bump when the default test shape changes so an old in-progress quiz cannot
 // hide the new start experience after a reload.
-const SESSION_KEY = "aiq-test-v4";
+const SESSION_KEY = "aiq-test-v5";
 
 /** Validate a raw parsed object before restoring session state. */
 function isValidSession(v: unknown): v is {
@@ -53,6 +75,7 @@ function isValidSession(v: unknown): v is {
   answers: (number | null)[];
   current: number;
   quizToken: string;
+  answerDeadline?: number;
   review?: SubmitResponse;
 } {
   if (!v || typeof v !== "object") return false;
@@ -62,6 +85,7 @@ function isValidSession(v: unknown): v is {
   if (!Array.isArray(s.answers) || s.answers.length !== s.puzzles.length) return false;
   if (typeof s.current !== "number" || s.current < 0 || s.current >= s.puzzles.length) return false;
   if (typeof s.quizToken !== "string" || s.quizToken.length === 0) return false;
+  if (s.answerDeadline !== undefined && typeof s.answerDeadline !== "number") return false;
   if (s.phase === "result" && (!s.review || typeof s.review !== "object")) return false;
   return true;
 }
@@ -74,13 +98,20 @@ export default function Page() {
   const [review, setReview] = useState<SubmitResponse | null>(null);
   const [current, setCurrent] = useState(0);
   const [meta, setMeta] = useState<{
+    profile: TestProfile;
+    secondsPerQuestion: number;
     source: Source;
     generatorVersion?: string;
     notice?: string;
   } | null>(null);
+  // The countdown is restored from the deadline the server issued, never from a
+  // locally kept elapsed time, so a reload cannot hand anyone extra minutes.
+  const [answerDeadline, setAnswerDeadline] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const autoSubmitted = useRef(false);
   const [error, setError] = useState<string>("");
   const startRequestId = useRef(0);
-  const requestedMode = useRef<QuizMode>(SHOW_EXPANDED_PREVIEW ? "expanded-preview" : "current");
+  const requestedProfile = useRef<TestProfile>("long-30");
 
   function clearStoredSession() {
     try {
@@ -97,6 +128,9 @@ export default function Page() {
     setReview(null);
     setCurrent(0);
     setMeta(null);
+    setAnswerDeadline(null);
+    setSecondsLeft(null);
+    autoSubmitted.current = false;
   }
 
   function isTokenFailureMessage(message: string): boolean {
@@ -114,16 +148,25 @@ export default function Page() {
       setPuzzles(parsed.puzzles);
       setAnswers(parsed.answers);
       setQuizToken(parsed.quizToken);
+      if (typeof parsed.answerDeadline === "number") setAnswerDeadline(parsed.answerDeadline);
       if (parsed.review) setReview(parsed.review);
       setCurrent(parsed.current);
       if ("meta" in (parsed as Record<string, unknown>) && parsed && typeof parsed === "object") {
         const m = (parsed as Record<string, unknown>).meta;
         if (m && typeof m === "object") {
-          setMeta(m as {
+          const restored = m as {
+            profile?: TestProfile;
+            secondsPerQuestion?: number;
             source: Source;
             generatorVersion?: string;
             notice?: string;
+          };
+          setMeta({
+            ...restored,
+            profile: restored.profile ?? "long-30",
+            secondsPerQuestion: restored.secondsPerQuestion ?? 60,
           });
+          requestedProfile.current = restored.profile ?? "long-30";
         }
       }
     } catch {
@@ -135,17 +178,19 @@ export default function Page() {
   useEffect(() => {
     if (phase !== "active" && phase !== "result") return;
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ phase, puzzles, answers, current, meta, quizToken, review }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        phase, puzzles, answers, current, meta, quizToken, answerDeadline, review,
+      }));
     } catch {
       // Storage quota exceeded or private browsing restriction — ignore.
     }
-  }, [phase, puzzles, answers, current, meta, quizToken, review]);
+  }, [phase, puzzles, answers, current, meta, quizToken, answerDeadline, review]);
 
-  async function start(mode: QuizMode) {
+  async function start(profile: TestProfile) {
     if (phase === "loading" || phase === "submitting") return;
 
     const requestId = ++startRequestId.current;
-    requestedMode.current = mode;
+    requestedProfile.current = profile;
     clearStoredSession();
     resetLocalTestState();
 
@@ -161,7 +206,7 @@ export default function Page() {
 
     try {
       const data = await Promise.race([
-        apiFetch<GenerateResponse>("/api/generate", mode === "expanded-preview" ? { mode } : {}),
+        apiFetch<GenerateResponse>("/api/generate", { profile }),
         timeout,
       ]);
       if (startRequestId.current !== requestId) return;
@@ -170,7 +215,15 @@ export default function Page() {
       setPuzzles(data.puzzles);
       setQuizToken(data.quizToken);
       setAnswers(new Array(data.puzzles.length).fill(null));
+      const secondsPerQuestion = data.secondsPerQuestion ?? 60;
+      setAnswerDeadline(
+        data.answerDeadline ??
+          Math.floor(Date.now() / 1000) + secondsPerQuestion * data.puzzles.length,
+      );
+      autoSubmitted.current = false;
       setMeta({
+        profile: data.profile ?? profile,
+        secondsPerQuestion,
         source: data.source,
         generatorVersion: data.generatorVersion,
         notice: data.notice,
@@ -185,6 +238,31 @@ export default function Page() {
       if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
+
+  // One countdown for the whole test, driven by the wall clock so a paused tab
+  // or a slow render cannot slow it down.
+  useEffect(() => {
+    if (phase !== "active" || answerDeadline === null) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () => setSecondsLeft(Math.max(0, answerDeadline - Math.floor(Date.now() / 1000)));
+    tick();
+    const handle = setInterval(tick, 1000);
+    return () => clearInterval(handle);
+  }, [phase, answerDeadline]);
+
+  // Out of time: submit whatever is answered. Everything left blank scores wrong,
+  // exactly as it would have on an early submission.
+  useEffect(() => {
+    if (phase !== "active" || secondsLeft === null || secondsLeft > 0) return;
+    if (autoSubmitted.current) return;
+    autoSubmitted.current = true;
+    void finish();
+    // `finish` is stable in behaviour but recreated each render; re-running this
+    // effect on that alone would fire a second submission.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, secondsLeft]);
 
   async function finish() {
     setPhase("submitting");
@@ -235,10 +313,10 @@ export default function Page() {
         )}
       </header>
 
-      {phase === "intro" && <Intro onStart={start} showExpandedPreview={SHOW_EXPANDED_PREVIEW} />}
+      {phase === "intro" && <Intro onStart={start} />}
       {phase === "loading" && <Loading label="Creating a fresh test…" />}
       {phase === "submitting" && <Loading label="Scoring your answers…" />}
-      {phase === "error" && <ErrorView message={error} onRetry={() => start(requestedMode.current)} />}
+      {phase === "error" && <ErrorView message={error} onRetry={() => start(requestedProfile.current)} />}
 
       {phase === "active" && puzzles[current] && (
         <Solver
@@ -246,6 +324,8 @@ export default function Page() {
           index={current}
           total={puzzles.length}
           selected={answers[current]}
+          secondsLeft={secondsLeft}
+          lowTimeAt={lowTimeThreshold((meta?.secondsPerQuestion ?? 60) * puzzles.length)}
           // One concise banner on Q1 only — repeating it on every question reads
           // as a new warning each time (ui-qa finding).
           notice={current === 0 && (meta?.source === "fallback" || meta?.source === "experimental")
@@ -271,75 +351,48 @@ export default function Page() {
   );
 }
 
-function Intro({
-  onStart,
-  showExpandedPreview,
-}: {
-  onStart: (mode: QuizMode) => void;
-  showExpandedPreview: boolean;
-}) {
-  if (showExpandedPreview) {
-    return (
-      <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-        <h2 className="text-xl font-semibold">Try the varied 12-question preview</h2>
-        <p className="mt-3 text-gray-600">
-          This version moves from two visual warmups into composition, spatial constraints,
-          and rule transfer. It uses the new visual families and leaves out the opaque shape-and-count equation.
-        </p>
-        <p className="mt-2 text-sm text-amber-700">
-          Experimental: every answer passes the code checks, but the notation and difficulty are still being tested with people.
-        </p>
-        <p className="mt-4 text-xs text-gray-500">
-          Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
-        </p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onStart("expanded-preview")}
-            className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
-          >
-            Start the 12-question preview
-          </button>
-          <button
-            type="button"
-            onClick={() => onStart("current")}
-            className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
-          >
-            Use the compact 5-question test
-          </button>
-        </div>
-      </section>
-    );
-  }
-
+function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-      <h2 className="text-xl font-semibold">Take a fresh 5-question reasoning test</h2>
+      <h2 className="text-xl font-semibold">Take a fresh visual reasoning test</h2>
       <p className="mt-3 text-gray-600">
-        Five language-independent puzzles across matrices, sequences, analogies, odd-one-out,
-        and worked visual equations. Pick the option that fits each hidden rule; you&apos;ll get a
-        score and a per-question review at the end.
+        Every question is generated the moment you start, so nobody has seen it before. The test
+        moves from simple relations into composition, spatial constraints, and rule transfer.
+        There is no reading and no general knowledge — only what you can see.
       </p>
-      <p className="mt-2 text-sm text-gray-500">
-        This test always starts at the hard ramp (3, 4, 4, 5, 5). It measures performance on
-        fresh visual rules. It is not yet a standardized human IQ score.
+      <p className="mt-3 text-gray-600">
+        You get one minute per question as a single countdown for the whole test, so you can
+        spend longer on a hard question and make it back on an easy one. At the end you get a
+        raw score and a breakdown by reasoning family. It is not an IQ number.
       </p>
-
-      <div className="mt-6">
-        <p className="mt-2 text-xs text-gray-500">
-          Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
-        </p>
-      </div>
+      <p className="mt-3 text-sm text-amber-700">
+        Experimental: every answer passes the code checks, but the notation and difficulty are
+        still being tested with people.
+      </p>
+      <p className="mt-4 text-xs text-gray-500">
+        Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
+      </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => onStart("current")}
+          onClick={() => onStart("long-30")}
           className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
-          Start a fresh test
+          Start the 30-question test · 30 min
+        </button>
+        <button
+          type="button"
+          onClick={() => onStart("short-5")}
+          className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+        >
+          Try the 5-question sample · 5 min
         </button>
       </div>
+      <p className="mt-3 text-xs text-gray-500">
+        The short sample draws from the same question families in the same rising order — it is a
+        taste of the long test, not an easier one.
+      </p>
     </section>
   );
 }
@@ -405,12 +458,31 @@ function NoticeBanner({ notice }: { notice?: string }) {
   );
 }
 
+function Countdown({ secondsLeft, lowTimeAt }: { secondsLeft: number | null; lowTimeAt: number }) {
+  if (secondsLeft === null) return null;
+  const low = secondsLeft <= lowTimeAt;
+  return (
+    <span
+      role="timer"
+      aria-live={low ? "polite" : "off"}
+      aria-label={`${Math.floor(secondsLeft / 60)} minutes and ${secondsLeft % 60} seconds left in the test`}
+      className={`rounded-md px-2 py-0.5 font-mono text-sm tabular-nums ${
+        low ? "bg-amber-100 font-semibold text-amber-800" : "text-gray-500"
+      }`}
+    >
+      {formatClock(secondsLeft)} left
+    </span>
+  );
+}
+
 function Solver({
   puzzle,
   index,
   total,
   selected,
   notice,
+  secondsLeft,
+  lowTimeAt,
   onChoose,
   onPrev,
   onNext,
@@ -421,6 +493,8 @@ function Solver({
   total: number;
   selected: number | null;
   notice?: string;
+  secondsLeft: number | null;
+  lowTimeAt: number;
   onChoose: (i: number) => void;
   onPrev: () => void;
   onNext: () => void;
@@ -489,6 +563,7 @@ function Solver({
         <span>
           Question {index + 1} of {total}
         </span>
+        <Countdown secondsLeft={secondsLeft} lowTimeAt={lowTimeAt} />
       </div>
       <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
         <div className="h-full bg-gray-900 transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
@@ -572,6 +647,8 @@ function Result({
   answers: (number | null)[];
   review: SubmitResponse;
   meta: {
+    profile: TestProfile;
+    secondsPerQuestion: number;
     source: Source;
     generatorVersion?: string;
     notice?: string;
@@ -580,11 +657,11 @@ function Result({
 }) {
   const pct = Math.round((review.score / review.total) * 100);
 
+  const length = meta ? PROFILE_LABELS[meta.profile] : `${puzzles.length}-question test`;
+  const version = meta?.generatorVersion ? ` · ${meta.generatorVersion}` : "";
   const attribution = meta?.source === "fallback"
-    ? "From the verified reference set"
-    : meta?.source === "experimental"
-      ? `Experimental scene preview${meta?.generatorVersion ? ` · ${meta.generatorVersion}` : ""}`
-      : `Fresh deterministic test${meta?.generatorVersion ? ` · ${meta.generatorVersion}` : ""}`;
+    ? `${length} · from the verified reference set`
+    : `${length} · fresh generated questions${version}`;
 
   return (
     <section>
@@ -595,6 +672,12 @@ function Result({
           <span className="text-2xl font-normal text-gray-400"> / {puzzles.length}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
+        {review.late && (
+          <p className="mt-2 text-sm text-amber-700">
+            Submitted {formatClock(review.secondsLate ?? 0)} after time ran out. Your answers are
+            still scored; this result is left out of the family measurements.
+          </p>
+        )}
         <div className="mt-3 text-xs text-gray-400">{attribution}</div>
         <button
           onClick={onRestart}

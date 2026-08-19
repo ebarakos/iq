@@ -99,12 +99,41 @@ The deterministic generator becomes the default and fresh path. The static bank
 stays as a regression suite and emergency fallback. It is not described as a
 fresh test.
 
-## Expanded 12-question test architecture
+## Test architecture: two lengths, one ladder
 
-The next test profile is a fixed 12-question assessment. It is a design target,
-not a description of the current five-question generator. Its shape is part of
-the versioned generation contract: a generator version may change the families
-or their weights, but it must not silently change the number or order of bands.
+Decided 2026-08-16. The product ships **two test lengths, 5 and 30 questions**,
+and no others. The 12-question profile this plan previously described is
+withdrawn as a product target; the 12-slot assembler stays in the code only so
+that tokens already issued and golden-seed replays keep working.
+
+Both lengths are drawn from the same expanded family pool and use the same four
+difficulty bands. The short test is a sample of the long test's curve, not an
+easier test: someone who only wants a quick look gets the same kinds of question
+in the same rising order.
+
+The 2026-08-16 decisions in full:
+
+- **Two lengths, 5 and 30 questions.** Both are built from the expanded family
+  pool. There is no public difficulty selector; length is the only choice.
+- **A flat 60 seconds per question.** The budget is one whole-test countdown of
+  `60 seconds x question count` — 5 minutes for the short test, 30 minutes for
+  the long one — not a per-question timer. A taker may spend the time unevenly.
+- **A hard deadline with a grace window and a late marker.** The countdown ends
+  the test. "The answer deadline" below fixes the exact rule.
+- **Results are a raw score and a reasoning-family breakdown, and nothing else.**
+  No IQ number, no percentile, no normalized scale. `BRAINSTORM.md` Q8 records
+  why an IQ figure is not available to us.
+- **Code-valid families ship publicly behind a visible experimental label.**
+  This reverses the earlier rule that a family had to pass the human pilot
+  before it could appear in a public test. The pilot becomes a **retention
+  gate**: a family is public until pilot evidence removes it, instead of private
+  until pilot evidence admits it. Withdrawal happens through an environment
+  variable holding the excluded family ids, read at request time.
+
+The reason for the reversal is that the pilot needs real takers and the only way
+to reach real takers is to ship. The risk it accepts is that a confusing family
+is briefly public; the experimental label and the withdrawal list are what pay
+for that risk.
 
 ### Presentation contract
 
@@ -115,39 +144,85 @@ stages so the relationship is learned from a sequence rather than inferred from
 one unexplained board. After the full test is submitted, the review shows a rich
 plain-language explanation of the evidence, operations, and answer.
 
-Difficulty must rise across the test. The development preview uses 12 distinct
-families, does not decrease from difficulty 2 through 5, and reserves the last
-questions for rule switching and composed visible transformations. It remains
-development-only until the human-solvability gate and representative fallback
-bank are complete.
+Difficulty must rise across the test. Within a band the questions run from the
+lower to the higher validated difficulty bucket, and no band starts below the
+previous band's floor. The ramp is a property of the assembler, not of a
+hand-written table of one family per slot.
 
 ### Four fixed difficulty bands
 
-| Positions | Band | Item count | What the band tests | Intended time |
-|---|---|---:|---|---:|
-| 1–2 | Relational warmup | 2 | Notice one clear relation and apply it without hidden notation. | 2 minutes |
-| 3–6 | Composition | 4 | Combine, reverse, or interleave two demonstrated relations or transformations. | 6 minutes |
-| 7–10 | Constraint or spatial reasoning | 4 | Satisfy interacting board, set, geometry, or connectivity constraints. | 8 minutes |
-| 11–12 | Induction or transfer | 2 | Infer a demonstrated system or carry the same structure into a changed representation. | 4 minutes |
+| Band | 30-question positions | 5-question positions | What the band tests |
+|---|---|---|---|
+| Relational warmup | 1–5 | 1 | Notice one clear relation and apply it without hidden notation. |
+| Composition | 6–15 | 2 | Combine, reverse, or interleave two demonstrated relations or transformations. |
+| Constraint or spatial reasoning | 16–25 | 3–4 | Satisfy interacting board, set, geometry, or connectivity constraints. |
+| Induction or transfer | 26–30 | 5 | Infer a demonstrated system or carry the same structure into a changed representation. |
 
-The maximum intended completion time is **20 minutes**. This is a design budget,
-not an automatic failure deadline: the product records elapsed time and still
-accepts a later submission. Pilot data must show that a representative user can
-normally complete the full profile within the budget. If a band consistently
-exceeds its share, simplify or remove its families instead of extending the test
-or making the visuals denser.
+The long schedule is 5 / 10 / 10 / 5; the short schedule is 1 / 1 / 2 / 1. The
+short one is not exactly one sixth of the long one, because 5 questions do not
+divide into those shares evenly. The spare question goes to constraint and
+spatial reasoning, the band that carries the most weight in the long test.
+
+The whole-test budget is 60 seconds per question: **5 minutes** for the short
+test and **30 minutes** for the long one. Unlike the earlier 20-minute figure,
+this is an enforced deadline rather than only a design target. Pilot data must
+show that a representative taker normally finishes inside it. If a band
+consistently eats more than its share, simplify or remove its families instead
+of extending the test or making the visuals denser.
 
 Difficulty comes from the reasoning operation, not from smaller marks, more
 answer choices, unexplained symbols, or a larger board. Each item carries one
 primary reasoning-family tag matching its band and may carry secondary tags for
 diagnostics. The primary tag owns its score so one item is never counted twice.
 
+### The answer deadline
+
+The deadline is its own value, `answerDeadline`, and it is not the token's
+`expiresAt`. They answer two different questions:
+
+| Value | Question it answers | Set to |
+|---|---|---|
+| `answerDeadline` | Is this submission on time? | `issuedAt + 60 seconds x question count` |
+| `expiresAt` | May this token still be opened at all? | `issuedAt + the token lifetime` (2 hours) |
+
+`expiresAt` is always later than `answerDeadline`, and the two must never be
+collapsed into one field. A token whose deadline has passed can still be opened
+and scored — the deadline decides how the result is marked, the expiry decides
+whether the answer key can be read at all. Reusing `expiresAt` as the deadline
+would mean a taker could not be told their score after running out of time, and
+lengthening the token lifetime would silently lengthen the test.
+
+The deadline is returned in plain form beside the opaque token, so the browser
+can show a countdown without reading token contents. It is also sealed inside
+the token, and the sealed copy is the one that scoring trusts.
+
+One rule for lateness, used everywhere:
+
+- **The server clock decides.** The countdown in the browser is a display. A
+  wrong device clock, a paused tab, or an edited local value cannot buy time.
+- **Grace window: 10 seconds.** A submission arriving at or before
+  `answerDeadline + 10 seconds` is ordinary. It gets a normal score and carries
+  no marker. The window exists to absorb the round trip of the automatic
+  submission and small clock differences, and for no other reason.
+- **After that, the submission is late, not refused.** It is still scored, and
+  the response carries a late marker and the number of whole seconds past the
+  deadline. Refusing would throw away a finished test because of a slow network;
+  marking keeps the score honest.
+- **A late result never enters calibration data.** It is shown to the person who
+  took the test and excluded from any human or agent measurement.
+- **Running out of time is not a special score.** When the countdown reaches
+  zero the browser submits what it has, and unanswered questions count as wrong,
+  exactly as they would if the taker had submitted early. That submission
+  normally lands inside the grace window.
+
 ### Family eligibility by band
 
-This table defines where a family may appear after it passes the correctness and
-human-solvability gates below. A blank means that the family is not eligible for
-that band, even if its generator could produce an item at a superficially similar
-difficulty.
+This table defines where a family may appear once it passes the shared
+correctness contract below. A blank means the family is not eligible for that
+band, even if its generator could produce an item at a superficially similar
+difficulty. Since 2026-08-16 a code-valid family may be served publicly in an
+eligible band before its human pilot; what the pilot decides is whether it stays
+(see the retention gate above).
 
 | Family or query mode | Warmup | Composition | Constraint / spatial | Induction / transfer |
 |---|:---:|:---:|:---:|:---:|
@@ -166,61 +241,141 @@ difficulty.
 | Minimal repair |  |  | yes |  |
 | Rule switching or rule transfer |  |  |  | yes |
 
-The current modular visual-operator family is not eligible for this expanded
-profile. Its hidden shape indexes and parity conditions are implementation
-conventions rather than visibly learned operations. The transformation-machine
-replacement becomes eligible only after its gates pass; until then, the
-expanded profile remains unavailable rather than filling its final band with a
-weaker substitute.
+The old modular visual-operator family (`operator-induction-v1`) is not eligible
+in any band. Its hidden shape indexes and parity conditions are implementation
+conventions rather than visibly learned operations. Its replacement,
+`transformation-machine-v2`, shows every gate it applies and is eligible in
+induction/transfer. A band whose eligible families all get withdrawn makes the
+test length unavailable; the assembler must fail visibly rather than fill the
+band with a weaker substitute.
 
 An eligibility registry is the single assembly input. Each entry contains a
-versioned family id, allowed bands, primary reasoning-family tag, enabled status,
-validated difficulty buckets, per-item time budget, and fallback availability.
-Changing any of these generation semantics requires a new generator version.
+versioned family id, allowed bands, primary reasoning-family tag, promotion
+state, validated difficulty buckets, per-item time budget, and fallback
+availability. Assembly selects a family only in a band it is registered for; it
+never remaps a family into a different band. Changing any of these generation
+semantics requires a new generator version.
 
 ### Deterministic assembly and coverage
 
-`generateQuiz(seed, generatorVersion, expandedProfile)` must reproduce the same
-canonical 12 items, option order, and family order on every machine. Assembly
-uses stable child seeds for the schedule, each slot, candidate retries, and
-option shuffling. One family's rejection count must therefore not perturb later
-questions.
+`assembleExpandedQuiz(seed, profile, registry)` is a pure function.
+`profile` is `long-30` or `short-5`, and the generator version for both is
+`scene-families-v3`. The same seed, profile, and generator version reproduce the
+same items, the same family order, and the same option order on every machine.
+Assembly uses stable child seeds for the schedule, each slot, candidate retries,
+and option shuffling, so one family's rejection count never perturbs a later
+question. The 12-question `scene-families-v2` profile is withdrawn and its
+assembler is gone; the `procedural-v1`, `v2`, and `v3` assemblers in
+`src/items/generate.ts` stay untouched, because golden-seed replay tests depend
+on them.
 
 Assembly happens in this order:
 
-1. Filter the registry to families enabled for each band and difficulty bucket.
-2. Use the schedule child seed to choose all 12 family ids before generating any
-   item.
-3. Enforce the band counts and coverage rules on that schedule.
+1. Filter the registry to families that are code-valid or better in a band, and
+   drop every family id named in the withdrawal list.
+2. Use the schedule child seed to choose every family id for the whole test
+   before generating any item.
+3. Enforce the band counts and coverage rules below on that schedule.
 4. Generate each slot from its own child seed with a bounded retry budget.
-5. Reject duplicate program fingerprints, duplicate visual fingerprints, and
-   adjacent items with the same family or rule structure.
+5. Reject any item that repeats a visible puzzle already in the test, and any
+   whose difficulty does not match the bucket it was scheduled from.
 6. Shuffle choices from an item-specific child seed after the canonical answer
    is fixed.
 
-Every generated test must satisfy all of these coverage rules:
+A program fingerprint names a family's *rule structure*, not one instance: most
+families emit a single fingerprint across every seed. Requiring fingerprints to
+be unique across a test would therefore mean "each family at most once", which
+30 questions and 18 families cannot satisfy. Uniqueness is enforced on the
+visible puzzle instead, and the fingerprint stays what it always was — the
+calibration bucket key.
 
-- exactly 2 warmup, 4 composition, 4 constraint/spatial, and 2
-  induction/transfer items;
-- at least 6 distinct family ids overall;
-- no family may supply more than 2 questions;
-- the 2 warmups come from different families;
-- each four-item middle band contains at least 3 distinct families;
-- the 2 induction/transfer items come from different families; and
-- adjacent questions may not share a family or canonical rule structure.
+#### Band schedule
+
+| Profile | Warmup | Composition | Constraint / spatial | Induction / transfer | Total |
+|---|---:|---:|---:|---:|---:|
+| `long-30` | 5 | 10 | 10 | 5 | 30 |
+| `short-5` | 1 | 1 | 2 | 1 | 5 |
+
+The counts are part of the generator version. A new version may change them; a
+released one may not.
+
+#### Family coverage and repeat caps
+
+Within one band the schedule is **as even as the eligible pool allows**. With `n`
+questions in a band and `k` eligible families, every chosen family appears either
+`floor(n / k)` or `ceil(n / k)` times. That single rule fixes both the repeat cap
+and the distinct-family count, and it keeps working when a withdrawal shrinks the
+pool — nothing has to be re-tuned by hand.
+
+What it produces from the 18 currently code-valid families (2 warmup, 6
+composition, 6 constraint/spatial, 4 induction/transfer):
+
+| Profile | Band | Questions | Eligible families | Used | Most from one family |
+|---|---|---:|---:|---:|---:|
+| `long-30` | Warmup | 5 | 2 | 2 | 3 |
+| `long-30` | Composition | 10 | 6 | 6 | 2 |
+| `long-30` | Constraint / spatial | 10 | 6 | 6 | 2 |
+| `long-30` | Induction / transfer | 5 | 4 | 4 | 2 |
+| `short-5` | every band | 1 or 2 | 2–6 | 1 or 2 | 1 |
+
+A known thin spot: only two families are currently registered for warmup, so a
+`long-30` test fills five warmup questions from two generators whose rule
+structure does not vary — three of the five will share a rule with a different
+surface. Adding a third warmup family is the fix; until then, the ramp's first
+band is the weakest part of the long test.
+
+On top of the even split, every test must satisfy:
+
+- no two questions next to each other share a family id or a canonical rule
+  structure, inside a band or across a band boundary;
+- a `long-30` test uses at least 12 distinct family ids;
+- a `short-5` test uses 5 distinct family ids, one per question; and
+- no family supplies more than a fifth of any band, or more than a tenth of a
+  `long-30` test.
+
+#### Minimum eligible pool
+
+Withdrawing families must not quietly produce a thinner test. A `long-30` test
+requires at least **2 warmup, 4 composition, 4 constraint/spatial, and 3
+induction/transfer** families after withdrawals, and at least 12 in total. Below
+any of those, the long test is unavailable and the failure is loud: the server
+refuses the request and logs which band is short, rather than serving a test
+built from three families. A `short-5` test needs one eligible family per band.
+
+#### Measured cost
+
+Measured 2026-08-18 on the development machine, 100 fresh seeds per length:
+
+| Profile | Median | 95th percentile | Slowest | Failed assemblies |
+|---|---:|---:|---:|---:|
+| `short-5` | 3.6 ms | 8.7 ms | 27.0 ms | 0 of 100 |
+| `long-30` | 18.0 ms | 21.0 ms | 22.5 ms | 0 of 100 |
+
+Candidate rejection at the family-acceptance stage is 0% across 100 draws from
+each of the 18 families, so the retry budget only ever absorbs the rare repeat
+of a visible puzzle. A 30-question test is therefore built in about 20
+milliseconds and fits inside the browser's 20-second start timeout with four
+orders of magnitude to spare. Generating questions progressively would add a
+loading state, a partial-test failure mode, and more token bookkeeping to solve
+a problem the measurement says does not exist, so the test is still assembled in
+one request.
+
+#### When generation fails
 
 The assembler chooses a quota-valid family schedule first; it does not pool all
 accepted candidates and take whichever generators finish first. If a selected
 family exhausts its retry budget, use a validated fallback from the same family
-and band. If none exists, fail the expanded-profile request visibly. Do not
-silently substitute a more permissive family or return a narrower test. The
-emergency bank must obey the same band and coverage contract.
+and band. If none exists, fail the request visibly. Do not silently substitute a
+more permissive family or return a shorter test. The emergency bank must obey
+the same band schedule and coverage rules.
 
 ### Scoring and reporting
 
-The canonical overall score is the number correct out of 12. Also report the
-four band subtotals and one `correct / attempted` subtotal for every primary
-reasoning family present in that test. Family results are meaningful even when
+The canonical overall score is the raw number correct out of the test length —
+out of 5 or out of 30. It is never converted into an IQ number, a percentile, or
+any other normalized scale. Also report the four band subtotals and one
+`correct / attempted` subtotal for every primary reasoning family present in
+that test. Family results are meaningful even when
 the denominator is small, but they are descriptive and must not be presented as
 a standardized IQ subscore. Elapsed time is reported overall and by band; it
 does not change correctness.
@@ -274,9 +429,13 @@ the notation or that another human interpretation is unreasonable.
 ## Human-solvability promotion gate
 
 Families move through four states: **prototype → code-valid → pilot → enabled**.
-Only `enabled` family/band pairs may enter the expanded profile. Promotion is per
-band because a clear introductory form does not establish that a denser or
-composed form is readable.
+Since the 2026-08-16 retention decision, `code-valid` is enough to be served
+publicly behind the experimental label, and the gate below decides whether a
+family/band pair is kept and loses the label or is withdrawn. The states and
+thresholds are unchanged; only what a failing gate means has changed — it now
+removes a family that is already public instead of holding back one that is not.
+Judging is per band, because a clear introductory form does not establish that a
+denser or composed form is readable.
 
 For an initial pilot, prepare at least three representative items from every
 band in which the family seeks eligibility. Each item is attempted by at least
@@ -295,9 +454,19 @@ Promote a family/band pair only when all of the following hold:
   or a required visual distinction;
 - no repeated alternative interpretation produces a different defensible
   answer; any such interpretation returns the family to correctness design;
-- median solve time fits the band's per-item budget: 1 minute for warmup, 90
-  seconds for composition, and 2 minutes for constraint/spatial or
-  induction/transfer; and
+- median solve time fits the band's per-item budget: 25 seconds for warmup, 40
+  seconds for composition, 50 seconds for constraint/spatial, and 55 seconds for
+  induction/transfer. These replace the earlier 60 / 90 / 120 / 120 second
+  budgets, which were set when the 20-minute figure was a design target rather
+  than a deadline. Three of those four allowed a median above the flat 60-second
+  per-question budget, so a family could pass the gate and still make the
+  countdown unreachable. Two rules now bind together: no band's median may
+  exceed 60 seconds, and the band medians weighted by the 30-question schedule
+  (5 / 10 / 10 / 5) must not exceed 45 seconds per question — three quarters of
+  the budget, so that the slower half of takers also finishes. The four numbers
+  above weigh 1300 seconds against a 1800-second budget, or 43 seconds per
+  question. Any change to a band budget must be re-checked against both rules;
+  and
 - the observed ordering supports the intended curve: the promoted warmup bucket
   is easier and faster than the family's later promoted bucket. Do not infer a
   curve from provisional generator complexity alone.

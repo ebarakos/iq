@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { openQuizToken, QuizTokenError } from "@/lib/quiz-token";
+import { openQuizToken, QuizTokenError, submissionTiming } from "@/lib/quiz-token";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -54,6 +54,10 @@ export async function POST(req: Request) {
     };
   });
   const score = results.filter((result) => result.correct).length;
+  // The server clock decides. A submission inside the grace window is ordinary;
+  // a later one is still scored and shown, but marked and kept out of any
+  // calibration set.
+  const timing = submissionTiming(quiz);
   const summarize = (field: "familyId" | "band") => {
     const groups = new Map<string, { correct: number; attempted: number }>();
     for (const result of results) {
@@ -70,6 +74,8 @@ export async function POST(req: Request) {
     score,
     total: results.length,
     results,
+    late: timing.late,
+    secondsLate: timing.secondsLate,
     breakdown: { bands: summarize("band"), families: summarize("familyId") },
   });
 }

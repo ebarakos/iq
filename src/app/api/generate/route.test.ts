@@ -1,26 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+function generateRequest(body: Record<string, unknown>, from: string) {
+  return new NextRequest("http://localhost/api/generate", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": from },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("POST /api/generate", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("returns a fresh answer-free deterministic quiz with an opaque scoring token", async () => {
+  it("serves the 30-question test by default, answer-free and with an opaque token", async () => {
     vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
     vi.resetModules();
     const { POST } = await import("./route");
 
-    const request = new NextRequest("http://localhost/api/generate", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "generate-route-test" },
-      body: JSON.stringify({ difficulty: "hard" }),
-    });
-
-    const response = await POST(request);
+    const response = await POST(generateRequest({}, "generate-route-default"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.source).toBe("procedural");
-    expect(body.puzzles).toHaveLength(5);
+    expect(body.source).toBe("experimental");
+    expect(body.profile).toBe("long-30");
+    expect(body.generatorVersion).toBe("scene-families-v3");
+    expect(body.notice).toMatch(/still being tested/);
+    expect(body.puzzles).toHaveLength(30);
     expect(body.quizToken).toMatch(/^v1\./);
     for (const puzzle of body.puzzles) {
       expect(puzzle).not.toHaveProperty("answerIndex");
@@ -30,68 +35,60 @@ describe("POST /api/generate", () => {
     }
   });
 
-  it("returns the explicitly requested 12-question scene preview in development", async () => {
+  it("returns the answer deadline beside the opaque token", async () => {
     vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
     vi.resetModules();
     const { POST } = await import("./route");
 
-    const request = new NextRequest("http://localhost/api/generate", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "generate-route-preview" },
-      body: JSON.stringify({ mode: "expanded-preview" }),
-    });
+    const before = Math.floor(Date.now() / 1000);
+    const body = await (await POST(generateRequest({ profile: "short-5" }, "deadline-short"))).json();
 
-    const response = await POST(request);
+    expect(body.secondsPerQuestion).toBe(60);
+    // Five questions at a minute each, measured from when the server issued it.
+    expect(body.answerDeadline).toBeGreaterThanOrEqual(before + 300);
+    expect(body.answerDeadline).toBeLessThanOrEqual(before + 305);
+  });
+
+  it("serves the 5-question test when it is asked for", async () => {
+    vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
+    vi.resetModules();
+    const { POST } = await import("./route");
+
+    const response = await POST(generateRequest({ profile: "short-5" }, "generate-route-short"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.profile).toBe("short-5");
     expect(body.source).toBe("experimental");
-    expect(body.generatorVersion).toBe("scene-preview-v2");
-    expect(body.notice).toMatch(/still being tested/);
-    expect(body.puzzles).toHaveLength(12);
-    expect(new Set(body.puzzles.map((puzzle: { familyId?: string }) => puzzle.familyId)).size)
-      .toBeGreaterThanOrEqual(6);
-    for (const puzzle of body.puzzles) {
-      expect(puzzle).not.toHaveProperty("answerIndex");
-      expect(puzzle).not.toHaveProperty("rule");
-      expect(puzzle).not.toHaveProperty("explanation");
-    }
+    expect(body.puzzles).toHaveLength(5);
+    expect(new Set(body.puzzles.map((puzzle: { familyId?: string }) => puzzle.familyId)).size).toBe(5);
   });
 
-  it("does not expose the unpiloted preview in production without the explicit flag", async () => {
+  it("labels both lengths as experimental", async () => {
+    vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
     vi.stubEnv("NODE_ENV", "production");
     vi.resetModules();
     const { POST } = await import("./route");
 
-    const request = new NextRequest("http://localhost/api/generate", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "generate-route-preview-prod" },
-      body: JSON.stringify({ mode: "expanded-preview" }),
-    });
+    const short = await (await POST(generateRequest({ profile: "short-5" }, "notice-short"))).json();
+    const long = await (await POST(generateRequest({ profile: "long-30" }, "notice-long"))).json();
 
-    const response = await POST(request);
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toMatchObject({ message: expect.stringMatching(/not enabled/) });
+    expect(short.notice).toMatch(/still being tested/);
+    expect(long.notice).toMatch(/still being tested/);
   });
 
-  it("falls back to the bank when procedural generation fails", async () => {
+  it("falls back to the bank when assembly fails", async () => {
     vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
     vi.resetModules();
-    vi.doMock("@/items/generate", async () => ({
-      CURRENT_GENERATOR_VERSION: "procedural-v2" as const,
-      generateQuiz: vi.fn(() => {
+    vi.doMock("@/items/expanded-quiz", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("@/items/expanded-quiz")>()),
+      assembleExpandedQuiz: vi.fn(() => {
         throw new Error("forced fail");
       }),
     }));
     const { POST } = await import("./route");
 
-    const request = new NextRequest("http://localhost/api/generate", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "generate-route-fallback" },
-      body: JSON.stringify({ difficulty: "hard" }),
-    });
-
-    const response = await POST(request);
+    const response = await POST(generateRequest({ profile: "short-5" }, "generate-route-fallback"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -104,5 +101,6 @@ describe("POST /api/generate", () => {
       expect(puzzle).not.toHaveProperty("rule");
       expect(puzzle).not.toHaveProperty("explanation");
     }
+    vi.doUnmock("@/items/expanded-quiz");
   });
 });

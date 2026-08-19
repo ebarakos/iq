@@ -1,133 +1,157 @@
 import { describe, expect, it } from "vitest";
 import {
-  BAND_TIME_BUDGET_SECONDS,
   CURRENT_FAMILY_PROMOTION_REGISTRY,
-  type FamilyPromotionRegistry,
-  type PilotAggregate,
+  EXPANDED_PROFILE_BANDS,
 } from "./family-promotion";
 import {
-  assembleExpandedPreviewQuiz,
   assembleExpandedQuiz,
-  EXPANDED_QUIZ_SLOTS,
+  assertProfilesRemainBuildable,
+  BAND_SCHEDULE,
+  EXPANDED_GENERATOR_VERSION,
+  EXPANDED_PROFILES,
+  eligibleFamiliesForBand,
+  MINIMUM_DISTINCT_FAMILIES,
+  planExpandedSchedule,
+  questionCount,
+  type ExpandedProfile,
 } from "./expanded-quiz";
-import { VisualPuzzleSetSchema } from "./schema";
+import { VisualPuzzleSetSchema, visualElementSignature } from "./schema";
 
-function passingRegistry(): FamilyPromotionRegistry {
-  return CURRENT_FAMILY_PROMOTION_REGISTRY.map((family) => ({
-    ...family,
-    bands: family.bands.map((band) => {
-      if (band.validatedDifficultyBuckets.length === 0) return band;
-      const metrics: PilotAggregate = {
-        difficultyBuckets: band.validatedDifficultyBuckets,
-        representativeItemCount: 3,
-        attempts: 24,
-        minimumAttemptsPerItem: 8,
-        correctAttempts: 18,
-        intendedRelationshipDescriptions: 20,
-        notationMisunderstandingReports: 2,
-        medianSolveTimeSeconds: BAND_TIME_BUDGET_SECONDS[band.band] - 10,
-        allItemsPassCorrectnessContract: true,
-        hasRepeatedDefensibleAlternativeAnswer: false,
-        spatialLayoutChangesAcrossViewports: false,
-        desktopAttempts: 12,
-        mobileAttempts: 12,
-      };
-      return { ...band, state: "enabled" as const, fallbackAvailable: true, pilotMetrics: metrics };
-    }),
-  }));
+const REGISTRY = CURRENT_FAMILY_PROMOTION_REGISTRY;
+
+function bandOrder(profile: ExpandedProfile): string[] {
+  return EXPANDED_PROFILE_BANDS.flatMap((band) =>
+    new Array(BAND_SCHEDULE[profile][band]).fill(band) as string[]);
 }
 
+describe("eligible family pool", () => {
+  it("offers every code-valid family, each only in its registered band", () => {
+    const byBand = EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band));
+    expect(byBand.map((families) => families.length)).toEqual([2, 6, 6, 4]);
+    expect(byBand.flat()).toHaveLength(18);
+    expect(byBand.flat().every((family) => family.difficulty >= 2 && family.difficulty <= 5)).toBe(true);
+
+    const composition = eligibleFamiliesForBand(REGISTRY, "composition").map((f) => f.familyId);
+    expect(composition).toContain("spatial-transform-v1");
+    expect(eligibleFamiliesForBand(REGISTRY, "warmup").map((f) => f.familyId))
+      .not.toContain("spatial-transform-v1");
+  });
+
+  it("drops withdrawn families", () => {
+    const withdrawn = new Set(["relational-outlier-v1"]);
+    expect(eligibleFamiliesForBand(REGISTRY, "warmup", withdrawn).map((f) => f.familyId))
+      .toEqual(["relational-sequence-v1"]);
+  });
+});
+
 describe("assembleExpandedQuiz", () => {
-  it("refuses to assemble from code-valid families without human pilot evidence", () => {
-    expect(() => assembleExpandedQuiz("not-promoted", CURRENT_FAMILY_PROMOTION_REGISTRY))
-      .toThrow(/no eligible/);
+  it("uses the documented band schedule for both lengths", () => {
+    expect(questionCount("short-5")).toBe(5);
+    expect(questionCount("long-30")).toBe(30);
+    expect(EXPANDED_PROFILES).toEqual(["short-5", "long-30"]);
   });
 
-  it("assembles the deterministic 2/4/4/2 profile from fully enabled families", () => {
-    const registry = passingRegistry();
-    const first = assembleExpandedQuiz("expanded-scenes", registry);
-    const replay = assembleExpandedQuiz("expanded-scenes", registry);
+  for (const profile of EXPANDED_PROFILES) {
+    it(`assembles a deterministic ${profile} test from code-valid families`, () => {
+      const first = assembleExpandedQuiz(`${profile}-scenes`, profile, REGISTRY);
+      const replay = assembleExpandedQuiz(`${profile}-scenes`, profile, REGISTRY);
 
-    expect(replay).toEqual(first);
-    expect(VisualPuzzleSetSchema.safeParse(first).success).toBe(true);
-    expect(first).toHaveLength(12);
-    expect(EXPANDED_QUIZ_SLOTS.map((slot) => slot.band)).toEqual([
-      "warmup", "warmup",
-      "composition", "composition", "composition", "composition",
-      "constraint-spatial", "constraint-spatial", "constraint-spatial", "constraint-spatial",
-      "induction-transfer", "induction-transfer",
-    ]);
-
-    const familyIds = first.map((puzzle) => puzzle.generation!.familyId);
-    const counts = familyIds.reduce((map, familyId) =>
-      map.set(familyId, (map.get(familyId) ?? 0) + 1), new Map<string, number>());
-    expect(new Set(familyIds).size).toBeGreaterThanOrEqual(6);
-    expect(Math.max(...counts.values())).toBeLessThanOrEqual(2);
-    for (let index = 1; index < familyIds.length; index++) {
-      expect(familyIds[index]).not.toBe(familyIds[index - 1]);
-    }
-  });
-
-  it("requires a representative fallback for every selected family", () => {
-    const registry = passingRegistry().map((family) => ({
-      ...family,
-      bands: family.bands.map((band) =>
-        band.band === "induction-transfer" ? { ...band, fallbackAvailable: false } : band),
-    }));
-    expect(() => assembleExpandedQuiz("missing-fallback", registry)).toThrow(/verified fallback/);
-  });
-
-  it("keeps coverage and replay invariants across many expanded schedules", () => {
-    const registry = passingRegistry();
-    for (let seed = 0; seed < 30; seed++) {
-      const first = assembleExpandedQuiz(`schedule-${seed}`, registry);
-      const replay = assembleExpandedQuiz(`schedule-${seed}`, registry);
       expect(replay).toEqual(first);
-      const familyIds = first.map((puzzle) => puzzle.generation!.familyId);
-      const counts = familyIds.reduce((map, familyId) =>
-        map.set(familyId, (map.get(familyId) ?? 0) + 1), new Map<string, number>());
-      expect(new Set(familyIds).size).toBeGreaterThanOrEqual(6);
-      expect(Math.max(...counts.values())).toBeLessThanOrEqual(2);
-      for (let index = 1; index < familyIds.length; index++) {
-        expect(familyIds[index]).not.toBe(familyIds[index - 1]);
+      expect(VisualPuzzleSetSchema.safeParse(first).success).toBe(true);
+      expect(first).toHaveLength(questionCount(profile));
+      expect(first.map((puzzle) => puzzle.band)).toEqual(bandOrder(profile));
+      expect(first.every((puzzle) =>
+        puzzle.generation!.generatorVersion === EXPANDED_GENERATOR_VERSION)).toBe(true);
+      expect(first.every((puzzle) =>
+        puzzle.layout === "singleScene" ||
+        puzzle.stem.length === 0 ||
+        puzzle.stem.filter((panel) => !("blank" in panel)).length >= 2)).toBe(true);
+    });
+  }
+
+  it("keeps coverage, spread, and ramp invariants across many schedules", () => {
+    for (const profile of EXPANDED_PROFILES) {
+      for (let seed = 0; seed < 12; seed++) {
+        const quiz = assembleExpandedQuiz(`schedule-${seed}`, profile, REGISTRY);
+        const familyIds = quiz.map((puzzle) => puzzle.generation!.familyId);
+
+        expect(new Set(familyIds).size).toBeGreaterThanOrEqual(MINIMUM_DISTINCT_FAMILIES[profile]);
+        for (let index = 1; index < familyIds.length; index++) {
+          expect(familyIds[index]).not.toBe(familyIds[index - 1]);
+        }
+
+        // Even split: no family may take more than its share of a band.
+        for (const band of EXPANDED_PROFILE_BANDS) {
+          const inBand = quiz.filter((puzzle) => puzzle.band === band);
+          const pool = eligibleFamiliesForBand(REGISTRY, band).length;
+          const cap = Math.ceil(BAND_SCHEDULE[profile][band] / pool);
+          const counts = new Map<string, number>();
+          for (const puzzle of inBand) {
+            const id = puzzle.generation!.familyId;
+            counts.set(id, (counts.get(id) ?? 0) + 1);
+          }
+          expect(Math.max(...counts.values())).toBeLessThanOrEqual(cap);
+        }
+
+        // Rising ramp: each band's floor is at least the previous band's floor,
+        // and inside a band the repeat rule may cost at most two dips.
+        let previousFloor = 0;
+        for (const band of EXPANDED_PROFILE_BANDS) {
+          const difficulties = quiz
+            .filter((puzzle) => puzzle.band === band)
+            .map((puzzle) => puzzle.difficulty);
+          const floor = Math.min(...difficulties);
+          expect(floor).toBeGreaterThanOrEqual(previousFloor);
+          previousFloor = floor;
+          const dips = difficulties.filter((value, index) =>
+            index > 0 && value < difficulties[index - 1]).length;
+          expect(dips).toBeLessThanOrEqual(2);
+        }
       }
     }
   });
 
-  it("assembles an explicitly unpiloted preview without weakening the live gate", () => {
-    const first = assembleExpandedPreviewQuiz("preview-scenes", CURRENT_FAMILY_PROMOTION_REGISTRY);
-    const replay = assembleExpandedPreviewQuiz("preview-scenes", CURRENT_FAMILY_PROMOTION_REGISTRY);
-
-    expect(replay).toEqual(first);
-    expect(VisualPuzzleSetSchema.safeParse(first).success).toBe(true);
-    expect(first).toHaveLength(12);
-    expect(new Set(first.map((puzzle) => puzzle.familyId)).size).toBe(12);
-    expect(first.map((puzzle) => puzzle.band)).toEqual(EXPANDED_QUIZ_SLOTS.map((slot) => slot.band));
-    expect(first.map((puzzle) => puzzle.difficulty)).toEqual([2, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5]);
-    expect(first[0].familyId).toBe("relational-sequence-v1");
-    expect(first[1].familyId).toBe("spatial-transform-v1");
-    expect(first[10].familyId).toBe("rule-switching-v1");
-    expect(first[11]).toMatchObject({
-      familyId: "transformation-machine-v2",
-      layout: "machineTable",
-      difficulty: 5,
-    });
-    expect(first[11].stem).toHaveLength(12);
-    expect(() => assembleExpandedQuiz("preview-scenes", CURRENT_FAMILY_PROMOTION_REGISTRY))
-      .toThrow(/no eligible/);
-
-    for (let seed = 0; seed < 20; seed++) {
-      const preview = assembleExpandedPreviewQuiz(`preview-variety-${seed}`, CURRENT_FAMILY_PROMOTION_REGISTRY);
-      const familyIds = preview.map((puzzle) => puzzle.familyId);
-      expect(preview).toHaveLength(12);
-      expect(new Set(familyIds).size).toBe(12);
-      expect(preview.every((puzzle) =>
-        puzzle.stem.filter((panel) => !("blank" in panel)).length >= 2)).toBe(true);
-      expect(preview.every((puzzle) => puzzle.layout !== "singleScene")).toBe(true);
-      for (let index = 1; index < preview.length; index++) {
-        expect(preview[index].difficulty).toBeGreaterThanOrEqual(preview[index - 1].difficulty);
+  it("gives every option a distinct visual identity", () => {
+    // The agent harness shuffles options and maps the model's pick back by this
+    // identity, so two options that share one would silently mis-score a run.
+    for (const profile of EXPANDED_PROFILES) {
+      const quiz = assembleExpandedQuiz(`identity-${profile}`, profile, REGISTRY);
+      for (const puzzle of quiz) {
+        const identities = puzzle.options.map(visualElementSignature);
+        expect(new Set(identities).size).toBe(identities.length);
       }
-      expect(preview.some((puzzle) => puzzle.layout === "operatorTable")).toBe(false);
     }
+  });
+
+  it("plans the whole family schedule before generating anything", () => {
+    const schedule = planExpandedSchedule("plan-only", "long-30", REGISTRY);
+    expect(schedule).toHaveLength(30);
+    expect(schedule.map((entry) => entry.band)).toEqual(bandOrder("long-30"));
+  });
+
+  it("refuses a long test when withdrawals leave a band too thin", () => {
+    const withdrawn = new Set(["relational-outlier-v1"]);
+    expect(() => assembleExpandedQuiz("thin-warmup", "long-30", REGISTRY, withdrawn))
+      .toThrow(/at least 2 eligible warmup families but has 1/);
+  });
+
+  it("refuses a short test when a band has no family left", () => {
+    const withdrawn = new Set(["relational-sequence-v1", "relational-outlier-v1"]);
+    expect(() => assembleExpandedQuiz("no-warmup", "short-5", REGISTRY, withdrawn))
+      .toThrow(/at least 1 eligible warmup families but has 0/);
+  });
+
+  it("refuses to start when withdrawals leave a band too thin", () => {
+    expect(() => assertProfilesRemainBuildable(REGISTRY, new Set())).not.toThrow();
+    expect(() => assertProfilesRemainBuildable(REGISTRY, new Set(["relational-outlier-v1"])))
+      .toThrow(/long-30 needs 2 warmup families but only 1 remain/);
+    expect(() => assertProfilesRemainBuildable(
+      REGISTRY,
+      new Set(["relational-sequence-v1", "relational-outlier-v1"]),
+    )).toThrow(/short-5 needs 1 warmup families but only 0 remain/);
+  });
+
+  it("rejects an empty seed", () => {
+    expect(() => assembleExpandedQuiz("", "short-5", REGISTRY)).toThrow(/seed must not be empty/);
   });
 });

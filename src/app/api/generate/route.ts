@@ -1,10 +1,19 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { CURRENT_GENERATOR_VERSION, generateQuiz, type QuizProfile } from "@/items/generate";
 import { loadBank, sampleQuiz } from "@/items/bank";
-import { assembleExpandedPreviewQuiz } from "@/items/expanded-quiz";
-import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
-import { createQuizDelivery, QuizTokenError } from "@/lib/quiz-token";
+import {
+  assembleExpandedQuiz,
+  assertProfilesRemainBuildable,
+  EXPANDED_GENERATOR_VERSION,
+  questionCount,
+  type ExpandedProfile,
+} from "@/items/expanded-quiz";
+import {
+  CURRENT_FAMILY_PROMOTION_REGISTRY,
+  readWithdrawnFamilyIds,
+  unknownWithdrawnFamilyIds,
+} from "@/items/family-promotion";
+import { createQuizDelivery, QuizTokenError, SECONDS_PER_QUESTION } from "@/lib/quiz-token";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +21,28 @@ export const runtime = "nodejs";
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const hits = new Map<string, number[]>();
+
+const EXPERIMENTAL_NOTICE =
+  "Experimental: every answer passes the code checks, but the notation and difficulty are still being tested with people.";
+
+/**
+ * Check the withdrawal list once, at server start.
+ *
+ * A list that empties a band throws here, so the deployment fails on boot
+ * instead of serving a thinner test to whoever presses start first.
+ */
+const WITHDRAWN_FAMILY_IDS = readWithdrawnFamilyIds();
+assertProfilesRemainBuildable(CURRENT_FAMILY_PROMOTION_REGISTRY, WITHDRAWN_FAMILY_IDS);
+const UNKNOWN_WITHDRAWALS = unknownWithdrawnFamilyIds(
+  CURRENT_FAMILY_PROMOTION_REGISTRY,
+  WITHDRAWN_FAMILY_IDS,
+);
+if (UNKNOWN_WITHDRAWALS.length > 0) {
+  console.warn(
+    `generate: WITHDRAWN_FAMILY_IDS names families that do not exist — ${UNKNOWN_WITHDRAWALS.join(", ")}. ` +
+      "Check for a typo; these entries withdraw nothing.",
+  );
+}
 
 function allow(ip: string): boolean {
   const now = Date.now();
@@ -25,8 +56,9 @@ function allow(ip: string): boolean {
   return true;
 }
 
-function profile(value: unknown): QuizProfile {
-  return value === "easy" || value === "standard" || value === "hard" ? value : "hard";
+/** Both public lengths are built from the expanded family pool; long is the default. */
+function requestedProfile(value: unknown): ExpandedProfile {
+  return value === "short-5" || value === "short" ? "short-5" : "long-30";
 }
 
 /** POST /api/generate — create a fresh, reproducible, answer-safe quiz. */
@@ -39,47 +71,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = await req.json().catch(() => ({})) as { difficulty?: unknown; mode?: unknown };
-  const difficulty = profile(body.difficulty);
-  const wantsPreview = body.mode === "expanded-preview";
-
-  if (
-    wantsPreview &&
-    process.env.NODE_ENV === "production" &&
-    process.env.ENABLE_SCENE_PROTOTYPES !== "1"
-  ) {
-    return NextResponse.json({ message: "The expanded preview is not enabled on this deployment." }, { status: 404 });
-  }
-
-  if (wantsPreview) {
-    try {
-      const seed = randomBytes(16).toString("hex");
-      const puzzles = assembleExpandedPreviewQuiz(seed, CURRENT_FAMILY_PROMOTION_REGISTRY);
-      const delivery = createQuizDelivery(puzzles);
-      return NextResponse.json({
-        ...delivery,
-        source: "experimental",
-        generatorVersion: "scene-preview-v2",
-        notice: "Experimental preview: these families pass code checks but are still being tested for human clarity and difficulty.",
-      });
-    } catch (error) {
-      if (error instanceof QuizTokenError && error.code === "configuration") {
-        console.error("generate: quiz token configuration error —", error.message);
-        return NextResponse.json({ message: "Test scoring is temporarily unavailable." }, { status: 500 });
-      }
-      console.error("generate: expanded preview failed —", error);
-      return NextResponse.json({ message: "Could not create the expanded preview. Please try again." }, { status: 500 });
-    }
-  }
+  const body = await req.json().catch(() => ({})) as { profile?: unknown };
+  const profile = requestedProfile(body.profile);
 
   try {
     const seed = randomBytes(16).toString("hex");
-    const puzzles = generateQuiz(seed, CURRENT_GENERATOR_VERSION, difficulty);
+    const puzzles = assembleExpandedQuiz(
+      seed,
+      profile,
+      CURRENT_FAMILY_PROMOTION_REGISTRY,
+      WITHDRAWN_FAMILY_IDS,
+    );
     const delivery = createQuizDelivery(puzzles);
     return NextResponse.json({
       ...delivery,
-      source: "procedural",
-      generatorVersion: CURRENT_GENERATOR_VERSION,
+      profile,
+      secondsPerQuestion: SECONDS_PER_QUESTION,
+      source: "experimental",
+      generatorVersion: EXPANDED_GENERATOR_VERSION,
+      notice: EXPERIMENTAL_NOTICE,
     });
   } catch (error) {
     if (error instanceof QuizTokenError && error.code === "configuration") {
@@ -87,13 +97,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Test scoring is temporarily unavailable." }, { status: 500 });
     }
 
-    console.error("generate: procedural generation failed —", error);
+    console.error(`generate: ${profile} assembly failed —`, error);
     try {
-      const compactFallback = loadBank().filter((item) => item.puzzle.type !== "operatorInduction");
-      const { puzzles } = sampleQuiz(compactFallback, 5, difficulty);
+      const fallback = loadBank().filter((item) =>
+        item.puzzle.type !== "operatorInduction" &&
+        !(item.puzzle.familyId && WITHDRAWN_FAMILY_IDS.has(item.puzzle.familyId)));
+      const { puzzles } = sampleQuiz(fallback, questionCount(profile), "hard");
       const delivery = createQuizDelivery(puzzles);
       return NextResponse.json({
         ...delivery,
+        profile,
+        secondsPerQuestion: SECONDS_PER_QUESTION,
         source: "fallback",
         notice: "Fresh generation failed, so this test comes from the verified reference set.",
       });

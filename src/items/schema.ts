@@ -431,11 +431,13 @@ export function toPublicPuzzle<V extends Visual>(puzzle: Puzzle<V>): PublicPuzzl
   return VisualPublicPuzzleSchema.parse(puzzle) as PublicPuzzle<V>;
 }
 
-/** Replay supports legacy five-item tests and current twelve-item tests. */
+/** The two public lengths are 5 and 30; 12 is the retired profile, kept for replay. */
+export const PUZZLE_SET_LENGTHS = [5, 12, 30] as const;
+
 const RuntimePuzzleSetSchema = z
   .array(VisualPuzzleSchema)
-  .refine((set) => set.length === 5 || set.length === 12, {
-    message: "a puzzle set must contain exactly 5 legacy items or 12 current items",
+  .refine((set) => (PUZZLE_SET_LENGTHS as readonly number[]).includes(set.length), {
+    message: "a puzzle set must contain 5, 12, or 30 items",
   })
   .refine((set) => new Set(set.map((p) => p.id)).size === set.length, {
     message: "puzzle ids must be unique across the set",
@@ -446,8 +448,8 @@ export const VisualPuzzleSetSchema = RuntimePuzzleSetSchema as z.ZodType<PuzzleS
 
 const RuntimePublicPuzzleSetSchema = z
   .array(VisualPublicPuzzleSchema)
-  .refine((set) => set.length === 5 || set.length === 12, {
-    message: "a public puzzle set must contain exactly 5 legacy items or 12 current items",
+  .refine((set) => (PUZZLE_SET_LENGTHS as readonly number[]).includes(set.length), {
+    message: "a public puzzle set must contain 5, 12, or 30 items",
   })
   .refine((set) => new Set(set.map((p) => p.id)).size === set.length, {
     message: "puzzle ids must be unique across the set",

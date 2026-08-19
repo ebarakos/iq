@@ -4,12 +4,14 @@
 > administers them to **both humans and AI agents**, using a difficulty ladder to
 > separate "human-hard" from "agent-hard" items.
 
-**Status: GENERATED REASONING-TEST PROTOTYPE.** Each five-item test is generated
-from a fresh seed, validated in pure code, served without answers, and scored
-server-side. The fifth family, visual operator induction, accepts an item only
-when every program consistent with its examples predicts the same answer. Human
-and model calibration by generator bucket remains open; this is not yet a
-standardized IQ score. See [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
+**Status: GENERATED REASONING-TEST PROTOTYPE.** The app serves two test lengths,
+5 and 30 questions, both drawn from the same pool of 18 visual reasoning families
+and the same four difficulty bands. Every test is generated from a fresh seed,
+validated in pure code, served without answers, and scored server-side against a
+whole-test deadline of 60 seconds per question. Families ship behind a visible
+experimental label: they pass the code-correctness contract, but no human pilot
+has run, so nothing is calibrated and this is not a standardized IQ score. See
+[docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ### Running the MVP
 
@@ -28,12 +30,19 @@ not make model calls. See `.env.example`.
   public contract.
 - `src/items/rules.ts` — rule DSL, semantic validator, bounded operator grammar,
   and full-grammar uniqueness oracle.
-- `src/items/generate.ts` — versioned seeded generator. `procedural-v1` is
-  replayable; `procedural-v2` produces one item from each of five families.
+- `src/items/scene-families.ts` — the 18 visual families and their acceptance
+  contract; `src/items/family-promotion.ts` — which family may appear in which
+  band, and the `WITHDRAWN_FAMILY_IDS` list that pulls one back out.
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v3`): band
+  schedules of 5/10/10/5 and 1/1/2/1, an even family split per band, and an
+  easiest-first order that never repeats a family back to back.
+- `src/items/generate.ts` — the older seeded generator. `procedural-v1`, `v2`,
+  and `v3` are kept only so golden-seed replay tests keep passing.
 - `src/items/render.tsx` / `src/items/compose-image.tsx` — deterministic human
   and agent renderers over the same visible data.
 - `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
-  token and server-side scoring.
+  token, the answer deadline (separate from the token's own expiry), and
+  server-side scoring with a late marker.
 - `src/lib/solver.ts` / `scripts/agent-run.ts` — relay-backed vision-model
   harness using the same answer-free public puzzle.
 - `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by

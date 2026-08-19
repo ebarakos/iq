@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CURRENT_GENERATOR_VERSION, generateQuiz } from "@/items/generate";
-import { createQuizDelivery } from "@/lib/quiz-token";
+import { createQuizDelivery, GRACE_WINDOW_SECONDS } from "@/lib/quiz-token";
 import { POST } from "./route";
 
 const SECRET = "test-only-submit-route-secret-with-at-least-32-characters";
@@ -16,6 +16,30 @@ function request(body: unknown): Request {
 describe("POST /api/submit", () => {
   beforeEach(() => vi.stubEnv("QUIZ_TOKEN_SECRET", SECRET));
   afterEach(() => vi.unstubAllEnvs());
+
+  it("marks a submission late only after the grace window, and still scores it", async () => {
+    const quiz = generateQuiz("submit-route-late", CURRENT_GENERATOR_VERSION, "standard");
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const { quizToken, answerDeadline } = createQuizDelivery(quiz, { secret: SECRET, nowSeconds: issuedAt });
+    const answers = quiz.map((puzzle) => puzzle.answerIndex);
+
+    const onTime = await (await POST(request({ quizToken, answers }))).json();
+    expect(onTime.late).toBe(false);
+    expect(onTime.secondsLate).toBe(0);
+    expect(onTime.score).toBe(quiz.length);
+
+    // Move the clock past the deadline and its grace window.
+    vi.useFakeTimers();
+    vi.setSystemTime((answerDeadline + GRACE_WINDOW_SECONDS + 30) * 1000);
+    const late = await (await POST(request({ quizToken, answers }))).json();
+    vi.useRealTimers();
+
+    expect(late.late).toBe(true);
+    expect(late.secondsLate).toBe(GRACE_WINDOW_SECONDS + 30);
+    // A late test is still scored and still explained; only the marker changes.
+    expect(late.score).toBe(quiz.length);
+    expect(late.results).toHaveLength(quiz.length);
+  });
 
   it("scores on the server and returns review data without the hidden rules", async () => {
     const quiz = generateQuiz("submit-route-test", CURRENT_GENERATOR_VERSION, "standard");

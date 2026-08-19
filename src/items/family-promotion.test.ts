@@ -4,8 +4,10 @@ import {
   CURRENT_FAMILY_PROMOTION_REGISTRY,
   evaluatePilotAggregate,
   promoteFamilyBand,
+  readWithdrawnFamilyIds,
   recordPilotAggregate,
   selectEnabledFamilyBands,
+  unknownWithdrawnFamilyIds,
   type ExpandedProfileBand,
   type FamilyBandPromotion,
   type FamilyPromotionRegistry,
@@ -176,13 +178,14 @@ describe("human-solvability gate", () => {
       state: "enabled" as const,
       pilotMetrics: passingMetrics("warmup", {
         correctAttempts: 18,
-        medianSolveTimeSeconds: 50,
+        // Both medians stay inside their band budgets so only the curve rule fails.
+        medianSolveTimeSeconds: 20,
       }),
     };
     const later = pilotPromotion("composition", {
       pilotMetrics: passingMetrics("composition", {
         correctAttempts: 20,
-        medianSolveTimeSeconds: 45,
+        medianSolveTimeSeconds: 15,
       }),
     });
 
@@ -230,5 +233,22 @@ describe("expanded-profile family selection", () => {
       },
     ]);
     expect(selectEnabledFamilyBands(registry, "composition", "unknown-bucket")).toEqual([]);
+  });
+});
+
+describe("family withdrawal", () => {
+  it("reads a comma or space separated list and ignores empty entries", () => {
+    expect([...readWithdrawnFamilyIds({ WITHDRAWN_FAMILY_IDS: " topology-path-v1, ,minimal-repair-v1 " })])
+      .toEqual(["topology-path-v1", "minimal-repair-v1"]);
+    expect([...readWithdrawnFamilyIds({ WITHDRAWN_FAMILY_IDS: "fold-punch-v1 rule-switching-v1" })])
+      .toEqual(["fold-punch-v1", "rule-switching-v1"]);
+    expect(readWithdrawnFamilyIds({}).size).toBe(0);
+    expect(readWithdrawnFamilyIds({ WITHDRAWN_FAMILY_IDS: "  " }).size).toBe(0);
+  });
+
+  it("names withdrawn ids that match no registered family", () => {
+    const withdrawn = new Set(["topology-path-v1", "typo-family-v9"]);
+    expect(unknownWithdrawnFamilyIds(CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn))
+      .toEqual(["typo-family-v9"]);
   });
 });

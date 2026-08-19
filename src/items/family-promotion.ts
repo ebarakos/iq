@@ -18,11 +18,20 @@ export type ExpandedProfileBand = (typeof EXPANDED_PROFILE_BANDS)[number];
 export const PROMOTION_STATES = ["prototype", "code-valid", "pilot", "enabled"] as const;
 export type PromotionState = (typeof PROMOTION_STATES)[number];
 
+/**
+ * Median solve time a family/band pair may take and still be kept.
+ *
+ * These fit inside the flat 60-second-per-question budget: no band exceeds 60
+ * seconds on its own, and weighted by the 30-question schedule (5 / 10 / 10 / 5)
+ * they come to 1300 of the 1800 available seconds, leaving headroom for the
+ * slower half of takers. Changing a number here means re-checking both rules —
+ * see the human-solvability gate in docs/plans/deterministic-novel-tests.md.
+ */
 export const BAND_TIME_BUDGET_SECONDS: Readonly<Record<ExpandedProfileBand, number>> = {
-  warmup: 60,
-  composition: 90,
-  "constraint-spatial": 120,
-  "induction-transfer": 120,
+  warmup: 25,
+  composition: 40,
+  "constraint-spatial": 50,
+  "induction-transfer": 55,
 };
 
 export const PILOT_THRESHOLDS = {
@@ -236,6 +245,34 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("constraint-spatial", ["minimal-repair-d5"])],
   },
 ];
+
+/**
+ * Families pulled out of every public test, named in `WITHDRAWN_FAMILY_IDS`.
+ *
+ * This is the only safety net now that code-valid families are served before
+ * their human pilot: a family that confuses people is removed by editing one
+ * environment variable, with no deploy and no code change. The value is a list
+ * of family ids separated by commas or whitespace.
+ */
+export function readWithdrawnFamilyIds(
+  env: Record<string, string | undefined> = process.env,
+): Set<string> {
+  return new Set(
+    (env.WITHDRAWN_FAMILY_IDS ?? "")
+      .split(/[,\s]+/)
+      .map((familyId) => familyId.trim())
+      .filter((familyId) => familyId.length > 0),
+  );
+}
+
+/** Withdrawn ids that no family in the registry answers to — almost always a typo. */
+export function unknownWithdrawnFamilyIds(
+  registry: FamilyPromotionRegistry,
+  withdrawnFamilyIds: ReadonlySet<string>,
+): string[] {
+  const known = new Set(registry.map((family) => family.familyId));
+  return [...withdrawnFamilyIds].filter((familyId) => !known.has(familyId)).sort();
+}
 
 function rate(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
