@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
 
 function generateRequest(body: Record<string, unknown>, from: string) {
   return new NextRequest("http://localhost/api/generate", {
@@ -23,7 +24,7 @@ describe("POST /api/generate", () => {
     expect(response.status).toBe(200);
     expect(body.source).toBe("experimental");
     expect(body.profile).toBe("long-30");
-    expect(body.generatorVersion).toBe("scene-families-v3");
+    expect(body.generatorVersion).toBe(EXPANDED_GENERATOR_VERSION);
     expect(body.notice).toMatch(/still being tested/);
     expect(body.puzzles).toHaveLength(30);
     expect(body.quizToken).toMatch(/^v1\./);
@@ -77,7 +78,10 @@ describe("POST /api/generate", () => {
     expect(long.notice).toMatch(/still being tested/);
   });
 
-  it("falls back to the bank when assembly fails", async () => {
+  it.each([
+    ["short-5", 5],
+    ["long-30", 30],
+  ] as const)("falls back to the bank for %s when assembly fails", async (profile, expectedCount) => {
     vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
     vi.resetModules();
     vi.doMock("@/items/expanded-quiz", async (importOriginal) => ({
@@ -88,13 +92,13 @@ describe("POST /api/generate", () => {
     }));
     const { POST } = await import("./route");
 
-    const response = await POST(generateRequest({ profile: "short-5" }, "generate-route-fallback"));
+    const response = await POST(generateRequest({ profile }, `generate-route-fallback-${profile}`));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.source).toBe("fallback");
     expect(body.notice).toMatch(/verified reference set/);
-    expect(body.puzzles).toHaveLength(5);
+    expect(body.puzzles).toHaveLength(expectedCount);
     expect(body.puzzles.some((puzzle: { type?: string }) => puzzle.type === "operatorInduction")).toBe(false);
     for (const puzzle of body.puzzles) {
       expect(puzzle).not.toHaveProperty("answerIndex");

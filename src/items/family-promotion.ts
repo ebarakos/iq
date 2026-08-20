@@ -155,92 +155,108 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [],
   },
   {
-    familyId: "relational-sequence-v1",
+    familyId: "relational-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
     bands: [codeValidBand("warmup", ["relational-sequence-d2"])],
   },
   {
-    familyId: "compositional-analogy-v1",
+    familyId: "attribute-pairing-v1",
+    primaryReasoningFamily: "analogical-relation",
+    bands: [codeValidBand("warmup", ["attribute-pairing-d2"])],
+  },
+  {
+    familyId: "compositional-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
     bands: [codeValidBand("composition", ["compositional-analogy-d3"])],
   },
   {
-    familyId: "containment-analogy-v1",
+    familyId: "containment-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
     bands: [codeValidBand("composition", ["containment-analogy-d4"])],
   },
   {
-    familyId: "relational-outlier-v1",
+    familyId: "composed-transform-v1",
+    primaryReasoningFamily: "ordered-composition",
+    bands: [codeValidBand("composition", ["composed-transform-d4"])],
+  },
+  {
+    familyId: "relational-outlier-v2",
     primaryReasoningFamily: "classification-relation",
     bands: [codeValidBand("warmup", ["relational-outlier-d2"])],
   },
   {
-    familyId: "relational-matrix-v1",
+    familyId: "relational-matrix-v2",
     primaryReasoningFamily: "matrix-reasoning",
     bands: [codeValidBand("constraint-spatial", ["relational-matrix-d4"])],
   },
   {
-    familyId: "visual-set-algebra-v1",
+    familyId: "visual-set-algebra-v2",
     primaryReasoningFamily: "set-combination",
     bands: [codeValidBand("constraint-spatial", ["visual-set-algebra-d4"])],
   },
   {
-    familyId: "constraint-mosaic-v1",
+    familyId: "constraint-mosaic-v2",
     primaryReasoningFamily: "constraint-satisfaction",
     bands: [codeValidBand("constraint-spatial", ["constraint-mosaic-d4"])],
   },
   {
+    // Withdrawn by the human gate on 2026-08-19: the rendered item admits two
+    // defensible readings — continue the visible line, or form the closed
+    // shape — so the answer is ambiguous by sight. Both calibrated models also
+    // scored 0% on it. No eligible band until a redesign passes the gate.
     familyId: "topology-path-v1",
     primaryReasoningFamily: "topological-reasoning",
-    bands: [codeValidBand("constraint-spatial", ["topology-path-d4"])],
+    bands: [],
   },
   {
-    familyId: "spatial-transform-v1",
+    familyId: "spatial-transform-v2",
     primaryReasoningFamily: "spatial-transformation",
     bands: [codeValidBand("composition", ["spatial-transform-d3"])],
   },
   {
-    familyId: "transformation-machine-v2",
+    familyId: "transformation-machine-v3",
     primaryReasoningFamily: "operator-induction",
     bands: [codeValidBand("induction-transfer", ["transformation-machine-d5"])],
   },
   {
-    familyId: "rule-switching-v1",
+    familyId: "rule-switching-v2",
     primaryReasoningFamily: "operator-induction",
     bands: [codeValidBand("induction-transfer", ["rule-switching-d5"])],
   },
   {
-    familyId: "concept-induction-v1",
+    familyId: "concept-induction-v2",
     primaryReasoningFamily: "concept-induction",
     bands: [codeValidBand("induction-transfer", ["concept-induction-d5"])],
   },
   {
-    familyId: "fold-punch-v1",
+    familyId: "fold-punch-v2",
     primaryReasoningFamily: "spatial-transformation",
     bands: [codeValidBand("constraint-spatial", ["fold-punch-d4"])],
   },
   {
-    familyId: "inverse-fold-punch-v1",
+    familyId: "inverse-fold-punch-v2",
     primaryReasoningFamily: "spatial-transformation",
     bands: [codeValidBand("induction-transfer", ["inverse-fold-punch-d5"])],
   },
   {
-    familyId: "interleaved-sequence-v1",
+    familyId: "interleaved-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
     bands: [codeValidBand("composition", ["interleaved-sequence-d4"])],
   },
   {
-    familyId: "second-order-sequence-v1",
+    familyId: "second-order-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
     bands: [codeValidBand("composition", ["second-order-sequence-d4"])],
   },
   {
-    familyId: "inverse-analogy-v1",
+    familyId: "inverse-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
     bands: [codeValidBand("composition", ["inverse-analogy-d4"])],
   },
   {
-    familyId: "minimal-repair-v1",
+    // v3 preserves v2's visible 3x3 repair while varying which categorical
+    // attribute and complete board pattern define the repair program.
+    familyId: "minimal-repair-v3",
     primaryReasoningFamily: "constraint-satisfaction",
     bands: [codeValidBand("constraint-spatial", ["minimal-repair-d5"])],
   },
@@ -263,6 +279,20 @@ export function readWithdrawnFamilyIds(
       .map((familyId) => familyId.trim())
       .filter((familyId) => familyId.length > 0),
   );
+}
+
+/**
+ * The canonical, order-independent form of a withdrawal list.
+ *
+ * Anything that replays generated content later must store this alongside the
+ * seed. The withdrawal list is an input to `assembleExpandedQuiz`, so a record
+ * that keeps seed, profile, and generator version but not this cannot be
+ * replayed once an operator withdraws a family.
+ */
+export function normalizeWithdrawnFamilyIds(
+  withdrawnFamilyIds: Iterable<string>,
+): string[] {
+  return [...new Set(withdrawnFamilyIds)].sort();
 }
 
 /** Withdrawn ids that no family in the registry answers to — almost always a typo. */

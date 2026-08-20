@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it, beforeAll } from "vitest";
+import { AttemptFileSchema } from "./attempts";
 import {
   agentTag,
   MIN_ATTEMPTS,
@@ -14,6 +15,8 @@ import {
   applyCalibration,
   type ItemRollup,
   type AgentTag,
+  harnessFailureAttemptFiles,
+  reportableAttemptFiles,
 } from "./calibrate";
 import { loadBank, type BankItem } from "@/items/bank";
 import type { AttemptFile } from "./attempts";
@@ -415,5 +418,112 @@ describe("promptVersions", () => {
     expect(promptVersions).toContain("solver-v1");
     expect(promptVersions).toContain("solver-v2");
     expect(promptVersions).toHaveLength(2);
+  });
+});
+
+describe("trustworthy run filtering and outcome reporting", () => {
+  it("excludes partial runs by default and includes them only on explicit opt-in", () => {
+    const complete = makeFile({ runId: "complete" }, [{ itemId: "item-easy", correct: true }]);
+    const partial = {
+      ...makeFile({ runId: "partial" }, [{ itemId: "item-easy", correct: false }]),
+      plannedAttempts: 2,
+      completedAttempts: 1,
+      status: "partial" as const,
+    };
+
+    expect(buildReport([complete, partial], [B_EASY, B_HARD]).imageRollups[0].solveRate).toBe(1);
+    expect(buildReport([complete, partial], [B_EASY, B_HARD], { includePartial: true })
+      .imageRollups[0].solveRate).toBe(0.5);
+  });
+
+  it("keeps every outcome in strict accuracy while reporting failure classes separately", () => {
+    const file = makeFile({}, [
+      { itemId: "item-easy", correct: true },
+      { itemId: "item-easy", correct: false },
+      { itemId: "item-easy", correct: false },
+      { itemId: "item-easy", correct: false },
+      { itemId: "item-easy", correct: false },
+      { itemId: "item-easy", correct: false },
+    ]);
+    file.attempts = [
+      { ...file.attempts[0], chosen: 0, correct: true, outcome: "correct" },
+      { ...file.attempts[1], chosen: 1, outcome: "wrong" },
+      { ...file.attempts[2], chosen: null, outcome: "unparseable" },
+      { ...file.attempts[3], chosen: null, outcome: "timeout" },
+      { ...file.attempts[4], chosen: null, outcome: "rate-limit" },
+      { ...file.attempts[5], chosen: null, outcome: "transport-failure" },
+    ];
+
+    const report = buildReport([file], [B_EASY, B_HARD]);
+    expect(report.imageRollups[0]).toMatchObject({ attempts: 6, solveRate: 1 / 6 });
+    expect(report.outcomes.image).toEqual({
+      correct: 1,
+      wrong: 1,
+      unparseable: 1,
+      timeout: 1,
+      "rate-limit": 1,
+      "transport-failure": 1,
+    });
+  });
+});
+
+describe("runs that never reached the model", () => {
+  function file(overrides: Partial<AttemptFile> = {}): AttemptFile {
+    return AttemptFileSchema.parse({
+      runId: "r1",
+      startedAt: new Date(0).toISOString(),
+      provider: "p",
+      model: "m",
+      channel: "image",
+      promptVersion: "solver-v2",
+      attempts: [{
+        itemId: "i1",
+        chosen: null,
+        correct: false,
+        outcome: "transport-failure",
+        latencyMs: 0,
+        ts: new Date(0).toISOString(),
+      }],
+      ...overrides,
+    });
+  }
+
+  it("excludes an all-transport-failure run even when it is labelled complete", () => {
+    // The two 2026-08-19 v5 artifacts were written this way before the `failed`
+    // status existed; reported naively they read as 0% on every family.
+    const mislabelled = file({ status: "complete" });
+    expect(reportableAttemptFiles([mislabelled])).toEqual([]);
+    expect(reportableAttemptFiles([mislabelled], true)).toEqual([]);
+    expect(harnessFailureAttemptFiles([mislabelled])).toHaveLength(1);
+  });
+
+  it("keeps a run that reached the model, including one with wrong answers", () => {
+    const answered = file({
+      attempts: [{
+        itemId: "i1",
+        chosen: 1,
+        correct: false,
+        outcome: "wrong",
+        latencyMs: 5,
+        ts: new Date(0).toISOString(),
+      }],
+    });
+    expect(reportableAttemptFiles([answered])).toHaveLength(1);
+    expect(harnessFailureAttemptFiles([answered])).toEqual([]);
+  });
+
+  it("still reports artifacts written before the status field existed", () => {
+    const legacy = file({
+      attempts: [{
+        itemId: "i1",
+        chosen: 0,
+        correct: true,
+        outcome: "correct",
+        latencyMs: 5,
+        ts: new Date(0).toISOString(),
+      }],
+    });
+    expect(legacy.status).toBeUndefined();
+    expect(reportableAttemptFiles([legacy])).toHaveLength(1);
   });
 });

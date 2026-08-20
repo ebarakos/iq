@@ -33,6 +33,7 @@ playwright-report/
 
 # qa runner logs
 qa/runs/
+.claude/runs/
 
 # os / editor
 .DS_Store

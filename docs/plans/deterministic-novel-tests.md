@@ -61,7 +61,10 @@ Novelty has three separate levels:
    baseline.
 2. **Fresh composition.** The item combines known primitives in a program and
    parameter arrangement not present in the reference corpus. The generator
-   records a canonical program fingerprint so this can be measured.
+   records a canonical program fingerprint so this can be measured. Achieved
+   locally on 2026-08-19: all 19 eligible scene families emit at least eight
+   fingerprints across the fixed 200-seed probe, including ordered two-step
+   composition. See [mechanism-variety.md](mechanism-variety.md).
 3. **Held-out family.** A private evaluation family uses a rule structure that
    was not present in public practice items. This is the strongest test of
    transfer, but it requires private server configuration, human calibration,
@@ -139,7 +142,11 @@ for that risk.
 
 The solving screen shows only the visual evidence and answer options. It must
 not name the family, describe the hidden relationship, or provide a
-puzzle-specific instruction. Every item shows at least two worked scenes or
+puzzle-specific instruction. One exemption, added 2026-08-19 after a taker met
+a visually empty question: an item with no stem (the odd-one-out form, whose
+evidence lives in its options) shows one fixed, rule-neutral task line — "All
+options but one follow the same hidden rule — pick the one that breaks it." The
+line states the task form and never the relationship. Every item shows at least two worked scenes or
 stages so the relationship is learned from a sequence rather than inferred from
 one unexplained board. After the full test is submitted, the review shows a rich
 plain-language explanation of the evidence, operations, and answer.
@@ -234,7 +241,7 @@ eligible band before its human pilot; what the pilot decides is whether it stays
 | Relational matrix |  | yes | yes |  |
 | Visual set algebra |  | yes | yes |  |
 | Constraint mosaic |  |  | yes |  |
-| Topology or path completion |  |  | yes |  |
+| Topology or path completion (withdrawn 2026-08-19: ambiguous by sight) |  |  |  |  |
 | Transformation machine |  | yes |  | yes |
 | Fold, punch, reflection, or rotation |  |  | yes | yes |
 | Visual concept induction |  |  |  | yes |
@@ -260,7 +267,8 @@ semantics requires a new generator version.
 
 `assembleExpandedQuiz(seed, profile, registry)` is a pure function.
 `profile` is `long-30` or `short-5`, and the generator version for both is
-`scene-families-v3`. The same seed, profile, and generator version reproduce the
+`scene-families-v6`. The same seed, profile, generator version, and withdrawal
+list reproduce the
 same items, the same family order, and the same option order on every machine.
 Assembly uses stable child seeds for the schedule, each slot, candidate retries,
 and option shuffling, so one family's rejection count never perturbs a later
@@ -411,7 +419,9 @@ satisfies the same contract:
    answer.
 5. **Witnessed distractors.** Every wrong choice is the prediction of a concrete
    failed rule, omitted step, reversed operation, or violated constraint. Tests
-   retain the failure witness.
+   retain the failure witness. Every item offers `OPTIONS_PER_ITEM` choices
+   (`src/items/schema.ts`), so a family whose rule grammar cannot produce that
+   many witnessed near misses has to be widened rather than shipped short.
 6. **Visual integrity.** Choices are distinct in rendered meaning, no two
    choices render identically, meaningful cues are visible at normal desktop and
    mobile sizes, and decorative or unused cues are rejected.
@@ -515,7 +525,8 @@ candidate item:
 2. Keep only programs that explain every worked row.
 3. Apply every surviving program to the query.
 4. Accept the item only when all survivors predict the same visual answer.
-5. Create distractors from near-miss programs that fail at least one worked row.
+5. Create distractors from near-miss programs that fail at least one worked row,
+   enough of them to fill the option list.
 
 This proves answer uniqueness within the declared hypothesis space. Human pilots
 remain the check for plausible interpretations outside that space.

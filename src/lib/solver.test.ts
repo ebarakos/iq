@@ -90,10 +90,18 @@ describe("AttemptFileSchema round-trip", () => {
       model: "vision-model",
       channel: "image" as const,
       promptVersion: SOLVER_PROMPT_VERSION,
+      source: "generated" as const,
+      profile: "long-30",
+      runSeed: "probe-a",
+      generatorVersion: "scene-families-v5",
+      plannedAttempts: 1,
+      completedAttempts: 1,
+      status: "complete" as const,
       attempts: [{
         itemId: "gen-sequence-12345678",
         chosen: 1,
         correct: true,
+        outcome: "correct" as const,
         latencyMs: 500,
         attemptBudget: 1,
         costUsd: 0.0012,
@@ -120,6 +128,14 @@ describe("AttemptFileSchema round-trip", () => {
     expect(AttemptFileSchema.safeParse({
       ...artifact,
       attempts: [{ ...artifact.attempts[0], costUsd: -1 }],
+    }).success).toBe(false);
+    expect(AttemptFileSchema.safeParse({
+      ...artifact,
+      completedAttempts: 0,
+    }).success).toBe(false);
+    expect(AttemptFileSchema.safeParse({
+      ...artifact,
+      attempts: [{ ...artifact.attempts[0], correct: false, outcome: "correct" }],
     }).success).toBe(false);
   });
 });

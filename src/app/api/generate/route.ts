@@ -1,11 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { loadBank, sampleQuiz } from "@/items/bank";
+import { loadBank, sampleExpandedBankQuiz } from "@/items/bank";
 import {
   assembleExpandedQuiz,
   assertProfilesRemainBuildable,
   EXPANDED_GENERATOR_VERSION,
-  questionCount,
   type ExpandedProfile,
 } from "@/items/expanded-quiz";
 import {
@@ -73,9 +72,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({})) as { profile?: unknown };
   const profile = requestedProfile(body.profile);
+  const seed = randomBytes(16).toString("hex");
 
   try {
-    const seed = randomBytes(16).toString("hex");
     const puzzles = assembleExpandedQuiz(
       seed,
       profile,
@@ -102,7 +101,13 @@ export async function POST(req: NextRequest) {
       const fallback = loadBank().filter((item) =>
         item.puzzle.type !== "operatorInduction" &&
         !(item.puzzle.familyId && WITHDRAWN_FAMILY_IDS.has(item.puzzle.familyId)));
-      const { puzzles } = sampleQuiz(fallback, questionCount(profile), "hard");
+      const { puzzles } = sampleExpandedBankQuiz(
+        fallback,
+        profile,
+        seed,
+        CURRENT_FAMILY_PROMOTION_REGISTRY,
+        WITHDRAWN_FAMILY_IDS,
+      );
       const delivery = createQuizDelivery(puzzles);
       return NextResponse.json({
         ...delivery,

@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { sceneSignature, type Scene, type SceneToken } from "./schema";
 import {
   applySceneBinary,
+  applySceneCompositionPrimitive,
   applySceneExpression,
+  applySceneOrderedComposition,
   applySceneUnary,
   enumerateSceneConcepts,
+  enumerateSceneOrderedCompositions,
   enumerateSceneUnaryOperations,
   sceneProgramFits,
   sceneSatisfiesConcept,
@@ -102,6 +105,27 @@ describe("scene grammar", () => {
       object: { fill: "solid" },
     });
     expect(sceneProgramFits(expression, [{ inputs: [input], output: output! }])).toBe(true);
+  });
+
+  it("enumerates and applies visible ordered compositions", () => {
+    const programs = enumerateSceneOrderedCompositions();
+    expect(programs).toHaveLength(16);
+    expect(new Set(programs.map((program) => JSON.stringify(program))).size).toBe(16);
+    const input = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 2, column: 0, object: token("square") },
+    ]);
+    const program = programs[0];
+    const answer = applySceneOrderedComposition(input, program);
+    const reversed = applySceneOrderedComposition(input, { first: program.second, second: program.first });
+    expect(answer).not.toBeNull();
+    expect(reversed).not.toBeNull();
+    expect(sceneSignature(answer!)).not.toBe(sceneSignature(reversed!));
+    expect(applySceneCompositionPrimitive(input, {
+      kind: "setFillAt",
+      at: { row: 0, column: 0 },
+      fill: "half",
+    })?.objects[0].object).toMatchObject({ fill: "half" });
   });
 
   it("enumerates and evaluates the complete bounded relation grammar", () => {

@@ -71,7 +71,7 @@ describe("family promotion registry", () => {
       CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "operator-induction-v1")?.bands,
     ).toEqual([]);
     expect(
-      CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "transformation-machine-v2")?.bands[0],
+      CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "transformation-machine-v3")?.bands[0],
     ).toMatchObject({ state: "code-valid", band: "induction-transfer" });
     expect(selectEnabledFamilyBands(CURRENT_FAMILY_PROMOTION_REGISTRY, "warmup", "warmup-d1")).toEqual([]);
   });

@@ -7,7 +7,15 @@
  * arrives (calibrate.ts gains a data source, not a rewrite).
  */
 
-import type { Attempt, AttemptFile } from "./attempts";
+import {
+  ATTEMPT_OUTCOMES,
+  generatorVersionOf,
+  outcomeOf,
+  type Attempt,
+  type AttemptFile,
+  type AttemptOutcome,
+  hasModelEvidence,
+} from "./attempts";
 import type { BankItem } from "@/items/bank";
 
 // ---------------------------------------------------------------------------
@@ -73,6 +81,10 @@ export interface DifficultyTagMatrix {
 export interface CalibrationReport {
   /** Distinct promptVersion strings seen across all attempt files. */
   promptVersions: string[];
+  /** Distinct run-level generator populations represented in this report. */
+  generatorVersions: string[];
+  /** Strict accuracy keeps every outcome in its denominator; these counts expose why attempts failed. */
+  outcomes: Record<"image" | "symbolic", Record<AttemptOutcome, number>>;
   /** Headline rollups: channel === "image". */
   imageRollups: ItemRollup[];
   /** Secondary/diagnostic rollups: channel === "symbolic". */
@@ -92,6 +104,11 @@ export interface CalibrationReport {
    * Reported but never crash-worthy.
    */
   orphanItemIds: string[];
+}
+
+export interface BuildReportOptions {
+  /** Partial runs are excluded by default so interrupted prefixes cannot bias evidence. */
+  includePartial?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +175,37 @@ function aggregateByChannel(
   return map;
 }
 
+export function reportableAttemptFiles(
+  files: readonly AttemptFile[],
+  includePartial = false,
+): AttemptFile[] {
+  // A run with no model answers is excluded unconditionally — `--include-partial`
+  // widens the population for diagnostics, it does not license reporting a run
+  // that never reached the model as though it measured the items.
+  // `status` is optional: artifacts written before it existed are treated as
+  // complete, exactly as they were before this filter gained the evidence check.
+  return files.filter((file) =>
+    hasModelEvidence(file) && (includePartial || file.status !== "partial"));
+}
+
+/** Runs that recorded attempts but never reached the model. */
+export function harnessFailureAttemptFiles(files: readonly AttemptFile[]): AttemptFile[] {
+  return files.filter((file) => !hasModelEvidence(file));
+}
+
+function outcomeCounts(
+  files: readonly AttemptFile[],
+  channel: "image" | "symbolic",
+): Record<AttemptOutcome, number> {
+  const counts = Object.fromEntries(ATTEMPT_OUTCOMES.map((outcome) => [outcome, 0])) as
+    Record<AttemptOutcome, number>;
+  for (const file of files) {
+    if (file.channel !== channel) continue;
+    for (const attempt of file.attempts) counts[outcomeOf(attempt)] += 1;
+  }
+  return counts;
+}
+
 /** Convert the aggregated map to a list of ItemRollups. */
 function toRollups(
   agg: Map<string, AggregateEntry>,
@@ -217,27 +265,31 @@ function toBucketRollups(agg: Map<string, AggregateEntry>): BucketRollup[] {
  * Build the full calibration report from a set of attempt files and the
  * current bank items.
  *
- * When multiple promptVersions are present the caller (scripts/report.ts)
- * should split files by promptVersion and call buildReport once per version,
- * then print per-version sections. buildReport itself still aggregates whatever
- * files it is given — it never silently hides version diversity, but exposes
- * them in promptVersions so the script can warn and group.
+ * The caller (scripts/report.ts) splits files by both prompt and generator
+ * version before calling this function. buildReport exposes both version sets
+ * as a second guard against silently mixing incompatible populations.
  */
-export function buildReport(files: AttemptFile[], bank: BankItem[]): CalibrationReport {
+export function buildReport(
+  files: AttemptFile[],
+  bank: BankItem[],
+  options: BuildReportOptions = {},
+): CalibrationReport {
+  const reportFiles = reportableAttemptFiles(files, options.includePartial);
   // --- promptVersions ---
-  const promptVersions = [...new Set(files.map((f) => f.promptVersion))].sort();
+  const promptVersions = [...new Set(reportFiles.map((f) => f.promptVersion))].sort();
+  const generatorVersions = [...new Set(reportFiles.map(generatorVersionOf))].sort();
 
   // --- aggregation ---
-  const imageAgg = aggregateByChannel(files, "image");
-  const symbolicAgg = aggregateByChannel(files, "symbolic");
+  const imageAgg = aggregateByChannel(reportFiles, "image");
+  const symbolicAgg = aggregateByChannel(reportFiles, "symbolic");
 
   const imageRollups = toRollups(imageAgg);
   const symbolicRollups = toRollups(symbolicAgg);
   const imageBucketRollups = toBucketRollups(
-    aggregateByChannel(files, "image", (attempt) => attempt.generation?.featureBucket),
+    aggregateByChannel(reportFiles, "image", (attempt) => attempt.generation?.featureBucket),
   );
   const symbolicBucketRollups = toBucketRollups(
-    aggregateByChannel(files, "symbolic", (attempt) => attempt.generation?.featureBucket),
+    aggregateByChannel(reportFiles, "symbolic", (attempt) => attempt.generation?.featureBucket),
   );
 
   // --- orphan detection ---
@@ -358,6 +410,11 @@ export function buildReport(files: AttemptFile[], bank: BankItem[]): Calibration
 
   return {
     promptVersions,
+    generatorVersions,
+    outcomes: {
+      image: outcomeCounts(reportFiles, "image"),
+      symbolic: outcomeCounts(reportFiles, "symbolic"),
+    },
     imageRollups,
     symbolicRollups,
     imageBucketRollups,

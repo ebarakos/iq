@@ -11,7 +11,7 @@ describe("prototype answer route", () => {
     const { POST } = await import("./route");
     const response = await POST(new Request("http://localhost/api/prototypes/answer", {
       method: "POST",
-      body: JSON.stringify({ itemId: "relational-sequence-v1:r1", selectedOption: 0 }),
+      body: JSON.stringify({ itemId: "relational-sequence-v2:r1", selectedOption: 0 }),
     }));
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -25,7 +25,7 @@ describe("prototype answer route", () => {
     const { POST } = await import("./route");
     const response = await POST(new Request("http://localhost/api/prototypes/answer", {
       method: "POST",
-      body: JSON.stringify({ itemId: "relational-sequence-v1:r1", selectedOption: 0 }),
+      body: JSON.stringify({ itemId: "relational-sequence-v2:r1", selectedOption: 0 }),
     }));
     expect(response.status).toBe(404);
   });

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PublicPuzzle, Visual } from "@/items/schema";
 import { StemView, VisualGraphic, describeVisual } from "@/items/render";
+import { countUnansweredAnswers, needsBlankSubmissionConfirmation } from "@/lib/quiz-progress";
 import { apiFetch, formatApiError } from "@/lib/relay-client";
 
 type Source = "procedural" | "experimental" | "fallback";
@@ -258,13 +259,18 @@ export default function Page() {
     if (phase !== "active" || secondsLeft === null || secondsLeft > 0) return;
     if (autoSubmitted.current) return;
     autoSubmitted.current = true;
-    void finish();
+    void finish(true);
     // `finish` is stable in behaviour but recreated each render; re-running this
     // effect on that alone would fire a second submission.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, secondsLeft]);
 
-  async function finish() {
+  async function finish(automatic = false) {
+    const unanswered = countUnansweredAnswers(answers);
+    if (needsBlankSubmissionConfirmation(answers, automatic)) {
+      const questionLabel = unanswered === 1 ? "question" : "questions";
+      if (!window.confirm(`You have ${unanswered} unanswered ${questionLabel}. Submit anyway?`)) return;
+    }
     setPhase("submitting");
     setError("");
     try {
@@ -324,6 +330,7 @@ export default function Page() {
           index={current}
           total={puzzles.length}
           selected={answers[current]}
+          answers={answers}
           secondsLeft={secondsLeft}
           lowTimeAt={lowTimeThreshold((meta?.secondsPerQuestion ?? 60) * puzzles.length)}
           // One concise banner on Q1 only — repeating it on every question reads
@@ -334,6 +341,7 @@ export default function Page() {
           onChoose={choose}
           onPrev={() => setCurrent((c) => Math.max(0, c - 1))}
           onNext={() => setCurrent((c) => Math.min(puzzles.length - 1, c + 1))}
+          onGoTo={setCurrent}
           onFinish={finish}
         />
       )}
@@ -356,9 +364,9 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
       <h2 className="text-xl font-semibold">Take a fresh visual reasoning test</h2>
       <p className="mt-3 text-gray-600">
-        Every question is generated the moment you start, so nobody has seen it before. The test
-        moves from simple relations into composition, spatial constraints, and rule transfer.
-        There is no reading and no general knowledge — only what you can see.
+        Each test starts from a fresh random seed. The test moves from simple relations into
+        composition, spatial constraints, and rule transfer. There is no reading and no general
+        knowledge — only what you can see.
       </p>
       <p className="mt-3 text-gray-600">
         You get one minute per question as a single countdown for the whole test, so you can
@@ -424,24 +432,26 @@ function ErrorView({ message, onRetry }: { message: string; onRetry: () => void 
 
 function puzzleTypeLabel(puzzle: PublicPuzzle<Visual>): string {
   const familyLabels: Record<string, string> = {
-    "relational-sequence-v1": "relational sequence",
-    "compositional-analogy-v1": "compositional analogy",
-    "containment-analogy-v1": "containment analogy",
-    "relational-outlier-v1": "relational outlier",
-    "relational-matrix-v1": "relational matrix",
-    "visual-set-algebra-v1": "visual set algebra",
-    "constraint-mosaic-v1": "constraint mosaic",
+    "relational-sequence-v2": "relational sequence",
+    "attribute-pairing-v1": "attribute pairing",
+    "compositional-analogy-v2": "compositional analogy",
+    "containment-analogy-v2": "containment analogy",
+    "composed-transform-v1": "composed transformation",
+    "relational-outlier-v2": "relational outlier",
+    "relational-matrix-v2": "relational matrix",
+    "visual-set-algebra-v2": "visual set algebra",
+    "constraint-mosaic-v2": "constraint mosaic",
     "topology-path-v1": "path completion",
-    "spatial-transform-v1": "spatial transformation",
-    "transformation-machine-v2": "transformation machine",
-    "rule-switching-v1": "rule switching",
-    "concept-induction-v1": "concept induction",
-    "fold-punch-v1": "fold and punch",
-    "inverse-fold-punch-v1": "inverse fold and punch",
-    "interleaved-sequence-v1": "interleaved sequence",
-    "second-order-sequence-v1": "second-order sequence",
-    "inverse-analogy-v1": "inverse analogy",
-    "minimal-repair-v1": "minimal repair",
+    "spatial-transform-v2": "spatial transformation",
+    "transformation-machine-v3": "transformation machine",
+    "rule-switching-v2": "rule switching",
+    "concept-induction-v2": "concept induction",
+    "fold-punch-v2": "fold and punch",
+    "inverse-fold-punch-v2": "inverse fold and punch",
+    "interleaved-sequence-v2": "interleaved sequence",
+    "second-order-sequence-v2": "second-order sequence",
+    "inverse-analogy-v2": "inverse analogy",
+    "minimal-repair-v3": "minimal repair",
   };
   if (puzzle.familyId && familyLabels[puzzle.familyId]) return familyLabels[puzzle.familyId];
   return puzzle.type === "operatorInduction"
@@ -480,24 +490,28 @@ function Solver({
   index,
   total,
   selected,
+  answers,
   notice,
   secondsLeft,
   lowTimeAt,
   onChoose,
   onPrev,
   onNext,
+  onGoTo,
   onFinish,
 }: {
   puzzle: PublicPuzzle<Visual>;
   index: number;
   total: number;
   selected: number | null;
+  answers: readonly (number | null)[];
   notice?: string;
   secondsLeft: number | null;
   lowTimeAt: number;
   onChoose: (i: number) => void;
   onPrev: () => void;
   onNext: () => void;
+  onGoTo: (index: number) => void;
   onFinish: () => void;
 }) {
   const isLast = index === total - 1;
@@ -534,14 +548,13 @@ function Solver({
       }
 
       if (e.key === "ArrowRight") {
-        if (selected !== null && !isLast) onNext();
+        if (!isLast) onNext();
         return;
       }
 
       if (e.key === "Enter") {
         // Skip if a button already has focus — its native click handles it.
         if (document.activeElement?.tagName === "BUTTON") return;
-        if (selected === null) return;
         if (isLast) onFinish();
         else onNext();
       }
@@ -561,19 +574,57 @@ function Solver({
       <NoticeBanner notice={notice} />
       <div className="mb-3 flex items-center justify-between text-sm text-gray-500">
         <span>
-          Question {index + 1} of {total}
+          Question {index + 1} of {total}{selected === null ? " · Unanswered" : ""}
         </span>
         <Countdown secondsLeft={secondsLeft} lowTimeAt={lowTimeAt} />
       </div>
       <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
         <div className="h-full bg-gray-900 transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
       </div>
+      <nav className="mb-5" aria-label="Question navigation">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs text-gray-500">Questions</span>
+          {answers.map((answer, questionIndex) => {
+            const isCurrent = questionIndex === index;
+            const isAnswered = answer !== null;
+            return (
+              <button
+                key={questionIndex}
+                type="button"
+                onClick={() => onGoTo(questionIndex)}
+                aria-current={isCurrent ? "step" : undefined}
+                aria-label={`Question ${questionIndex + 1}, ${isAnswered ? "answered" : "unanswered"}${isCurrent ? ", current" : ""}`}
+                className={`h-8 min-w-8 rounded-md border px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
+                  isCurrent
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : isAnswered
+                      ? "border-gray-300 text-gray-700 hover:bg-gray-100"
+                      : "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                }`}
+              >
+                {questionIndex + 1}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          {countUnansweredAnswers(answers)} unanswered · amber questions need an answer.
+        </p>
+      </nav>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        {puzzle.stem.length > 0 && (
+        {puzzle.stem.length > 0 ? (
           <div className="mb-6 rounded-xl bg-gray-50 p-4" aria-label="Puzzle diagram">
             <StemView puzzle={puzzle} />
           </div>
+        ) : (
+          // Odd-one-out items carry their evidence in the options and have no
+          // stem. Without this line the question renders as bare option
+          // buttons and reads as missing. The line states the task form only —
+          // never the hidden relationship.
+          <p className="mb-6 rounded-xl bg-gray-50 p-4 text-center text-gray-700">
+            All options but one follow the same hidden rule — pick the one that breaks it.
+          </p>
         )}
 
         <div className={gridClass}>
@@ -616,17 +667,15 @@ function Solver({
         </button>
         {isLast ? (
           <button
-            onClick={onFinish}
-            disabled={selected === null}
-            className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white enabled:hover:bg-gray-700 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+            onClick={() => onFinish()}
+            className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
           >
             See results
           </button>
         ) : (
           <button
             onClick={onNext}
-            disabled={selected === null}
-            className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white enabled:hover:bg-gray-700 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+            className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
           >
             Next →
           </button>

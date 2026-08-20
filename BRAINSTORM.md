@@ -69,3 +69,64 @@ model propose a rule program that pure code then validates, builds, and scores â
 stays available if procedural sampling ever runs out of genuine variety. The
 code lives in `src/lib/llm-rule-proposal.ts` and `scripts/llm-rule-experiment.ts`.
 Nothing in production calls it.
+
+## High-value measurement ideas
+
+These are unapproved ideas, ordered roughly by meaning for the work they add.
+None should displace the human pilot or the current calibration pass.
+
+**Compare error paths, not only scores.** Every wrong option already has a
+failed-rule witness; retain a stable witness category through option shuffling
+and compare which mistakes people and agents choose. This could show that both
+groups miss equally often but reason incorrectly in different ways, while also
+exposing distractors that nobody finds plausible.
+
+**Pair the human and agent evidence item by item.** Run the fixed model panel on
+the exact images used in each human calibration batch, then aggregate those
+paired results by generator bucket. Report an uncertainty interval and call a
+gap inconclusive until the interval supports its direction, so a lucky item mix
+or a tiny sample cannot create a headline result.
+
+**Separate visual failure from reasoning failure.** Keep a small pilot-only set
+of direct perception controls for every meaningful cue, and generate
+answer-preserving variants that swap shape identities, palette, and harmless
+layout details. Failure on a control, or a changed answer after a meaning-neutral
+restyle, should be labelled notation- or vision-sensitive rather than hard
+reasoning.
+
+**Measure example efficiency with matched variants.** Hold the rule and query
+fixed while changing only how many worked examples reveal it; compare the
+human and agent learning curves. The number of demonstrations needed to infer a
+fresh rule may expose a larger and more useful gap than final accuracy alone.
+
+**Hold out compositions before holding out whole families.** Reserve some
+combinations of public primitives for private evaluation while exposing each
+primitive separately. This is a lower-cost bridge to the plan's held-out-family
+level and tests whether a solver can recombine known operations instead of
+recognizing a practiced family procedure.
+
+**Gate personal interpretations on parallel-form reliability.** Ask a pilot
+subset to take two fresh, equivalent forms far enough apart to limit immediate
+practice effects. If overall or family-level results swing widely, describe a
+test result as one sample and suppress profile-like claims until the forms are
+stable enough to support them.
+
+Research anchors: wrong-option choices can carry useful information in Raven's
+matrices ([distractor analysis](https://pmc.ncbi.nlm.nih.gov/articles/PMC7151189/));
+paired equivalent representations can expose modality-specific failure
+([SEAM](https://arxiv.org/abs/2508.18179)); held-out rule compositions measure
+transfer rather than surface novelty
+([CVR](https://openreview.net/forum?id=MKDdTASg_1y)); and fresh forms need their
+own consistency check
+([alternate-forms reliability](https://pmc.ncbi.nlm.nih.gov/articles/PMC8243205/)).
+
+## Low-hanging, high-leverage ideas
+
+These ideas reuse state or machinery the project already has. They are ordered
+roughly by likely benefit, not by implementation sequence.
+
+**Return a useful completion receipt.** The server already knows issue time,
+submission time, generator version, and item ids. After scoring, show elapsed
+time plus a short opaque test code and a Copy diagnostics action, giving users
+useful context and making a confusing generated item easy to report without
+storing an account or exposing the seed.

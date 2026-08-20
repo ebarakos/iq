@@ -7,7 +7,8 @@
  *
  *   npm run report                              # print only
  *   npm run report -- --write                   # print + write bank
- *   npm run report -- --write --version solver-v2  # required when versions are mixed
+ *   npm run report -- --include-partial             # diagnostic only
+ *   npm run report -- --write --version solver-v2 --generator-version scene-families-v6
  *
  * Note: a-priori difficulty is the human-difficulty proxy until a DB with human
  * attempt data exists. This report makes no combined human/agent scoring claims.
@@ -17,11 +18,18 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { AttemptFileSchema, type AttemptFile } from "../src/lib/attempts";
+import {
+  ATTEMPT_OUTCOMES,
+  AttemptFileSchema,
+  generatorVersionOf,
+  type AttemptFile,
+} from "../src/lib/attempts";
 import { BankFileSchema, type BankItem } from "../src/items/bank";
 import {
   buildReport,
   applyCalibration,
+  harnessFailureAttemptFiles,
+  reportableAttemptFiles,
   type ItemRollup,
   type CalibrationReport,
 } from "../src/lib/calibrate";
@@ -43,6 +51,8 @@ const { values: args } = parseArgs({
   options: {
     write: { type: "boolean", default: false },
     version: { type: "string" },
+    "generator-version": { type: "string" },
+    "include-partial": { type: "boolean", default: false },
   },
   allowPositionals: true,
 });
@@ -238,6 +248,20 @@ function printBucketTable(rollups: CalibrationReport["imageBucketRollups"]): voi
   }
 }
 
+function printOutcomeTable(report: CalibrationReport): void {
+  printHeader("Attempt outcomes  [strict accuracy denominator]");
+  console.log("  Every non-correct outcome remains an incorrect one-attempt result.");
+  for (const channel of ["image", "symbolic"] as const) {
+    const counts = report.outcomes[channel];
+    const total = ATTEMPT_OUTCOMES.reduce((sum, outcome) => sum + counts[outcome], 0);
+    if (total === 0) continue;
+    console.log(`\n  ${channel}: ${total}`);
+    for (const outcome of ATTEMPT_OUTCOMES) {
+      console.log(`    ${pad(outcome, 20)} ${counts[outcome]}`);
+    }
+  }
+}
+
 function printDivergenceSection(divergence: CalibrationReport["divergence"]): void {
   printHeader("Divergence: a-priori difficulty × agent calibration tag");
   console.log("  NOTE: Until a DB exists, a-priori puzzle difficulty is the human-difficulty proxy.");
@@ -278,11 +302,13 @@ function printDivergenceSection(divergence: CalibrationReport["divergence"]): vo
 // ---------------------------------------------------------------------------
 
 function printReport(files: AttemptFile[], bank: BankItem[], versionLabel?: string): void {
-  const report = buildReport(files, bank);
+  // Without the flag, buildReport re-filters partial runs out, so a
+  // --include-partial report silently aggregated only the complete ones.
+  const report = buildReport(files, bank, { includePartial: args["include-partial"] });
 
   if (versionLabel) {
     console.log(`\n${"═".repeat(60)}`);
-    console.log(`  promptVersion: ${versionLabel}`);
+    console.log(`  population: ${versionLabel}`);
     console.log(`  Files: ${files.length}  |  Items with image attempts: ${report.imageRollups.length}`);
     console.log(`${"═".repeat(60)}`);
   }
@@ -297,6 +323,7 @@ function printReport(files: AttemptFile[], bank: BankItem[], versionLabel?: stri
   printTierTable(report.byTier);
   printTypeTable(report.byType);
   printBucketTable(report.imageBucketRollups);
+  printOutcomeTable(report);
   printByModelTable(report.imageRollups);
   printDivergenceSection(report.divergence);
 
@@ -313,35 +340,62 @@ function printReport(files: AttemptFile[], bank: BankItem[], versionLabel?: stri
 // Main
 // ---------------------------------------------------------------------------
 
-const attemptFiles = loadAttemptFiles();
+const allAttemptFiles = loadAttemptFiles();
 
-if (attemptFiles.length === 0) {
+if (allAttemptFiles.length === 0) {
   console.log("report: no attempt artifacts yet — run `npm run agent:run` first");
+  process.exit(0);
+}
+
+const attemptFiles = reportableAttemptFiles(allAttemptFiles, args["include-partial"]);
+const partialCount = allAttemptFiles.filter((file) => file.status === "partial").length;
+if (!args["include-partial"] && partialCount > 0) {
+  console.log(`\n  Excluded ${partialCount} partial run(s). Pass --include-partial for diagnostics.`);
+}
+const harnessFailures = harnessFailureAttemptFiles(allAttemptFiles);
+if (harnessFailures.length > 0) {
+  console.log(`\n  ⚠  ${harnessFailures.length} run(s) never reached the model — excluded from every table below.`);
+  console.log("     These recorded attempts but produced no model answer (transport, timeout, or rate limit),");
+  console.log("     so they measure the harness, not the items. They cannot support any capability claim.");
+  for (const file of harnessFailures) {
+    const outcomes = new Set(file.attempts.map((attempt) => attempt.outcome ?? "unknown"));
+    console.log(`     ${file.runId} — ${file.attempts.length} attempts, all ${[...outcomes].sort().join("/")}`);
+  }
+}
+if (attemptFiles.length === 0) {
+  console.log("report: no complete attempt artifacts to report");
   process.exit(0);
 }
 
 const bank = loadBankFile();
 
-// Group by promptVersion; when multiple exist, print per-version sections with a warning.
-const byVersion = new Map<string, AttemptFile[]>();
+// Prompt and generator revisions are separate populations; never pool either.
+const byPopulation = new Map<string, AttemptFile[]>();
 for (const f of attemptFiles) {
-  const list = byVersion.get(f.promptVersion) ?? [];
+  const key = `${f.promptVersion}\u0000${generatorVersionOf(f)}`;
+  const list = byPopulation.get(key) ?? [];
   list.push(f);
-  byVersion.set(f.promptVersion, list);
+  byPopulation.set(key, list);
 }
 
-const versions = [...byVersion.keys()].sort();
+const populations = [...byPopulation.entries()]
+  .map(([key, files]) => {
+    const [promptVersion, generatorVersion] = key.split("\u0000");
+    return { key, files, promptVersion, generatorVersion };
+  })
+  .sort((left, right) => left.key.localeCompare(right.key));
 
-if (versions.length > 1) {
-  console.log(`\n  ⚠  Multiple promptVersions detected: ${versions.join(", ")}`);
-  console.log(`     Results below are grouped per version — cross-version aggregation would pollute comparisons.`);
+if (populations.length > 1) {
+  console.log(`\n  ⚠  ${populations.length} incompatible prompt/generator populations detected.`);
+  console.log("     Results below are separated; cross-population aggregation would pollute comparisons.");
 
-  for (const version of versions) {
-    printReport(byVersion.get(version)!, bank, version);
+  for (const population of populations) {
+    printReport(population.files, bank,
+      `prompt ${population.promptVersion} · generator ${population.generatorVersion}`);
   }
 } else {
-  // Single version — full report without the version header clutter.
-  console.log(`\n  promptVersion: ${versions[0]}  |  Files: ${attemptFiles.length}  |  Bank items: ${bank.length}`);
+  const population = populations[0];
+  console.log(`\n  promptVersion: ${population.promptVersion}  |  generatorVersion: ${population.generatorVersion}  |  Files: ${attemptFiles.length}  |  Bank items: ${bank.length}`);
   printReport(attemptFiles, bank);
 }
 
@@ -353,25 +407,18 @@ if (DRY_RUN) {
   console.log(`\n  ──────────────────────────────────────────────────────`);
   console.log(`  Dry-run complete. Pass --write to persist calibration data to data/bank/items.json.`);
 } else {
-  // Tags must come from a SINGLE prompt version — pooling attempts across solver
-  // prompt revisions would mix incomparable populations into one solve rate.
-  let writeVersion: string;
-  if (args.version) {
-    if (!byVersion.has(args.version)) {
-      console.error(`\nreport: --version ${args.version} not found in attempts (have: ${versions.join(", ")})`);
-      process.exit(1);
-    }
-    writeVersion = args.version;
-  } else if (versions.length === 1) {
-    writeVersion = versions[0];
-  } else {
-    console.error(`\nreport: refusing --write with multiple promptVersions (${versions.join(", ")}).`);
-    console.error(`        Pass --version <one of them> to choose which population to calibrate from.`);
+  const candidates = populations.filter((population) =>
+    (!args.version || population.promptVersion === args.version) &&
+    (!args["generator-version"] || population.generatorVersion === args["generator-version"]));
+  if (candidates.length !== 1) {
+    console.error(`\nreport: refusing --write; choose exactly one prompt/generator population.`);
+    console.error("        Pass --version and --generator-version to identify it.");
     process.exit(1);
   }
 
   const now = new Date().toISOString();
-  const writeFiles = byVersion.get(writeVersion)!;
+  const selectedPopulation = candidates[0];
+  const writeFiles = selectedPopulation.files;
   const { imageRollups } = buildReport(writeFiles, bank);
   const updated = applyCalibration(bank, imageRollups, now);
 
@@ -388,6 +435,6 @@ if (DRY_RUN) {
   writeFileSync(BANK_PATH, JSON.stringify(fileContent, null, 2) + "\n", "utf8");
 
   console.log(`\n  ──────────────────────────────────────────────────────`);
-  console.log(`  Bank written: ${BANK_PATH}  (calibrated from promptVersion ${writeVersion})`);
+  console.log(`  Bank written: ${BANK_PATH}  (prompt ${selectedPopulation.promptVersion} · generator ${selectedPopulation.generatorVersion})`);
   console.log(`    agent-easy: ${easy}  |  agent-mid: ${mid}  |  agent-hard: ${hard}  |  untagged: ${untagged}`);
 }

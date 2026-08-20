@@ -5,12 +5,26 @@ import {
   PuzzleSchema,
   PUZZLE_TYPES,
   isBlank,
+  isScene,
+  sceneSignature,
   shuffleOptions,
   visualSignature,
   type Puzzle,
   type PuzzleSet,
   type PuzzleType,
+  type Visual,
 } from "./schema";
+import {
+  EXPANDED_GENERATOR_VERSION,
+  planExpandedSchedule,
+  type ExpandedProfile,
+} from "./expanded-quiz";
+import {
+  CURRENT_FAMILY_PROMOTION_REGISTRY,
+  readWithdrawnFamilyIds,
+  type FamilyPromotionRegistry,
+} from "./family-promotion";
+import { seededRng, shuffled, type Seed } from "../lib/rng";
 
 /**
  * The item bank — validated puzzles as data (data/bank/items.json, committed).
@@ -18,10 +32,9 @@ import {
  * The bank is the deterministic generator's emergency fallback and regression
  * corpus. Loaded via a static JSON import so it works identically on Vercel
  * serverless with zero fs/tracing config. Items are stored in canonical
- * (unshuffled) option order for stable diffs; `shuffleOptions` runs at serve
- * time. Bank invariant (enforced by
- * scripts/bank-verify.ts and the topup CLI, not at runtime): every item has a
- * `rule` and passes `checkRule`.
+ * (unshuffled) option order for stable diffs and shuffled at serve time. Bank
+ * invariants are enforced by `scripts/bank-verify.ts`: expanded items replay
+ * through their current generator and legacy items pass `checkRule`.
  */
 
 export const BankItemSchema = z.object({
@@ -30,10 +43,19 @@ export const BankItemSchema = z.object({
   /** Content-addressed identity (see fingerprintPuzzle) — dedup + stable ids. */
   fingerprint: z.string().min(1),
   provenance: z.object({
-    source: z.enum(["procedural", "model", "handAuthored"]),
+    source: z.enum(["procedural", "model", "handAuthored", "expanded"]),
     provider: z.string().optional(), // when source = "model"
     model: z.string().optional(),
-    seed: z.number().optional(), // when source = "procedural"
+    seed: z.union([z.number(), z.string()]).optional(),
+    profile: z.enum(["short-5", "long-30"]).optional(),
+    generatorVersion: z.string().optional(),
+    /**
+     * Normalized withdrawal list this item was generated under (source
+     * "expanded"). The withdrawal list is an input to the assembler, so replay
+     * must use the stored value: verifying against the runtime list makes every
+     * expanded item fail the moment an operator withdraws any family.
+     */
+    withdrawnFamilyIds: z.array(z.string()).optional(),
     createdAt: z.string(), // ISO 8601
   }),
   /** Calibration tags (Phase D): "agent-easy" | "agent-mid" | "agent-hard". */
@@ -61,10 +83,11 @@ export type BankFile = z.infer<typeof BankFileSchema>;
  * order ("·" for blanks), SORTED option signatures (shuffle-invariant), and the
  * answer's signature (same stem + different correct answer = different item).
  */
-export function fingerprintPuzzle(p: Puzzle): string {
-  const stemSigs = p.stem.map((panel) => (isBlank(panel) ? "·" : visualSignature(panel)));
-  const optionSigs = p.options.map(visualSignature).sort();
-  const answerSig = visualSignature(p.options[p.answerIndex]);
+export function fingerprintPuzzle(p: Puzzle<Visual>): string {
+  const signature = (visual: Visual) => isScene(visual) ? sceneSignature(visual) : visualSignature(visual);
+  const stemSigs = p.stem.map((panel) => (isBlank(panel) ? "·" : signature(panel)));
+  const optionSigs = p.options.map(signature).sort();
+  const answerSig = signature(p.options[p.answerIndex]);
   const base = [p.type, p.layout, stemSigs.join(","), optionSigs.join(","), answerSig];
   // Preserve every legacy bank fingerprint byte-for-byte; only the new family
   // appends its visible nominal ordering.
@@ -82,7 +105,7 @@ const ID_PREFIX: Record<PuzzleType, string> = {
 };
 
 /** The bank id a puzzle should carry: `<typePrefix>-<fingerprint>`. */
-export function bankIdFor(p: Puzzle): string {
+export function bankIdFor(p: Puzzle<Visual>): string {
   return `${ID_PREFIX[p.type]}-${fingerprintPuzzle(p)}`;
 }
 
@@ -205,6 +228,66 @@ export function sampleQuiz(
   chosen.sort((a, b) => a.puzzle.difficulty - b.puzzle.difficulty);
   return {
     puzzles: chosen.map((i) => shuffleOptions(i.puzzle)) as PuzzleSet,
+    items: chosen,
+  };
+}
+
+function shuffleOptionsWithSeed<V extends Visual>(puzzle: Puzzle<V>, seed: Seed, slot: number): Puzzle<V> {
+  const order = shuffled(
+    seededRng(seed, `expanded-bank-options:${slot}:${puzzle.id}`),
+    puzzle.options.map((_, index) => index),
+  );
+  return {
+    ...puzzle,
+    options: order.map((index) => puzzle.options[index]),
+    answerIndex: order.indexOf(puzzle.answerIndex),
+  };
+}
+
+/**
+ * Build an emergency quiz from expanded-family bank entries.
+ *
+ * The live assembler owns the schedule, so fallback keeps the same band counts,
+ * family draws, repeat caps, and easiest-first ordering instead of silently
+ * falling back to the legacy type-based ramp.
+ */
+export function sampleExpandedBankQuiz(
+  items: BankItem[] = loadBank(),
+  profile: ExpandedProfile,
+  seed: Seed,
+  registry: FamilyPromotionRegistry = CURRENT_FAMILY_PROMOTION_REGISTRY,
+  withdrawnFamilyIds: ReadonlySet<string> = readWithdrawnFamilyIds(),
+): SampledQuiz {
+  const schedule = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds);
+  const usable = items.filter((item) =>
+    item.provenance.source === "expanded" &&
+    item.provenance.generatorVersion === EXPANDED_GENERATOR_VERSION &&
+    item.puzzle.generation?.generatorVersion === EXPANDED_GENERATOR_VERSION &&
+    item.puzzle.familyId !== undefined &&
+    !withdrawnFamilyIds.has(item.puzzle.familyId));
+  const used = new Set<string>();
+  const chosen = schedule.map((slot, slotIndex) => {
+    const candidates = usable.filter((item) =>
+      !used.has(item.fingerprint) &&
+      item.puzzle.familyId === slot.familyId &&
+      item.puzzle.band === slot.band &&
+      item.puzzle.difficulty === slot.difficulty);
+    const item = shuffled(
+      seededRng(seed, `expanded-bank-item:${slotIndex}:${slot.familyId}`),
+      candidates,
+    )[0];
+    if (!item) {
+      throw new Error(
+        `expanded emergency bank cannot fill ${profile} slot ${slotIndex + 1}: ` +
+          `${slot.familyId} in ${slot.band} needs another current-version item`,
+      );
+    }
+    used.add(item.fingerprint);
+    return item;
+  });
+
+  return {
+    puzzles: chosen.map((item, index) => shuffleOptionsWithSeed(item.puzzle, seed, index)) as PuzzleSet,
     items: chosen,
   };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { OPTIONS_PER_ITEM } from "./schema";
 import { materializeSceneRuleProposal, parseSceneRuleProposal } from "./scene-proposal";
 
 const proposal = {
@@ -22,6 +23,6 @@ describe("scene rule proposals", () => {
     expect(first.acceptance.accepted).toBe(true);
     expect(first.candidate.puzzle).toEqual(replay.candidate.puzzle);
     expect(first.candidate.puzzle).not.toHaveProperty("generation");
-    expect(first.candidate.puzzle.options).toHaveLength(4);
+    expect(first.candidate.puzzle.options).toHaveLength(OPTIONS_PER_ITEM);
   });
 });

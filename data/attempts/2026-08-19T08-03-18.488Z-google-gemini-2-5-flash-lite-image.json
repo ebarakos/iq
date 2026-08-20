@@ -1,0 +1,125 @@
+{
+  "runId": "2026-08-19T08-03-18.488Z-google-gemini-2-5-flash-lite-image",
+  "startedAt": "2026-08-19T08:03:18.488Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-flash-lite",
+  "channel": "image",
+  "promptVersion": "solver-v2",
+  "attempts": [
+    {
+      "itemId": "expanded-pilot-smoke-0-2-compositional-analogy-v1",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2306,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "compositional-analogy-v1",
+        "programFingerprint": "082ef7f41548d406",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:20.797Z"
+    },
+    {
+      "itemId": "expanded-pilot-smoke-0-1-relational-sequence-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 2489,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:20.979Z"
+    },
+    {
+      "itemId": "expanded-pilot-smoke-0-3-visual-set-algebra-v1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1410,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "visual-set-algebra-v1",
+        "programFingerprint": "aea16edeec74cd80",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:22.208Z"
+    },
+    {
+      "itemId": "expanded-pilot-smoke-0-4-minimal-repair-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1389,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "minimal-repair-v1",
+        "programFingerprint": "d282eb4d75290e1f",
+        "featureBucket": "minimal-repair-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:22.368Z"
+    },
+    {
+      "itemId": "expanded-pilot-smoke-0-5-transformation-machine-v2",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1120,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "transformation-machine-v2",
+        "programFingerprint": "b44546ab9c578d90",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:23.329Z"
+    }
+  ]
+}

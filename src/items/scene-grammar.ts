@@ -25,6 +25,22 @@ export type SceneUnaryOperation =
 
 export type SceneBinaryOperation = "union" | "intersection" | "subtract" | "xor";
 
+export type SceneCompositionPrimitive =
+  | {
+      kind: "spatial";
+      operation: Extract<SceneUnaryOperation, { kind: "rotate" | "reflect" }>;
+    }
+  | {
+      kind: "setFillAt";
+      at: ScenePosition;
+      fill: "half" | "solid";
+    };
+
+export interface SceneOrderedComposition {
+  first: SceneCompositionPrimitive;
+  second: SceneCompositionPrimitive;
+}
+
 export interface ScenePosition {
   row: number;
   column: number;
@@ -235,6 +251,55 @@ export function applySceneUnary(scene: Scene, operation: SceneUnaryOperation): S
   objects[firstIndex] = { ...operation.first, object: second.object };
   objects[targetIndex] = { ...operation.second, object: first.object };
   return normalize({ ...scene, objects });
+}
+
+/** Apply one primitive whose effect can be demonstrated in a visible worked row. */
+export function applySceneCompositionPrimitive(
+  input: Scene,
+  primitive: SceneCompositionPrimitive,
+): Scene | null {
+  if (primitive.kind === "spatial") return applySceneUnary(input, primitive.operation);
+  const sourceIndex = input.objects.findIndex((placement) =>
+    placement.row === primitive.at.row && placement.column === primitive.at.column);
+  const source = input.objects[sourceIndex];
+  if (!source || source.object.kind !== "token" || source.object.fill === primitive.fill) return null;
+  const objects = [...input.objects];
+  objects[sourceIndex] = {
+    ...source,
+    object: { ...source.object, fill: primitive.fill },
+  };
+  return normalize({ ...input, objects });
+}
+
+/** Apply a two-step program in its declared left-to-right order. */
+export function applySceneOrderedComposition(
+  input: Scene,
+  program: SceneOrderedComposition,
+): Scene | null {
+  const afterFirst = applySceneCompositionPrimitive(input, program.first);
+  return afterFirst ? applySceneCompositionPrimitive(afterFirst, program.second) : null;
+}
+
+/** Complete small grammar used by composed scene families. */
+export function enumerateSceneOrderedCompositions(): SceneOrderedComposition[] {
+  const spatial: SceneCompositionPrimitive[] = [
+    { kind: "spatial", operation: { kind: "rotate", quarterTurns: 1 } },
+    { kind: "spatial", operation: { kind: "rotate", quarterTurns: 3 } },
+    { kind: "spatial", operation: { kind: "reflect", axis: "horizontal" } },
+    { kind: "spatial", operation: { kind: "reflect", axis: "vertical" } },
+  ];
+  const attribute: SceneCompositionPrimitive[] = [
+    { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "half" },
+    { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "solid" },
+  ];
+  return spatial.flatMap((spatialPrimitive) => attribute.flatMap((attributePrimitive) => [
+    { first: spatialPrimitive, second: attributePrimitive },
+    { first: attributePrimitive, second: spatialPrimitive },
+  ]));
+}
+
+export function sceneOrderedCompositionKey(program: SceneOrderedComposition): string {
+  return JSON.stringify(program);
 }
 
 /** Combine aligned scenes through exact visible atoms. */

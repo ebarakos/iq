@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { bankIdFor, fingerprintPuzzle, loadBank, sampleQuiz } from "./bank";
-import { PUZZLE_TYPES, PuzzleSetSchema, shuffleOptions } from "./schema";
-import { checkRule } from "./rules";
+import {
+  bankIdFor,
+  fingerprintPuzzle,
+  loadBank,
+  sampleExpandedBankQuiz,
+  sampleQuiz,
+} from "./bank";
+import {
+  BAND_SCHEDULE,
+  EXPANDED_GENERATOR_VERSION,
+  EXPANDED_PROFILES,
+} from "./expanded-quiz";
+import { CURRENT_FAMILY_PROMOTION_REGISTRY, readWithdrawnFamilyIds } from "./family-promotion";
+import { PuzzleSetSchema, shuffleOptions } from "./schema";
 
 describe("fingerprintPuzzle", () => {
   const base = loadBank()[0].puzzle;
@@ -24,12 +35,43 @@ describe("fingerprintPuzzle", () => {
 });
 
 describe("loadBank", () => {
-  it("parses the embedded bank and every item passes checkRule", () => {
+  it("parses the expanded emergency bank with current replay provenance", () => {
     const items = loadBank();
-    expect(items.length).toBeGreaterThanOrEqual(60);
+    expect(items.length).toBeGreaterThanOrEqual(57);
     for (const item of items) {
-      const res = checkRule(item.puzzle);
-      expect(res.ok, `${item.puzzle.id}: ${res.ok ? "" : res.issues.join("; ")}`).toBe(true);
+      expect(item.provenance).toMatchObject({
+        source: "expanded",
+        generatorVersion: EXPANDED_GENERATOR_VERSION,
+        profile: "long-30",
+      });
+      expect(typeof item.provenance.seed).toBe("string");
+      expect(item.puzzle.generation?.generatorVersion).toBe(EXPANDED_GENERATOR_VERSION);
+    }
+  });
+});
+
+describe("sampleExpandedBankQuiz", () => {
+  it.each(EXPANDED_PROFILES)("serves %s with the live band schedule and family constraints", (profile) => {
+    const withdrawn = readWithdrawnFamilyIds();
+    for (let run = 0; run < 100; run++) {
+      const { puzzles, items } = sampleExpandedBankQuiz(
+        loadBank(),
+        profile,
+        `bank-test:${profile}:${run}`,
+        CURRENT_FAMILY_PROMOTION_REGISTRY,
+        withdrawn,
+      );
+      expect(PuzzleSetSchema.safeParse(puzzles).success).toBe(true);
+      expect(puzzles).toHaveLength(profile === "long-30" ? 30 : 5);
+      expect(items.map((item) => item.puzzle.id)).toEqual(puzzles.map((puzzle) => puzzle.id));
+      for (const band of Object.keys(BAND_SCHEDULE[profile]) as Array<keyof typeof BAND_SCHEDULE[typeof profile]>) {
+        expect(puzzles.filter((puzzle) => puzzle.band === band)).toHaveLength(BAND_SCHEDULE[profile][band]);
+      }
+      for (let index = 1; index < puzzles.length; index++) {
+        expect(puzzles[index].familyId).not.toBe(puzzles[index - 1].familyId);
+      }
+      expect(new Set(puzzles.map((puzzle) => puzzle.familyId)).size)
+        .toBeGreaterThanOrEqual(profile === "long-30" ? 12 : 5);
     }
   });
 });
@@ -69,10 +111,23 @@ describe("sampleQuiz", () => {
     }
   });
 
-  it("enforces full family coverage in hard fallback quizzes when all families are present", () => {
+  it("covers every puzzle type available in the bank in a hard five-item sample", () => {
+    const availableTypes = new Set(loadBank().map((item) => item.puzzle.type));
     for (let run = 0; run < 80; run++) {
       const { items } = sampleQuiz(loadBank(), 5, "hard");
-      expect(new Set(items.map((item) => item.puzzle.type)).size).toBe(PUZZLE_TYPES.length);
+      expect(new Set(items.map((item) => item.puzzle.type)).size).toBe(availableTypes.size);
+    }
+  });
+});
+
+describe("expanded provenance replay", () => {
+  it("records the withdrawal list every expanded item was built under", () => {
+    const expanded = loadBank().filter((item) => item.provenance.source === "expanded");
+    expect(expanded.length).toBeGreaterThan(0);
+    // Without this, replay verifies against the runtime withdrawal list, so a
+    // legitimate withdrawal invalidates every previously banked item at once.
+    for (const item of expanded) {
+      expect(Array.isArray(item.provenance.withdrawnFamilyIds), item.puzzle.id).toBe(true);
     }
   });
 });

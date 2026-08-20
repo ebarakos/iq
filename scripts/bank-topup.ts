@@ -1,10 +1,13 @@
 /**
  * Top up the item bank (data/bank/items.json) with validated puzzles.
  *
- *   npm run bank:topup -- --count 48 --seed 42        # procedural items
+ *   npm run bank:topup -- --count 48 --seed 42        # legacy procedural items
  *   npm run bank:topup -- --count 10 --source model   # relay-generated (needs .env.local)
- *   flags: --count N  --source procedural|model|both  --type <puzzleType>
- *          --difficulty 1..5  --seed N
+ *   npm run bank:topup -- --source expanded --replace --per-family 3 --seed emergency-v5
+ *   flags: --count N (procedural/model/both only)  --source procedural|model|both|expanded
+ *          --per-family N (expanded only; --count is ignored for that source)
+ *          --type <puzzleType>
+ *          --difficulty 1..5  --seed S  --replace  --per-family N
  *
  * `--count` is an exact ceiling for every source: `model` keeps calling the relay
  * (5 validated puzzles per call) until N new items are banked, and `both` splits
@@ -26,8 +29,19 @@ import {
   type BankItem,
 } from "../src/items/bank";
 import { generatePuzzle } from "../src/items/generate";
+import {
+  assembleExpandedQuiz,
+  eligibleFamiliesForBand,
+  EXPANDED_GENERATOR_VERSION,
+} from "../src/items/expanded-quiz";
+import {
+  CURRENT_FAMILY_PROMOTION_REGISTRY,
+  EXPANDED_PROFILE_BANDS,
+  normalizeWithdrawnFamilyIds,
+  readWithdrawnFamilyIds,
+} from "../src/items/family-promotion";
 import { checkRule } from "../src/items/rules";
-import { PUZZLE_TYPES, type Puzzle, type PuzzleType } from "../src/items/schema";
+import { PUZZLE_TYPES, type Puzzle, type PuzzleType, type Visual } from "../src/items/schema";
 import { mulberry32 } from "../src/lib/rng";
 
 const BANK_PATH = new URL("../data/bank/items.json", import.meta.url).pathname;
@@ -39,6 +53,8 @@ const { values: args } = parseArgs({
     type: { type: "string" },
     difficulty: { type: "string" },
     seed: { type: "string" },
+    replace: { type: "boolean", default: false },
+    "per-family": { type: "string", default: "3" },
   },
 });
 
@@ -51,11 +67,21 @@ function loadFile(): { version: 1; items: BankItem[] } {
 }
 
 /** Re-id to the content-addressed id, validate, and wrap as a BankItem. */
-function toBankItem(puzzle: Puzzle, provenance: BankItem["provenance"]): BankItem {
+function toBankItem(puzzle: Puzzle<Visual>, provenance: BankItem["provenance"]): BankItem {
   const canonical = { ...puzzle, id: bankIdFor(puzzle) };
-  const check = checkRule(canonical);
-  if (!check.ok) {
-    throw new Error(`refusing to bank ${canonical.id}: ${check.issues.join("; ")}`);
+  if (provenance.source === "expanded") {
+    if (
+      canonical.generation?.generatorVersion !== EXPANDED_GENERATOR_VERSION ||
+      !canonical.familyId ||
+      !canonical.band
+    ) {
+      throw new Error(`refusing to bank ${canonical.id}: expanded provenance is incomplete`);
+    }
+  } else {
+    const check = checkRule(canonical as Puzzle);
+    if (!check.ok) {
+      throw new Error(`refusing to bank ${canonical.id}: ${check.issues.join("; ")}`);
+    }
   }
   return BankItemSchema.parse({
     puzzle: canonical,
@@ -66,7 +92,11 @@ function toBankItem(puzzle: Puzzle, provenance: BankItem["provenance"]): BankIte
 }
 
 async function main() {
-  const file = loadFile();
+  const source = args.source as "procedural" | "model" | "both" | "expanded";
+  if (args.replace && source !== "expanded") {
+    throw new Error("--replace is reserved for building the expanded emergency bank");
+  }
+  const file = args.replace ? { version: 1 as const, items: [] } : loadFile();
   const have = new Set(file.items.map((i) => i.fingerprint));
   const added: BankItem[] = [];
   const skipped = { duplicate: 0 };
@@ -86,17 +116,65 @@ async function main() {
   if (!Number.isInteger(count) || count <= 0) {
     throw new Error(`--count must be a positive integer, got "${args.count}"`);
   }
-  const source = args.source as "procedural" | "model" | "both";
   const types: PuzzleType[] = args.type ? [args.type as PuzzleType] : [...PUZZLE_TYPES];
   const difficulties = args.difficulty ? [Number(args.difficulty)] : [1, 2, 3, 4, 5];
-  const seed = args.seed ? Number(args.seed) : Date.now() % 2 ** 31;
+  const seedText = args.seed ?? String(Date.now() % 2 ** 31);
+  const seed = Number(seedText);
+  if ((source === "procedural" || source === "both") && !Number.isFinite(seed)) {
+    throw new Error(`procedural --seed must be numeric, got "${seedText}"`);
+  }
   const rng = mulberry32(seed);
+
+  if (source === "expanded") {
+    const perFamily = Number(args["per-family"]);
+    if (!Number.isInteger(perFamily) || perFamily <= 0) {
+      throw new Error(`--per-family must be a positive integer, got "${args["per-family"]}"`);
+    }
+    const withdrawn = readWithdrawnFamilyIds();
+    const familyIds = [...new Set(EXPANDED_PROFILE_BANDS.flatMap((band) =>
+      eligibleFamiliesForBand(CURRENT_FAMILY_PROMOTION_REGISTRY, band, withdrawn)
+        .map((family) => family.familyId)))].sort();
+    const counts = new Map(familyIds.map((familyId) => [familyId, 0]));
+    const complete = () => [...counts.values()].every((value) => value >= perFamily);
+
+    for (let quizIndex = 0; quizIndex < 1_000 && !complete(); quizIndex++) {
+      const quizSeed = `${seedText}:${quizIndex}`;
+      const puzzles = assembleExpandedQuiz(
+        quizSeed,
+        "long-30",
+        CURRENT_FAMILY_PROMOTION_REGISTRY,
+        withdrawn,
+      );
+      for (const puzzle of puzzles) {
+        const familyId = puzzle.familyId;
+        if (!familyId || !counts.has(familyId) || counts.get(familyId)! >= perFamily) continue;
+        if (add(toBankItem(puzzle, {
+          source: "expanded",
+          seed: quizSeed,
+          profile: "long-30",
+          generatorVersion: EXPANDED_GENERATOR_VERSION,
+          withdrawnFamilyIds: normalizeWithdrawnFamilyIds(withdrawn),
+          createdAt: now(),
+        }))) {
+          counts.set(familyId, counts.get(familyId)! + 1);
+        }
+      }
+    }
+
+    const missing = [...counts].filter(([, value]) => value < perFamily);
+    if (missing.length > 0) {
+      throw new Error(
+        `expanded bank could not reach ${perFamily} items per family: ` +
+          missing.map(([familyId, value]) => `${familyId} ${value}`).join(", "),
+      );
+    }
+  }
 
   // Per-source budgets: `both` gives the model half (rounded up) and lets the
   // procedural pass fill the remainder, so the total never exceeds --count.
   const modelTarget = source === "model" ? count : source === "both" ? Math.ceil(count / 2) : 0;
 
-  if (modelTarget > 0) {
+  if (source !== "expanded" && modelTarget > 0) {
     const { generatePuzzles } = await import("../src/lib/model");
     // Each relay call yields 5 validated puzzles; trim the last batch to the
     // budget. Cap calls so a dedup-saturated bank doesn't loop the relay forever.

@@ -22,10 +22,15 @@ import {
  * Generation semantics for the two public test lengths.
  *
  * Bump this whenever the band schedule, the family pool rule, the ordering
- * rule, or the child-seed layout changes. `scene-families-v2` was the retired
- * 12-question profile and is no longer assembled.
+ * rule, or any family's item semantics change. `scene-families-v2` was the
+ * retired 12-question profile; `v3` carried the ill-posed `minimal-repair-v1`,
+ * so attempt data recorded under it must not be pooled with `v4`. `v5` adds
+ * seeded family-pool subsampling, so it is likewise a separate population.
+ * `v6` serves `OPTIONS_PER_ITEM` options instead of four, which lowers the value
+ * of a guess and changes every family's near misses — results from `v5` and `v6`
+ * are not comparable and must never be pooled.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v3" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v6" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -55,6 +60,20 @@ export const MINIMUM_ELIGIBLE_FAMILIES: Readonly<
 export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>> = {
   "long-30": 12,
   "short-5": 5,
+};
+
+/**
+ * Non-warmup bands draw this many families for one test before their questions
+ * are split and ordered. Warmup keeps its complete pool so every test still
+ * begins with the full set of introductory mechanisms.
+ */
+export const FAMILY_SUBSAMPLE_SIZES: Readonly<
+  Record<ExpandedProfileBand, number | undefined>
+> = {
+  warmup: undefined,
+  composition: 4,
+  "constraint-spatial": 4,
+  "induction-transfer": 3,
 };
 
 /** Attempts per slot before assembly gives up. Each attempt has its own child seed. */
@@ -232,9 +251,25 @@ function programDepth(band: ExpandedProfileBand): number {
   return band === "warmup" ? 1 : band === "composition" ? 2 : 3;
 }
 
+/**
+ * A public item id that cannot be turned back into the seed.
+ *
+ * The previous scheme embedded the first 28 characters of the 32-character seed
+ * directly in the id, so anyone holding a served puzzle could brute-force the
+ * remaining four hex digits, regenerate the quiz, and read every answer. That
+ * defeats the answer-free public contract, which is the point of serving the
+ * puzzle without `answerIndex`, `rule`, or `explanation` at all.
+ *
+ * The id is now a keyed hash of the seed and slot: still deterministic (the
+ * same seed replays the same ids) and still unique within a test, but one-way.
+ * The real seed stays inside the sealed server token.
+ */
 function runtimePuzzleId(seed: Seed, slotIndex: number, familyId: string): string {
-  const normalizedSeed = String(seed).replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 28) || "seed";
-  return `expanded-${normalizedSeed}-${slotIndex + 1}-${familyId}`;
+  const digest = createHash("sha256")
+    .update(`aiq.public-item-id.v1\u0000${String(seed)}\u0000${slotIndex}`)
+    .digest("hex")
+    .slice(0, 16);
+  return `expanded-${digest}-${slotIndex + 1}-${familyId}`;
 }
 
 function visibleFingerprint(puzzle: Puzzle<Scene>): string {
@@ -244,6 +279,16 @@ function visibleFingerprint(puzzle: Puzzle<Scene>): string {
     stem: puzzle.stem,
     options: puzzle.options,
   })).digest("hex");
+}
+
+function drawnFamiliesForBand(
+  families: readonly EligibleFamily[],
+  band: ExpandedProfileBand,
+  rng: Rng,
+): EligibleFamily[] {
+  const requested = FAMILY_SUBSAMPLE_SIZES[band];
+  if (requested === undefined) return [...families];
+  return shuffled(rng, families).slice(0, Math.min(requested, families.length));
 }
 
 /** Choose every family for the whole test before any item is generated. */
@@ -264,8 +309,13 @@ export function planExpandedSchedule(
         `the ${profile} test needs at least ${minimum} eligible ${band} families but has ${families.length}`,
       );
     }
-    const byFamilyId = new Map(families.map((family) => [family.familyId, family]));
-    const counts = evenSplit(count, families, seededRng(seed, `expanded-split:${profile}:${band}`));
+    const drawn = drawnFamiliesForBand(
+      families,
+      band,
+      seededRng(seed, `expanded-family-pool:${profile}:${band}`),
+    );
+    const byFamilyId = new Map(drawn.map((family) => [family.familyId, family]));
+    const counts = evenSplit(count, drawn, seededRng(seed, `expanded-split:${profile}:${band}`));
     schedule.push(...arrangeBand(
       counts,
       byFamilyId,
@@ -341,10 +391,20 @@ export function assembleExpandedQuiz(
     let acceptedVisible = "";
 
     for (let attempt = 0; attempt < RETRY_BUDGET && !accepted; attempt++) {
-      const generated = generateSceneFamilyCandidate(
-        familyId,
-        seededRng(seed, `expanded-scene-slot:${profile}:${slotIndex}:${attempt}:${familyId}`),
-      );
+      // A family can refuse a draw outright — for instance when the rule it
+      // sampled cannot produce enough near misses to fill the option list. That
+      // is a rejected attempt like any other, not a failed test: the next
+      // attempt has its own child seed and usually succeeds.
+      let generated;
+      try {
+        generated = generateSceneFamilyCandidate(
+          familyId,
+          seededRng(seed, `expanded-scene-slot:${profile}:${slotIndex}:${attempt}:${familyId}`),
+        );
+      } catch (error) {
+        rejections.push(error instanceof Error ? error.message : String(error));
+        continue;
+      }
       const puzzle: Puzzle<Scene> = {
         ...generated.puzzle,
         id: runtimePuzzleId(seed, slotIndex, familyId),

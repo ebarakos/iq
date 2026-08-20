@@ -18,6 +18,39 @@ import { DIMENSIONS, RuleSchema } from "./rules";
 
 export { SHAPES, FILLS, SIZES, ROTATIONS, visualSignature } from "./domains";
 
+/**
+ * How many answer options every generated item offers — **the single place this
+ * number is set**. Change it here and the whole battery follows: families build
+ * `DISTRACTORS_PER_ITEM` near misses, the assembler serves that many options,
+ * and both renderers lay them out.
+ *
+ * More options make an item harder in the only way this project accepts: they
+ * lower the value of a guess (1 in 6 rather than 1 in 4) without making any
+ * single option harder to see. Difficulty still comes from the rule.
+ */
+export const OPTIONS_PER_ITEM = 6;
+
+/** Wrong options per item. The answer plus these make one full option list. */
+export const DISTRACTORS_PER_ITEM = OPTIONS_PER_ITEM - 1;
+
+/**
+ * Structural bounds on an option list, wider than `OPTIONS_PER_ITEM` on purpose.
+ * The floor keeps items authored under an earlier setting readable, so lowering
+ * the constant never invalidates a stored item; the ceiling is the real limit of
+ * the agent image composer, which fits one row of six options.
+ */
+export const MINIMUM_OPTIONS_PER_ITEM = 4;
+export const MAXIMUM_OPTIONS_PER_ITEM = 6;
+
+if (OPTIONS_PER_ITEM < MINIMUM_OPTIONS_PER_ITEM || OPTIONS_PER_ITEM > MAXIMUM_OPTIONS_PER_ITEM) {
+  throw new Error(
+    `OPTIONS_PER_ITEM must be between ${MINIMUM_OPTIONS_PER_ITEM} and ${MAXIMUM_OPTIONS_PER_ITEM}, ` +
+      `but it is ${OPTIONS_PER_ITEM}. Raising the ceiling means changing the option letters in ` +
+      "src/lib/solver.ts, the option grid in src/items/compose-image.tsx, and the keyboard " +
+      "shortcuts in src/app/page.tsx first.",
+  );
+}
+
 /** A single drawable cell: `count` copies of `shape`, arranged in a mini-grid. */
 export const CellSchema = z
   .object({
@@ -234,7 +267,7 @@ const RuntimePuzzleSchema = z
      */
     stem: z.array(PanelSchema),
     /** Multiple-choice options rendered through the shared visual contract. */
-    options: z.array(VisualSchema).min(4).max(6),
+    options: z.array(VisualSchema).min(MINIMUM_OPTIONS_PER_ITEM).max(MAXIMUM_OPTIONS_PER_ITEM),
     /** 0-based index into `options` of the single correct answer. */
     answerIndex: z.number().int().min(0),
     /** Detailed answer reasoning, shown only in the completed-test review. */
@@ -416,7 +449,7 @@ const RuntimePublicPuzzleSchema = z.object({
   band: z.enum(REASONING_BANDS).optional(),
   operatorLegend: OperatorLegendSchema.optional(),
   stem: z.array(PanelSchema),
-  options: z.array(VisualSchema).min(4).max(6),
+  options: z.array(VisualSchema).min(MINIMUM_OPTIONS_PER_ITEM).max(MAXIMUM_OPTIONS_PER_ITEM),
 });
 type RuntimePublicPuzzle = z.infer<typeof RuntimePublicPuzzleSchema>;
 export type PublicPuzzle<V extends Visual = Cell> = Omit<RuntimePublicPuzzle, "stem" | "options"> & {

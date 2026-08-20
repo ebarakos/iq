@@ -1,4 +1,5 @@
-import { seededRng } from "../lib/rng";
+import { createHash } from "node:crypto";
+import { seededRng, shuffled } from "../lib/rng";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY, type ExpandedProfileBand } from "./family-promotion";
 import {
   SCENE_FAMILY_IDS,
@@ -9,7 +10,11 @@ import {
 import { toPublicPuzzle, type PublicPuzzle, type Scene } from "./schema";
 
 export const PILOT_ITEMS_PER_FAMILY = 3;
+export const PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION = "prototype-pilot-packets-v1";
+export const PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION = "prototype-pilot-aggregate-v1";
+export const PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET = 10;
 const ITEM_ID_PATTERN = /^([a-z-]+-v\d+):r([1-3])$/;
+const PACKET_ID_PATTERN = /^pilot-v1-[a-f]$/;
 
 export interface PrototypePilotQuestion {
   itemId: string;
@@ -19,8 +24,20 @@ export interface PrototypePilotQuestion {
   puzzle: PublicPuzzle<Scene>;
 }
 
+export interface PrototypePilotPacket {
+  /** Stable assignment name for moderator scheduling and aggregate exports. */
+  packetId: string;
+  schemaVersion: typeof PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION;
+  /** Hash of this packet's exact membership and visible content. */
+  contentFingerprint: string;
+  items: readonly PrototypePilotQuestion[];
+}
+
 function promotionFor(familyId: SceneFamilyId) {
   const family = CURRENT_FAMILY_PROMOTION_REGISTRY.find((entry) => entry.familyId === familyId);
+  // A family with no bands has been withdrawn by the human gate; there is
+  // nothing to pilot until a redesign gives it an eligible band again.
+  if (family && family.bands.length === 0) return null;
   const band = family?.bands.find((entry) => entry.validatedDifficultyBuckets.length > 0);
   if (!band || band.validatedDifficultyBuckets.length !== 1) {
     throw new Error(`${familyId} needs exactly one code-valid pilot band and bucket`);
@@ -46,6 +63,7 @@ export function prototypePilotCandidate(familyId: SceneFamilyId, representative:
 export function buildPrototypePilotQuestions(): PrototypePilotQuestion[] {
   return SCENE_FAMILY_IDS.flatMap((familyId) => {
     const promotion = promotionFor(familyId);
+    if (!promotion) return [];
     return Array.from({ length: PILOT_ITEMS_PER_FAMILY }, (_, index) => {
       const representative = index + 1;
       const candidate = prototypePilotCandidate(familyId, representative);
@@ -57,6 +75,89 @@ export function buildPrototypePilotQuestions(): PrototypePilotQuestion[] {
       };
     });
   });
+}
+
+/**
+ * Six fixed, near-equal packets cover the 57 eligible representatives once.
+ *
+ * A family's three representatives land in three different packets. The
+ * staggered assignment also gives every packet a spread of the fixed family
+ * list without turning the moderator's packet label into a participant record.
+ */
+export function buildPrototypePilotPackets(): PrototypePilotPacket[] {
+  const questions = buildPrototypePilotQuestions();
+  const packetItems = Array.from({ length: 6 }, () => [] as PrototypePilotQuestion[]);
+  const familyIndex = new Map(
+    [...new Set(questions.map((question) => question.familyId))].map((familyId, index) => [familyId, index]),
+  );
+
+  for (const question of questions) {
+    const index = familyIndex.get(question.familyId);
+    if (index === undefined) throw new Error(`pilot family ${question.familyId} is missing from the assignment`);
+    const representative = Number(question.itemId.split(":r")[1]);
+    const packetIndex = (index + (representative - 1) * 2) % packetItems.length;
+    packetItems[packetIndex].push(question);
+  }
+
+  return packetItems.map((items, index) => {
+    if (items.length > PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET) {
+      throw new Error(`pilot packet ${index + 1} exceeds ${PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET} items`);
+    }
+    return {
+      packetId: `pilot-v1-${String.fromCharCode(97 + index)}`,
+      schemaVersion: PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION,
+      contentFingerprint: prototypePilotPacketFingerprint(items),
+      items,
+    };
+  });
+}
+
+/**
+ * Identity of what a packet actually contains, not just what it is called.
+ *
+ * A packet id is stable by construction, but its membership is derived from the
+ * current family list — so `pilot-v1-a` run before and after a family change is
+ * two different packets wearing one name. Recording this hash with a result
+ * makes that detectable instead of silently pooling two populations.
+ */
+export function prototypePilotPacketFingerprint(
+  items: readonly PrototypePilotQuestion[],
+): string {
+  const canonical = items.map((item) => ({
+    itemId: item.itemId,
+    familyId: item.familyId,
+    band: item.band,
+    difficultyBucket: item.difficultyBucket,
+    puzzle: item.puzzle,
+  }));
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex").slice(0, 16);
+}
+
+export function findPrototypePilotPacket(packetId: string): PrototypePilotPacket | undefined {
+  return buildPrototypePilotPackets().find((packet) => packet.packetId === packetId);
+}
+
+export function prototypePilotAggregateFilename(packetId: string): string {
+  if (!PACKET_ID_PATTERN.test(packetId)) throw new Error("unknown pilot packet");
+  return `aiq-prototype-${packetId}.json`;
+}
+
+/**
+ * Order is reproducible for a moderator's session label but changes between
+ * labels, so repeated sessions do not always encounter families in one order.
+ */
+export function orderPrototypePilotPacket(
+  packet: PrototypePilotPacket,
+  sessionLabel: string,
+): PrototypePilotQuestion[] {
+  const normalizedLabel = sessionLabel.trim();
+  if (!normalizedLabel || normalizedLabel.length > 80) {
+    throw new Error("pilot session label must contain 1 to 80 characters");
+  }
+  return shuffled(
+    seededRng(PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION, `${packet.packetId}:${normalizedLabel}`),
+    packet.items,
+  );
 }
 
 export function gradePrototypePilotAnswer(itemId: string, selectedOption: number): {

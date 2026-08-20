@@ -1,0 +1,1390 @@
+{
+  "runId": "2026-08-19T08-03-37.865Z-google-gemini-2-5-flash-lite-image",
+  "startedAt": "2026-08-19T08:03:37.865Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-flash-lite",
+  "channel": "image",
+  "promptVersion": "solver-v2",
+  "attempts": [
+    {
+      "itemId": "expanded-pilot-a-0-3-relational-sequence-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1829,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:39.697Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-2-relational-outlier-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 2266,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-outlier-v1",
+        "programFingerprint": "1eda972fd705ba18",
+        "featureBucket": "relational-outlier-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:40.134Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-1-relational-sequence-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 2453,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:40.320Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-4-relational-outlier-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1210,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-outlier-v1",
+        "programFingerprint": "1eda972fd705ba18",
+        "featureBucket": "relational-outlier-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:40.907Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-6-compositional-analogy-v1",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1305,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "compositional-analogy-v1",
+        "programFingerprint": "082ef7f41548d406",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:41.626Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-5-relational-sequence-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1903,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:42.038Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-7-spatial-transform-v1",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1316,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "spatial-transform-v1",
+        "programFingerprint": "3fa61c1bacd4bd07",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:42.224Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-8-compositional-analogy-v1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1327,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "compositional-analogy-v1",
+        "programFingerprint": "082ef7f41548d406",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:42.953Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-9-spatial-transform-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1083,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "spatial-transform-v1",
+        "programFingerprint": "738de56c434e24e2",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:43.122Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-10-second-order-sequence-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1323,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "second-order-sequence-v1",
+        "programFingerprint": "4b7163baf4ebfd24",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:43.547Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-12-second-order-sequence-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1256,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "second-order-sequence-v1",
+        "programFingerprint": "4b7163baf4ebfd24",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:44.378Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-11-inverse-analogy-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 2043,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-analogy-v1",
+        "programFingerprint": "6bc188b4ccb57881",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:44.996Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-13-inverse-analogy-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1611,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-analogy-v1",
+        "programFingerprint": "6bc188b4ccb57881",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:45.158Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-14-containment-analogy-v1",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1009,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "containment-analogy-v1",
+        "programFingerprint": "7221416ade151986",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:45.387Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-15-interleaved-sequence-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1349,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "interleaved-sequence-v1",
+        "programFingerprint": "1ccc0e3a2b5786d4",
+        "featureBucket": "interleaved-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:46.345Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-17-fold-punch-v1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1130,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "fold-punch-v1",
+        "programFingerprint": "33e52953e4eb1fa9",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:46.518Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-16-relational-matrix-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1571,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-matrix-v1",
+        "programFingerprint": "98e9d3cedc3be2d7",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:46.730Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-19-constraint-mosaic-v1",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1491,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "constraint-mosaic-v1",
+        "programFingerprint": "e0c521bbab9c8897",
+        "featureBucket": "constraint-mosaic-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:48.009Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-20-relational-matrix-v1",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1478,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-matrix-v1",
+        "programFingerprint": "98e9d3cedc3be2d7",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:48.209Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-18-topology-path-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 2738,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "topology-path-v1",
+        "programFingerprint": "8f8d3d4ec8f6ebb5",
+        "featureBucket": "topology-path-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:49.083Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-22-topology-path-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1329,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "topology-path-v1",
+        "programFingerprint": "8f8d3d4ec8f6ebb5",
+        "featureBucket": "topology-path-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:49.538Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-21-fold-punch-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 2239,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "fold-punch-v1",
+        "programFingerprint": "33e52953e4eb1fa9",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:50.249Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-24-visual-set-algebra-v1",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1196,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "visual-set-algebra-v1",
+        "programFingerprint": "2dcf2a824e1419cf",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:50.735Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-23-minimal-repair-v1",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 2143,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "minimal-repair-v1",
+        "programFingerprint": "e6c625c2a6f52ea7",
+        "featureBucket": "minimal-repair-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:51.227Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-25-minimal-repair-v1",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1175,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "minimal-repair-v1",
+        "programFingerprint": "d282eb4d75290e1f",
+        "featureBucket": "minimal-repair-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:51.424Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-26-inverse-fold-punch-v1",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1449,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-fold-punch-v1",
+        "programFingerprint": "aa15d895c23b487c",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:52.184Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-27-rule-switching-v1",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1265,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "rule-switching-v1",
+        "programFingerprint": "268d06c6d4f32471",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:52.492Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-28-concept-induction-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1307,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "concept-induction-v1",
+        "programFingerprint": "1810cbf4f55ab863",
+        "featureBucket": "concept-induction-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:52.732Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-29-transformation-machine-v2",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1590,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "transformation-machine-v2",
+        "programFingerprint": "b44546ab9c578d90",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:53.775Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-30-inverse-fold-punch-v1",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1431,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-fold-punch-v1",
+        "programFingerprint": "aa15d895c23b487c",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:53.924Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-1-relational-sequence-v1",
+      "chosen": 0,
+      "correct": true,
+      "latencyMs": 1362,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:54.095Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-4-relational-outlier-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 973,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-outlier-v1",
+        "programFingerprint": "1eda972fd705ba18",
+        "featureBucket": "relational-outlier-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:55.068Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-3-relational-sequence-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1287,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:55.212Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-2-relational-outlier-v1",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1573,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-outlier-v1",
+        "programFingerprint": "1eda972fd705ba18",
+        "featureBucket": "relational-outlier-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:55.348Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-5-relational-sequence-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1239,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-sequence-v1",
+        "programFingerprint": "c3bf3720a54dd711",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:56.308Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-6-compositional-analogy-v1",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1244,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "compositional-analogy-v1",
+        "programFingerprint": "082ef7f41548d406",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:03:56.456Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-7-spatial-transform-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1309,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "spatial-transform-v1",
+        "programFingerprint": "3fa61c1bacd4bd07",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:03:56.657Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-8-compositional-analogy-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1038,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "compositional-analogy-v1",
+        "programFingerprint": "082ef7f41548d406",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:57.346Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-9-spatial-transform-v1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 1503,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "spatial-transform-v1",
+        "programFingerprint": "738de56c434e24e2",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:57.959Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-11-inverse-analogy-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1335,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-analogy-v1",
+        "programFingerprint": "6bc188b4ccb57881",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:58.681Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-10-second-order-sequence-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 2177,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "second-order-sequence-v1",
+        "programFingerprint": "4b7163baf4ebfd24",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:03:58.834Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-12-second-order-sequence-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1147,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "second-order-sequence-v1",
+        "programFingerprint": "4b7163baf4ebfd24",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:03:59.106Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-13-inverse-analogy-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1488,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-analogy-v1",
+        "programFingerprint": "6bc188b4ccb57881",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:04:00.169Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-14-containment-analogy-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1460,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "containment-analogy-v1",
+        "programFingerprint": "7221416ade151986",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:04:00.295Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-15-interleaved-sequence-v1",
+      "chosen": 3,
+      "correct": true,
+      "latencyMs": 2232,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "interleaved-sequence-v1",
+        "programFingerprint": "1ccc0e3a2b5786d4",
+        "featureBucket": "interleaved-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:04:01.338Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-16-relational-matrix-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1309,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-matrix-v1",
+        "programFingerprint": "98e9d3cedc3be2d7",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:04:01.478Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-17-fold-punch-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1337,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "fold-punch-v1",
+        "programFingerprint": "33e52953e4eb1fa9",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:04:01.632Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-18-topology-path-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1041,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "topology-path-v1",
+        "programFingerprint": "8f8d3d4ec8f6ebb5",
+        "featureBucket": "topology-path-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:04:02.379Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-20-relational-matrix-v1",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1079,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "relational-matrix-v1",
+        "programFingerprint": "98e9d3cedc3be2d7",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:04:02.712Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-19-constraint-mosaic-v1",
+      "chosen": 1,
+      "correct": true,
+      "latencyMs": 1382,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "constraint-mosaic-v1",
+        "programFingerprint": "e0c521bbab9c8897",
+        "featureBucket": "constraint-mosaic-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:04:02.860Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-21-fold-punch-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 955,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "fold-punch-v1",
+        "programFingerprint": "33e52953e4eb1fa9",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:04:03.334Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-22-topology-path-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1087,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "topology-path-v1",
+        "programFingerprint": "8f8d3d4ec8f6ebb5",
+        "featureBucket": "topology-path-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:04:03.799Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-23-minimal-repair-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1480,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "minimal-repair-v1",
+        "programFingerprint": "e6c625c2a6f52ea7",
+        "featureBucket": "minimal-repair-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:04:04.340Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-24-visual-set-algebra-v1",
+      "chosen": 2,
+      "correct": false,
+      "latencyMs": 1499,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "visual-set-algebra-v1",
+        "programFingerprint": "2dcf2a824e1419cf",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:04:04.834Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-26-inverse-fold-punch-v1",
+      "chosen": 0,
+      "correct": false,
+      "latencyMs": 1697,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-fold-punch-v1",
+        "programFingerprint": "aa15d895c23b487c",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:04:06.037Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-27-rule-switching-v1",
+      "chosen": 1,
+      "correct": false,
+      "latencyMs": 1204,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "rule-switching-v1",
+        "programFingerprint": "268d06c6d4f32471",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-19T08:04:06.038Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-25-minimal-repair-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 2239,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "minimal-repair-v1",
+        "programFingerprint": "d282eb4d75290e1f",
+        "featureBucket": "minimal-repair-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-19T08:04:06.038Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-28-concept-induction-v1",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1562,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "concept-induction-v1",
+        "programFingerprint": "1810cbf4f55ab863",
+        "featureBucket": "concept-induction-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:04:07.600Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-30-inverse-fold-punch-v1",
+      "chosen": 2,
+      "correct": true,
+      "latencyMs": 1671,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "inverse-fold-punch-v1",
+        "programFingerprint": "aa15d895c23b487c",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-19T08:04:07.710Z"
+    },
+    {
+      "itemId": "expanded-pilot-a-0-29-transformation-machine-v2",
+      "chosen": 3,
+      "correct": false,
+      "latencyMs": 1781,
+      "generation": {
+        "generatorVersion": "scene-families-v3",
+        "familyId": "transformation-machine-v2",
+        "programFingerprint": "b44546ab9c578d90",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-19T08:04:07.819Z"
+    }
+  ]
+}
