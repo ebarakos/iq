@@ -5,8 +5,17 @@ import {
 import { eligibleFamiliesForBand } from "@/items/expanded-quiz";
 import type { GenerationMetadata, Puzzle, Visual } from "@/items/schema";
 
-/** Two observations per family keeps the standard probe broader than one lucky draw. */
-export const STANDARD_PROBE_MINIMUM = 2;
+/**
+ * Observations per family required by the standard probe.
+ *
+ * Raised from two to five on 2026-08-23. At two, a family reading "50%" had
+ * missed one item, which is indistinguishable from noise — the first v7 probe
+ * produced six such families and none of them supported a conclusion. Five is
+ * the smallest count where a single miss (80%) and a real weakness (40%) look
+ * different. It is still far too small for a confidence interval; it is enough
+ * to decide which families are worth a longer look.
+ */
+export const STANDARD_PROBE_MINIMUM = 5;
 
 export interface ProbeCoverageRequirements {
   families: readonly string[];

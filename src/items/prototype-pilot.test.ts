@@ -3,6 +3,7 @@ import {
   PILOT_ITEMS_PER_FAMILY,
   PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION,
   PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET,
+  PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION,
   buildPrototypePilotQuestions,
   buildPrototypePilotPackets,
   gradePrototypePilotAnswer,
@@ -10,18 +11,22 @@ import {
   prototypePilotAggregateFilename,
 } from "./prototype-pilot";
 import { SCENE_FAMILY_IDS, generateSceneFamilyCandidate } from "./scene-families";
+import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "./family-promotion";
 import { seededRng } from "../lib/rng";
 
 describe("prototype pilot manifest", () => {
   it("serves three fixed answer-free representatives for every family", () => {
     const questions = buildPrototypePilotQuestions();
-    // topology-path-v1 is withdrawn (no eligible band), so the gallery skips it.
-    expect(questions).toHaveLength((SCENE_FAMILY_IDS.length - 1) * PILOT_ITEMS_PER_FAMILY);
-    expect(questions.some((question) => question.familyId === "topology-path-v1")).toBe(false);
+    // The gallery follows the registry: a family with no eligible band is
+    // withdrawn and must not appear, however many are withdrawn at the time.
+    const eligible = CURRENT_FAMILY_PROMOTION_REGISTRY
+      .filter((family) => family.bands.some((band) => band.state !== "prototype" && band.validatedDifficultyBuckets.length > 0))
+      .map((family) => family.familyId);
+    expect(questions).toHaveLength(eligible.length * PILOT_ITEMS_PER_FAMILY);
     expect(new Set(questions.map((question) => question.itemId)).size).toBe(questions.length);
     for (const familyId of SCENE_FAMILY_IDS) {
-      if (familyId === "topology-path-v1") continue;
-      expect(questions.filter((question) => question.familyId === familyId)).toHaveLength(3);
+      const expected = eligible.includes(familyId) ? PILOT_ITEMS_PER_FAMILY : 0;
+      expect(questions.filter((question) => question.familyId === familyId), familyId).toHaveLength(expected);
     }
     for (const question of questions) {
       expect(question.puzzle).not.toHaveProperty("answerIndex");
@@ -45,14 +50,12 @@ describe("prototype pilot manifest", () => {
     const packets = buildPrototypePilotPackets();
     const questions = buildPrototypePilotQuestions();
 
-    expect(packets.map((packet) => packet.packetId)).toEqual([
-      "pilot-v1-a",
-      "pilot-v1-b",
-      "pilot-v1-c",
-      "pilot-v1-d",
-      "pilot-v1-e",
-      "pilot-v1-f",
-    ]);
+    // Derived, not hardcoded: the packet count follows the battery size, which
+    // shrinks whenever the human gate withdraws a family.
+    const expectedCount = Math.ceil(questions.length / PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET);
+    expect(packets.map((packet) => packet.packetId)).toEqual(
+      Array.from({ length: expectedCount }, (_, index) => `pilot-v2-${String.fromCharCode(97 + index)}`),
+    );
     expect(packets.flatMap((packet) => packet.items).map((item) => item.itemId).sort())
       .toEqual(questions.map((item) => item.itemId).sort());
     expect(Math.max(...packets.map((packet) => packet.items.length))).toBeLessThanOrEqual(
@@ -77,7 +80,11 @@ describe("prototype pilot manifest", () => {
 
   it("uses a versioned aggregate envelope and packet-specific export filename", () => {
     expect(PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION).toBe("prototype-pilot-aggregate-v1");
-    expect(prototypePilotAggregateFilename("pilot-v1-c")).toBe("aiq-prototype-pilot-v1-c.json");
-    expect(() => prototypePilotAggregateFilename("pilot-v1-z")).toThrow(/unknown/);
+    expect(PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION).toBe("prototype-pilot-packets-v2");
+    expect(prototypePilotAggregateFilename("pilot-v2-b")).toBe("aiq-prototype-pilot-v2-b.json");
+    expect(() => prototypePilotAggregateFilename("pilot-v2-z")).toThrow(/unknown/);
+    // A packet name from the previous, longer pilot must not resolve — its
+    // packets held different items, and a result filed under it is not comparable.
+    expect(() => prototypePilotAggregateFilename("pilot-v1-a")).toThrow(/unknown/);
   });
 });

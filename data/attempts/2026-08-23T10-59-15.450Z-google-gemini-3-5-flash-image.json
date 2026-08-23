@@ -1,0 +1,786 @@
+{
+  "runId": "2026-08-23T10-59-15.450Z-google-gemini-3-5-flash-image",
+  "startedAt": "2026-08-23T10:59:15.450Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3.5-flash",
+  "channel": "image",
+  "promptVersion": "solver-v2",
+  "source": "generated",
+  "profile": "long-30",
+  "runSeed": "probe-v7-strong",
+  "generatorVersion": "scene-families-v7",
+  "withdrawnFamilyIds": [],
+  "plannedAttempts": 32,
+  "completedAttempts": 32,
+  "status": "complete",
+  "attempts": [
+    {
+      "itemId": "expanded-391714c57bbfb098-2-relational-sequence-v2",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 6876,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "9dd797ae4fc64ed7",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-23T10:59:22.329Z"
+    },
+    {
+      "itemId": "expanded-2306533a60effbb5-1-attribute-pairing-v1",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 8525,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "60a462b9ea737088",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-23T10:59:23.977Z"
+    },
+    {
+      "itemId": "expanded-15e23c72222884e8-4-relational-sequence-v2",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 7726,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "33c999bf78599dc6",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-23T10:59:31.703Z"
+    },
+    {
+      "itemId": "expanded-313e0c7b129cd581-3-attribute-pairing-v1",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 14664,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "7864541be506af9f",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-23T10:59:36.993Z"
+    },
+    {
+      "itemId": "expanded-7938828fa326471e-6-compositional-analogy-v2",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 8371,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "11d488e71656f1cc",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T10:59:40.074Z"
+    },
+    {
+      "itemId": "expanded-da460adb64ebfd3b-8-compositional-analogy-v2",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 9395,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "620445f9d3111370",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T10:59:49.470Z"
+    },
+    {
+      "itemId": "expanded-e38b3ff684d58185-7-inverse-analogy-v2",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "latencyMs": 36017,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "6be0c1b98de58500",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-23T11:00:13.011Z"
+    },
+    {
+      "itemId": "expanded-5542683ce99b8dc5-9-composed-transform-v1",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 26459,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "composed-transform-v1",
+        "programFingerprint": "176d549d1d48f881",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-23T11:00:15.930Z"
+    },
+    {
+      "itemId": "expanded-fa53ddd04f06584e-10-inverse-analogy-v2",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 10741,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "176310276fbeaaad",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-23T11:00:23.752Z"
+    },
+    {
+      "itemId": "expanded-9e06ab9f6acba089-11-containment-analogy-v2",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "latencyMs": 38995,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "e0f4d3ffed410afc",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-23T11:00:54.927Z"
+    },
+    {
+      "itemId": "expanded-012d3cff622f2dcc-14-containment-analogy-v2",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "latencyMs": 11796,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "e6471cd769f621aa",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-23T11:01:06.723Z"
+    },
+    {
+      "itemId": "expanded-ea1c16ff05c1fe62-16-fold-punch-v2",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 14247,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "4618a8f0da75b055",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-23T11:01:20.971Z"
+    },
+    {
+      "itemId": "expanded-a03d1397e30a81d3-12-composed-transform-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "timeout",
+      "latencyMs": 60008,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "composed-transform-v1",
+        "programFingerprint": "28342404e884b42a",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "The operation was aborted due to timeout",
+      "ts": "2026-08-23T11:01:23.760Z"
+    },
+    {
+      "itemId": "expanded-09fd3c52c663de20-17-relational-matrix-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 6534,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "56ef48bbb7763a77",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-23T11:01:27.506Z"
+    },
+    {
+      "itemId": "expanded-8e87ff459c181a87-18-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "unparseable",
+      "latencyMs": 22654,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "f3226f859109128e",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "An analysis of the folding pattern reveals the following:\n\n1. **Folding Process:** \n   - The vertical dashed line down the center of column 2 with an arrow pointing left represents folding the right s",
+      "ts": "2026-08-23T11:01:46.415Z"
+    },
+    {
+      "itemId": "expanded-aef7bb8affea8b48-20-relational-matrix-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 6322,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "83c1446f74548ec5",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-23T11:01:52.738Z"
+    },
+    {
+      "itemId": "expanded-40a153eeafda7e3a-19-visual-set-algebra-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 29981,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "52e554e74bebf707",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-23T11:01:57.488Z"
+    },
+    {
+      "itemId": "expanded-7af3ac8e67755759-22-visual-set-algebra-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 8658,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "8faeadbbee5c8b0a",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-23T11:02:01.397Z"
+    },
+    {
+      "itemId": "expanded-58c865eada47ed8b-26-rule-switching-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 14851,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "525c0faefd8a49b7",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-23T11:02:12.339Z"
+    },
+    {
+      "itemId": "expanded-694e62f8c015f5a6-27-concept-induction-v2",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 14217,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "concept-induction-v2",
+        "programFingerprint": "3838181a0c99f265",
+        "featureBucket": "concept-induction-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T11:02:15.615Z"
+    },
+    {
+      "itemId": "expanded-dab7b8d8671897c9-29-rule-switching-v2",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 20862,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "e2dd5ba3fb649335",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-23T11:02:36.478Z"
+    },
+    {
+      "itemId": "expanded-7b19fcec48f6ae95-30-concept-induction-v2",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 13919,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "concept-induction-v2",
+        "programFingerprint": "6b8a9d484c7dd732",
+        "featureBucket": "concept-induction-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-23T11:02:50.397Z"
+    },
+    {
+      "itemId": "expanded-cbd4ee48bcb27c72-28-transformation-machine-v3",
+      "chosen": null,
+      "correct": false,
+      "outcome": "unparseable",
+      "latencyMs": 51506,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "fccc00d53616d3de",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "An analysis of the transformations in each row reveals the following rules:\n\n1. **Triangle Operator (Move):** Rotates all shapes $90^\\circ$ counter-clockwise around the center of the grid $(2,2)$. \n  ",
+      "ts": "2026-08-23T11:03:03.846Z"
+    },
+    {
+      "itemId": "expanded-f90d2a26c43a359a-9-second-order-sequence-v2",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 13912,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "df9837df1a6a780d",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T11:03:04.310Z"
+    },
+    {
+      "itemId": "expanded-ccb379364bedfb46-11-second-order-sequence-v2",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 27998,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "0e2aa773f31fa32c",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-23T11:03:31.845Z"
+    },
+    {
+      "itemId": "expanded-699434d4903efa5a-26-transformation-machine-v3",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 34261,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "fccc00d53616d3de",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T11:03:38.573Z"
+    },
+    {
+      "itemId": "expanded-9a66472ed0110eaf-30-inverse-fold-punch-v2",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 24298,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "3f56e79fc6bba3de",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "**F**",
+      "ts": "2026-08-23T11:04:02.872Z"
+    },
+    {
+      "itemId": "expanded-c1e9d00299b058c9-7-spatial-transform-v2",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 6784,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "88d2f96f1a5fcf42",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-23T11:04:09.657Z"
+    },
+    {
+      "itemId": "expanded-88a56c3357c9b368-9-spatial-transform-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 5471,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "8deef2bce36a15db",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T11:04:15.128Z"
+    },
+    {
+      "itemId": "expanded-8b62870de22622bd-27-inverse-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "unparseable",
+      "latencyMs": 46561,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "3cc441d6a2cc4c6a",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "An analysis of the visual puzzle reveals the following logic:\n\n1. **First Pair Relationship ($1 : 2$):** \n   * Image 1 contains two black triangles at the top-left $(1,1)$ and top-right $(1,3)$.\n   * ",
+      "ts": "2026-08-23T11:04:18.407Z"
+    },
+    {
+      "itemId": "expanded-5475b1ac6e2b578f-14-interleaved-sequence-v2",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 12824,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "interleaved-sequence-v2",
+        "programFingerprint": "03fcabfbd4d54d85",
+        "featureBucket": "interleaved-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-23T11:04:31.232Z"
+    },
+    {
+      "itemId": "expanded-b97142795caa0456-12-interleaved-sequence-v2",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "latencyMs": 18113,
+      "generation": {
+        "generatorVersion": "scene-families-v7",
+        "familyId": "interleaved-sequence-v2",
+        "programFingerprint": "87343e2f3b55284d",
+        "featureBucket": "interleaved-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-23T11:04:33.242Z"
+    }
+  ]
+}

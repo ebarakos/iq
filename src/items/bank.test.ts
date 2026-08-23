@@ -24,9 +24,13 @@ describe("fingerprintPuzzle", () => {
   });
 
   it("changes when the marked answer changes", () => {
-    const odd = loadBank().find((i) => i.puzzle.type === "oddOneOut")!.puzzle;
-    const otherIndex = odd.options.findIndex((_, i) => i !== odd.answerIndex);
-    expect(fingerprintPuzzle({ ...odd, answerIndex: otherIndex })).not.toBe(fingerprintPuzzle(odd));
+    // Any banked item will do. This used to reach for an oddOneOut item, which
+    // stopped existing on 2026-08-23 when the last odd-one-out family was
+    // withdrawn — the assertion is about the fingerprint, not about a type.
+    const item = loadBank()[0]!.puzzle;
+    const otherIndex = item.options.findIndex((_, i) => i !== item.answerIndex);
+    expect(otherIndex).toBeGreaterThanOrEqual(0);
+    expect(fingerprintPuzzle({ ...item, answerIndex: otherIndex })).not.toBe(fingerprintPuzzle(item));
   });
 
   it("prefixes ids by type", () => {

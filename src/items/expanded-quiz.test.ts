@@ -12,6 +12,7 @@ import {
   FAMILY_SUBSAMPLE_SIZES,
   eligibleFamiliesForBand,
   MINIMUM_DISTINCT_FAMILIES,
+  MINIMUM_ELIGIBLE_FAMILIES,
   planExpandedSchedule,
   questionCount,
   type ExpandedProfile,
@@ -28,8 +29,15 @@ function bandOrder(profile: ExpandedProfile): string[] {
 describe("eligible family pool", () => {
   it("offers every code-valid family, each only in its registered band", () => {
     const byBand = EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band));
-    expect(byBand.map((families) => families.length)).toEqual([3, 7, 5, 4]);
-    expect(byBand.flat()).toHaveLength(19);
+    // Derived from the registry, not hardcoded: a withdrawal is a normal event
+    // and must not need this number edited. What matters is that every band can
+    // still fill the long test and that each family appears in exactly one band.
+    const eligible = REGISTRY.filter((family) => family.bands.some((band) => band.state !== "prototype" && band.validatedDifficultyBuckets.length > 0));
+    expect(byBand.flat()).toHaveLength(eligible.length);
+    expect(new Set(byBand.flat().map((family) => family.familyId)).size).toBe(eligible.length);
+    EXPANDED_PROFILE_BANDS.forEach((band, index) => {
+      expect(byBand[index].length, band).toBeGreaterThanOrEqual(MINIMUM_ELIGIBLE_FAMILIES["long-30"][band]);
+    });
     expect(byBand.flat().every((family) => family.difficulty >= 2 && family.difficulty <= 5)).toBe(true);
 
     const composition = eligibleFamiliesForBand(REGISTRY, "composition").map((f) => f.familyId);

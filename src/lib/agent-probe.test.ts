@@ -7,6 +7,7 @@ import {
   probeCoverage,
   selectCoverageItems,
   standardProbeRequirements,
+  STANDARD_PROBE_MINIMUM,
 } from "./agent-probe";
 
 describe("standard generated probe coverage", () => {
@@ -20,8 +21,9 @@ describe("standard generated probe coverage", () => {
     const selected = selectCoverageItems(pool, requirements);
     const report = probeCoverage(selected, requirements);
 
-    expect(requirements.families).toHaveLength(19);
-    expect(requirements.minimum).toBe(2);
+    const eligible = CURRENT_FAMILY_PROMOTION_REGISTRY.filter((family) => family.bands.some((band) => band.state !== "prototype" && band.validatedDifficultyBuckets.length > 0));
+    expect(requirements.families).toHaveLength(eligible.length);
+    expect(requirements.minimum).toBe(STANDARD_PROBE_MINIMUM);
     expect(coverageComplete(report)).toBe(true);
     expect(selected.length).toBeGreaterThanOrEqual(requirements.families.length * requirements.minimum);
   });

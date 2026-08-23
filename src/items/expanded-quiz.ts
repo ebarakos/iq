@@ -28,9 +28,10 @@ import {
  * seeded family-pool subsampling, so it is likewise a separate population.
  * `v6` serves `OPTIONS_PER_ITEM` options instead of four, which lowers the value
  * of a guess and changes every family's near misses — results from `v5` and `v6`
- * are not comparable and must never be pooled.
+ * are not comparable and must never be pooled. `v7` withdraws the three families
+ * that showed no worked evidence, so its family pool is smaller than `v6`'s.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v6" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v7" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -53,7 +54,11 @@ export const BAND_SCHEDULE: Readonly<
 export const MINIMUM_ELIGIBLE_FAMILIES: Readonly<
   Record<ExpandedProfile, Readonly<Record<ExpandedProfileBand, number>>>
 > = {
-  "long-30": { warmup: 2, composition: 4, "constraint-spatial": 4, "induction-transfer": 3 },
+  // constraint-spatial dropped from five families to three on 2026-08-23, when
+  // constraint-mosaic and minimal-repair were withdrawn for showing no worked
+  // evidence. Three is now its real floor, not a comfortable one: ten questions
+  // over three families means each is seen three or four times in a long test.
+  "long-30": { warmup: 2, composition: 4, "constraint-spatial": 3, "induction-transfer": 3 },
   "short-5": { warmup: 1, composition: 1, "constraint-spatial": 2, "induction-transfer": 1 },
 };
 
@@ -72,7 +77,7 @@ export const FAMILY_SUBSAMPLE_SIZES: Readonly<
 > = {
   warmup: undefined,
   composition: 4,
-  "constraint-spatial": 4,
+  "constraint-spatial": 3,
   "induction-transfer": 3,
 };
 
@@ -87,11 +92,18 @@ const RETRY_BUDGET = 4;
  * their evidence is not in the stem: an outlier item is read across its four
  * options, and a mosaic, path, or repair board is read as a whole.
  */
+/**
+ * Every served item must show at least this many visible panels.
+ *
+ * This is what makes an item a reasoning question rather than a guess: the
+ * panels demonstrate the rule, and the options ask for it applied. A single
+ * board with six variations of itself shows nothing to infer from — the solver
+ * has to guess which property matters. `singleScene` and empty-stem layouts
+ * were exempted here until 2026-08-23, when the user hit them in the pilot and
+ * ruled them out; the exemption is gone rather than narrowed, so no future
+ * family can reintroduce the shape.
+ */
 const MINIMUM_VISIBLE_STEM_PANELS = 2;
-
-function needsWorkedExamples(puzzle: Puzzle<Scene>): boolean {
-  return puzzle.layout !== "singleScene" && puzzle.stem.length > 0;
-}
 
 export function questionCount(profile: ExpandedProfile): number {
   return EXPANDED_PROFILE_BANDS.reduce((total, band) => total + BAND_SCHEDULE[profile][band], 0);
@@ -437,7 +449,7 @@ export function assembleExpandedQuiz(
         continue;
       }
       const visiblePanels = puzzle.stem.filter((panel) => !("blank" in panel)).length;
-      if (needsWorkedExamples(puzzle) && visiblePanels < MINIMUM_VISIBLE_STEM_PANELS) {
+      if (visiblePanels < MINIMUM_VISIBLE_STEM_PANELS) {
         rejections.push(`only ${visiblePanels} visible stem panels`);
         continue;
       }

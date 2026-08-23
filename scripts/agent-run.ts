@@ -76,6 +76,9 @@ import {
 
 const ATTEMPTS_DIR = new URL("../data/attempts/", import.meta.url).pathname;
 
+/** Matches the AttemptSchema cap; enough to audit a reasoning reply after the run. */
+const RAW_REPLY_CHARS = 2000;
+
 const { values: args } = parseArgs({
   options: {
     items: { type: "string" },
@@ -297,7 +300,7 @@ async function main() {
           latencyMs: outcome.latencyMs,
           generation: canonical.generation,
           attemptBudget: 1,
-          raw: outcome.raw.slice(0, 200),
+          raw: outcome.raw.slice(0, RAW_REPLY_CHARS),
           ts: new Date().toISOString(),
         });
       } catch (err) {
@@ -310,7 +313,7 @@ async function main() {
           latencyMs: Date.now() - attemptStarted,
           generation: canonical.generation,
           attemptBudget: 1,
-          raw: (err instanceof Error ? err.message : String(err)).slice(0, 200),
+          raw: (err instanceof Error ? err.message : String(err)).slice(0, RAW_REPLY_CHARS),
           ts: new Date().toISOString(),
         });
         if (outcome === "rate-limit") {

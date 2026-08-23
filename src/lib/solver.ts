@@ -18,7 +18,13 @@ import { puzzleToSvg } from "@/items/compose-image";
  * prompt revisions (see AttemptFile.promptVersion).
  */
 
-export const SOLVER_PROMPT_VERSION = "solver-v2";
+/**
+ * Version of the whole reply-to-answer path, not just the prompt text. Reports
+ * group by it so runs measured under different rules are never pooled. `v3`
+ * keeps `v2`'s prompt but scans the entire reply and prefers the last letter;
+ * `v2` read only the first 200 characters and took the first letter.
+ */
+export const SOLVER_PROMPT_VERSION = "solver-v3";
 
 /** Fixed neutral instruction — identical across channels and models. */
 const SOLVER_PROMPT =
@@ -45,30 +51,40 @@ export interface SolveOutcome {
 /**
  * Parse a single option letter (A–F) out of a model reply. Tolerant, in order:
  *   1. the whole trimmed reply is exactly one A–F letter;
- *   2. an "Answer: C" style declaration;
- *   3. the first standalone A–F token (word boundary, case-insensitive) within
- *      the first 200 chars.
+ *   2. the LAST "Answer: C" style declaration anywhere in the reply;
+ *   3. the LAST standalone A–F token (word boundary, case-insensitive).
  * Returns the 0-based index, or null when nothing in range is found. Letters
  * beyond `optionCount` (e.g. "F" with 4 options) are treated as out of range.
+ *
+ * Why the last match and not the first: a model asked for one letter usually
+ * gives one, and rule 1 catches that. When it reasons instead, the early letters
+ * are options being weighed and discarded — "Option A keeps the fill but…" — and
+ * the conclusion is at the end. Taking the first letter would confidently record
+ * a rejected candidate as the model's answer, which is worse than recording
+ * nothing. The whole reply is scanned rather than a 200-character window: on
+ * 2026-08-23 that window silently dropped three of thirty-two answers, all on
+ * hard families, because the model wrote an analysis before concluding.
  */
 export function parseAnswerLetter(raw: string, optionCount: number): number | null {
   const inRange = (idx: number): number | null => (idx >= 0 && idx < optionCount ? idx : null);
   const letterIndex = (ch: string): number => LETTERS.indexOf(ch.toUpperCase() as (typeof LETTERS)[number]);
+  const lastMatch = (text: string, pattern: RegExp): string | null => {
+    const matches = [...text.matchAll(pattern)];
+    return matches.length > 0 ? matches[matches.length - 1][1] : null;
+  };
 
   const trimmed = raw.trim();
 
-  // 1. Exact single letter.
+  // 1. Exact single letter — the compliant reply, and the only unambiguous one.
   if (/^[a-fA-F]$/.test(trimmed)) return inRange(letterIndex(trimmed));
 
-  const head = trimmed.slice(0, 200);
+  // 2. "Answer: C" / "answer is c" style, last one wins.
+  const labelled = lastMatch(trimmed, /\banswer\b[^a-z0-9]*([a-fA-F])\b/gi);
+  if (labelled) return inRange(letterIndex(labelled));
 
-  // 2. "Answer: C" / "answer is c" style.
-  const labelled = head.match(/\banswer\b[^a-z0-9]*([a-fA-F])\b/i);
-  if (labelled) return inRange(letterIndex(labelled[1]));
-
-  // 3. First standalone A–F token (word boundary).
-  const standalone = head.match(/\b([a-fA-F])\b/);
-  if (standalone) return inRange(letterIndex(standalone[1]));
+  // 3. Last standalone A–F token (word boundary).
+  const standalone = lastMatch(trimmed, /\b([a-fA-F])\b/g);
+  if (standalone) return inRange(letterIndex(standalone));
 
   return null;
 }

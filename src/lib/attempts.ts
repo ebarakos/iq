@@ -39,8 +39,16 @@ export const AttemptSchema = z.object({
   attemptBudget: z.number().int().positive().optional(),
   /** Actual provider/model cost when supplied by a trustworthy source. */
   costUsd: z.number().finite().nonnegative().optional(),
-  /** Truncated raw model reply, for debugging odd answers. */
-  raw: z.string().max(200).optional(),
+  /**
+   * Truncated raw model reply, for debugging odd answers.
+   *
+   * Raised from 200 to 2000 characters on 2026-08-23. At 200 an unparseable
+   * reply could not be checked after the fact — the stored text was the model
+   * clearing its throat, and whether it reached the right answer further down
+   * was unknowable. 2000 holds a normal reasoning reply whole without turning
+   * the corpus into a transcript archive.
+   */
+  raw: z.string().max(2000).optional(),
   ts: z.string(), // ISO 8601
 }).superRefine((attempt, ctx) => {
   if (attempt.outcome === undefined) return;

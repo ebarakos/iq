@@ -9,12 +9,25 @@ import {
 } from "./scene-families";
 import { toPublicPuzzle, type PublicPuzzle, type Scene } from "./schema";
 
-export const PILOT_ITEMS_PER_FAMILY = 3;
-export const PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION = "prototype-pilot-packets-v1";
+/**
+ * How many items each family contributes to the pilot.
+ *
+ * Lowered from three to one on 2026-08-23 at the user's request: the whole
+ * battery was 45 items over six sittings, which is more than a person will
+ * actually sit through. One per family covers every family in two sittings.
+ *
+ * What that costs: a family is now judged on a single draw, so an unlucky
+ * instance can condemn a sound family and a lucky one can hide a weak family's
+ * variance. That is an acceptable trade while the pilot's job is the retention
+ * gate — spotting formats nobody can read, which one item shows plainly — and
+ * not difficulty calibration, which needs several items per family.
+ */
+export const PILOT_ITEMS_PER_FAMILY = 1;
+export const PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION = "prototype-pilot-packets-v2";
 export const PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION = "prototype-pilot-aggregate-v1";
 export const PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET = 10;
-const ITEM_ID_PATTERN = /^([a-z-]+-v\d+):r([1-3])$/;
-const PACKET_ID_PATTERN = /^pilot-v1-[a-f]$/;
+const ITEM_ID_PATTERN = new RegExp(`^([a-z-]+-v\\d+):r([1-${PILOT_ITEMS_PER_FAMILY}])$`);
+const PACKET_ID_PATTERN = /^pilot-v2-[a-f]$/;
 
 export interface PrototypePilotQuestion {
   itemId: string;
@@ -47,7 +60,7 @@ function promotionFor(familyId: SceneFamilyId) {
 
 export function prototypePilotCandidate(familyId: SceneFamilyId, representative: number) {
   if (!Number.isInteger(representative) || representative < 1 || representative > PILOT_ITEMS_PER_FAMILY) {
-    throw new Error("pilot representative must be 1, 2, or 3");
+    throw new Error(`pilot representative must be between 1 and ${PILOT_ITEMS_PER_FAMILY}`);
   }
   const candidate = generateSceneFamilyCandidate(
     familyId,
@@ -78,15 +91,19 @@ export function buildPrototypePilotQuestions(): PrototypePilotQuestion[] {
 }
 
 /**
- * Six fixed, near-equal packets cover the 57 eligible representatives once.
+ * The fewest near-equal packets that cover every eligible representative once.
  *
- * A family's three representatives land in three different packets. The
- * staggered assignment also gives every packet a spread of the fixed family
- * list without turning the moderator's packet label into a participant record.
+ * When a family contributes more than one representative, the staggered
+ * assignment spreads them across different packets. It also gives every packet a
+ * spread of the family list without turning the moderator's packet label into a
+ * participant record.
  */
 export function buildPrototypePilotPackets(): PrototypePilotPacket[] {
   const questions = buildPrototypePilotQuestions();
-  const packetItems = Array.from({ length: 6 }, () => [] as PrototypePilotQuestion[]);
+  // As few packets as will hold the battery. A fixed six left two or three
+  // items per sitting once the pilot shrank, which wastes a whole sitting.
+  const packetCount = Math.max(1, Math.ceil(questions.length / PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET));
+  const packetItems = Array.from({ length: packetCount }, () => [] as PrototypePilotQuestion[]);
   const familyIndex = new Map(
     [...new Set(questions.map((question) => question.familyId))].map((familyId, index) => [familyId, index]),
   );
@@ -104,7 +121,7 @@ export function buildPrototypePilotPackets(): PrototypePilotPacket[] {
       throw new Error(`pilot packet ${index + 1} exceeds ${PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET} items`);
     }
     return {
-      packetId: `pilot-v1-${String.fromCharCode(97 + index)}`,
+      packetId: `pilot-v2-${String.fromCharCode(97 + index)}`,
       schemaVersion: PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION,
       contentFingerprint: prototypePilotPacketFingerprint(items),
       items,

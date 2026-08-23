@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "prototype-pilot-aggregate-v1",
+  "packetId": "pilot-v2-b",
+  "packetContentFingerprint": "7a30daf8e2547299",
+  "aggregates": {
+    "second-order-sequence-v2:composition:second-order-sequence-d4": {
+      "familyId": "second-order-sequence-v2", "band": "composition",
+      "difficultyBuckets": ["second-order-sequence-d4"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 15, "timeHistogramSeconds": { "15": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    },
+    "relational-matrix-v2:constraint-spatial:relational-matrix-d4": {
+      "familyId": "relational-matrix-v2", "band": "constraint-spatial",
+      "difficultyBuckets": ["relational-matrix-d4"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 15, "timeHistogramSeconds": { "15": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    },
+    "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5": {
+      "familyId": "inverse-fold-punch-v2", "band": "induction-transfer",
+      "difficultyBuckets": ["inverse-fold-punch-d5"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 15, "timeHistogramSeconds": { "15": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    },
+    "rule-switching-v2:induction-transfer:rule-switching-d5": {
+      "familyId": "rule-switching-v2", "band": "induction-transfer",
+      "difficultyBuckets": ["rule-switching-d5"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 30, "timeHistogramSeconds": { "30": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    },
+    "containment-analogy-v2:composition:containment-analogy-d4": {
+      "familyId": "containment-analogy-v2", "band": "composition",
+      "difficultyBuckets": ["containment-analogy-d4"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 15, "timeHistogramSeconds": { "15": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    },
+    "spatial-transform-v2:composition:spatial-transform-d3": {
+      "familyId": "spatial-transform-v2", "band": "composition",
+      "difficultyBuckets": ["spatial-transform-d3"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 15, "timeHistogramSeconds": { "15": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    },
+    "attribute-pairing-v1:warmup:attribute-pairing-d2": {
+      "familyId": "attribute-pairing-v1", "band": "warmup",
+      "difficultyBuckets": ["attribute-pairing-d2"],
+      "representativeItemCount": 1, "attempts": 1, "minimumAttemptsPerItem": 1,
+      "correctAttempts": 1, "intendedRelationshipDescriptions": 1, "notationMisunderstandingReports": 0,
+      "medianSolveTimeSeconds": 30, "timeHistogramSeconds": { "30": 1 },
+      "allItemsPassCorrectnessContract": true, "hasRepeatedDefensibleAlternativeAnswer": false,
+      "spatialLayoutChangesAcrossViewports": true, "desktopAttempts": 1, "mobileAttempts": 0
+    }
+  }
+}

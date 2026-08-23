@@ -45,7 +45,7 @@ describe("parseAnswerLetter", () => {
   });
 
   it("exposes a stable prompt version", () => {
-    expect(SOLVER_PROMPT_VERSION).toBe("solver-v2");
+    expect(SOLVER_PROMPT_VERSION).toBe("solver-v3");
   });
 });
 
@@ -77,8 +77,10 @@ describe("AttemptFileSchema round-trip", () => {
 
     // Invalid channel is rejected.
     expect(AttemptFileSchema.safeParse({ ...artifact, channel: "audio" }).success).toBe(false);
-    // raw over 200 chars is rejected.
-    const longRaw = { ...artifact, attempts: [{ ...artifact.attempts[0], raw: "x".repeat(201) }] };
+    // A whole reasoning reply fits; a transcript does not.
+    const auditableRaw = { ...artifact, attempts: [{ ...artifact.attempts[0], raw: "x".repeat(2000) }] };
+    expect(AttemptFileSchema.safeParse(auditableRaw).success).toBe(true);
+    const longRaw = { ...artifact, attempts: [{ ...artifact.attempts[0], raw: "x".repeat(2001) }] };
     expect(AttemptFileSchema.safeParse(longRaw).success).toBe(false);
   });
 
@@ -137,5 +139,34 @@ describe("AttemptFileSchema round-trip", () => {
       ...artifact,
       attempts: [{ ...artifact.attempts[0], correct: false, outcome: "correct" }],
     }).success).toBe(false);
+  });
+});
+
+describe("parseAnswerLetter on replies that reason before concluding", () => {
+  // Regression for the 2026-08-23 probe: three of thirty-two replies were
+  // recorded unparseable because the parser read only the first 200 characters.
+  const analysis =
+    "An analysis of the folding pattern reveals the following:\n\n" +
+    "1. **Folding.** The sheet is folded along the vertical crease, so every punch " +
+    "is mirrored to the opposite column when it opens. Option A keeps only one " +
+    "punch, which cannot be right because opening a single fold always doubles " +
+    "them. Option B doubles them but mirrors across the wrong axis, and option C " +
+    "moves the punch instead of copying it.\n\n" +
+    "2. **Conclusion.** Only one board keeps the original punch and adds its " +
+    "mirror across the shown crease.\n\nAnswer: E";
+
+  it("reads the conclusion instead of the first option it discusses", () => {
+    expect(analysis.slice(0, 200)).not.toMatch(/\banswer\b/i);
+    expect(parseAnswerLetter(analysis, 6)).toBe(4);
+  });
+
+  it("falls back to the last standalone letter when there is no 'Answer:' line", () => {
+    expect(parseAnswerLetter("Option A is tempting, but the correct board is D", 6)).toBe(3);
+  });
+
+  it("still prefers a bare letter and still rejects out-of-range ones", () => {
+    expect(parseAnswerLetter("  c  ", 6)).toBe(2);
+    expect(parseAnswerLetter(analysis, 4)).toBeNull();
+    expect(parseAnswerLetter("no letter here at all", 6)).toBeNull();
   });
 });

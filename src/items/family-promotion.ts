@@ -180,9 +180,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("composition", ["composed-transform-d4"])],
   },
   {
+    // Withdrawn by the human gate on 2026-08-23. The item shows no stem at all — six options and nothing else, so
+    // there is no worked evidence to infer a rule from — the solver has to guess
+    // which property matters. An IQ-style item must demonstrate its rule before
+    // asking for it applied. No eligible band until a redesign shows at least two
+    // worked panels.
     familyId: "relational-outlier-v2",
     primaryReasoningFamily: "classification-relation",
-    bands: [codeValidBand("warmup", ["relational-outlier-d2"])],
+    bands: [],
   },
   {
     familyId: "relational-matrix-v2",
@@ -195,9 +200,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("constraint-spatial", ["visual-set-algebra-d4"])],
   },
   {
+    // Withdrawn by the human gate on 2026-08-23. The item shows one board and six completions of it, so
+    // there is no worked evidence to infer a rule from — the solver has to guess
+    // which property matters. An IQ-style item must demonstrate its rule before
+    // asking for it applied. No eligible band until a redesign shows at least two
+    // worked panels.
     familyId: "constraint-mosaic-v2",
     primaryReasoningFamily: "constraint-satisfaction",
-    bands: [codeValidBand("constraint-spatial", ["constraint-mosaic-d4"])],
+    bands: [],
   },
   {
     // Withdrawn by the human gate on 2026-08-19: the rendered item admits two
@@ -224,9 +234,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("induction-transfer", ["rule-switching-d5"])],
   },
   {
+    // Withdrawn by the human gate on 2026-08-23, after the first pilot. The
+    // check-marked and crossed example groups are a labelled-set classification,
+    // not a rule demonstrated and then applied: the pilot could not tell what
+    // the task was asking, and the mixed shapes across examples read as noise
+    // rather than evidence. No eligible band until a redesign shows the rule.
     familyId: "concept-induction-v2",
     primaryReasoningFamily: "concept-induction",
-    bands: [codeValidBand("induction-transfer", ["concept-induction-d5"])],
+    bands: [],
   },
   {
     familyId: "fold-punch-v2",
@@ -254,11 +269,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("composition", ["inverse-analogy-d4"])],
   },
   {
-    // v3 preserves v2's visible 3x3 repair while varying which categorical
-    // attribute and complete board pattern define the repair program.
+    // Withdrawn by the human gate on 2026-08-23. The item shows one faulty board and six repairs of it, so
+    // there is no worked evidence to infer a rule from — the solver has to guess
+    // which property matters. An IQ-style item must demonstrate its rule before
+    // asking for it applied. No eligible band until a redesign shows at least two
+    // worked panels.
     familyId: "minimal-repair-v3",
     primaryReasoningFamily: "constraint-satisfaction",
-    bands: [codeValidBand("constraint-spatial", ["minimal-repair-d5"])],
+    bands: [],
   },
 ];
 

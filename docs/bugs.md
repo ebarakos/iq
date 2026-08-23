@@ -73,3 +73,44 @@ without widening somewhere else first. Verified: 200 seeds through
 `npm run families:verify` with no rejections, and no option in 2,400 generated
 options has two tokens of different sizes. The emergency bank was rebuilt, since
 some of its stored outlier items were size items.
+
+## 2026-08-23 — an agent probe cannot tell "the model was wrong" from "we could not read its answer"
+
+In the first probe of `scene-families-v7`
+(`data/attempts/2026-08-23T10-59-15.450Z-google-gemini-3-5-flash-image.json`),
+3 of 32 attempts were recorded `unparseable`: the model replied with a prose
+analysis instead of a single letter, and `parseAnswerLetter` in
+`src/lib/solver.ts` only scans the first 200 characters for a standalone A–F
+token. All three replies begin "An analysis of …", so no letter falls in that
+window.
+
+Those three count as incorrect under strict one-attempt accuracy, which is the
+right scoring rule. The defect is that **we cannot check them afterwards**:
+`AttemptSchema.raw` in `src/lib/attempts.ts` is capped at 200 characters, so the
+stored artifact holds only the opening of the reply. Whether the model reached
+the correct answer further down is unknowable from the corpus.
+
+Why this matters more than three items: all three landed on `fold-punch-v2`,
+`transformation-machine-v3`, and `inverse-fold-punch-v2` — three of the hardest
+families. If a model is likelier to write prose when an item is hard, then
+unreadable replies cluster on hard items and pull their measured accuracy down
+for a reason that has nothing to do with reasoning. That biases exactly the
+signal this project exists to measure.
+
+Proof:
+
+```
+node -e 'const f=require("./data/attempts/2026-08-23T10-59-15.450Z-google-gemini-3-5-flash-image.json");
+for (const a of f.attempts) if (a.outcome==="unparseable") console.log(a.generation.familyId, JSON.stringify(a.raw.slice(0,60)));'
+```
+
+Not yet established: whether this is systematic. A re-solve of a `fold-punch-v2`
+item on the same model returned a compliant one-letter reply, so the prose
+replies are intermittent rather than deterministic for a family.
+
+Possible fixes, for the checkpoint gate to weigh: scan the whole reply rather
+than the first 200 characters (cheapest, but "the first letter mentioned" is a
+worse rule on a long reply than on a short one); prefer a trailing "Answer: X";
+raise or remove the `raw` cap so the artifact can be audited after the fact; or
+record a separate `rawLength` and a `replyShape` field so clustering can be
+measured without storing whole transcripts.
