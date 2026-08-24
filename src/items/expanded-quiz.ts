@@ -28,10 +28,13 @@ import {
  * seeded family-pool subsampling, so it is likewise a separate population.
  * `v6` serves `OPTIONS_PER_ITEM` options instead of four, which lowers the value
  * of a guess and changes every family's near misses — results from `v5` and `v6`
- * are not comparable and must never be pooled. `v7` withdraws the three families
- * that showed no worked evidence, so its family pool is smaller than `v6`'s.
+ * are not comparable and must never be pooled. `v7` withdraws the four families
+ * the first human pilot ruled out, so its family pool is smaller than `v6`'s.
+ * `v8` withdraws `interleaved-sequence-v2` (one observed transition is not
+ * evidence a step repeats), shrinking the pool again — attempts recorded under
+ * `v7` and `v8` are different populations and must never be pooled.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v7" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v8" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];

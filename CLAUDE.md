@@ -5,14 +5,16 @@
 > separate "human-hard" from "agent-hard" items.
 
 **Status: GENERATED REASONING-TEST PROTOTYPE.** The app serves two test lengths,
-5 and 30 questions, both drawn from the same pool of 19 eligible visual reasoning
-families (20 code-valid families, with one withdrawn) and the same four difficulty
-bands. Every test is generated from a fresh seed,
+5 and 30 questions, both drawn from the same pool of 14 eligible visual reasoning
+families (20 code-valid families, six withdrawn on human or structural evidence)
+and the same four difficulty bands. Every test is generated from a fresh seed,
 validated in pure code, served without answers, and scored server-side against a
 whole-test deadline of 60 seconds per question. Every question offers six
 answer options, so a blind guess is worth 1 in 6. Families ship behind a visible
-experimental label: they pass the code-correctness contract, but no human pilot
-has run, so nothing is calibrated and this is not a standardized IQ score. See
+experimental label: they pass the code-correctness contract, and the first human
+pilots (one participant, 14 of 15 items correct — see `data/pilot/README.md`) and
+the first trustworthy agent probes have run. That evidence is enough to withdraw
+families, not to calibrate difficulty, so this is not a standardized IQ score. See
 [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ### Running the MVP
@@ -37,7 +39,7 @@ not make model calls. See `.env.example`.
 - `src/items/scene-families.ts` — the 20 visual families and their acceptance
   contract; `src/items/family-promotion.ts` — which family may appear in which
   band, and the `WITHDRAWN_FAMILY_IDS` list that pulls one back out.
-- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v6`): band
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v8`): band
   schedules of 5/10/10/5 and 1/1/2/1, seeded 4/4/3 non-warmup family draws, an
   even split over each draw, and an easiest-first order without adjacent repeats.
 - `src/items/generate.ts` — the older seeded generator. `procedural-v1`, `v2`,

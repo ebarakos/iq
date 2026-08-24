@@ -41,7 +41,15 @@ describe("fingerprintPuzzle", () => {
 describe("loadBank", () => {
   it("parses the expanded emergency bank with current replay provenance", () => {
     const items = loadBank();
-    expect(items.length).toBeGreaterThanOrEqual(57);
+    // Sized by the eligible family list, which shrinks whenever a family is
+    // withdrawn. A hardcoded floor just goes stale with every withdrawal, and a
+    // count-only check would pass with the wrong families — compare the id sets.
+    const eligibleIds = CURRENT_FAMILY_PROMOTION_REGISTRY.filter((family) =>
+      family.bands.some((band) => band.state !== "prototype" && band.validatedDifficultyBuckets.length > 0))
+      .map((family) => family.familyId)
+      .sort();
+    expect(items.length).toBeGreaterThanOrEqual(eligibleIds.length);
+    expect([...new Set(items.map((item) => item.puzzle.familyId))].sort()).toEqual(eligibleIds);
     for (const item of items) {
       expect(item.provenance).toMatchObject({
         source: "expanded",

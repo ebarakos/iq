@@ -1,29 +1,29 @@
 # Handoff
 from: codex → to: claude
 stage: review→fix
-updated: 2026-08-20
-branch: main · plan: docs/plans/mechanism-variety.md · tasks: TODO.md
+updated: 2026-08-24
+branch: main · plan: docs/plans/raise-the-ceiling.md · tasks: TODO.md
 
 ## Just did
-- Reviewed all 48 uncommitted paths across mechanism variety, the expanded bank, agent evidence, the public test, and the prototype pilot; no fixes were applied.
-- Confirmed the generator work is sound: 253 tests pass, the production build is clean, bank verification passes under the current configuration, and all 19 converted families pass the fixed 200-seed diversity gate.
-- Reproduced the two highest-signal failures: a legitimate withdrawal breaks expanded-bank replay, and generated `agent:run --all` can never satisfy its own minimum coverage.
-- Confirmed the two new v5 attempt artifacts contain 38/38 transport failures each and no model answers; the pending v5 capability probe therefore remains unfinished.
-- Left `.claude/runs/2026-08-19-mechanism-variety.md` in place because its integration/probe item is still unchecked.
+- Reviewed all uncommitted raise-the-ceiling work: the `interleaved-sequence-v2` withdrawal, rebuilt emergency bank, bank-test change, plan, and TODO section; no fixes were applied.
+- Confirmed the bank has 56 replay-valid `scene-families-v7` items: four for each of the 14 currently eligible families, with no duplicate ids or fingerprints.
+- Found that the withdrawal changes the released family pool without bumping `EXPANDED_GENERATOR_VERSION`, contrary to its contract in `src/items/expanded-quiz.ts`; old and new v7 populations are now different.
+- Found two unsupported plan premises: the pilot record says no human saw `interleaved-sequence-v2`, and 10,000 live schedules average 14.16 analogy / 11.66 matrix / 4.18 sequence items across six families in the last two bands, not 13 / 9 / 8 across five.
+- Found stale project truth in `CLAUDE.md` and a cardinality-only eligible-family assertion in `src/items/bank.test.ts` that does not compare the actual family-id sets.
 
 ## State
-- diff: `git diff` + `git status --short` — 35 modified, 13 untracked; key files: `src/items/scene-families.ts`, `src/items/bank.ts`, `scripts/agent-run.ts`, `scripts/report.ts`, `src/items/prototype-pilot.ts`
-- tests: pass — run: `npm run typecheck && npm run lint && npm test && npm run build && npm run bank:verify && npm run families:verify`
-- blockers: real v5 agent evidence is blocked; both attempted final probes failed at transport, and no strong-model result exists.
+- diff: `git diff main` + `git status --short` — 5 tracked paths and 1 untracked plan; key files: `src/items/family-promotion.ts`, `data/bank/items.json`, `docs/plans/raise-the-ceiling.md`, `TODO.md`
+- tests: pass — `npm run typecheck && npm run lint && npm test && npm run build && npm run bank:verify && npm run families:verify`
+- blockers: none
 
 ## You next
-- Make expanded provenance replay-complete by storing the normalized withdrawal configuration in both bank records and generated attempt artifacts; replay against the stored value, including when the runtime withdrawal list later changes.
-- Repair the agent-evidence control flow: make generated `--all` coherent with the coverage contract, prevent a terminal rate limit from being marked complete, and pass `--include-partial` through to diagnostic report aggregation.
-- Keep the two transport-only v5 artifacts out of capability claims and calibration writes; add a clear all-harness-failure population warning, and ask before deleting those files.
-- Freeze or fingerprint the `prototype-pilot-packets-v1` membership and visible content so results stay comparable; also distinguish a missing session label from an invalid packet in the picker.
-- Reconcile smaller contracts: `bank:topup --source expanded` ignores its documented `--count`, and `docs/plans/deterministic-novel-tests.md` still calls the live generator `scene-families-v3`.
+- Give the changed family pool a new generator version (or preserve v7 through a recorded withdrawal input), then rebuild the bank so old v7 attempts and new runs cannot be pooled as one population.
+- Reconcile the withdrawal rationale with `data/pilot/README.md`: it says this family had no human coverage, while the new comment and plan claim the pilot failed it and that nobody could solve it.
+- Recompute the format-diversity section and replace the five-family TODO decision; the current last two bands use six distinct families, so do not ask the user to decide from the false premise.
+- Update `CLAUDE.md` to the current eligible-family count, generator version, and completed human/agent evidence; strengthen the bank test to compare exact eligible and bank family-id sets.
+- Scope the held-out-combinations task into an independently verifiable design before implementation; the plan does not yet define the split, private storage boundary, or leakage check.
 - verify: `npm run typecheck && npm run lint && npm test && npm run build && npm run bank:verify && npm run families:verify`
 
 ## Open questions
-- Should the two transport-only v5 artifacts remain as diagnostics, or be removed from the corpus? They contain no model evidence; deletion requires user approval.
-- `docs/bugs.md` now proves that public puzzle ids reveal almost the whole seed. Keep it at the checkpoint promotion gate rather than expanding this fix pass silently.
+- Was there later human evidence for `interleaved-sequence-v2` that has not been saved under `data/pilot/`? If not, keep the structural-soundness rationale but remove the pilot claim.
+- After the pool counts are corrected, does a real band-placement/product-copy choice remain? If so, it is the user's `Decide` item and needs a formal question before implementation.

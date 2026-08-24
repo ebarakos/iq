@@ -254,9 +254,17 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("induction-transfer", ["inverse-fold-punch-d5"])],
   },
   {
+    // Withdrawn 2026-08-23 on structural grounds. The row interleaves two
+    // strands, and the strand containing the blank shows only two terms — one
+    // observed transition — on every seed. A solver cannot check whether the
+    // step repeats, only assume it, and the uniqueness oracle silently assumes
+    // it too. No human ever saw this family (its pilot packet was never run);
+    // the strong vision model answered it wrongly four times in five — see
+    // data/pilot/README.md. A redesign needs a longer row so the answered
+    // strand shows three terms; until then, no eligible band.
     familyId: "interleaved-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
-    bands: [codeValidBand("composition", ["interleaved-sequence-d4"])],
+    bands: [],
   },
   {
     familyId: "second-order-sequence-v2",
