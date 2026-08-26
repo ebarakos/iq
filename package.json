@@ -18,7 +18,8 @@
     "render:item": "tsx scripts/render-item.ts",
     "families:verify": "node --import tsx scripts/scene-family-verify.ts",
     "experiment:llm-rules": "node --env-file=.env.local --import tsx scripts/llm-rule-experiment.ts",
-    "report": "tsx scripts/report.ts"
+    "report": "tsx scripts/report.ts",
+    "pilot:report": "tsx scripts/pilot-report.ts"
   },
   "engines": {
     "node": ">=20"

@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   ConnectionTileSchema,
+  GATE_STRIP_COLUMNS,
+  PublicPuzzleSchema,
+  GATE_STRIP_ROWS,
+  MACHINE_TABLE_PANEL_COUNTS,
+  MAXIMUM_DIFFICULTY,
+  MAXIMUM_GATE_STRIP_COLUMNS,
   PublicPuzzleSetSchema,
   PuzzleSchema,
   PuzzleSetSchema,
+  SceneContainerSchema,
   SceneSchema,
+  SceneTokenSchema,
+  SCENE_SHAPES,
+  ROTATIONS,
+  areScenesCategoricallyDistinct,
   SHAPES,
   VisualPuzzleSchema,
   shuffleOptions,
@@ -17,7 +28,7 @@ import {
   type SceneToken,
   type Visual,
 } from "./schema";
-import { generatePuzzle } from "./generate";
+import { generatePuzzle, generateQuiz } from "./generate";
 import { mulberry32 } from "../lib/rng";
 
 const c = (
@@ -237,19 +248,26 @@ describe("PuzzleSchema — matrix", () => {
 });
 
 describe("PuzzleSchema — sequence", () => {
-  it("accepts 4–6 panels with a single trailing blank", () => {
+  it("accepts 4–8 panels with a single trailing blank", () => {
     expect(PuzzleSchema.safeParse(validSequence).success).toBe(true);
     const six = {
       ...validSequence,
       stem: [c("square", 1, 0, "solid"), c("square", 2, 0, "solid"), c("square", 3, 0, "solid"), c("square", 4, 0, "solid"), c("square", 1, 0, "outline"), BLANK],
     };
     expect(PuzzleSchema.safeParse(six).success).toBe(true);
+    // Eight panels: the two-strand interleaved row (extrapolation gate needs
+    // the answered strand shown three times).
+    const eight = {
+      ...validSequence,
+      stem: [...Array.from({ length: 7 }, (_, i) => c("square", ((i % 4) + 1) as Cell["count"], 0, "solid")), BLANK],
+    };
+    expect(PuzzleSchema.safeParse(eight).success).toBe(true);
   });
 
   it("rejects too-short, too-long, non-trailing-blank, and wrong-layout stems", () => {
     expect(PuzzleSchema.safeParse({ ...validSequence, stem: [c("square", 1, 0, "solid"), c("square", 2, 0, "solid"), BLANK] }).success).toBe(false);
-    const seven = { ...validSequence, stem: [...Array.from({ length: 6 }, (_, i) => c("square", ((i % 4) + 1) as Cell["count"], 0, "solid")), BLANK] };
-    expect(PuzzleSchema.safeParse(seven).success).toBe(false);
+    const nine = { ...validSequence, stem: [...Array.from({ length: 8 }, (_, i) => c("square", ((i % 4) + 1) as Cell["count"], 0, "solid")), BLANK] };
+    expect(PuzzleSchema.safeParse(nine).success).toBe(false);
     expect(PuzzleSchema.safeParse({ ...validSequence, stem: [BLANK, c("square", 1, 0, "solid"), c("square", 2, 0, "solid"), c("square", 3, 0, "solid")] }).success).toBe(false);
     expect(PuzzleSchema.safeParse({ ...validSequence, layout: "grid3x3" }).success).toBe(false);
   });
@@ -294,6 +312,73 @@ describe("PuzzleSchema — oddOneOut", () => {
       answerIndex: 0,
     };
     expect(PuzzleSchema.safeParse(clash).success).toBe(false);
+  });
+});
+
+describe("PuzzleSchema — difficulty range", () => {
+  it("admits difficulty 6 and nothing above it, in every schema that carries one", () => {
+    // The ceiling moved from 5 to 6 on 2026-08-26 so the `-d6` buckets at the
+    // tail of induction-transfer can state their difficulty honestly.
+    expect(MAXIMUM_DIFFICULTY).toBe(6);
+    for (const difficulty of [1, 5, MAXIMUM_DIFFICULTY]) {
+      expect(VisualPuzzleSchema.safeParse({ ...validMatrix, difficulty }).success, `difficulty ${difficulty}`)
+        .toBe(true);
+      expect(PublicPuzzleSchema.safeParse(toPublicPuzzle({ ...validMatrix, difficulty })).success, `public ${difficulty}`)
+        .toBe(true);
+    }
+    for (const difficulty of [0, MAXIMUM_DIFFICULTY + 1, 2.5]) {
+      expect(VisualPuzzleSchema.safeParse({ ...validMatrix, difficulty }).success, `difficulty ${difficulty}`)
+        .toBe(false);
+    }
+    // Generation metadata carries its own copy of the number and moved with it,
+    // so a d6 item can record what it is rather than being labelled a d5.
+    const generation = {
+      generatorVersion: "scene-families-test",
+      familyId: "composed-transform-v2",
+      programFingerprint: "0123456789abcdef",
+      featureBucket: "composed-transform-d6",
+      features: {
+        difficulty: MAXIMUM_DIFFICULTY,
+        ruleComplexity: 6,
+        programDepth: 5,
+        activeDimensions: [],
+        usesWrap: false,
+        distractorStrategy: "near-miss" as const,
+      },
+    };
+    expect(VisualPuzzleSchema.safeParse({
+      ...validMatrix,
+      difficulty: MAXIMUM_DIFFICULTY,
+      generation,
+    }).success).toBe(true);
+    expect(VisualPuzzleSchema.safeParse({
+      ...validMatrix,
+      difficulty: MAXIMUM_DIFFICULTY,
+      generation: { ...generation, features: { ...generation.features, difficulty: MAXIMUM_DIFFICULTY + 1 } },
+    }).success).toBe(false);
+  });
+
+  it("keeps the legacy compact-cell generators at difficulty 5 or below", () => {
+    // Widening the puzzle schema's range must not quietly loosen what the older
+    // paths produce. `procedural-v1`, `v2`, and `v3` have sha256 golden-seed
+    // tests in generate.test.ts that would notice a changed ITEM; this notices a
+    // changed RANGE, which is the thing the schema edit could have opened up.
+    // Their own difficulty ramps top out at 5 and nothing here may exceed it.
+    for (const version of ["procedural-v1", "procedural-v2", "procedural-v3"] as const) {
+      for (const profile of ["easy", "standard", "hard"] as const) {
+        for (let seed = 0; seed < 12; seed++) {
+          const quiz = generateQuiz(`legacy-difficulty-cap-${seed}`, version, profile);
+          for (const puzzle of quiz) {
+            expect(puzzle.difficulty, `${version} ${profile} seed ${seed}`).toBeLessThanOrEqual(5);
+            expect(puzzle.generation?.features.difficulty ?? 1, `${version} ${profile} seed ${seed}`)
+              .toBeLessThanOrEqual(5);
+          }
+        }
+      }
+    }
+    // And the per-item entry point refuses a difficulty above its own ramp,
+    // whatever the puzzle schema now allows.
+    expect(() => generatePuzzle("matrix", MAXIMUM_DIFFICULTY as 5, mulberry32(11))).toThrow();
   });
 });
 
@@ -342,6 +427,130 @@ describe("PuzzleSchema — scene-specific layouts", () => {
     expect(VisualPuzzleSchema.safeParse(singleBoard).success).toBe(true);
     expect(VisualPuzzleSchema.safeParse(machine).success).toBe(true);
     expect(VisualPuzzleSchema.safeParse({ ...machine, stem: machine.stem.slice(0, 8) }).success).toBe(false);
+  });
+
+  it("allows a four- or five-gate strip only as a machine table's gate, and never as an option", () => {
+    const gate = (shape: SceneToken["shape"]): Scene => ({
+      kind: "scene",
+      rows: 3,
+      columns: 3,
+      objects: [{ row: 1, column: 0, object: token(shape) }],
+      tiles: [],
+    });
+    const strip: Scene = {
+      kind: "scene",
+      rows: GATE_STRIP_ROWS,
+      columns: GATE_STRIP_COLUMNS,
+      objects: (["triangle", "square", "diamond", "star"] as const)
+        .map((shape, column) => ({ row: 0, column, object: token(shape) })),
+      tiles: [],
+    };
+    // The five-gate strip is the same shape one column wider — the `-d6` bucket
+    // added on 2026-08-26. Everything else about the strip is unchanged.
+    const wideStrip: Scene = {
+      kind: "scene",
+      rows: GATE_STRIP_ROWS,
+      columns: MAXIMUM_GATE_STRIP_COLUMNS,
+      objects: (["triangle", "square", "diamond", "star", "hexagon"] as const)
+        .map((shape, column) => ({ row: 0, column, object: token(shape) })),
+      tiles: [],
+    };
+    // The wide board is a legal scene on its own; where it may appear is a
+    // puzzle-level rule, not a board-level one.
+    expect(SceneSchema.safeParse(strip).success).toBe(true);
+    expect(SceneSchema.safeParse(wideStrip).success).toBe(true);
+    // ...but nothing else may be that shape. Widening the strip to five columns
+    // did NOT widen the ordinary board: two rows of five, or one row of six, is
+    // still not a board this project draws.
+    expect(SceneSchema.safeParse({ ...strip, rows: 2 }).success).toBe(false);
+    expect(SceneSchema.safeParse({ ...wideStrip, rows: 2 }).success).toBe(false);
+    expect(SceneSchema.safeParse({
+      ...wideStrip,
+      columns: MAXIMUM_GATE_STRIP_COLUMNS + 1,
+      objects: [...wideStrip.objects, { row: 0, column: 5, object: token("circle") }],
+    }).success).toBe(false);
+    expect(SceneSchema.safeParse({
+      kind: "scene",
+      rows: 1,
+      columns: 3,
+      objects: [{ row: 0, column: 0, object: token() }],
+      tiles: [],
+    }).success).toBe(false);
+
+    const fourGateMachine: Puzzle<Visual> = {
+      ...validMatrix,
+      id: "four-gate-machine",
+      layout: "machineTable",
+      stem: [
+        scene(0), gate("triangle"), scene(1),
+        scene(0), gate("square"), scene(1),
+        scene(0), gate("diamond"), scene(1),
+        scene(0), gate("star"), scene(1),
+        scene(0), strip, { blank: true },
+      ],
+      options: sceneOptions,
+    };
+    expect(VisualPuzzleSchema.safeParse(fourGateMachine).success).toBe(true);
+    // Fifteen panels is the four-row form; fourteen is not a machine table.
+    expect(VisualPuzzleSchema.safeParse({
+      ...fourGateMachine,
+      stem: fourGateMachine.stem.slice(0, 14),
+    }).success).toBe(false);
+
+    // Eighteen panels is the five-row form: five worked (input, gate, output)
+    // rows plus the query row, with the five-gate strip as its gate. The 9, 12,
+    // and 15 panel forms stay exactly as valid as they were.
+    const fiveGateMachine: Puzzle<Visual> = {
+      ...fourGateMachine,
+      id: "five-gate-machine",
+      difficulty: MAXIMUM_DIFFICULTY,
+      stem: [
+        scene(0), gate("triangle"), scene(1),
+        scene(0), gate("square"), scene(1),
+        scene(0), gate("diamond"), scene(1),
+        scene(0), gate("star"), scene(1),
+        scene(0), gate("hexagon"), scene(1),
+        scene(0), wideStrip, { blank: true },
+      ],
+    };
+    expect(fiveGateMachine.stem).toHaveLength(18);
+    expect(VisualPuzzleSchema.safeParse(fiveGateMachine).success).toBe(true);
+    expect(MACHINE_TABLE_PANEL_COUNTS).toEqual([9, 12, 15, 18]);
+    // Seventeen and twenty-one are not machine tables, so the new length did
+    // not open the layout to any stem length that happens to divide by three.
+    for (const length of [17, 21]) {
+      expect(VisualPuzzleSchema.safeParse({
+        ...fiveGateMachine,
+        stem: length < 18
+          ? fiveGateMachine.stem.slice(0, length)
+          : [...fiveGateMachine.stem.slice(0, 15), scene(0), gate("circle"), scene(1), ...fiveGateMachine.stem.slice(15)],
+      }).success, `${length} panels`).toBe(false);
+    }
+    // A five-glyph strip is no more allowed outside a gate column than a
+    // four-glyph one, and it is never an answer.
+    expect(VisualPuzzleSchema.safeParse({
+      ...fiveGateMachine,
+      stem: fiveGateMachine.stem.map((panel, index) => index === 15 ? wideStrip : panel),
+    }).success).toBe(false);
+    expect(VisualPuzzleSchema.safeParse({
+      ...fiveGateMachine,
+      options: [...sceneOptions.slice(0, 3), wideStrip],
+    }).success).toBe(false);
+    // The strip may only sit in the gate column of a machine table.
+    expect(VisualPuzzleSchema.safeParse({
+      ...fourGateMachine,
+      stem: fourGateMachine.stem.map((panel, index) => index === 12 ? strip : panel),
+    }).success).toBe(false);
+    expect(VisualPuzzleSchema.safeParse({
+      ...fourGateMachine,
+      layout: "grid3x3",
+      stem: [scene(0), strip, scene(1), scene(0), scene(1), scene(0), scene(1), scene(0), { blank: true }],
+    }).success).toBe(false);
+    // And it is never an answer.
+    expect(VisualPuzzleSchema.safeParse({
+      ...fourGateMachine,
+      options: [...sceneOptions.slice(0, 3), strip],
+    }).success).toBe(false);
   });
 
   it("keeps the reasoning family in the answer-free public contract", () => {
@@ -403,5 +612,84 @@ describe("shuffleOptions", () => {
     const snapshot = JSON.stringify(validAnalogy);
     shuffleOptions(validAnalogy);
     expect(JSON.stringify(validAnalogy)).toBe(snapshot);
+  });
+});
+
+describe("scene-only arrow shape", () => {
+  const arrowToken = (rotation: number): SceneToken => ({
+    kind: "token",
+    shape: "arrow",
+    rotation,
+    fill: "solid",
+    size: "l",
+  });
+
+  const arrowScene = (rotation: number): Scene => ({
+    kind: "scene",
+    rows: 2,
+    columns: 2,
+    objects: [{ row: 0, column: 0, object: arrowToken(rotation) }],
+    tiles: [],
+  });
+
+  it("extends the scene vocabulary without touching the frozen cell vocabulary", () => {
+    expect(SCENE_SHAPES).toEqual([...SHAPES, "arrow"]);
+    expect(SHAPES as readonly string[]).not.toContain("arrow");
+  });
+
+  it("accepts an arrow token at every quarter turn", () => {
+    for (const rotation of ROTATIONS) {
+      expect(SceneTokenSchema.safeParse(arrowToken(rotation)).success).toBe(true);
+      expect(SceneSchema.safeParse(arrowScene(rotation)).success).toBe(true);
+    }
+  });
+
+  it("still refuses rotation on shapes whose orientation cannot be seen", () => {
+    for (const shape of ["circle", "square", "diamond", "star", "hexagon"] as const) {
+      expect(SceneTokenSchema.safeParse({ kind: "token", shape, rotation: 90, fill: "solid", size: "l" }).success)
+        .toBe(false);
+      expect(SceneTokenSchema.safeParse({ kind: "token", shape, rotation: 0, fill: "solid", size: "l" }).success)
+        .toBe(true);
+    }
+    expect(SceneTokenSchema.safeParse({ kind: "token", shape: "triangle", rotation: 270, fill: "solid", size: "l" }).success)
+      .toBe(true);
+  });
+
+  it("keeps arrows out of container outlines", () => {
+    expect(SceneContainerSchema.safeParse({ kind: "container", shape: "arrow", contents: [arrowToken(0)] }).success)
+      .toBe(false);
+    expect(SceneContainerSchema.safeParse({ kind: "container", shape: "circle", contents: [arrowToken(90)] }).success)
+      .toBe(true);
+  });
+
+  it("reads all four arrow rotations as categorically different boards", () => {
+    for (const rotation of ROTATIONS) {
+      for (const other of ROTATIONS) {
+        expect(areScenesCategoricallyDistinct(arrowScene(rotation), arrowScene(other)))
+          .toBe(rotation !== other);
+      }
+    }
+  });
+
+  it("serves six arrow-rotation options as an instantly distinguishable option list", () => {
+    const puzzle: Puzzle<Visual> = {
+      id: "arrow-options",
+      type: "sequence",
+      instruction: "What comes next?",
+      difficulty: 3,
+      layout: "row",
+      stem: [arrowScene(0), arrowScene(90), arrowScene(180), BLANK],
+      options: [
+        arrowScene(270),
+        arrowScene(0),
+        arrowScene(90),
+        arrowScene(180),
+        { ...arrowScene(0), objects: [{ row: 1, column: 1, object: arrowToken(0) }] },
+        { ...arrowScene(0), objects: [{ row: 0, column: 0, object: { ...arrowToken(0), fill: "outline" } }] },
+      ],
+      answerIndex: 0,
+      explanation: "The arrow turns a quarter clockwise each step.",
+    };
+    expect(VisualPuzzleSchema.safeParse(puzzle).success).toBe(true);
   });
 });

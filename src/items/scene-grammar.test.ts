@@ -8,7 +8,14 @@ import {
   applySceneUnary,
   enumerateSceneConcepts,
   enumerateSceneOrderedCompositions,
+  enumerateSceneOrderedFiveStepCompositions,
+  enumerateSceneOrderedFourStepCompositions,
+  enumerateSceneOrderedThreeStepCompositions,
   enumerateSceneUnaryOperations,
+  isSceneComposedProgram,
+  sceneComposedPrimitives,
+  sceneComposedProgramFromSteps,
+  sceneComposedProgramSteps,
   sceneProgramFits,
   sceneSatisfiesConcept,
   sceneSatisfiesRelation,
@@ -32,6 +39,9 @@ describe("scene grammar", () => {
     const operations = enumerateSceneUnaryOperations(2, 2);
     expect(operations).toEqual(enumerateSceneUnaryOperations(2, 2));
     expect(operations).toContainEqual({ kind: "reflect", axis: "horizontal" });
+    expect(operations).toContainEqual({ kind: "turn", quarterTurns: 1 });
+    expect(operations).toContainEqual({ kind: "turn", quarterTurns: 2 });
+    expect(operations).toContainEqual({ kind: "turn", quarterTurns: 3 });
     expect(operations).toContainEqual({ kind: "duplicate", from: { row: 0, column: 0 }, to: { row: 1, column: 1 } });
     expect(operations).toContainEqual({ kind: "contain", at: { row: 0, column: 0 }, containerShape: "square" });
     expect(new Set(operations.map((operation) => JSON.stringify(operation))).size).toBe(operations.length);
@@ -149,5 +159,136 @@ describe("scene grammar", () => {
     const second = scene([...first.objects].reverse());
     const normalized = applySceneUnary(first, { kind: "setFill", fill: "outline" });
     expect(sceneSignature(normalized!)).toBe(sceneSignature(applySceneUnary(second, { kind: "setFill", fill: "outline" })!));
+  });
+});
+
+describe("token turn", () => {
+  const spinner = (
+    shape: SceneToken["shape"],
+    rotation = 0,
+  ): SceneToken => ({ kind: "token", shape, rotation, fill: "outline", size: "l" });
+
+  it("turns every orientable token in place and leaves the board alone", () => {
+    const input: Scene = {
+      kind: "scene",
+      rows: 3,
+      columns: 3,
+      objects: [
+        { row: 0, column: 2, object: spinner("arrow", 90) },
+        { row: 2, column: 0, object: spinner("triangle") },
+      ],
+      tiles: [{ row: 1, column: 1, edges: ["north", "west"] }],
+    };
+
+    const turned = applySceneUnary(input, { kind: "turn", quarterTurns: 1 });
+    expect(turned?.objects).toEqual([
+      { row: 0, column: 2, object: spinner("arrow", 180) },
+      { row: 2, column: 0, object: spinner("triangle", 90) },
+    ]);
+    expect(turned?.tiles).toEqual(input.tiles);
+  });
+
+  it("wraps past a full circle", () => {
+    const input = scene([{ row: 0, column: 0, object: spinner("arrow", 270) }]);
+    expect(applySceneUnary(input, { kind: "turn", quarterTurns: 1 })?.objects[0].object)
+      .toMatchObject({ rotation: 0 });
+    expect(applySceneUnary(input, { kind: "turn", quarterTurns: 3 })?.objects[0].object)
+      .toMatchObject({ rotation: 180 });
+  });
+
+  it("composes: two single turns equal one double turn", () => {
+    const input = scene([
+      { row: 0, column: 0, object: spinner("arrow", 90) },
+      { row: 1, column: 1, object: spinner("triangle", 180) },
+    ]);
+    const once = applySceneUnary(input, { kind: "turn", quarterTurns: 1 })!;
+    const twice = applySceneUnary(once, { kind: "turn", quarterTurns: 1 })!;
+    const doubled = applySceneUnary(input, { kind: "turn", quarterTurns: 2 })!;
+    expect(sceneSignature(twice)).toBe(sceneSignature(doubled));
+    expect(sceneSignature(once)).not.toBe(sceneSignature(doubled));
+  });
+
+  it("leaves shapes with no readable orientation exactly as they were", () => {
+    const input = scene([
+      { row: 0, column: 0, object: spinner("arrow") },
+      { row: 1, column: 1, object: spinner("circle") },
+      { row: 2, column: 2, object: spinner("star") },
+    ]);
+    const turned = applySceneUnary(input, { kind: "turn", quarterTurns: 2 });
+    expect(turned?.objects[0].object).toMatchObject({ shape: "arrow", rotation: 180 });
+    expect(turned?.objects[1].object).toEqual(spinner("circle"));
+    expect(turned?.objects[2].object).toEqual(spinner("star"));
+  });
+
+  it("turns orientable tokens inside containers too", () => {
+    const input = scene([{
+      row: 1,
+      column: 1,
+      object: { kind: "container", shape: "circle", contents: [spinner("arrow"), spinner("square")] },
+    }]);
+    expect(applySceneUnary(input, { kind: "turn", quarterTurns: 3 })?.objects[0].object).toEqual({
+      kind: "container",
+      shape: "circle",
+      contents: [spinner("arrow", 270), spinner("square")],
+    });
+  });
+
+  it("rejects a scene with nothing to turn instead of returning it unchanged", () => {
+    expect(applySceneUnary(
+      scene([{ row: 0, column: 0, object: spinner("circle") }]),
+      { kind: "turn", quarterTurns: 1 },
+    )).toBeNull();
+    expect(applySceneUnary(
+      scene([{
+        row: 0,
+        column: 0,
+        object: { kind: "container", shape: "square", contents: [spinner("hexagon")] },
+      }]),
+      { kind: "turn", quarterTurns: 2 },
+    )).toBeNull();
+    expect(applySceneUnary(
+      { kind: "scene", rows: 2, columns: 2, objects: [], tiles: [{ row: 0, column: 0, edges: ["north"] }] },
+      { kind: "turn", quarterTurns: 1 },
+    )).toBeNull();
+  });
+});
+
+describe("five-gate composed programs", () => {
+  it("carries the three- and four-gate rules over to five gates unchanged", () => {
+    const programs = enumerateSceneOrderedFiveStepCompositions();
+    // 8x7x6x5x4 = 6720 ordered quintuples of distinct primitives, less the
+    // C(6,3) x 5! = 2400 that hold both turns. There is no all-spatial term:
+    // only four board moves exist, so five distinct primitives cannot all be
+    // spatial.
+    expect(programs).toHaveLength(4320);
+    for (const program of programs) {
+      const steps = sceneComposedProgramSteps(program);
+      expect(steps).toHaveLength(5);
+      // Distinct primitives.
+      expect(new Set(steps.map((step) => JSON.stringify(step))).size).toBe(5);
+      // Not all board moves, and at most one turn.
+      expect(steps.some((step) => step.kind !== "spatial")).toBe(true);
+      expect(steps.filter((step) => step.kind === "turn").length).toBeLessThanOrEqual(1);
+      expect(isSceneComposedProgram(steps)).toBe(true);
+    }
+  });
+
+  it("round-trips a five-gate program through its ordered steps", () => {
+    const pool = sceneComposedPrimitives();
+    const steps = [pool[0], pool[1], pool[4], pool[5], pool[6]];
+    const program = sceneComposedProgramFromSteps(steps);
+    expect(sceneComposedProgramSteps(program)).toEqual(steps);
+    expect(Object.keys(program)).toEqual(["first", "second", "third", "fourth", "fifth"]);
+    // Three and four still round-trip, and six is not a program length.
+    expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 3)))).toHaveLength(3);
+    expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 4)))).toHaveLength(4);
+    expect(() => sceneComposedProgramFromSteps([...steps, pool[7]])).toThrow(/three, four, or five gates/);
+    expect(isSceneComposedProgram([...steps, pool[7]])).toBe(false);
+    expect(isSceneComposedProgram(steps.slice(0, 2))).toBe(false);
+  });
+
+  it("keeps the three- and four-gate grammars exactly as they were", () => {
+    expect(enumerateSceneOrderedThreeStepCompositions()).toHaveLength(276);
+    expect(enumerateSceneOrderedFourStepCompositions()).toHaveLength(1296);
   });
 });

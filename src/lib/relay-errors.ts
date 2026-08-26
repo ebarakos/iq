@@ -1,4 +1,4 @@
-// @relay-template: relay-errors@5
+// @relay-template: relay-errors@6
 
 /**
  * Typed rate-limit error handling for llm-relay consumers.
@@ -29,9 +29,10 @@ export function isRateLimitError(err: unknown): boolean {
   if (e.statusCode === 429 || e.status === 429) return true;
   const msg = typeof e.message === "string" ? e.message.toLowerCase() : "";
   if (msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("429")) return true;
-  // Check the response body — extractResponseBody already unwraps the
-  // { error: {...} } envelope via unwrapError(), so the discriminator lives
-  // at the top level as `type`, not nested under `error`.
+  // Check the response body — the relay's { error: { type: "rate_limited" } }
+  // envelope is the most reliable signal when status codes get transformed
+  // through error wrappers. extractResponseBody() already unwraps the `error`
+  // envelope (see unwrapError), so the type lives at the top level here.
   const body = extractResponseBody(err);
   if (body?.type === "rate_limited") return true;
   return false;
@@ -67,7 +68,7 @@ export function parseRateLimitError(err: unknown): RateLimitInfo {
 // ── Internals ──
 
 /** Pull the parsed response body out of an AI SDK error. */
-function extractResponseBody(err: unknown): Record<string, unknown> | null {
+export function extractResponseBody(err: unknown): Record<string, unknown> | null {
   if (!err || typeof err !== "object") return null;
   const e = err as Record<string, unknown>;
 
@@ -136,7 +137,7 @@ function findResetField(err: unknown): string | null {
   return null;
 }
 
-function formatResetTimestamp(iso: string): string {
+export function formatResetTimestamp(iso: string): string {
   const reset = new Date(iso);
   const now = new Date();
   const s = Math.round((reset.getTime() - now.getTime()) / 1000);

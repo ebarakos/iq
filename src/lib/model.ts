@@ -42,12 +42,20 @@ export function relayModel(overrides?: ModelOverrides) {
   const byoKey = overrides?.apiKey ?? (keyEnv ? process.env[keyEnv] : undefined);
 
   // Capture which provider actually served the request in a REQUEST-LOCAL
-  // variable (relayModel() runs once per generate call). relay-fetch.ts also
-  // records this in a module-global, but that can misattribute across concurrent
-  // requests — reading it here from the per-request response avoids the race.
+  // variable (relayModel() runs once per generate call). relay-fetch.ts itself
+  // carries no module-global state — attribution is delivered per request via
+  // the optional onAttribution sink — but relayModel() already has a
+  // request-scoped closure, so this wrapper reads the response header directly
+  // instead of wiring that sink.
   const relayFetch = createRelayFetch({
     provider,
+    expectedModel: model,
     apiKey: byoKey,
+    // Forwarded, not dropped: readWidgetOverrides parses both and createRelayFetch
+    // turns them into the free-tier and X-No-Fallback headers, so losing them here
+    // silently ignored what the user picked in the widget.
+    userKeyTier: overrides?.userKeyTier,
+    noFallback: overrides?.noFallback,
     thinkingBudget: overrides?.thinkingBudget,
     customUrl: overrides?.customUrl,
   });

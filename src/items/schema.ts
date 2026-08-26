@@ -1,5 +1,15 @@
 import { z } from "zod";
-import { FILLS, isInstantlyDistinct, ORIENTABLE_SHAPES, ROTATIONS, SHAPES, SIZES } from "./domains";
+import {
+  FILLS,
+  isInstantlyDistinct,
+  isSceneTokenInstantlyDistinct,
+  ORIENTABLE_SHAPES,
+  ROTATIONS,
+  SCENE_ORIENTABLE_SHAPES,
+  SCENE_SHAPES,
+  SHAPES,
+  SIZES,
+} from "./domains";
 import { DIMENSIONS, RuleSchema } from "./rules";
 
 /**
@@ -16,7 +26,8 @@ import { DIMENSIONS, RuleSchema } from "./rules";
  * here); the machine-readable rule DSL + semantic validator live in rules.ts.
  */
 
-export { SHAPES, FILLS, SIZES, ROTATIONS, visualSignature } from "./domains";
+export { SHAPES, SCENE_SHAPES, FILLS, SIZES, ROTATIONS, visualSignature } from "./domains";
+export type { Shape, SceneShape } from "./domains";
 
 /**
  * How many answer options every generated item offers — **the single place this
@@ -41,6 +52,49 @@ export const DISTRACTORS_PER_ITEM = OPTIONS_PER_ITEM - 1;
  */
 export const MINIMUM_OPTIONS_PER_ITEM = 4;
 export const MAXIMUM_OPTIONS_PER_ITEM = 6;
+
+/**
+ * Hardest difficulty an item may claim.
+ *
+ * The ceiling moved from 5 to 6 on 2026-08-26 (`docs/plans/raise-the-ceiling-v12.md`).
+ * The v11 battery topped out at 5 and the pilot participant solved five of its
+ * six d5 items, so the top of the ladder was no longer measuring anything: a
+ * test that nobody misses cannot tell two people apart at the top. Difficulty 6
+ * is reserved for buckets whose program has one more step that provably changes
+ * the answer — never for a smaller mark, a busier board, or a relabelled d5.
+ *
+ * Widening the range does NOT loosen the older compact-cell generators. They are
+ * capped by their own tables, and `generate.test.ts` pins that `procedural-v1`,
+ * `v2`, and `v3` still never emit above 5.
+ */
+export const MAXIMUM_DIFFICULTY = 6;
+
+/**
+ * The one board shape wider than three columns the schema allows: a machine
+ * table's four- or five-gate query strip.
+ *
+ * A four-step machine has to show four gate glyphs side by side, and the
+ * ordinary 2–3 by 2–3 board has nowhere to put the fourth. The strip is a
+ * single row of glyphs, drawn full width across the machine row. It is
+ * restricted on purpose: it may only appear in a `machineTable`'s gate column,
+ * and never as an answer option, so widening the board here cannot widen the
+ * puzzle vocabulary anywhere else. See `docs/plans/escalate-the-quiz.md`,
+ * Phase 3.
+ *
+ * The five-column form arrived with `composed-transform-d6` on 2026-08-26
+ * (`docs/plans/raise-the-ceiling-v12.md`): a five-gate program needs a fifth
+ * glyph in the same single row. Nothing else about the strip changed, and an
+ * ordinary board is still 2–3 by 2–3.
+ */
+export const GATE_STRIP_ROWS = 1;
+export const GATE_STRIP_COLUMNS = 4;
+export const MAXIMUM_GATE_STRIP_COLUMNS = 5;
+
+/** Is this a legal gate-strip width — the four-gate strip or the five-gate one? */
+function isGateStripShape(rows: number, columns: number): boolean {
+  return rows === GATE_STRIP_ROWS &&
+    columns >= GATE_STRIP_COLUMNS && columns <= MAXIMUM_GATE_STRIP_COLUMNS;
+}
 
 if (OPTIONS_PER_ITEM < MINIMUM_OPTIONS_PER_ITEM || OPTIONS_PER_ITEM > MAXIMUM_OPTIONS_PER_ITEM) {
   throw new Error(
@@ -77,7 +131,8 @@ export type ConnectionEdge = (typeof CONNECTION_EDGES)[number];
 
 const SceneTokenFields = {
   kind: z.literal("token"),
-  shape: z.enum(SHAPES),
+  /** Scenes use the wider vocabulary: the legacy six shapes plus the arrow. */
+  shape: z.enum(SCENE_SHAPES),
   rotation: z.number().int().refine((r) => (ROTATIONS as readonly number[]).includes(r), {
     message: "rotation must be one of 0,90,180,270 (quarter turns)",
   }),
@@ -91,8 +146,8 @@ const SceneTokenFields = {
 export const SceneTokenSchema = z
   .object(SceneTokenFields)
   .strict()
-  .refine((token) => token.rotation === 0 || (ORIENTABLE_SHAPES as readonly string[]).includes(token.shape), {
-    message: "only triangles may be rotated",
+  .refine((token) => token.rotation === 0 || (SCENE_ORIENTABLE_SHAPES as readonly string[]).includes(token.shape), {
+    message: "only triangles and arrows may be rotated",
     path: ["rotation"],
   });
 export type SceneToken = z.infer<typeof SceneTokenSchema>;
@@ -104,6 +159,7 @@ export type SceneToken = z.infer<typeof SceneTokenSchema>;
  */
 export const SceneContainerSchema = z.object({
   kind: z.literal("container"),
+  /** Outer outlines stay symmetric on purpose: an arrow is a token, never a container. */
   shape: z.enum(["circle", "square", "diamond", "hexagon"]),
   contents: z.array(SceneTokenSchema).min(1).max(2),
 }).strict();
@@ -156,12 +212,27 @@ export type SceneGuide = z.infer<typeof SceneGuideSchema>;
  */
 export const SceneSchema = z.object({
   kind: z.literal("scene"),
-  rows: z.number().int().min(2).max(3),
-  columns: z.number().int().min(2).max(3),
+  rows: z.number().int().min(GATE_STRIP_ROWS).max(3),
+  columns: z.number().int().min(2).max(MAXIMUM_GATE_STRIP_COLUMNS),
   objects: z.array(ScenePlacementSchema).max(9).default([]),
   tiles: z.array(ConnectionTileSchema).max(9).default([]),
   guides: z.array(SceneGuideSchema).max(2).optional(),
 }).strict().superRefine((scene, ctx) => {
+  // An ordinary board is 2–3 by 2–3. The single exception is the machine gate
+  // strip: one row of four or five glyphs. The puzzle-level check below then
+  // confines that shape to a machine table's gate column, so no other layout
+  // and no answer option can ever be more than three columns wide.
+  const ordinaryBoard = scene.rows >= 2 && scene.rows <= 3 && scene.columns >= 2 && scene.columns <= 3;
+  const gateStrip = isGateStripShape(scene.rows, scene.columns);
+  if (!ordinaryBoard && !gateStrip) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `a board is 2–3 by 2–3, or the ${GATE_STRIP_ROWS}x${GATE_STRIP_COLUMNS} or ` +
+        `${GATE_STRIP_ROWS}x${MAXIMUM_GATE_STRIP_COLUMNS} machine gate strip, ` +
+        `but this one is ${scene.rows}x${scene.columns}`,
+    });
+  }
+
   if (scene.objects.length + scene.tiles.length + (scene.guides?.length ?? 0) === 0) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a scene must contain at least one object or connection tile" });
   }
@@ -208,6 +279,13 @@ export type PuzzleType = (typeof PUZZLE_TYPES)[number];
 /** How the stem panels are arranged on screen. */
 export const LAYOUTS = ["grid3x3", "row", "analogy", "operatorTable", "machineTable", "conceptGroups", "singleScene"] as const;
 export type Layout = (typeof LAYOUTS)[number];
+/**
+ * Legal stem lengths for a `machineTable`: one triple per worked (input, gate,
+ * output) row, plus the query triple whose output is the blank. Two through
+ * five worked rows.
+ */
+export const MACHINE_TABLE_PANEL_COUNTS: readonly number[] = [9, 12, 15, 18];
+
 export const REASONING_BANDS = ["warmup", "composition", "constraint-spatial", "induction-transfer"] as const;
 export type ReasoningBand = (typeof REASONING_BANDS)[number];
 
@@ -225,7 +303,7 @@ export type OperatorLegend = z.infer<typeof OperatorLegendSchema>;
 
 /** Stable, compact features used to calibrate generated puzzle buckets. */
 export const GenerationFeatureVectorSchema = z.object({
-  difficulty: z.number().int().min(1).max(5),
+  difficulty: z.number().int().min(1).max(MAXIMUM_DIFFICULTY),
   ruleComplexity: z.number().int().nonnegative(),
   programDepth: z.number().int().positive(),
   activeDimensions: z.array(z.enum(DIMENSIONS)).max(DIMENSIONS.length),
@@ -250,8 +328,8 @@ const RuntimePuzzleSchema = z
     type: z.enum(PUZZLE_TYPES),
     /** Short, neutral instruction (kept minimal — the task should be visual). */
     instruction: z.string().min(3).max(140),
-    /** 1 (easiest) … 5 (hardest). */
-    difficulty: z.number().int().min(1).max(5),
+    /** 1 (easiest) … 6 (hardest). */
+    difficulty: z.number().int().min(1).max(MAXIMUM_DIFFICULTY),
     layout: z.enum(LAYOUTS),
     /** Versioned reasoning-family identity for family-aware results and calibration. */
     familyId: z.string().min(1).optional(),
@@ -261,7 +339,7 @@ const RuntimePuzzleSchema = z
     /**
      * The question, as a list of panels.
      *  - matrix:    9 panels (grid3x3) with exactly one { blank: true }
-     *  - sequence:  4–6 panels (row) with exactly one trailing { blank: true }
+     *  - sequence:  4–8 panels (row) with exactly one trailing { blank: true }
      *  - analogy:   exactly [A, B, C] visuals (layout "analogy"); renderer adds ":" "::" "?"
      *  - oddOneOut: empty [] — the options ARE the items; pick the one that doesn't belong
      */
@@ -295,17 +373,25 @@ const RuntimePuzzleSchema = z
       const grid = p.layout === "grid3x3" && p.stem.length === 9 && blanks === 1;
       const board = p.layout === "singleScene" && p.stem.length === 1 && blanks === 0 &&
         !isBlank(p.stem[0]) && isScene(p.stem[0]);
-      const machine = p.layout === "machineTable" && (p.stem.length === 9 || p.stem.length === 12) && blanks === 1 &&
+      // 9 / 12 / 15 / 18 panels: two, three, four, or five worked (input, gate,
+      // output) rows plus the query row. The 15-panel form arrived with the
+      // four-step composed-transform bucket (escalate-the-quiz, Phase 3); the
+      // 18-panel form with the five-step `composed-transform-d6` bucket
+      // (raise-the-ceiling-v12, 2026-08-26). The shorter forms are unchanged.
+      const machine = p.layout === "machineTable" &&
+        MACHINE_TABLE_PANEL_COUNTS.includes(p.stem.length) && blanks === 1 &&
         isBlank(p.stem[p.stem.length - 1]);
       if (!grid && !board && !machine) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid, one incomplete scene, or a three- or four-row machine table" });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid, one incomplete scene, or a two- to five-row machine table" });
       }
     } else if (p.type === "sequence") {
-      // 4–6 panels total: 3–5 drawn cells + exactly one trailing blank. Variable
-      // length is a difficulty lever (more cells → more pattern to infer).
+      // 4–8 panels total: 3–7 drawn cells + exactly one trailing blank. Variable
+      // length is a difficulty lever (more cells → more pattern to infer), and
+      // the top widened from 6 to 8 on 2026-08-24 so a two-strand interleaved
+      // row can show every strand's step at least twice (extrapolation gate).
       const lastIsBlank = p.stem.length > 0 && isBlank(p.stem[p.stem.length - 1]);
-      if (p.layout !== "row" || p.stem.length < 4 || p.stem.length > 6 || blanks !== 1 || !lastIsBlank) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "sequence must be a row of 4–6 panels whose ONLY blank is the trailing one" });
+      if (p.layout !== "row" || p.stem.length < 4 || p.stem.length > 8 || blanks !== 1 || !lastIsBlank) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "sequence must be a row of 4–8 panels whose ONLY blank is the trailing one" });
       }
     } else if (p.type === "analogy") {
       if (p.layout !== "analogy" || p.stem.length !== 3 || blanks !== 0) {
@@ -314,13 +400,17 @@ const RuntimePuzzleSchema = z
     } else if (p.type === "oddOneOut") {
       // Classic outliers use options only. Scene concept induction reuses the
       // same choose-one answer shape with three positive and three negative examples.
+      // The demonstrated shape (2026-08-24) shows three example boards that all
+      // satisfy the shared rule, so the rule is worked evidence, not a guess.
       const classic = p.layout === "row" && p.stem.length === 0;
+      const demonstrated = p.layout === "row" && p.stem.length === 3 && blanks === 0 &&
+        p.stem.every((panel) => !isBlank(panel) && isScene(panel));
       const concept = p.layout === "conceptGroups" && p.stem.length === 6 && blanks === 0 &&
         p.stem.every((panel) => !isBlank(panel) && isScene(panel));
       const repair = p.layout === "singleScene" && p.stem.length === 1 && blanks === 0 &&
         !isBlank(p.stem[0]) && isScene(p.stem[0]);
-      if (!classic && !concept && !repair) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "oddOneOut must be an empty row, six conceptGroups examples, or one singleScene repair prompt" });
+      if (!classic && !demonstrated && !concept && !repair) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "oddOneOut must be an empty row, three demonstrated example boards, six conceptGroups examples, or one singleScene repair prompt" });
       }
     } else if (p.type === "operatorInduction") {
       // Consecutive triples encode (left, right) -> output. There are 3–5
@@ -375,6 +465,26 @@ const RuntimePuzzleSchema = z
           code: z.ZodIssueCode.custom,
           path: ["stem", index],
           message: "stem visuals and answer options must use the same visual vocabulary",
+        });
+      }
+      // The wide board exists to hold four or five gate glyphs in one row. A
+      // machine table's panels run (input, gate, output), so the gate column is
+      // every index whose remainder is 1; anywhere else a four- or five-wide
+      // board would be a playing surface, which this project does not have.
+      if (isGateStrip(panel) && (p.layout !== "machineTable" || index % 3 !== 1)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stem", index],
+          message: `a ${GATE_STRIP_ROWS}-row board of ${GATE_STRIP_COLUMNS} or more columns is only allowed as a machine table's gate strip`,
+        });
+      }
+    }
+    for (const [index, option] of p.options.entries()) {
+      if (isGateStrip(option)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["options", index],
+          message: `an answer option may not be ${GATE_STRIP_COLUMNS} or more columns wide`,
         });
       }
     }
@@ -443,7 +553,7 @@ const RuntimePublicPuzzleSchema = z.object({
   id: z.string().min(1),
   type: z.enum(PUZZLE_TYPES),
   instruction: z.string().min(3).max(140),
-  difficulty: z.number().int().min(1).max(5),
+  difficulty: z.number().int().min(1).max(MAXIMUM_DIFFICULTY),
   layout: z.enum(LAYOUTS),
   familyId: z.string().min(1).optional(),
   band: z.enum(REASONING_BANDS).optional(),
@@ -510,6 +620,11 @@ export function isCell(visual: Visual): visual is Cell {
   return !isScene(visual);
 }
 
+/** Is this the wide one-row board a four-gate machine strip is drawn on? */
+export function isGateStrip(visual: Visual): boolean {
+  return isScene(visual) && isGateStripShape(visual.rows, visual.columns);
+}
+
 /** Canonical signature for exact visual-scene duplicate rejection. */
 export function sceneSignature(scene: Scene): string {
   const objects = [...scene.objects].sort((a, b) => a.row - b.row || a.column - b.column);
@@ -521,12 +636,12 @@ export function sceneSignature(scene: Scene): string {
 function sceneObjectIsDistinct(left: SceneObject, right: SceneObject): boolean {
   if (left.kind !== right.kind) return true;
   if (left.kind === "token" && right.kind === "token") {
-    return isInstantlyDistinct({ ...left, count: 1 }, { ...right, count: 1 });
+    return isSceneTokenInstantlyDistinct(left, right);
   }
   if (left.kind === "container" && right.kind === "container") {
     if (left.shape !== right.shape || left.contents.length !== right.contents.length) return true;
     return left.contents.some((token, index) =>
-      isInstantlyDistinct({ ...token, count: 1 }, { ...right.contents[index], count: 1 }));
+      isSceneTokenInstantlyDistinct(token, right.contents[index]));
   }
   return true;
 }

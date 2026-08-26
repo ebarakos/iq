@@ -38,6 +38,13 @@ export type SolverOpts = {
   model?: string;
   apiKey?: string;
   timeoutMs?: number;
+  /**
+   * Provider thinking budget, forwarded as the relay's X-Thinking-Budget
+   * header. Some endpoints (google/gemini-3.5-flash since 2026-08) refuse
+   * requests with reasoning disabled, which is the relay's default — every
+   * attempt then records transport-failure. Pass a budget to enable reasoning.
+   */
+  thinkingBudget?: number;
 };
 
 export interface SolveOutcome {
@@ -124,7 +131,12 @@ export async function solveItem(
   channel: Channel,
   opts?: SolverOpts,
 ): Promise<SolveOutcome> {
-  const { model } = relayModel({ provider: opts?.provider, model: opts?.model, apiKey: opts?.apiKey });
+  const { model } = relayModel({
+    provider: opts?.provider,
+    model: opts?.model,
+    apiKey: opts?.apiKey,
+    thinkingBudget: opts?.thinkingBudget,
+  });
   const abortSignal = AbortSignal.timeout(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const optionCount = puzzle.options.length;
 

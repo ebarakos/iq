@@ -10,6 +10,28 @@ item set the packet held at the time. Packets change whenever a family is
 withdrawn, so two results with the same `packetId` and different fingerprints
 did not answer the same questions.
 
+## `pilot-v3-manifest.json` — what the v3 packets held
+
+The answer-free record of every pilot-v3 packet: item identity, difficulty, and
+band time budget, plus each packet's content fingerprint. No puzzle, no answer,
+no explanation. It is generated from the code by
+`buildPrototypePilotManifest()` and a test asserts the committed file still
+matches, so it can never drift from what the app would build.
+
+It exists because a packet is derived from the live promotion registry, which
+means the packet a person answered stops existing the moment a family is
+withdrawn. `npm run pilot:report -- <aggregate.json>` checks a result against
+this file rather than against the live registry, so an aggregate stays checkable
+afterwards. A mismatched packet id, fingerprint, item set, or schema version is
+a hard error naming exactly what disagreed.
+
+Aggregate exports from the pilot screen are schema
+`prototype-pilot-aggregate-v2`: one row of counts per item, five-second solve
+time bins, and an explicit defensible-alternative count. Aggregate v1 files
+(the three results below) are per family with fifteen-second bins, and
+`pilot:report` refuses them by name — they belong to packets v1 and v2, which
+held different items.
+
 ## 2026-08-23 — `pilot-v1-a`, first human pilot ever run
 
 Seven of eight correct on a desktop. The miss was `concept-induction-v2`, filed
@@ -26,11 +48,11 @@ misunderstandings and no reports of a second defensible answer. Combined with
 `pilot-v1-a`, one person has now judged 12 of the 15 eligible families and got
 14 of 15 items right; the single miss was `concept-induction-v2`, withdrawn.
 
-Not covered by any human: `fold-punch-v2`, `interleaved-sequence-v2`,
-`inverse-analogy-v2`. All three sit in packet `pilot-v2-a`, which was never run.
-`interleaved-sequence-v2` is the gap that matters — the strong vision model
-answers it wrongly four times in five, so whether a person can read it decides
-whether it is the project's first genuinely agent-hard family or a broken one.
+Not covered by any human at that point: `fold-punch-v2`,
+`interleaved-sequence-v2`, `inverse-analogy-v2`. All three sat in packet
+`pilot-v2-a`, which was never run in its two-packet form. The 2026-08-24
+full-battery run below closed that gap (for `interleaved-sequence` via its
+`-v3` redesign; `-v2` had already been withdrawn on structural grounds).
 
 What this evidence supports: these 12 families are legible, and their intended
 relationship is recoverable by sight. What it does not support: any statement
@@ -41,3 +63,64 @@ be calibrated from these files.
 Timing worth carrying forward: `transformation-machine-v3` took 135 seconds
 against a 60-second-per-question budget in the public test. Everything else
 finished in 15 to 60 seconds.
+
+## 2026-08-24 — `pilot-v2-a`, full battery in one sitting, same participant
+
+The packet held all 16 then-eligible families, one item each (the packet size
+cap was raised to 20 at the user's request so the whole battery fits one
+sitting). Result: 15 of 16 correct, most items in 15 to 30 seconds.
+
+Withdrawn the same day, shipped as `scene-families-v10`:
+
+- `relational-outlier-v3` — wrong answer, a notation-misunderstanding report,
+  45 seconds. The demonstrated-examples redesign fixed the structural defect
+  that withdrew `-v2`, and people still cannot read the format. The battery
+  again has no odd-one-out item.
+- `interleaved-sequence-v3` — answered correctly in 30 seconds, but with a
+  notation-misunderstanding report and no intended-relationship description.
+  The user withdrew it: a right answer without the intended reading does not
+  prove the item measures its rule, and the gate withdraws rather than admits.
+
+Worth watching, not withdrawn: `composed-transform-v2` (the new three-step
+composer) was solved correctly but took 60 seconds against its band's
+40-second budget — the same one-slow-item signature `transformation-machine-v3`
+showed on 2026-08-23. One more slow reading and the band placement needs a
+second look.
+
+Every other family: correct, intended relationship described, no notation
+reports. `containment-analogy-v2` was judged in its new `constraint-spatial`
+band (15 seconds) — the 2026-08-24 band move survives its first human contact.
+
+## 2026-08-26 — pilot-v3-a (the v11 escalation pilot)
+
+One participant, one sitting, 20 items — one per enabled family/band/bucket key.
+Aggregate: `2026-08-26-pilot-v3-a.json`. Verify it with
+`npm run pilot:report -- data/pilot/2026-08-26-pilot-v3-a.json`.
+
+**Result: 15 of 20 correct, and the escalation test PASSED.** Four clean misses
+among the 15 d4/d5 items, against a bar of two: `visual-set-algebra-d5`,
+`composed-transform-d4`, `compositional-analogy-d4`, and `fold-punch-d5`. A clean
+miss is the outcome the escalation was built for — the participant understood the
+rule, described it correctly, reported no notation problem and no defensible
+alternative, and still chose wrong. That is difficulty coming from the rule, which
+is what the legibility doctrine asks for.
+
+**Timing is not evidence in this sitting.** The participant said they were
+interrupted throughout, and the data shows it: one warmup item sat at 495 seconds
+against a 25-second budget. Every "median over budget" flag in the report is
+discounted for that reason, and the second escalation branch (median d5 time near
+its budget) is reported as failing only because solving was unhurried, not because
+the items were easy. Read branch 1 alone for this sitting.
+
+**One family withdrawn: `containment-analogy-v2`.** It drew the single
+notation-misunderstanding report, and the participant independently named it as the
+only thing they disliked ("tiny shapes encircled in triangles"). It is the only
+family that draws a token inside another shape, so it is the only one that renders
+a token smaller than every other family does. Withdrawn the same day; the
+constraint-spatial pool drops from four families to three.
+
+**One family flagged but kept: `attribute-pairing-v1`.** Its single response was
+wrong, did not describe the intended relationship, and reported a defensible
+alternative — the ill-posed signature. The participant judged the rest of the
+battery good and asked to keep it, so it stays on one observation; a second
+sitting showing the same pattern should withdraw it.

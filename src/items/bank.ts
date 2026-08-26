@@ -15,12 +15,14 @@ import {
   type Visual,
 } from "./schema";
 import {
+  eligibleFamiliesForBand,
   EXPANDED_GENERATOR_VERSION,
   planExpandedSchedule,
   type ExpandedProfile,
 } from "./expanded-quiz";
 import {
   CURRENT_FAMILY_PROMOTION_REGISTRY,
+  EXPANDED_PROFILE_BANDS,
   readWithdrawnFamilyIds,
   type FamilyPromotionRegistry,
 } from "./family-promotion";
@@ -188,7 +190,15 @@ export function sampleQuiz(
   const ramp = rampSource[level].slice(0, n);
   while (ramp.length < n) ramp.push(ramp[ramp.length - 1] ?? 3);
   const forceAllTypes = level === "hard" && n >= PUZZLE_TYPES.length;
-  const requiredTypes = forceAllTypes ? [...PUZZLE_TYPES] : [];
+  // Hard mode forces one item per type, but only for types the profile can
+  // reach without dropping below its own floor: a type that exists only at d2
+  // (the demonstrated outliers) must not drag a hard sample down to warmup.
+  const profileFloor = Math.min(...ramp);
+  const coverableTypes = new Set(
+    items.filter((i) => i.puzzle.difficulty >= profileFloor).map((i) => i.puzzle.type));
+  const requiredTypes = forceAllTypes
+    ? PUZZLE_TYPES.filter((puzzleType) => coverableTypes.has(puzzleType))
+    : [];
 
   const used = new Set<string>();
   const typesCovered = new Set<PuzzleType>();
@@ -198,14 +208,22 @@ export function sampleQuiz(
     // Nearest available difficulty, widening the spread only when a bucket is exhausted.
     const requiredType = requiredTypes.length > 0 ? requiredTypes.shift() : null;
     let pool: BankItem[] = [];
-    for (let spread = 0; pool.length === 0 && spread <= 4; spread++) {
-      pool = items.filter((i) => !used.has(i.fingerprint) && Math.abs(i.puzzle.difficulty - target) <= spread);
+    // Keep widening for a required type even when the untyped pool is already
+    // non-empty: a type that only exists far from the target difficulty (the
+    // demonstrated outliers live at d2) must still be reachable in hard mode.
+    for (let spread = 0; spread <= 4; spread++) {
+      const candidates = items.filter((i) =>
+        !used.has(i.fingerprint) && Math.abs(i.puzzle.difficulty - target) <= spread);
       if (requiredType) {
-        const typed = pool.filter((i) => i.puzzle.type === requiredType);
+        const typed = candidates.filter((i) => i.puzzle.type === requiredType);
         if (typed.length > 0) {
           pool = typed;
           break;
         }
+        pool = candidates;
+      } else if (candidates.length > 0) {
+        pool = candidates;
+        break;
       }
     }
     if (pool.length === 0) {
@@ -230,6 +248,93 @@ export function sampleQuiz(
     puzzles: chosen.map((i) => shuffleOptions(i.puzzle)) as PuzzleSet,
     items: chosen,
   };
+}
+
+/**
+ * How many banked items every enabled family/band/bucket key holds.
+ *
+ * Four, because that is the most times one key can come up in a single test:
+ * constraint-spatial splits ten questions over three families, so a family
+ * with one validated bucket there is asked for four times. The emergency bank
+ * has to answer every one of them from the exact bucket the schedule asked
+ * for — a fifth item would be spare, a third would push a slot onto the
+ * fallback ladder below. See docs/plans/escalate-the-quiz.md, Phase 5.
+ */
+export const BANK_ITEMS_PER_KEY = 4;
+
+/**
+ * What a bank item is stocked against: one family, in one band, at one bucket.
+ *
+ * Family alone was too coarse. A family with two validated buckets in a band
+ * serves a shallower question the first time and a deeper one after that, and
+ * a family registered in two bands serves a different item shape in each — so
+ * "four items of compositional-analogy-v2" said nothing about whether the d4
+ * bucket was covered.
+ */
+export function expandedBankKey(
+  familyId: string,
+  band: string,
+  difficultyBucket: string,
+): string {
+  return `${familyId}:${band}:${difficultyBucket}`;
+}
+
+/** The key a banked puzzle covers, or null when it is not a current expanded item. */
+export function expandedBankKeyOf(puzzle: Puzzle<Visual>): string | null {
+  const generation = puzzle.generation;
+  if (!generation || generation.generatorVersion !== EXPANDED_GENERATOR_VERSION) return null;
+  if (!puzzle.band) return null;
+  return expandedBankKey(generation.familyId, puzzle.band, generation.featureBucket);
+}
+
+/** Every key the live registry can schedule, sorted; the bank must cover all of them. */
+export function enabledExpandedBankKeys(
+  registry: FamilyPromotionRegistry = CURRENT_FAMILY_PROMOTION_REGISTRY,
+  withdrawnFamilyIds: ReadonlySet<string> = readWithdrawnFamilyIds(),
+): string[] {
+  return EXPANDED_PROFILE_BANDS.flatMap((band) =>
+    eligibleFamiliesForBand(registry, band, withdrawnFamilyIds).flatMap((family) =>
+      family.bandBuckets.map((bucket) => expandedBankKey(family.familyId, band, bucket.bucket))))
+    .sort();
+}
+
+export interface ExpandedBankCoverage {
+  /** Enabled key -> current-version items the bank holds for it. */
+  countsByKey: Map<string, number>;
+  /** Enabled keys holding fewer than `BANK_ITEMS_PER_KEY` items. */
+  short: { key: string; have: number }[];
+  /** Current expanded items whose key the live registry cannot schedule. */
+  strays: string[];
+}
+
+/**
+ * Count the bank against the keys the registry can schedule.
+ *
+ * This is the check that keeps the fallback ladder in `sampleExpandedBankQuiz`
+ * unreachable: it is a property of the built bank, decided before anything is
+ * served, rather than something a sampling run might or might not run into.
+ */
+export function expandedBankCoverage(
+  items: readonly BankItem[] = loadBank(),
+  registry: FamilyPromotionRegistry = CURRENT_FAMILY_PROMOTION_REGISTRY,
+  withdrawnFamilyIds: ReadonlySet<string> = readWithdrawnFamilyIds(),
+): ExpandedBankCoverage {
+  const countsByKey = new Map<string, number>(enabledExpandedBankKeys(registry, withdrawnFamilyIds)
+    .map((key) => [key, 0]));
+  const strays: string[] = [];
+  for (const item of items) {
+    if (item.provenance.source !== "expanded") continue;
+    const key = expandedBankKeyOf(item.puzzle);
+    if (key === null || !countsByKey.has(key)) {
+      strays.push(`${item.puzzle.id} (${key ?? "no current-version key"})`);
+      continue;
+    }
+    countsByKey.set(key, countsByKey.get(key)! + 1);
+  }
+  const short = [...countsByKey]
+    .filter(([, have]) => have < BANK_ITEMS_PER_KEY)
+    .map(([key, have]) => ({ key, have }));
+  return { countsByKey, short, strays };
 }
 
 function shuffleOptionsWithSeed<V extends Visual>(puzzle: Puzzle<V>, seed: Seed, slot: number): Puzzle<V> {
@@ -267,11 +372,38 @@ export function sampleExpandedBankQuiz(
     !withdrawnFamilyIds.has(item.puzzle.familyId));
   const used = new Set<string>();
   const chosen = schedule.map((slot, slotIndex) => {
-    const candidates = usable.filter((item) =>
-      !used.has(item.fingerprint) &&
-      item.puzzle.familyId === slot.familyId &&
-      item.puzzle.band === slot.band &&
-      item.puzzle.difficulty === slot.difficulty);
+    const inSlotFamily = usable.filter((item) =>
+      !used.has(item.fingerprint) && item.puzzle.familyId === slot.familyId);
+    const inSlotBand = inSlotFamily.filter((item) => item.puzzle.band === slot.band);
+    const key = expandedBankKey(slot.familyId, slot.band, slot.difficultyBucket);
+    const exactKey = inSlotBand.filter((item) => expandedBankKeyOf(item.puzzle) === key);
+    const sameDifficulty = inSlotBand.filter((item) => item.puzzle.difficulty === slot.difficulty);
+    // Four rungs, each used only when the one above it is empty: the slot's
+    // exact family/band/bucket key, then the same family and band at the same
+    // difficulty, then the same family anywhere in that band, then the same
+    // family from whichever band the bank does hold it in.
+    //
+    // Only the first rung should ever run. A bank built by
+    // `npm run bank:topup -- --source expanded --replace --per-bucket 4` holds
+    // four items for every key the registry can schedule, and no key comes up
+    // more than four times in one test, so the exact bucket is always in stock
+    // — `expandedBankCoverage` above proves that from the built file rather
+    // than leaving it to a lucky sampling run.
+    //
+    // The lower rungs stay as a guard for the one case that is not a bug: a
+    // registry that has moved ahead of the committed bank. That has happened
+    // repeatedly — a deeper `fold-punch` bucket, then a second BAND for
+    // `composed-transform` — and an emergency fallback that refuses to serve a
+    // test is worse than one that serves the same family a step shallower.
+    // `npm run bank:verify` reports the gap rather than leaving a taker to
+    // find it.
+    const candidates = exactKey.length > 0
+      ? exactKey
+      : sameDifficulty.length > 0
+        ? sameDifficulty
+        : inSlotBand.length > 0
+          ? inSlotBand
+          : inSlotFamily;
     const item = shuffled(
       seededRng(seed, `expanded-bank-item:${slotIndex}:${slot.familyId}`),
       candidates,
@@ -283,11 +415,14 @@ export function sampleExpandedBankQuiz(
       );
     }
     used.add(item.fingerprint);
-    return item;
+    // The band a question occupies is the SLOT's, exactly as the live assembler
+    // stamps it; a substituted item must not report the band it was banked in,
+    // or the served test would not have the schedule shape it claims.
+    return { item, puzzle: { ...item.puzzle, band: slot.band } };
   });
 
   return {
-    puzzles: chosen.map((item, index) => shuffleOptionsWithSeed(item.puzzle, seed, index)) as PuzzleSet,
-    items: chosen,
+    puzzles: chosen.map((entry, index) => shuffleOptionsWithSeed(entry.puzzle, seed, index)) as PuzzleSet,
+    items: chosen.map((entry) => entry.item),
   };
 }

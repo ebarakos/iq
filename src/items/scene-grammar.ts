@@ -1,3 +1,4 @@
+import { isSceneShapeOrientable } from "./domains";
 import {
   SceneSchema,
   sceneSignature,
@@ -16,6 +17,13 @@ export type SceneUnaryOperation =
   | { kind: "translate"; rowDelta: -2 | -1 | 0 | 1 | 2; columnDelta: -2 | -1 | 0 | 1 | 2; wrap: boolean }
   | { kind: "reflect"; axis: "horizontal" | "vertical" }
   | { kind: "rotate"; quarterTurns: 1 | 2 | 3 }
+  /**
+   * Turn every orientable token on the spot, without moving it. `rotate` turns
+   * the BOARD (positions and edges move); `turn` turns each token's own
+   * orientation and leaves the layout alone — so a family can show the two as
+   * different visible steps.
+   */
+  | { kind: "turn"; quarterTurns: 1 | 2 | 3 }
   | { kind: "swap"; first: ScenePosition; second: ScenePosition }
   | { kind: "setFill"; fill: SceneToken["fill"] }
   | { kind: "contain"; at: ScenePosition; containerShape: "circle" | "square" | "diamond" | "hexagon" }
@@ -34,11 +42,87 @@ export type SceneCompositionPrimitive =
       kind: "setFillAt";
       at: ScenePosition;
       fill: "half" | "solid";
+    }
+  /**
+   * Turn every orientable token a quarter clockwise (1) or anticlockwise (3),
+   * without moving anything. This is the token-local twin of the `spatial`
+   * step: `spatial` moves board slots and leaves each token's own orientation
+   * alone, `turn` does exactly the opposite. A composed program that uses both
+   * therefore asks the solver to track two independent visible changes rather
+   * than one.
+   *
+   * A board with nothing orientable on it has no visible turn, and
+   * `applySceneUnary` returns null for it — such a draw is rejected, never
+   * served as a step that does nothing.
+   */
+  | {
+      kind: "turn";
+      quarterTurns: 1 | 3;
     };
 
 export interface SceneOrderedComposition {
   first: SceneCompositionPrimitive;
   second: SceneCompositionPrimitive;
+}
+
+export interface SceneOrderedThreeStepComposition {
+  first: SceneCompositionPrimitive;
+  second: SceneCompositionPrimitive;
+  third: SceneCompositionPrimitive;
+}
+
+export interface SceneOrderedFourStepComposition {
+  first: SceneCompositionPrimitive;
+  second: SceneCompositionPrimitive;
+  third: SceneCompositionPrimitive;
+  fourth: SceneCompositionPrimitive;
+}
+
+/**
+ * Five ordered gates — the deepest composed program the battery displays,
+ * added for `composed-transform-d6` on 2026-08-26 (raise-the-ceiling-v12).
+ */
+export interface SceneOrderedFiveStepComposition {
+  first: SceneCompositionPrimitive;
+  second: SceneCompositionPrimitive;
+  third: SceneCompositionPrimitive;
+  fourth: SceneCompositionPrimitive;
+  fifth: SceneCompositionPrimitive;
+}
+
+/** Any composed program a machine table displays: three, four, or five gates. */
+export type SceneComposedProgram =
+  | SceneOrderedThreeStepComposition
+  | SceneOrderedFourStepComposition
+  | SceneOrderedFiveStepComposition;
+
+/** How many gates a composed program displays. Also its honest program depth. */
+export type SceneComposedProgramLength = 3 | 4 | 5;
+
+/** The gates of a composed program, in the order the query strip shows them. */
+export function sceneComposedProgramSteps(program: SceneComposedProgram): SceneCompositionPrimitive[] {
+  if ("fifth" in program) {
+    return [program.first, program.second, program.third, program.fourth, program.fifth];
+  }
+  return "fourth" in program
+    ? [program.first, program.second, program.third, program.fourth]
+    : [program.first, program.second, program.third];
+}
+
+/** Rebuild a composed program from its ordered gates. Three, four, or five. */
+export function sceneComposedProgramFromSteps(
+  steps: readonly SceneCompositionPrimitive[],
+): SceneComposedProgram {
+  if (steps.length === 3) return { first: steps[0], second: steps[1], third: steps[2] };
+  if (steps.length === 4) {
+    return { first: steps[0], second: steps[1], third: steps[2], fourth: steps[3] };
+  }
+  if (steps.length === 5) {
+    return {
+      first: steps[0], second: steps[1], third: steps[2], fourth: steps[3], fifth: steps[4],
+    };
+  }
+  throw new Error(`a composed program shows three, four, or five gates, not ${steps.length}`);
 }
 
 export interface ScenePosition {
@@ -62,6 +146,9 @@ export function enumerateSceneUnaryOperations(rows: number, columns: number): Sc
     { kind: "rotate", quarterTurns: 1 },
     { kind: "rotate", quarterTurns: 2 },
     { kind: "rotate", quarterTurns: 3 },
+    { kind: "turn", quarterTurns: 1 },
+    { kind: "turn", quarterTurns: 2 },
+    { kind: "turn", quarterTurns: 3 },
     { kind: "setFill", fill: "outline" },
     { kind: "setFill", fill: "half" },
     { kind: "setFill", fill: "solid" },
@@ -197,6 +284,25 @@ export function applySceneUnary(scene: Scene, operation: SceneUnaryOperation): S
     return transformPositions(scene, operation);
   }
 
+  if (operation.kind === "turn") {
+    const degrees = operation.quarterTurns * 90;
+    let turned = false;
+    const spin = (token: SceneToken): SceneToken => {
+      if (!isSceneShapeOrientable(token.shape)) return token;
+      turned = true;
+      return { ...token, rotation: (token.rotation + degrees) % 360 };
+    };
+    const objects = scene.objects.map((placement) => ({
+      ...placement,
+      object: placement.object.kind === "token"
+        ? spin(placement.object)
+        : { ...placement.object, contents: placement.object.contents.map(spin) },
+    }));
+    // A scene with nothing to turn makes the step invisible. An inapplicable
+    // operation must be a rejectable draw, never a silent no-op.
+    return turned ? normalize({ ...scene, objects }) : null;
+  }
+
   if (operation.kind === "setFill") {
     const paint = (object: SceneObject): SceneObject => object.kind === "token"
       ? { ...object, fill: operation.fill }
@@ -259,6 +365,9 @@ export function applySceneCompositionPrimitive(
   primitive: SceneCompositionPrimitive,
 ): Scene | null {
   if (primitive.kind === "spatial") return applySceneUnary(input, primitive.operation);
+  if (primitive.kind === "turn") {
+    return applySceneUnary(input, { kind: "turn", quarterTurns: primitive.quarterTurns });
+  }
   const sourceIndex = input.objects.findIndex((placement) =>
     placement.row === primitive.at.row && placement.column === primitive.at.column);
   const source = input.objects[sourceIndex];
@@ -280,25 +389,151 @@ export function applySceneOrderedComposition(
   return afterFirst ? applySceneCompositionPrimitive(afterFirst, program.second) : null;
 }
 
+/**
+ * The shared primitive pool every composed scene family draws from.
+ *
+ * `spatial` moves board slots. `attribute` and `turn` are token-local: they
+ * change what a token looks like and leave the layout alone. The two turn
+ * primitives joined the pool on 2026-08-25 (escalate-the-quiz, Phase 3), which
+ * is what lets a composed program show two independent visible changes — a
+ * board that moved and tokens that rotated on the spot — instead of one.
+ */
+export function sceneCompositionPrimitivePool(): {
+  spatial: SceneCompositionPrimitive[];
+  attribute: SceneCompositionPrimitive[];
+  turn: SceneCompositionPrimitive[];
+} {
+  return {
+    spatial: [
+      { kind: "spatial", operation: { kind: "rotate", quarterTurns: 1 } },
+      { kind: "spatial", operation: { kind: "rotate", quarterTurns: 3 } },
+      { kind: "spatial", operation: { kind: "reflect", axis: "horizontal" } },
+      { kind: "spatial", operation: { kind: "reflect", axis: "vertical" } },
+    ],
+    attribute: [
+      { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "half" },
+      { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "solid" },
+    ],
+    turn: [
+      { kind: "turn", quarterTurns: 1 },
+      { kind: "turn", quarterTurns: 3 },
+    ],
+  };
+}
+
+/** Every primitive a composed program may use, in one flat list. */
+export function sceneComposedPrimitives(): SceneCompositionPrimitive[] {
+  const { spatial, attribute, turn } = sceneCompositionPrimitivePool();
+  return [...spatial, ...attribute, ...turn];
+}
+
+/**
+ * Is this ordered list of gates a program the composed grammar contains?
+ *
+ * Three rules, each removing programs whose displayed gates cannot all matter:
+ *
+ *  - the gates are distinct, so no two worked rows demonstrate the same thing;
+ *  - they are not all board moves — rotations and reflections compose to one
+ *    spatial move, so an all-spatial program can collapse into a single gate
+ *    and never changes anything token-local; and
+ *  - at most one of them is a turn. The two turns are a quarter clockwise and a
+ *    quarter anticlockwise, so a program holding both leaves every orientation
+ *    exactly as it found it. Single-gate ablation cannot see that, because with
+ *    one turn removed the other one does change the answer.
+ *
+ * Everything else is left to a family's own servability and ablation filters.
+ *
+ * The rules are stated once and applied at every displayed depth: the five-gate
+ * grammar added on 2026-08-26 carries them over unchanged, so nothing about
+ * "deeper" also means "looser".
+ */
+export function isSceneComposedProgram(steps: readonly SceneCompositionPrimitive[]): boolean {
+  if (steps.length !== 3 && steps.length !== 4 && steps.length !== 5) return false;
+  const keys = steps.map((primitive) => JSON.stringify(primitive));
+  if (new Set(keys).size !== keys.length) return false;
+  if (steps.every((primitive) => primitive.kind === "spatial")) return false;
+  return steps.filter((primitive) => primitive.kind === "turn").length <= 1;
+}
+
+/** Every ordered program of `steps` gates the composed grammar contains. */
+function enumerateComposedPrograms(steps: SceneComposedProgramLength): SceneCompositionPrimitive[][] {
+  const pool = sceneComposedPrimitives();
+  const programs: SceneCompositionPrimitive[][] = [];
+  const walk = (chosen: SceneCompositionPrimitive[]) => {
+    if (chosen.length === steps) {
+      if (isSceneComposedProgram(chosen)) programs.push([...chosen]);
+      return;
+    }
+    for (const primitive of pool) {
+      chosen.push(primitive);
+      walk(chosen);
+      chosen.pop();
+    }
+  };
+  walk([]);
+  return programs;
+}
+
 /** Complete small grammar used by composed scene families. */
 export function enumerateSceneOrderedCompositions(): SceneOrderedComposition[] {
-  const spatial: SceneCompositionPrimitive[] = [
-    { kind: "spatial", operation: { kind: "rotate", quarterTurns: 1 } },
-    { kind: "spatial", operation: { kind: "rotate", quarterTurns: 3 } },
-    { kind: "spatial", operation: { kind: "reflect", axis: "horizontal" } },
-    { kind: "spatial", operation: { kind: "reflect", axis: "vertical" } },
-  ];
-  const attribute: SceneCompositionPrimitive[] = [
-    { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "half" },
-    { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "solid" },
-  ];
+  const { spatial, attribute } = sceneCompositionPrimitivePool();
   return spatial.flatMap((spatialPrimitive) => attribute.flatMap((attributePrimitive) => [
     { first: spatialPrimitive, second: attributePrimitive },
     { first: attributePrimitive, second: spatialPrimitive },
   ]));
 }
 
+/** Every ordered triple of distinct primitives that is not three board moves. */
+export function enumerateSceneOrderedThreeStepCompositions(): SceneOrderedThreeStepComposition[] {
+  return enumerateComposedPrograms(3)
+    .map((steps) => ({ first: steps[0], second: steps[1], third: steps[2] }));
+}
+
+/** Every ordered quadruple of distinct primitives that is not four board moves. */
+export function enumerateSceneOrderedFourStepCompositions(): SceneOrderedFourStepComposition[] {
+  return enumerateComposedPrograms(4)
+    .map((steps) => ({ first: steps[0], second: steps[1], third: steps[2], fourth: steps[3] }));
+}
+
+/**
+ * Every ordered quintuple the grammar contains: five distinct primitives, at
+ * most one of them a turn. "Not all board moves" costs nothing here — there are
+ * only four board moves, so five distinct primitives can never all be spatial.
+ */
+export function enumerateSceneOrderedFiveStepCompositions(): SceneOrderedFiveStepComposition[] {
+  return enumerateComposedPrograms(5).map((steps) => ({
+    first: steps[0], second: steps[1], third: steps[2], fourth: steps[3], fifth: steps[4],
+  }));
+}
+
+export function applySceneOrderedThreeStepComposition(
+  input: Scene,
+  program: SceneOrderedThreeStepComposition,
+): Scene | null {
+  const afterFirst = applySceneCompositionPrimitive(input, program.first);
+  const afterSecond = afterFirst ? applySceneCompositionPrimitive(afterFirst, program.second) : null;
+  return afterSecond ? applySceneCompositionPrimitive(afterSecond, program.third) : null;
+}
+
+/** Run a composed program of either length, left to right. */
+export function applySceneComposedProgram(input: Scene, program: SceneComposedProgram): Scene | null {
+  let value: Scene | null = input;
+  for (const step of sceneComposedProgramSteps(program)) {
+    value = value && applySceneCompositionPrimitive(value, step);
+  }
+  return value;
+}
+
 export function sceneOrderedCompositionKey(program: SceneOrderedComposition): string {
+  return JSON.stringify(program);
+}
+
+export function sceneOrderedThreeStepCompositionKey(program: SceneOrderedThreeStepComposition): string {
+  return JSON.stringify(program);
+}
+
+/** Stable key for a composed program of either length. */
+export function sceneComposedProgramKey(program: SceneComposedProgram): string {
   return JSON.stringify(program);
 }
 

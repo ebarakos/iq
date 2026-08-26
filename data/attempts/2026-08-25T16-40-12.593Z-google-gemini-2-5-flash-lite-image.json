@@ -1,0 +1,1017 @@
+{
+  "runId": "2026-08-25T16-40-12.593Z-google-gemini-2-5-flash-lite-image",
+  "startedAt": "2026-08-25T16:40:12.593Z",
+  "provider": "openrouter",
+  "model": "google/gemini-2.5-flash-lite",
+  "channel": "image",
+  "promptVersion": "solver-v3",
+  "source": "held-out",
+  "profile": null,
+  "runSeed": "probe-escalation-held-out",
+  "generatorVersion": "scene-families-v11",
+  "plannedAttempts": 40,
+  "completedAttempts": 40,
+  "status": "complete",
+  "attempts": [
+    {
+      "itemId": "held-out-dade78067ee14275-2-composed-transform-d4",
+      "chosen": 3,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1609,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "7450ffd0e3a0afab",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:14.206Z"
+    },
+    {
+      "itemId": "held-out-e0bd16750bc4c2e2-1-composed-transform-d4",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1764,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "ec69e18fc29dabc2",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-25T16:40:14.360Z"
+    },
+    {
+      "itemId": "held-out-66b7b00adc142ce2-3-composed-transform-d4",
+      "chosen": 0,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1464,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "76c9d6dfc0fa2660",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-25T16:40:15.671Z"
+    },
+    {
+      "itemId": "held-out-a1522551025b36c6-4-composed-transform-d4",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2037,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "296d0dbf0977295a",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:16.398Z"
+    },
+    {
+      "itemId": "held-out-2459cac36138c570-5-composed-transform-d4",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1960,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "00fa1c96832bade5",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-25T16:40:17.631Z"
+    },
+    {
+      "itemId": "held-out-7e28d306384756f2-6-composed-transform-d4",
+      "chosen": 1,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2192,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "ec69e18fc29dabc2",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:18.591Z"
+    },
+    {
+      "itemId": "held-out-131f9326c554b61f-7-composed-transform-d4",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2283,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "0958ef18a9a01e19",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:19.914Z"
+    },
+    {
+      "itemId": "held-out-5444848fdb750166-8-composed-transform-d4",
+      "chosen": 3,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1698,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "415c2af73be90779",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:20.289Z"
+    },
+    {
+      "itemId": "held-out-d92c4dea4d1d1d8e-9-composed-transform-d4",
+      "chosen": 1,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1539,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "da77513bd94d8f22",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-25T16:40:21.454Z"
+    },
+    {
+      "itemId": "held-out-29e7a8f497f8f0c8-10-composed-transform-d4",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1383,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "415c2af73be90779",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:21.672Z"
+    },
+    {
+      "itemId": "held-out-8e2aad5a9031b078-11-composed-transform-d4",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2527,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8a30233985fd9874",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-25T16:40:23.982Z"
+    },
+    {
+      "itemId": "held-out-d730100e6f577d3a-12-composed-transform-d4",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2444,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "51823787a2117f9c",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-25T16:40:24.117Z"
+    },
+    {
+      "itemId": "held-out-98c4dee47e2d6173-13-composed-transform-d4",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1458,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "7450ffd0e3a0afab",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-25T16:40:25.440Z"
+    },
+    {
+      "itemId": "held-out-5b4089b5035a2f92-14-composed-transform-d4",
+      "chosen": 0,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2051,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "7dc8c312d8141d86",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:26.169Z"
+    },
+    {
+      "itemId": "held-out-93350352e8943334-15-composed-transform-d4",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1351,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "57e663a2d0b2a277",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:26.791Z"
+    },
+    {
+      "itemId": "held-out-8905bafeff94b3f1-16-composed-transform-d4",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1746,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "ec787392ce568a94",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-25T16:40:27.916Z"
+    },
+    {
+      "itemId": "held-out-d0d6e7178e9f0af7-18-composed-transform-d4",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1206,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "4a604bbc1fcc9ddb",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:29.124Z"
+    },
+    {
+      "itemId": "held-out-28a5cbce75ad89d2-17-composed-transform-d4",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2526,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "04d55616a09e0a2a",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:29.317Z"
+    },
+    {
+      "itemId": "held-out-be4ec2d2cc6d6f5f-20-composed-transform-d4",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1255,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "296d0dbf0977295a",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:30.573Z"
+    },
+    {
+      "itemId": "held-out-d91258bd922c927e-19-composed-transform-d4",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1947,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "4e99b1612a1bc4b0",
+        "featureBucket": "held-out-composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-25T16:40:31.072Z"
+    },
+    {
+      "itemId": "held-out-a5bd91041c122a12-1-composed-transform-d5",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1844,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8039f5ce7d4b2fe1",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-25T16:40:32.417Z"
+    },
+    {
+      "itemId": "held-out-ebf328578ef0916d-2-composed-transform-d5",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1761,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "46d2a3a07efeccb7",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:32.833Z"
+    },
+    {
+      "itemId": "held-out-041fd578c5c6824c-3-composed-transform-d5",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1833,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "c98797dfdaf705eb",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-25T16:40:34.250Z"
+    },
+    {
+      "itemId": "held-out-66e2be8cf57a1573-4-composed-transform-d5",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1930,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "9ee34021d8ba171c",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:34.763Z"
+    },
+    {
+      "itemId": "held-out-a2557ee3098b8cb0-6-composed-transform-d5",
+      "chosen": 1,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1138,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "7cabb9412144dc9e",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-25T16:40:35.901Z"
+    },
+    {
+      "itemId": "held-out-bf2314c31ae5fadf-5-composed-transform-d5",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1802,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "ee56a28e12b8a23f",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:36.052Z"
+    },
+    {
+      "itemId": "held-out-7124c60357e58b98-8-composed-transform-d5",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1455,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "9ee34021d8ba171c",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-25T16:40:37.508Z"
+    },
+    {
+      "itemId": "held-out-86ba6a27d553e94f-7-composed-transform-d5",
+      "chosen": 1,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1840,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "d8bcd378404be84f",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "ts": "2026-08-25T16:40:37.741Z"
+    },
+    {
+      "itemId": "held-out-4643f095f447e6e9-9-composed-transform-d5",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "held-out",
+      "latencyMs": 1349,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8b6e33d0719af68b",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-25T16:40:38.859Z"
+    },
+    {
+      "itemId": "held-out-88b527b146e2bfd6-10-composed-transform-d5",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1294,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "03b4571d51bf9b3d",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:39.035Z"
+    },
+    {
+      "itemId": "held-out-ce088565c17fea71-11-composed-transform-d5",
+      "chosen": 3,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1248,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "f1adbe59bfc82415",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-25T16:40:40.107Z"
+    },
+    {
+      "itemId": "held-out-0afe92b693609949-12-composed-transform-d5",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2062,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "3d8f249c3ac6673e",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:41.098Z"
+    },
+    {
+      "itemId": "held-out-8fcd98fe6cccfada-13-composed-transform-d5",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1779,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "3853ca79b4d5c32a",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:41.887Z"
+    },
+    {
+      "itemId": "held-out-96fe479cf817f184-14-composed-transform-d5",
+      "chosen": 0,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 7330,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8039f5ce7d4b2fe1",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "ts": "2026-08-25T16:40:48.428Z"
+    },
+    {
+      "itemId": "held-out-349a00b3dab5781c-15-composed-transform-d5",
+      "chosen": 2,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 9129,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8039f5ce7d4b2fe1",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "ts": "2026-08-25T16:40:51.016Z"
+    },
+    {
+      "itemId": "held-out-67c861c3e0b18d4c-17-composed-transform-d5",
+      "chosen": 0,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1931,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "c98797dfdaf705eb",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:52.947Z"
+    },
+    {
+      "itemId": "held-out-a517facbce1e8be5-18-composed-transform-d5",
+      "chosen": 1,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 2505,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "46d2a3a07efeccb7",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:55.452Z"
+    },
+    {
+      "itemId": "held-out-e34d6c5bd16dadbb-16-composed-transform-d5",
+      "chosen": 3,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 7653,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "cb54d3f3345d533d",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "ts": "2026-08-25T16:40:56.083Z"
+    },
+    {
+      "itemId": "held-out-43a6a27dc9a7a774-19-composed-transform-d5",
+      "chosen": 4,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1361,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "4adeeb0d97db3a0e",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "ts": "2026-08-25T16:40:56.814Z"
+    },
+    {
+      "itemId": "held-out-2a4c41ad88042d65-20-composed-transform-d5",
+      "chosen": 1,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "held-out",
+      "latencyMs": 1780,
+      "generation": {
+        "generatorVersion": "scene-families-v11",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "718fecc72301fb91",
+        "featureBucket": "held-out-composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 4,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "ts": "2026-08-25T16:40:57.863Z"
+    }
+  ]
+}

@@ -4,15 +4,29 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CELL_CANVAS_PADDING,
   CELL_VIEWBOX,
+  GATE_GLYPH_WIDTH,
+  GATE_SEPARATOR_WIDTH,
+  GATE_STRIP_FRAME,
+  GATE_STRIP_GAP,
+  NARROW_VIEWPORT_STEM_WIDTH,
+  UNSEPARATED_GATE_GLYPH_COUNT,
+  WIDE_GATE_GLYPH_WIDTH,
+  WIDE_GATE_SEPARATOR_WIDTH,
   SCENE_BOARD_INSET,
   SCENE_CONNECTION_STROKE,
   SceneGraphic,
   CellGraphic,
   StemView,
+  describeCell,
+  gateGlyphs,
+  gateStripWidth,
 } from "./render";
 import { generatePuzzle } from "./generate";
 import { loadBank } from "./bank";
 import {
+  GATE_STRIP_COLUMNS,
+  GATE_STRIP_ROWS,
+  MAXIMUM_GATE_STRIP_COLUMNS,
   isBlank,
   type Cell,
   type Puzzle,
@@ -446,7 +460,688 @@ describe("compose-image composition contract", () => {
     const svg = puzzleToSvg(puzzle);
     expect(svg).toContain("<svg");
 
-    const expectedCalls = puzzle.options.length + puzzle.stem.filter((panel) => !isBlank(panel)).length;
+    // Every option and every drawn stem panel goes through the shared renderer.
+    // A machine gate is the one panel that draws as more than one graphic: each
+    // of its glyphs gets a cell of its own, and each of those is one call.
+    const gatePanels = puzzle.layout === "machineTable"
+      ? puzzle.stem.filter((_, index) => index % 3 === 1)
+      : [];
+    const extraGateGlyphs = gatePanels.reduce((total, panel) => total + gateGlyphs(panel).length - 1, 0);
+    const expectedCalls =
+      puzzle.options.length + puzzle.stem.filter((panel) => !isBlank(panel)).length + extraGateGlyphs;
     expect(calls).toHaveLength(expectedCalls);
+  });
+});
+
+describe("scene-only arrow rendering", () => {
+  const arrowToken = (rotation: number, size: SceneToken["size"] = "l", fill: SceneToken["fill"] = "solid"): SceneToken =>
+    ({ kind: "token", shape: "arrow", rotation, fill, size });
+
+  /** One arrow on the tightest board the renderer serves (3 columns). */
+  const arrowBoard = (rotation: number, size: SceneToken["size"] = "l", fill: SceneToken["fill"] = "solid"): Scene => ({
+    kind: "scene",
+    rows: 3,
+    columns: 3,
+    objects: [{ row: 1, column: 1, object: arrowToken(rotation, size, fill) }],
+    tiles: [],
+  });
+
+  const arrowPuzzle: Puzzle<Visual> = {
+    id: "arrow-renderer",
+    type: "sequence",
+    instruction: "What comes next?",
+    difficulty: 3,
+    layout: "row",
+    stem: [arrowBoard(0), arrowBoard(90), arrowBoard(180), { blank: true }],
+    options: [arrowBoard(270), arrowBoard(0), arrowBoard(90), arrowBoard(180)],
+    answerIndex: 0,
+    explanation: "The arrow turns a quarter clockwise each step.",
+  };
+
+  /** The arrow is the only 7-point polygon the renderer draws. */
+  function arrowNodes(svg: string) {
+    return shapeNodesFromSvg(svg)
+      .filter((node) => node.tag === "polygon" && parsePoints(node.attrs.points ?? "").length === 7);
+  }
+
+  it("draws an arrow polygon in the browser path and the agent-image path alike", async () => {
+    const direct = renderToStaticMarkup(createElement(SceneGraphic, { scene: arrowBoard(0) }));
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: arrowPuzzle }));
+    const composed = await puzzleToSvg(arrowPuzzle);
+
+    expect(arrowNodes(direct)).toHaveLength(1);
+    expect(arrowNodes(browser)).toHaveLength(3);
+    expect(arrowNodes(composed)).toHaveLength(7); // 3 stem panels + 4 options
+    expect(composed).toContain(direct);
+  });
+
+  it("points up at rotation 0 and carries every quarter turn on the shared transform", () => {
+    for (const rotation of ROTATIONS) {
+      const svg = renderToStaticMarkup(createElement(SceneGraphic, { scene: arrowBoard(rotation) }));
+      const [node] = arrowNodes(svg);
+      expect(node).toBeDefined();
+
+      // The arrow turns about its board slot's centre, not its vertex centroid
+      // (the glyph is deliberately top-heavy), so derive the centre from the board.
+      const slot = (CELL_VIEWBOX - SCENE_BOARD_INSET * 2) / 3;
+      const center = { x: SCENE_BOARD_INSET + 1.5 * slot, y: SCENE_BOARD_INSET + 1.5 * slot };
+      const points = parsePoints(node.attrs.points ?? "");
+      const tip = points.reduce((best, point) => (point.y < best.y ? point : best));
+
+      // Orientation convention: 0 draws the arrow pointing UP (smallest y is the
+      // tip, straight above the centre); the rotate transform turns it clockwise.
+      expect(tip.x).toBeCloseTo(center.x, 1);
+      expect(tip.y).toBeLessThan(center.y);
+
+      const transform = parseRotation(node.attrs.transform);
+      expect(transform?.angle).toBe(rotation);
+      expect(transform?.x).toBeCloseTo(center.x, 6);
+      expect(transform?.y).toBeCloseTo(center.y, 6);
+    }
+  });
+
+  it("supports every fill on the arrow", () => {
+    for (const fill of FILLS) {
+      const svg = renderToStaticMarkup(createElement(SceneGraphic, { scene: arrowBoard(90, "l", fill) }));
+      const [node] = arrowNodes(svg);
+      const expected = styleFor(fill);
+      expect(node.attrs.fill).toBe(expected.fill);
+      expect(node.attrs.stroke).toBe(expected.stroke);
+      expect(Number(node.attrs["stroke-width"])).toBe(expected.strokeWidth);
+    }
+  });
+
+  it("keeps the head, stem, and length legible at the 80px solve and 64px review sizes", () => {
+    // Worst case the renderer can serve: the smallest token on the tightest board.
+    const svg = renderToStaticMarkup(createElement(SceneGraphic, { scene: arrowBoard(0, "m") }));
+    const [node] = arrowNodes(svg);
+    const points = parsePoints(node.attrs.points ?? "");
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const length = Math.max(...ys) - Math.min(...ys);
+    const headWidth = Math.max(...xs) - Math.min(...xs);
+    const tail = [...points].sort((a, b) => b.y - a.y).slice(0, 2);
+    const stemWidth = Math.abs(tail[0].x - tail[1].x);
+
+    expect(stemWidth).toBeLessThan(headWidth); // it reads as an arrow, not a bar
+
+    for (const displayedSize of [80, 64]) {
+      const optionScale = displayedSize / CELL_VIEWBOX;
+      expect(length * optionScale).toBeGreaterThan(10);
+      expect(headWidth * optionScale).toBeGreaterThan(7);
+      expect(stemWidth * optionScale).toBeGreaterThan(3);
+    }
+  });
+});
+
+describe("machine gates and wide stem rows", () => {
+  const gateScene = (...tokens: Array<[SceneToken["shape"], SceneToken["fill"]]>): Scene => ({
+    kind: "scene",
+    rows: 3,
+    columns: 3,
+    tiles: [],
+    // Deliberately out of column order: the renderer, not the data, decides the
+    // reading order of a combined gate.
+    objects: [...tokens].reverse().map(([shape, fill], reversedIndex) => ({
+      row: 1,
+      column: tokens.length - 1 - reversedIndex,
+      object: sceneToken(shape, fill),
+    })),
+  });
+
+  const gateA = gateScene(["triangle", "outline"]);
+  const gateB = gateScene(["square", "solid"]);
+  const gateC = gateScene(["diamond", "half"]);
+  const queryGate = gateScene(["triangle", "outline"], ["square", "solid"], ["diamond", "half"]);
+
+  const machinePuzzle: Puzzle<Visual> = {
+    id: "machine-renderer",
+    type: "matrix",
+    instruction: "Apply the gates left to right.",
+    difficulty: 4,
+    layout: "machineTable",
+    stem: [
+      sceneAt(0, 0), gateA, sceneAt(0, 1),
+      sceneAt(1, 0), gateB, sceneAt(1, 1),
+      sceneAt(0, 0, "square"), gateC, sceneAt(0, 1, "square"),
+      sceneAt(1, 0, "star"), queryGate, { blank: true },
+    ],
+    options: [sceneAt(0, 1, "star"), sceneAt(1, 1, "star"), sceneAt(0, 0, "diamond")],
+    answerIndex: 0,
+    explanation: "Each worked row shows one gate.",
+  };
+
+  const longRowPuzzle: Puzzle<Visual> = {
+    id: "long-row-renderer",
+    type: "sequence",
+    instruction: "What comes next?",
+    difficulty: 4,
+    layout: "row",
+    stem: [
+      sceneAt(0, 0), sceneAt(0, 1), sceneAt(1, 0), sceneAt(1, 1),
+      sceneAt(0, 0, "square"), sceneAt(0, 1, "square"), sceneAt(1, 0, "square"), { blank: true },
+    ],
+    options: [sceneAt(1, 1, "square"), sceneAt(0, 0, "star"), sceneAt(0, 1, "star")],
+    answerIndex: 0,
+    explanation: "The token walks the board.",
+  };
+
+  /**
+   * The frames a composed image draws around its cells: the plain grey cell
+   * boxes and the dashed gate frames. Board rectangles inside a scene are drawn
+   * in their own nested coordinate space and are excluded by their stroke.
+   */
+  function framedBoxes(svg: string) {
+    return Array.from(svg.matchAll(/<rect\b([^>]*?)(?:\/>|>[\s\S]*?<\/rect>)/g))
+      .map((match) => parseAttributes(match[1]))
+      .filter((rect) => rect.fill === "#ffffff" && (rect.stroke === "#9ca3af" || Boolean(rect["stroke-dasharray"])))
+      .map((rect) => ({
+        x: Number(rect.x),
+        y: Number(rect.y),
+        w: Number(rect.width),
+        h: Number(rect.height),
+        dashed: Boolean(rect["stroke-dasharray"]),
+      }));
+  }
+
+  it("reads a combined gate as one drawable per glyph, in application order", () => {
+    expect(gateGlyphs(queryGate).map((glyph) => (glyph as Cell).shape)).toEqual([
+      "triangle",
+      "square",
+      "diamond",
+    ]);
+    expect(gateGlyphs(queryGate).map((glyph) => (glyph as Cell).fill)).toEqual([
+      "outline",
+      "solid",
+      "half",
+    ]);
+    expect(gateGlyphs(gateA)).toHaveLength(1);
+    expect(gateGlyphs({ blank: true })).toHaveLength(0);
+    // A board that is not a bare row of tokens is left whole for the scene renderer.
+    expect(gateGlyphs(representativeScene)).toEqual([representativeScene]);
+  });
+
+  it("draws every gate glyph at cell scale in both paths", async () => {
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: machinePuzzle }));
+    const composed = await puzzleToSvg(machinePuzzle);
+
+    // One full-size drawing per glyph, worked and combined alike — a glyph drawn
+    // as a token on a board would carry the board's aria-label instead.
+    for (const glyph of gateGlyphs(queryGate)) {
+      const label = describeCell(glyph as Cell);
+      expect(browser).toContain(`aria-label="${label}"`);
+      expect((composed.match(new RegExp(`aria-label="${label}"`, "g")) ?? []).length).toBe(2);
+    }
+
+    const boxes = framedBoxes(composed);
+    const glyphCells = boxes.filter((box) => !box.dashed && Math.abs(box.w - 110) < 0.001);
+    const frames = boxes.filter((box) => box.dashed);
+    expect(frames).toHaveLength(4); // three worked gates plus the combined query gate
+    // The combined frame is the wide one; every glyph inside it is a whole cell.
+    const combined = frames.reduce((widest, frame) => (frame.w > widest.w ? frame : widest));
+    const inside = glyphCells.filter((cell) =>
+      cell.x > combined.x && cell.x + cell.w < combined.x + combined.w &&
+      cell.y > combined.y && cell.y + cell.h < combined.y + combined.h);
+    expect(inside).toHaveLength(3);
+    const order = inside.map((cell) => cell.x).sort((a, b) => a - b);
+    expect(order[1] - order[0]).toBeCloseTo(order[2] - order[1], 6);
+  });
+
+  it("keeps every composed stem row inside the canvas and wraps what does not fit", async () => {
+    for (const puzzle of [machinePuzzle, longRowPuzzle]) {
+      const svg = await puzzleToSvg(puzzle);
+      const canvasWidth = Number(parseAttributes(/<svg\b([^>]*)>/.exec(svg)?.[1] ?? "").width);
+      for (const box of framedBoxes(svg)) {
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.w).toBeLessThanOrEqual(canvasWidth);
+      }
+    }
+
+    // Eight panels do not fit one 800px line, so they wrap into two even lines.
+    const rows = new Map<number, number>();
+    for (const box of framedBoxes(await puzzleToSvg(longRowPuzzle))) {
+      rows.set(box.y, (rows.get(box.y) ?? 0) + 1);
+    }
+    const stemLines = [...rows.entries()].sort((a, b) => a[0] - b[0]).slice(0, 2);
+    expect(stemLines.map(([, count]) => count)).toEqual([4, 4]);
+  });
+
+  it("wraps a long sequence row so every term stays on screen at once", () => {
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: longRowPuzzle }));
+    // A sequence is compared term against term, so scrolling term 1 out of view
+    // to read term 8 defeats the puzzle. Its panels fold onto another line
+    // instead — there are no glued pairs here for a line break to split.
+    expect(browser).toContain("flex-wrap");
+    expect(browser).not.toContain("w-max");
+    // Wrapped content never overflows, so no edge marker is ever claimed.
+    expect(browser).not.toContain("data-strip-edge");
+  });
+
+  it("lets a clipped analogy strip scroll from its first panel", () => {
+    // An analogy's `A : B :: C : ?` panels are glued in pairs, so this strip
+    // must NOT wrap — a line break between a pair invents a grouping the puzzle
+    // does not have. It scrolls instead, and its content is centred with auto
+    // margins: `justify-center` would push the first panel out of reach.
+    const analogyPuzzle: Puzzle<Visual> = {
+      ...longRowPuzzle,
+      id: "long-analogy-renderer",
+      type: "analogy",
+      layout: "analogy",
+      stem: [sceneAt(0, 0), sceneAt(0, 1), sceneAt(1, 0), { blank: true }],
+    };
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: analogyPuzzle }));
+    expect(browser).toContain("overflow-x-auto");
+    // Asserted class by class: the order Tailwind classes appear in is not part
+    // of the contract, only that the strip is nowrap, sized to its content, and
+    // centred by auto margins rather than justify-center.
+    expect(browser).toContain("mx-auto");
+    expect(browser).toContain("w-max");
+    expect(browser).toContain("flex-nowrap");
+    expect(browser).not.toContain("sm:justify-center");
+    expect(browser).not.toContain("data-strip-edge");
+  });
+});
+
+describe("the four-gate machine table", () => {
+  const gateGlyph = (shape: SceneToken["shape"], fill: SceneToken["fill"]): SceneToken =>
+    ({ kind: "token", shape, rotation: 0, fill, size: "l" });
+
+  /** One worked gate: the ordinary board, glyph in the middle row's first slot. */
+  const workedGate = (shape: SceneToken["shape"], fill: SceneToken["fill"]): Scene => ({
+    kind: "scene",
+    rows: 3,
+    columns: 3,
+    tiles: [],
+    objects: [{ row: 1, column: 0, object: gateGlyph(shape, fill) }],
+  });
+
+  /** The four-gate query strip: the one wide board the schema allows. */
+  const queryStrip: Scene = {
+    kind: "scene",
+    rows: GATE_STRIP_ROWS,
+    columns: GATE_STRIP_COLUMNS,
+    tiles: [],
+    objects: ([
+      ["triangle", "outline"],
+      ["square", "solid"],
+      ["diamond", "half"],
+      ["star", "outline"],
+    ] as const).map(([shape, fill], column) => ({ row: 0, column, object: gateGlyph(shape, fill) })),
+  };
+
+  /** Fifteen panels: four worked (input, gate, output) rows plus the query row. */
+  const fourGatePuzzle: Puzzle<Visual> = {
+    id: "four-gate-machine",
+    type: "matrix",
+    instruction: "Apply the four gates left to right.",
+    difficulty: 5,
+    layout: "machineTable",
+    stem: [
+      sceneAt(0, 0), workedGate("triangle", "outline"), sceneAt(0, 1),
+      sceneAt(1, 0), workedGate("square", "solid"), sceneAt(1, 1),
+      sceneAt(0, 0, "square"), workedGate("diamond", "half"), sceneAt(0, 1, "square"),
+      sceneAt(1, 0, "star"), workedGate("star", "outline"), sceneAt(1, 1, "star"),
+      sceneAt(0, 0, "diamond"), queryStrip, { blank: true },
+    ],
+    options: [sceneAt(0, 1, "diamond"), sceneAt(1, 1, "diamond"), sceneAt(1, 0, "diamond")],
+    answerIndex: 0,
+    explanation: "Each worked row shows one gate.",
+  };
+
+  function framedBoxes(svg: string) {
+    return Array.from(svg.matchAll(/<rect\b([^>]*?)(?:\/>|>[\s\S]*?<\/rect>)/g))
+      .map((match) => parseAttributes(match[1]))
+      .filter((rect) => rect.fill === "#ffffff" && (rect.stroke === "#9ca3af" || Boolean(rect["stroke-dasharray"])))
+      .map((rect) => ({
+        x: Number(rect.x),
+        y: Number(rect.y),
+        w: Number(rect.width),
+        h: Number(rect.height),
+        dashed: Boolean(rect["stroke-dasharray"]),
+      }));
+  }
+
+  it("reads the wide strip as four glyphs in application order", () => {
+    expect(gateGlyphs(queryStrip).map((glyph) => (glyph as Cell).shape))
+      .toEqual(["triangle", "square", "diamond", "star"]);
+    expect(gateGlyphs(queryStrip).map((glyph) => (glyph as Cell).fill))
+      .toEqual(["outline", "solid", "half", "outline"]);
+    // Four glyphs, no two alike: the strip is only readable if each gate's
+    // label is unmistakable at the size the strip draws it.
+    expect(new Set(gateGlyphs(queryStrip).map((glyph) => describeCell(glyph as Cell))).size).toBe(4);
+  });
+
+  it("fits one row of four glyphs in the width a 375px phone actually has", () => {
+    // 4 glyph cells at 44px, 3 arrow columns at 14px, 6 gaps at 4px, and the
+    // dashed frame's 6px each side: 254px inside the 261px a machine row gets.
+    expect(gateStripWidth(4)).toBe(254);
+    expect(gateStripWidth(4)).toBeLessThanOrEqual(NARROW_VIEWPORT_STEM_WIDTH);
+    // Three glyphs keep the full 56px cell and still fit, so widening the strip
+    // did not cost the shapes the battery already serves anything.
+    expect(gateStripWidth(3)).toBe(236);
+    expect(gateStripWidth(3)).toBeLessThanOrEqual(NARROW_VIEWPORT_STEM_WIDTH);
+    expect(gateStripWidth(1)).toBe(68);
+
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: fourGatePuzzle }));
+    // The strip never wraps: a wrapped strip stops reading as one ordered
+    // program. The classes below are the widths measured above.
+    expect(browser).toContain("flex-nowrap");
+    expect(browser).not.toContain("flex-wrap items-center justify-center gap-1 rounded-2xl");
+    expect(browser).toContain("w-11 sm:w-16");
+    expect(browser).toContain("w-3.5 text-sm");
+    expect(browser).toContain('aria-label="4 gates, applied left to right"');
+    // The machine row itself wraps, so a strip too wide to sit beside its input
+    // takes a line of its own rather than pushing the row off the screen.
+    expect(browser).toContain("flex w-full flex-wrap items-center justify-center");
+    // Every glyph is drawn at cell scale, as its own graphic.
+    for (const glyph of gateGlyphs(queryStrip)) {
+      expect(browser).toContain(`aria-label="${describeCell(glyph as Cell)}"`);
+    }
+
+    // The QA finding this replaces packed two or three glyphs into one 50–55px
+    // gate cell, leaving each about 18px on a phone. Even the narrowest strip
+    // gives every glyph a 44px cell of its own, and the shape inside spans most
+    // of it, so the drawn glyph is still far larger than the one the mobile
+    // taker could not read.
+    for (const glyph of gateGlyphs(queryStrip)) {
+      const nodes = shapeNodesFromSvg(renderToStaticMarkup(
+        createElement(CellGraphic, { cell: glyph as Cell }),
+      ));
+      const drawn = nodes.filter((node) => node.tag !== "rect" || node.attrs.points === undefined);
+      const spans = drawn.map((node) => {
+        if (node.tag === "circle") return Number(node.attrs.r) * 2;
+        if (node.tag === "rect") return Number(node.attrs.width);
+        const points = parsePoints(node.attrs.points ?? "");
+        return Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x));
+      });
+      const widestViewBoxSpan = Math.max(...spans);
+      expect(widestViewBoxSpan * (WIDE_GATE_GLYPH_WIDTH / CELL_VIEWBOX), describeCell(glyph as Cell))
+        .toBeGreaterThan(24);
+    }
+  });
+
+  it("keeps all fifteen panels inside the agent canvas, the strip on one line", async () => {
+    const svg = await puzzleToSvg(fourGatePuzzle);
+    const canvasWidth = Number(parseAttributes(/<svg\b([^>]*)>/.exec(svg)?.[1] ?? "").width);
+    const boxes = framedBoxes(svg);
+    for (const box of boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.w).toBeLessThanOrEqual(canvasWidth);
+    }
+
+    // Five dashed frames: four worked gates and the query strip.
+    const frames = boxes.filter((box) => box.dashed);
+    expect(frames).toHaveLength(5);
+    const strip = frames.reduce((widest, frame) => (frame.w > widest.w ? frame : widest));
+    const glyphCells = boxes.filter((box) => !box.dashed && Math.abs(box.w - 110) < 0.001);
+    const inside = glyphCells.filter((cell) =>
+      cell.x > strip.x && cell.x + cell.w < strip.x + strip.w &&
+      cell.y > strip.y && cell.y + cell.h < strip.y + strip.h);
+    expect(inside).toHaveLength(4);
+    // One line: every glyph shares a row, evenly spaced left to right.
+    expect(new Set(inside.map((cell) => cell.y)).size).toBe(1);
+    const columns = inside.map((cell) => cell.x).sort((left, right) => left - right);
+    expect(columns[1] - columns[0]).toBeCloseTo(columns[2] - columns[1], 6);
+    expect(columns[2] - columns[1]).toBeCloseTo(columns[3] - columns[2], 6);
+    // No two panels overlap anywhere on the canvas.
+    for (let left = 0; left < boxes.length; left++) {
+      for (let right = left + 1; right < boxes.length; right++) {
+        const a = boxes[left];
+        const b = boxes[right];
+        const overlaps = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        // A dashed frame legitimately contains its own glyph cells.
+        const nests = (outer: typeof a, inner: typeof b) =>
+          outer.dashed && !inner.dashed &&
+          inner.x >= outer.x && inner.x + inner.w <= outer.x + outer.w &&
+          inner.y >= outer.y && inner.y + inner.h <= outer.y + outer.h;
+        expect(!overlaps || nests(a, b) || nests(b, a), `${JSON.stringify(a)} overlaps ${JSON.stringify(b)}`)
+          .toBe(true);
+      }
+    }
+  });
+
+  /** The three-gate form: the query gate still fits an ordinary 3x3 board. */
+  const threeGateStrip: Scene = {
+    kind: "scene",
+    rows: 3,
+    columns: 3,
+    objects: ([
+      ["triangle", "outline"],
+      ["square", "solid"],
+      ["diamond", "half"],
+    ] as const).map(([shape, fill], column) => ({ row: 1, column, object: gateGlyph(shape, fill) })),
+    tiles: [],
+  };
+
+  const threeGatePuzzle: Puzzle<Visual> = {
+    ...fourGatePuzzle,
+    id: "three-gate-machine",
+    instruction: "Apply the three gates left to right.",
+    difficulty: 4,
+    stem: [
+      sceneAt(0, 0), workedGate("triangle", "outline"), sceneAt(0, 1),
+      sceneAt(1, 0), workedGate("square", "solid"), sceneAt(1, 1),
+      sceneAt(0, 0, "square"), workedGate("diamond", "half"), sceneAt(0, 1, "square"),
+      sceneAt(0, 0, "diamond"), threeGateStrip, { blank: true },
+    ],
+  };
+
+  /**
+   * Every dashed gate frame in a rendered stem, as markup.
+   *
+   * Depth-counted rather than matched with a regular expression: a frame holds
+   * nested divs, and a non-greedy pattern stops at the first inner close.
+   */
+  function gateFrameMarkup(markup: string): string[] {
+    const opener = '<div class="flex shrink-0 flex-nowrap';
+    const frames: string[] = [];
+    let index = markup.indexOf(opener);
+    while (index !== -1) {
+      let depth = 0;
+      let cursor = index;
+      while (cursor < markup.length) {
+        if (markup.startsWith("<div", cursor)) { depth += 1; cursor += 4; continue; }
+        if (markup.startsWith("</div>", cursor)) {
+          depth -= 1;
+          cursor += 6;
+          if (depth === 0) break;
+          continue;
+        }
+        cursor += 1;
+      }
+      frames.push(markup.slice(index, cursor));
+      index = markup.indexOf(opener, cursor);
+    }
+    return frames;
+  }
+
+  /** The five-gate query strip and its eighteen-panel machine table (`-d6`). */
+  const wideStrip: Scene = {
+    kind: "scene",
+    rows: GATE_STRIP_ROWS,
+    columns: MAXIMUM_GATE_STRIP_COLUMNS,
+    objects: ([
+      ["triangle", "outline"],
+      ["square", "solid"],
+      ["diamond", "half"],
+      ["star", "outline"],
+      ["hexagon", "solid"],
+    ] as const).map(([shape, fill], column) => ({ row: 0, column, object: gateGlyph(shape, fill) })),
+    tiles: [],
+  };
+
+  const fiveGatePuzzle: Puzzle<Visual> = {
+    ...fourGatePuzzle,
+    id: "five-gate-machine",
+    instruction: "Apply the five gates left to right.",
+    difficulty: 6,
+    stem: [
+      sceneAt(0, 0), workedGate("triangle", "outline"), sceneAt(0, 1),
+      sceneAt(1, 0), workedGate("square", "solid"), sceneAt(1, 1),
+      sceneAt(0, 0, "square"), workedGate("diamond", "half"), sceneAt(0, 1, "square"),
+      sceneAt(1, 0, "star"), workedGate("star", "outline"), sceneAt(1, 1, "star"),
+      sceneAt(0, 0, "circle"), workedGate("hexagon", "solid"), sceneAt(0, 1, "circle"),
+      sceneAt(0, 0, "diamond"), wideStrip, { blank: true },
+    ],
+  };
+
+  it("measures the strip's width from the classes the markup really carries", () => {
+    // `gateStripWidth` is only worth anything if it describes the DOM. Every
+    // Tailwind width class the strip can emit is priced here and the total is
+    // rebuilt from the rendered markup, so a class edited without its constant
+    // fails this test instead of silently overflowing a phone.
+    const classWidths: Record<string, number> = {
+      "w-14": GATE_GLYPH_WIDTH,
+      "w-11": WIDE_GATE_GLYPH_WIDTH,
+      "w-5": GATE_SEPARATOR_WIDTH,
+      "w-3.5": WIDE_GATE_SEPARATOR_WIDTH,
+    };
+    expect(classWidths).toEqual({ "w-14": 56, "w-11": 44, "w-5": 20, "w-3.5": 14 });
+    expect(GATE_STRIP_GAP).toBe(4); // gap-1
+    expect(GATE_STRIP_FRAME).toBe(6); // p-1 (4) plus border-2 (2), per side
+
+    const strips: { glyphs: number; puzzle: Puzzle<Visual> }[] = [
+      { glyphs: 1, puzzle: fourGatePuzzle },
+      { glyphs: 3, puzzle: threeGatePuzzle },
+      { glyphs: 4, puzzle: fourGatePuzzle },
+      { glyphs: 5, puzzle: fiveGatePuzzle },
+    ];
+    for (const { glyphs, puzzle } of strips) {
+      const markup = renderToStaticMarkup(createElement(StemView, { puzzle }));
+      // The strip whose glyph count we are pricing: its dashed frame, its glyph
+      // cells, and the arrow columns between them, as one rendered fragment.
+      const frame = gateFrameMarkup(markup).find((candidate) =>
+        (candidate.match(/aspect-square/g) ?? []).length === glyphs);
+      expect(frame, `${glyphs} glyphs`).toBeDefined();
+      const cells = [...frame!.matchAll(/class="shrink-0 (w-[\d.]+)(?: sm:w-\d+)?"/g)].map((m) => m[1]);
+      const arrows = [...frame!.matchAll(/class="shrink-0 text-center text-gray-400 (w-[\d.]+)/g)].map((m) => m[1]);
+      expect(cells, `${glyphs} glyphs`).toHaveLength(glyphs);
+      const measured = [...cells, ...arrows].reduce((total, cls) => {
+        expect(classWidths[cls], `unpriced width class ${cls}`).toBeDefined();
+        return total + classWidths[cls];
+      }, 0) + (cells.length + arrows.length - 1) * GATE_STRIP_GAP + GATE_STRIP_FRAME * 2;
+      expect(measured, `${glyphs} glyphs`).toBe(gateStripWidth(glyphs));
+      expect(measured, `${glyphs} glyphs at 375px`).toBeLessThanOrEqual(NARROW_VIEWPORT_STEM_WIDTH);
+    }
+  });
+
+  it("fits one row of five glyphs in the width a 375px phone actually has", () => {
+    // 5 glyph cells at 44px, no arrow columns, 4 gaps at 4px, and the dashed
+    // frame's 6px each side: 248px inside the 261px a machine row gets.
+    expect(gateStripWidth(5)).toBe(248);
+    expect(gateStripWidth(5)).toBeLessThanOrEqual(NARROW_VIEWPORT_STEM_WIDTH);
+    // The glyph does not shrink. Five 44px cells plus four readable arrow
+    // columns cannot fit 261px at any arrow size, and the drawn mark inside a
+    // 44px cell is already within a third of a pixel of this project's measured
+    // legibility floor, so the arrows go and the mark stays.
+    expect(UNSEPARATED_GATE_GLYPH_COUNT).toBe(5);
+    expect(gateStripWidth(5) - gateStripWidth(4)).toBe(-6);
+    const withArrows = 5 * WIDE_GATE_GLYPH_WIDTH + 4 * WIDE_GATE_SEPARATOR_WIDTH +
+      8 * GATE_STRIP_GAP + GATE_STRIP_FRAME * 2;
+    expect(withArrows).toBe(320);
+    expect(withArrows).toBeGreaterThan(NARROW_VIEWPORT_STEM_WIDTH);
+
+    const browser = renderToStaticMarkup(createElement(StemView, { puzzle: fiveGatePuzzle }));
+    expect(browser).toContain("flex-nowrap");
+    expect(browser).toContain("w-11 sm:w-16");
+    expect(browser).toContain('aria-label="5 gates, applied left to right"');
+    // The ordering cue the dropped arrows carried is still stated: the machine
+    // row's own arrows around the strip, the group label above, and the
+    // instruction. What is gone is only the decoration between glyphs.
+    expect(browser).not.toMatch(/text-center text-gray-400 w-3\.5/);
+    for (const glyph of gateGlyphs(wideStrip)) {
+      expect(browser).toContain(`aria-label="${describeCell(glyph as Cell)}"`);
+    }
+    // Five glyphs, no two alike at the size the strip draws them.
+    expect(new Set(gateGlyphs(wideStrip).map((glyph) => describeCell(glyph as Cell))).size).toBe(5);
+
+    // Every glyph is drawn at exactly the size a four-gate strip draws one, so
+    // the fifth gate costs the reader nothing in mark size.
+    for (const glyph of gateGlyphs(wideStrip)) {
+      const nodes = shapeNodesFromSvg(renderToStaticMarkup(
+        createElement(CellGraphic, { cell: glyph as Cell }),
+      ));
+      const drawn = nodes.filter((node) => node.tag !== "rect" || node.attrs.points === undefined);
+      const spans = drawn.map((node) => {
+        if (node.tag === "circle") return Number(node.attrs.r) * 2;
+        if (node.tag === "rect") return Number(node.attrs.width);
+        const points = parsePoints(node.attrs.points ?? "");
+        return Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x));
+      });
+      const widestViewBoxSpan = Math.max(...spans);
+      expect(widestViewBoxSpan * (WIDE_GATE_GLYPH_WIDTH / CELL_VIEWBOX), describeCell(glyph as Cell))
+        .toBeGreaterThan(24);
+    }
+  });
+
+  it("keeps all eighteen panels inside the agent canvas, the five-glyph strip on one line", async () => {
+    const svg = await puzzleToSvg(fiveGatePuzzle);
+    const canvasWidth = Number(parseAttributes(/<svg\b([^>]*)>/.exec(svg)?.[1] ?? "").width);
+    expect(canvasWidth).toBe(800);
+    const boxes = framedBoxes(svg);
+    for (const box of boxes) {
+      expect(box.x, JSON.stringify(box)).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.w, JSON.stringify(box)).toBeLessThanOrEqual(canvasWidth);
+    }
+
+    // Six dashed frames: five worked gates and the query strip.
+    const frames = boxes.filter((box) => box.dashed);
+    expect(frames).toHaveLength(6);
+    const strip = frames.reduce((widest, frame) => (frame.w > widest.w ? frame : widest));
+    const glyphCells = boxes.filter((box) => !box.dashed && Math.abs(box.w - 110) < 0.001);
+    const inside = glyphCells.filter((cell) =>
+      cell.x > strip.x && cell.x + cell.w < strip.x + strip.w &&
+      cell.y > strip.y && cell.y + cell.h < strip.y + strip.h);
+    expect(inside).toHaveLength(5);
+    // One line: every glyph shares a row, evenly spaced left to right, and the
+    // cell is the same 110px a worked row's single gate gets.
+    expect(new Set(inside.map((cell) => cell.y)).size).toBe(1);
+    const columns = inside.map((cell) => cell.x).sort((left, right) => left - right);
+    for (let index = 2; index < columns.length; index++) {
+      expect(columns[index] - columns[index - 1]).toBeCloseTo(columns[1] - columns[0], 6);
+    }
+    // No two panels overlap anywhere on the canvas.
+    for (let left = 0; left < boxes.length; left++) {
+      for (let right = left + 1; right < boxes.length; right++) {
+        const a = boxes[left];
+        const b = boxes[right];
+        const overlaps = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        const nests = (outer: typeof a, inner: typeof b) =>
+          outer.dashed && !inner.dashed &&
+          inner.x >= outer.x && inner.x + inner.w <= outer.x + outer.w &&
+          inner.y >= outer.y && inner.y + inner.h <= outer.y + outer.h;
+        expect(!overlaps || nests(a, b) || nests(b, a), `${JSON.stringify(a)} overlaps ${JSON.stringify(b)}`)
+          .toBe(true);
+      }
+    }
+  });
+
+  it("draws one graphic per panel and per gate glyph", async () => {
+    const calls: Visual[] = [];
+    vi.resetModules();
+    vi.doMock("./render", async () => {
+      const actual = await vi.importActual<typeof import("./render")>("./render");
+      return {
+        ...actual,
+        VisualGraphic: vi.fn((props: { visual: Visual; className?: string }) => {
+          calls.push(props.visual);
+          return actual.VisualGraphic(props);
+        }),
+      };
+    });
+    const { puzzleToSvg: composed } = await import("./compose-image");
+    composed(fourGatePuzzle);
+    vi.doUnmock("./render");
+    vi.resetModules();
+
+    // 14 drawn stem panels (the fifteenth is the blank) plus 3 options, and the
+    // query strip draws four graphics rather than one, so it adds three.
+    const drawnPanels = fourGatePuzzle.stem.filter((panel) => !isBlank(panel)).length;
+    const extraGateGlyphs = fourGatePuzzle.stem
+      .filter((_, index) => index % 3 === 1)
+      .reduce((total, panel) => total + gateGlyphs(panel).length - 1, 0);
+    expect(extraGateGlyphs).toBe(3);
+    expect(calls).toHaveLength(drawnPanels + fourGatePuzzle.options.length + extraGateGlyphs);
+    expect(calls).toHaveLength(14 + 3 + 3);
   });
 });

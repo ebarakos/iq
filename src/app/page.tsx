@@ -436,8 +436,9 @@ function puzzleTypeLabel(puzzle: PublicPuzzle<Visual>): string {
     "attribute-pairing-v1": "attribute pairing",
     "compositional-analogy-v2": "compositional analogy",
     "containment-analogy-v2": "containment analogy",
-    "composed-transform-v1": "composed transformation",
+    "composed-transform-v2": "composed transformation",
     "relational-outlier-v2": "relational outlier",
+    "relational-outlier-v3": "relational outlier",
     "relational-matrix-v2": "relational matrix",
     "visual-set-algebra-v2": "visual set algebra",
     "constraint-mosaic-v2": "constraint mosaic",
@@ -448,7 +449,7 @@ function puzzleTypeLabel(puzzle: PublicPuzzle<Visual>): string {
     "concept-induction-v2": "concept induction",
     "fold-punch-v2": "fold and punch",
     "inverse-fold-punch-v2": "inverse fold and punch",
-    "interleaved-sequence-v2": "interleaved sequence",
+    "interleaved-sequence-v3": "interleaved sequence",
     "second-order-sequence-v2": "second-order sequence",
     "inverse-analogy-v2": "inverse analogy",
     "minimal-repair-v3": "minimal repair",
@@ -517,6 +518,14 @@ function Solver({
   const isLast = index === total - 1;
   const optionCount = puzzle.options.length;
 
+  // A new question starts at its top. Without this the page keeps the previous
+  // question's scroll position, so answering from the options and pressing Next
+  // drops the player into the middle of the next puzzle with its stem — the part
+  // they must read first — above the fold.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [index]);
+
   // Keyboard shortcuts: digits 1–6 / letters a–f select options; arrows navigate;
   // Enter advances. Guarded against modifier keys and non-puzzle target elements.
   useEffect(() => {
@@ -572,14 +581,20 @@ function Solver({
   return (
     <section>
       <NoticeBanner notice={notice} />
-      <div className="mb-3 flex items-center justify-between text-sm text-gray-500">
-        <span>
-          Question {index + 1} of {total}{selected === null ? " · Unanswered" : ""}
-        </span>
-        <Countdown secondsLeft={secondsLeft} lowTimeAt={lowTimeAt} />
-      </div>
-      <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-        <div className="h-full bg-gray-900 transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
+      {/* Sticky: only two of six options fit above the fold on a phone, so the
+          clock scrolls away exactly when a player is deciding how long to spend
+          — which is the whole-test timer's entire point. Full-bleed via -mx-4
+          against the page's px-4. */}
+      <div className="sticky top-0 z-20 -mx-4 mb-5 border-b border-gray-200 bg-gray-50/95 px-4 py-2 backdrop-blur-sm">
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <span>
+            Question {index + 1} of {total}{selected === null ? " · Unanswered" : ""}
+          </span>
+          <Countdown secondsLeft={secondsLeft} lowTimeAt={lowTimeAt} />
+        </div>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+          <div className="h-full bg-gray-900 transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
+        </div>
       </div>
       <nav className="mb-5" aria-label="Question navigation">
         <div className="flex flex-wrap items-center gap-2">

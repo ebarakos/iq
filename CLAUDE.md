@@ -6,15 +6,19 @@
 
 **Status: GENERATED REASONING-TEST PROTOTYPE.** The app serves two test lengths,
 5 and 30 questions, both drawn from the same pool of 14 eligible visual reasoning
-families (20 code-valid families, six withdrawn on human or structural evidence)
-and the same four difficulty bands. Every test is generated from a fresh seed,
+families (22 code-valid families; withdrawals on human or structural evidence,
+including two 2026-08-24 redesigns that failed their pilot and the
+`containment-analogy-v2` withdrawal of 2026-08-26) and the same four
+difficulty bands. Every test is generated from a fresh seed,
 validated in pure code, served without answers, and scored server-side against a
 whole-test deadline of 60 seconds per question. Every question offers six
 answer options, so a blind guess is worth 1 in 6. Families ship behind a visible
-experimental label: they pass the code-correctness contract, and the first human
-pilots (one participant, 14 of 15 items correct — see `data/pilot/README.md`) and
-the first trustworthy agent probes have run. That evidence is enough to withdraw
-families, not to calibrate difficulty, so this is not a standardized IQ score. See
+experimental label: they pass the code-correctness contract, and four human
+pilot sittings from one participant have run — most recently the 20-item v11
+escalation pilot of 2026-08-26, 15 of 20 correct with four clean misses at d4/d5
+(see `data/pilot/README.md`) — alongside the first trustworthy agent probes.
+That evidence is enough to withdraw families, not to calibrate difficulty, so
+this is not a standardized IQ score. See
 [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ### Running the MVP
@@ -36,10 +40,10 @@ not make model calls. See `.env.example`.
   follow it.
 - `src/items/rules.ts` — rule DSL, semantic validator, bounded operator grammar,
   and full-grammar uniqueness oracle.
-- `src/items/scene-families.ts` — the 20 visual families and their acceptance
+- `src/items/scene-families.ts` — the 22 visual families and their acceptance
   contract; `src/items/family-promotion.ts` — which family may appear in which
   band, and the `WITHDRAWN_FAMILY_IDS` list that pulls one back out.
-- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v8`): band
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v12`): band
   schedules of 5/10/10/5 and 1/1/2/1, seeded 4/4/3 non-warmup family draws, an
   even split over each draw, and an easiest-first order without adjacent repeats.
 - `src/items/generate.ts` — the older seeded generator. `procedural-v1`, `v2`,

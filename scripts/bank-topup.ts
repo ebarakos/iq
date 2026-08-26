@@ -3,11 +3,18 @@
  *
  *   npm run bank:topup -- --count 48 --seed 42        # legacy procedural items
  *   npm run bank:topup -- --count 10 --source model   # relay-generated (needs .env.local)
- *   npm run bank:topup -- --source expanded --replace --per-family 3 --seed emergency-v5
+ *   npm run bank:topup -- --source expanded --replace --per-bucket 4 --seed emergency-v11
  *   flags: --count N (procedural/model/both only)  --source procedural|model|both|expanded
- *          --per-family N (expanded only; --count is ignored for that source)
+ *          --per-bucket N (expanded only; --count is ignored for that source)
  *          --type <puzzleType>
- *          --difficulty 1..5  --seed S  --replace  --per-family N
+ *          --difficulty 1..5  --seed S  --replace
+ *
+ * `--per-family` was retired on 2026-08-25. It counted items per family, which
+ * stopped describing coverage once a family could hold two buckets in one band
+ * and two bands in one test: a family could be "complete" with every item drawn
+ * from its shallowest bucket. `--per-bucket` counts against the
+ * family/band/bucket keys the registry can actually schedule, which is what the
+ * emergency fallback needs in stock.
  *
  * `--count` is an exact ceiling for every source: `model` keeps calling the relay
  * (5 validated puzzles per call) until N new items are banked, and `both` splits
@@ -22,21 +29,24 @@ import { parseArgs } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
+  BANK_ITEMS_PER_KEY,
   BankFileSchema,
   BankItemSchema,
   bankIdFor,
+  enabledExpandedBankKeys,
+  expandedBankKeyOf,
   fingerprintPuzzle,
   type BankItem,
 } from "../src/items/bank";
 import { generatePuzzle } from "../src/items/generate";
 import {
   assembleExpandedQuiz,
-  eligibleFamiliesForBand,
   EXPANDED_GENERATOR_VERSION,
+  EXPANDED_PROFILES,
+  type ExpandedProfile,
 } from "../src/items/expanded-quiz";
 import {
   CURRENT_FAMILY_PROMOTION_REGISTRY,
-  EXPANDED_PROFILE_BANDS,
   normalizeWithdrawnFamilyIds,
   readWithdrawnFamilyIds,
 } from "../src/items/family-promotion";
@@ -54,7 +64,7 @@ const { values: args } = parseArgs({
     difficulty: { type: "string" },
     seed: { type: "string" },
     replace: { type: "boolean", default: false },
-    "per-family": { type: "string", default: "3" },
+    "per-bucket": { type: "string", default: String(BANK_ITEMS_PER_KEY) },
   },
 });
 
@@ -126,48 +136,61 @@ async function main() {
   const rng = mulberry32(seed);
 
   if (source === "expanded") {
-    const perFamily = Number(args["per-family"]);
-    if (!Number.isInteger(perFamily) || perFamily <= 0) {
-      throw new Error(`--per-family must be a positive integer, got "${args["per-family"]}"`);
+    const perBucket = Number(args["per-bucket"]);
+    if (!Number.isInteger(perBucket) || perBucket <= 0) {
+      throw new Error(`--per-bucket must be a positive integer, got "${args["per-bucket"]}"`);
     }
     const withdrawn = readWithdrawnFamilyIds();
-    const familyIds = [...new Set(EXPANDED_PROFILE_BANDS.flatMap((band) =>
-      eligibleFamiliesForBand(CURRENT_FAMILY_PROMOTION_REGISTRY, band, withdrawn)
-        .map((family) => family.familyId)))].sort();
-    const counts = new Map(familyIds.map((familyId) => [familyId, 0]));
-    const complete = () => [...counts.values()].every((value) => value >= perFamily);
+    const counts = new Map(enabledExpandedBankKeys(CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn)
+      .map((key) => [key, 0]));
+    const complete = () => [...counts.values()].every((value) => value >= perBucket);
 
+    // Both lengths, long first. A long test reaches all 21 keys of the v12
+    // battery on its own and so fills the bank by itself; a short test reaches
+    // 15, because it asks each band for one or two questions and therefore only
+    // ever draws a family's entry-point bucket. Keeping the short length in the
+    // round is what catches the case this loop exists for — a key that the long
+    // schedule stops reaching after a pool change — instead of spinning a
+    // thousand long tests and then failing.
+    const profileOrder: readonly ExpandedProfile[] = [
+      "long-30",
+      ...EXPANDED_PROFILES.filter((profile) => profile !== "long-30"),
+    ];
     for (let quizIndex = 0; quizIndex < 1_000 && !complete(); quizIndex++) {
-      const quizSeed = `${seedText}:${quizIndex}`;
-      const puzzles = assembleExpandedQuiz(
-        quizSeed,
-        "long-30",
-        CURRENT_FAMILY_PROMOTION_REGISTRY,
-        withdrawn,
-      );
-      for (const puzzle of puzzles) {
-        const familyId = puzzle.familyId;
-        if (!familyId || !counts.has(familyId) || counts.get(familyId)! >= perFamily) continue;
-        if (add(toBankItem(puzzle, {
-          source: "expanded",
-          seed: quizSeed,
-          profile: "long-30",
-          generatorVersion: EXPANDED_GENERATOR_VERSION,
-          withdrawnFamilyIds: normalizeWithdrawnFamilyIds(withdrawn),
-          createdAt: now(),
-        }))) {
-          counts.set(familyId, counts.get(familyId)! + 1);
+      for (const profile of profileOrder) {
+        if (complete()) break;
+        const quizSeed = `${seedText}:${profile}:${quizIndex}`;
+        const puzzles = assembleExpandedQuiz(
+          quizSeed,
+          profile,
+          CURRENT_FAMILY_PROMOTION_REGISTRY,
+          withdrawn,
+        );
+        for (const puzzle of puzzles) {
+          const key = expandedBankKeyOf(puzzle);
+          if (key === null || !counts.has(key) || counts.get(key)! >= perBucket) continue;
+          if (add(toBankItem(puzzle, {
+            source: "expanded",
+            seed: quizSeed,
+            profile,
+            generatorVersion: EXPANDED_GENERATOR_VERSION,
+            withdrawnFamilyIds: normalizeWithdrawnFamilyIds(withdrawn),
+            createdAt: now(),
+          }))) {
+            counts.set(key, counts.get(key)! + 1);
+          }
         }
       }
     }
 
-    const missing = [...counts].filter(([, value]) => value < perFamily);
+    const missing = [...counts].filter(([, value]) => value < perBucket);
     if (missing.length > 0) {
       throw new Error(
-        `expanded bank could not reach ${perFamily} items per family: ` +
-          missing.map(([familyId, value]) => `${familyId} ${value}`).join(", "),
+        `expanded bank could not reach ${perBucket} items per family/band/bucket key: ` +
+          missing.map(([key, value]) => `${key} ${value}`).join(", "),
       );
     }
+    console.log(`expanded coverage: ${counts.size} keys x ${perBucket} items`);
   }
 
   // Per-source budgets: `both` gives the model half (rounded up) and lets the

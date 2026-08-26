@@ -165,19 +165,55 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("warmup", ["attribute-pairing-d2"])],
   },
   {
+    // Two buckets in the composition band since 2026-08-25 (escalate-the-quiz,
+    // Phase 3). d3 shows a board move plus a fill cycle; d4 adds a third
+    // demonstrated change, a token turn, so a band's second question from this
+    // family asks for one more step than its first.
     familyId: "compositional-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
-    bands: [codeValidBand("composition", ["compositional-analogy-d3"])],
+    bands: [codeValidBand("composition", ["compositional-analogy-d3", "compositional-analogy-d4"])],
   },
   {
+    // Withdrawn 2026-08-26 on human evidence: the pilot flagged it for unclear
+    // notation, and the participant named it unprompted as the one thing they
+    // disliked — "tiny shapes encircled in triangles"
+    // (data/pilot/2026-08-26-pilot-v3-a.json). It is the only family that draws
+    // a token INSIDE another shape, so it is the only one that shrinks a token
+    // below the size every other family draws it at; the legibility doctrine
+    // says a visual difference must read at a glance, and this one did not.
+    // Containment as a relation leaves the battery with it. Previously moved
+    // from composition into constraint-spatial on 2026-08-24.
     familyId: "containment-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
-    bands: [codeValidBand("composition", ["containment-analogy-d4"])],
+    bands: [],
   },
   {
-    familyId: "composed-transform-v1",
+    // Extended from two to three ordered steps on 2026-08-24 (raise-the-ceiling
+    // plan, Lever 2); the version suffix moved with the item semantics.
+    //
+    // The first family registered in two BANDS (escalate-the-quiz, Phase 3):
+    // three ordered gates in composition, four in induction-transfer. The
+    // four-gate form is a different item shape, not a harder draw of the same
+    // one — fifteen panels instead of twelve, and a query strip of four glyphs
+    // — so it belongs to the band that already carries the machine formats
+    // rather than to a second slot inside composition. A test that draws this
+    // family in both bands still gets two different questions; the cross-band
+    // rule in expanded-quiz.ts keeps that from happening when another family
+    // is free.
+    //
+    // The five-gate `composed-transform-d6` bucket joined the SAME
+    // induction-transfer band on 2026-08-26 (raise-the-ceiling-v12). Every d6
+    // bucket lives in induction-transfer because the long test is ordered
+    // easiest-first and that band is last: a deeper bucket anywhere else would
+    // still be answered before the end. Within the band, slot difficulty
+    // orders occurrences, so a second draw of this family serves d5 and a
+    // third serves d6.
+    familyId: "composed-transform-v2",
     primaryReasoningFamily: "ordered-composition",
-    bands: [codeValidBand("composition", ["composed-transform-d4"])],
+    bands: [
+      codeValidBand("composition", ["composed-transform-d4"]),
+      codeValidBand("induction-transfer", ["composed-transform-d5", "composed-transform-d6"]),
+    ],
   },
   {
     // Withdrawn by the human gate on 2026-08-23. The item shows no stem at all — six options and nothing else, so
@@ -190,14 +226,27 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [],
   },
   {
+    // The -v3 redesign demonstrated the shared relation with three example
+    // boards, fixing -v2's no-evidence defect — and still failed its human
+    // pilot on 2026-08-24: wrong answer, notation-misunderstanding report, 45
+    // seconds (data/pilot/2026-08-24-pilot-v2-a.json). Withdrawn the same day.
+    // The battery again has no odd-one-out format.
+    familyId: "relational-outlier-v3",
+    primaryReasoningFamily: "classification-relation",
+    bands: [],
+  },
+  {
     familyId: "relational-matrix-v2",
     primaryReasoningFamily: "matrix-reasoning",
     bands: [codeValidBand("constraint-spatial", ["relational-matrix-d4"])],
   },
   {
+    // Two buckets in one band since 2026-08-25 (escalate-the-quiz, Phase 3).
+    // d4 combines the two boards and moves the result; d5 then turns every
+    // orientable token on it, so the rule is three visible steps.
     familyId: "visual-set-algebra-v2",
     primaryReasoningFamily: "set-combination",
-    bands: [codeValidBand("constraint-spatial", ["visual-set-algebra-d4"])],
+    bands: [codeValidBand("constraint-spatial", ["visual-set-algebra-d4", "visual-set-algebra-d5"])],
   },
   {
     // Withdrawn by the human gate on 2026-08-23. The item shows one board and six completions of it, so
@@ -224,9 +273,15 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("composition", ["spatial-transform-d3"])],
   },
   {
+    // Two buckets in one band since 2026-08-26 (raise-the-ceiling-v12). d5
+    // demonstrates three gates and applies them along the query path; d6
+    // demonstrates a fourth, a swap of two named slots, and applies that too.
+    // Both live in induction-transfer because every d6 bucket does: the long
+    // test is ordered easiest-first and that band is last, so a deeper bucket
+    // anywhere else would still be answered before the end.
     familyId: "transformation-machine-v3",
     primaryReasoningFamily: "operator-induction",
-    bands: [codeValidBand("induction-transfer", ["transformation-machine-d5"])],
+    bands: [codeValidBand("induction-transfer", ["transformation-machine-d5", "transformation-machine-d6"])],
   },
   {
     familyId: "rule-switching-v2",
@@ -244,11 +299,21 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [],
   },
   {
+    // Two buckets in one band since 2026-08-25 (escalate-the-quiz, Phase 3).
+    // d4 draws the whole crease grammar, so half its items need a single
+    // unfold; d5 draws two-crease programs only, so every d5 item needs two.
+    // A band's first fold-punch question is d4 and every later one is d5, which
+    // is what makes repetition inside a band a ramp instead of a plateau.
     familyId: "fold-punch-v2",
     primaryReasoningFamily: "spatial-transformation",
-    bands: [codeValidBand("constraint-spatial", ["fold-punch-d4"])],
+    bands: [codeValidBand("constraint-spatial", ["fold-punch-d4", "fold-punch-d5"])],
   },
   {
+    // Two buckets in one band since 2026-08-26 (raise-the-ceiling-v12). d5
+    // draws the whole crease grammar, so half its draws close a single fold;
+    // d6 draws two-crease programs only, so every d6 item closes two folds in
+    // turn. Both live in induction-transfer because every d6 bucket does: the
+    // long test is ordered easiest-first and that band is last.
     familyId: "inverse-fold-punch-v2",
     primaryReasoningFamily: "spatial-transformation",
     bands: [codeValidBand("induction-transfer", ["inverse-fold-punch-d5"])],
@@ -267,6 +332,18 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [],
   },
   {
+    // The -v3 redesign fixed -v2's structural defect (eight panels, every step
+    // observed at least twice), and the 2026-08-24 pilot answered it correctly
+    // in 30 seconds — but reported a notation misunderstanding and did not
+    // describe the intended two-strand relationship
+    // (data/pilot/2026-08-24-pilot-v2-a.json). A right answer without the
+    // intended reading does not prove the item measures its rule, so the user
+    // withdrew it the same day rather than admit it on a pass.
+    familyId: "interleaved-sequence-v3",
+    primaryReasoningFamily: "sequential-relation",
+    bands: [],
+  },
+  {
     familyId: "second-order-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
     bands: [codeValidBand("composition", ["second-order-sequence-d4"])],
@@ -275,6 +352,19 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     familyId: "inverse-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
     bands: [codeValidBand("composition", ["inverse-analogy-d4"])],
+  },
+  {
+    // Added 2026-08-25 (escalate-the-quiz, Phase 4). Three tokens on one board,
+    // each following its own perimeter-step and fill-cycle rule, all three
+    // strands fully visible in all five shown boards. d3 gives every token a
+    // rule that changes exactly one aspect; d4 draws the whole grammar and
+    // always includes at least one token that changes both, so a band's second
+    // question from this family really is deeper than its first. It is the
+    // sixth composition family, which is what the plan's dual-proof-fails
+    // branch needs to keep that band's pool at six.
+    familyId: "parallel-evolution-v1",
+    primaryReasoningFamily: "sequential-relation",
+    bands: [codeValidBand("composition", ["parallel-evolution-d3", "parallel-evolution-d4"])],
   },
   {
     // Withdrawn by the human gate on 2026-08-23. The item shows one faulty board and six repairs of it, so

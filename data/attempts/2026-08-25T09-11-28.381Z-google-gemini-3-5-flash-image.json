@@ -1,0 +1,1893 @@
+{
+  "runId": "2026-08-25T09-11-28.381Z-google-gemini-3-5-flash-image",
+  "startedAt": "2026-08-25T09:11:28.381Z",
+  "provider": "openrouter",
+  "model": "google/gemini-3.5-flash",
+  "channel": "image",
+  "promptVersion": "solver-v3",
+  "source": "generated",
+  "profile": "long-30",
+  "runSeed": "probe-escalation",
+  "generatorVersion": "scene-families-v10",
+  "withdrawnFamilyIds": [],
+  "plannedAttempts": 75,
+  "completedAttempts": 75,
+  "status": "failed",
+  "attempts": [
+    {
+      "itemId": "expanded-d7208a28bdd01709-2-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 1548,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "6cea0941fe3e7f89",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:29.931Z"
+    },
+    {
+      "itemId": "expanded-715155a763f89cb1-1-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 1772,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "84dedcd0a9050238",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:30.154Z"
+    },
+    {
+      "itemId": "expanded-e67f3d6e62b49e45-3-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 449,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "6a863ae28182d06a",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:30.380Z"
+    },
+    {
+      "itemId": "expanded-f3749e8ac3dcfa15-4-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 407,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "58849574b24a8f0b",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:30.561Z"
+    },
+    {
+      "itemId": "expanded-e1647fcffdaa4849-5-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 401,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "60a462b9ea737088",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:30.781Z"
+    },
+    {
+      "itemId": "expanded-2db65954cc882b2a-6-compositional-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 494,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "14cc4007bbc6e14c",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:31.055Z"
+    },
+    {
+      "itemId": "expanded-ad537c07bebc4a15-7-spatial-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 558,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "0694b76d1ec6dc65",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:31.339Z"
+    },
+    {
+      "itemId": "expanded-82c6d395c324274e-8-compositional-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 517,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "3dc152c762cdc944",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:31.572Z"
+    },
+    {
+      "itemId": "expanded-6cbaa27ee4ea7183-9-spatial-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 474,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "b816633eda34421a",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:31.813Z"
+    },
+    {
+      "itemId": "expanded-7e86c384e223acc7-10-compositional-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 517,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "a1d8ae27b2e3cc74",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:32.089Z"
+    },
+    {
+      "itemId": "expanded-a7daf0a26ca3b0a9-11-inverse-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 572,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "176310276fbeaaad",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:32.385Z"
+    },
+    {
+      "itemId": "expanded-a56726bcb760ce3a-12-composed-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 523,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "c8369d67e09c5fbb",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:32.612Z"
+    },
+    {
+      "itemId": "expanded-7ff4fd8b0fec4cb8-13-inverse-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 445,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "d50c8fd9f4af439a",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:32.830Z"
+    },
+    {
+      "itemId": "expanded-12bfb1ceaf01966e-14-composed-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 422,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "332604365204e9d0",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:33.034Z"
+    },
+    {
+      "itemId": "expanded-5120609a57580c43-15-inverse-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 449,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "41ce065f899a8077",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:33.279Z"
+    },
+    {
+      "itemId": "expanded-4b67365ca680776f-16-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 556,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "0a1f67075bd39640",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:33.591Z"
+    },
+    {
+      "itemId": "expanded-3dce2554ba0aa668-17-relational-matrix-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 618,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "69ab2494ca0a808f",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:33.897Z"
+    },
+    {
+      "itemId": "expanded-4f731b601e78b1dd-18-containment-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 591,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "99cbf2c3e2e2dc48",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:34.182Z"
+    },
+    {
+      "itemId": "expanded-6941e983b18b9e30-19-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 499,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "f3226f859109128e",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:34.396Z"
+    },
+    {
+      "itemId": "expanded-268285c2965be9a8-20-relational-matrix-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 471,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "56ef48bbb7763a77",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:34.653Z"
+    },
+    {
+      "itemId": "expanded-a90d249a995cc874-21-containment-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 517,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "9ad22078280b5430",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:34.913Z"
+    },
+    {
+      "itemId": "expanded-0f72dff6f06fadeb-22-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 487,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "0a1f67075bd39640",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:35.140Z"
+    },
+    {
+      "itemId": "expanded-5a15e2348bdc9640-23-relational-matrix-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 658,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "5c8cd3c8890e2ae2",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:35.571Z"
+    },
+    {
+      "itemId": "expanded-98f2222ee38fb939-24-containment-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 718,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "e0f4d3ffed410afc",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:35.858Z"
+    },
+    {
+      "itemId": "expanded-e76872e9e6f88ca9-25-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 559,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "d6d3d771243d7952",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:36.131Z"
+    },
+    {
+      "itemId": "expanded-018ee7bad6481f5f-26-transformation-machine-v3",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 500,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "0b620cf90ae04e45",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:36.358Z"
+    },
+    {
+      "itemId": "expanded-27efd9dbab8e809d-27-inverse-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 445,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "3f56e79fc6bba3de",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:36.576Z"
+    },
+    {
+      "itemId": "expanded-86698e0435edba01-28-transformation-machine-v3",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 503,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "fccc00d53616d3de",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:36.861Z"
+    },
+    {
+      "itemId": "expanded-c1cf3b06f9174852-29-rule-switching-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 479,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "ad1d33f6d18966ce",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:37.055Z"
+    },
+    {
+      "itemId": "expanded-782f8a212d57422a-30-inverse-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 397,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "3cc441d6a2cc4c6a",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:37.258Z"
+    },
+    {
+      "itemId": "expanded-f2661894360d3f62-1-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 382,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "23ee7d21a7764c30",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:37.438Z"
+    },
+    {
+      "itemId": "expanded-b4900b5481d97a47-2-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 395,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "44721e51b8362390",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:37.653Z"
+    },
+    {
+      "itemId": "expanded-6850b08a5c05cdb9-3-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 450,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "58849574b24a8f0b",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:37.888Z"
+    },
+    {
+      "itemId": "expanded-24641cd83e0f5302-4-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 426,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "be03680b10b85e72",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:38.079Z"
+    },
+    {
+      "itemId": "expanded-cbcfc10c2f4d05e1-5-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 413,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "06adbeb76285acc5",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:38.301Z"
+    },
+    {
+      "itemId": "expanded-7cc2ca8cf15e6f0b-6-spatial-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 487,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "871085305cf4ab87",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:38.566Z"
+    },
+    {
+      "itemId": "expanded-6c5accdc221a6ca3-7-composed-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 470,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "82fa864506785202",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:38.771Z"
+    },
+    {
+      "itemId": "expanded-4cf6d5ba13929d46-8-spatial-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 417,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "88d2f96f1a5fcf42",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:38.983Z"
+    },
+    {
+      "itemId": "expanded-918213a8793e20dc-9-inverse-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 458,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "6be0c1b98de58500",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:39.229Z"
+    },
+    {
+      "itemId": "expanded-136c2abfdac93384-10-composed-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 428,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "fcfa1c9d7757984d",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:39.411Z"
+    },
+    {
+      "itemId": "expanded-a7a9882400d7d312-11-second-order-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 400,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "8eb02fe7f14309fc",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:39.629Z"
+    },
+    {
+      "itemId": "expanded-1a0a727b69592f1a-12-inverse-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 620,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "a14a0578e71d4e39",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:40.031Z"
+    },
+    {
+      "itemId": "expanded-75b636edfcf7a35e-13-composed-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 623,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "11683c2711a5ab70",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:40.252Z"
+    },
+    {
+      "itemId": "expanded-964051197a65dea7-14-second-order-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 422,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "3c6132eff5080ed2",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:40.453Z"
+    },
+    {
+      "itemId": "expanded-85b05556b664ca2b-16-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 384,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "fold-punch-v2",
+        "programFingerprint": "e7efe1a28e11361c",
+        "featureBucket": "fold-punch-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:40.636Z"
+    },
+    {
+      "itemId": "expanded-c0ed476b68ff7932-17-containment-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 407,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "ae2b0994f93ae9b9",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:40.860Z"
+    },
+    {
+      "itemId": "expanded-7af0a89b9cc4f61f-18-visual-set-algebra-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 503,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "8b0f99d3df087a8a",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:41.139Z"
+    },
+    {
+      "itemId": "expanded-0e26dc62f310a866-20-containment-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 553,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "containment-analogy-v2",
+        "programFingerprint": "3c624cfe4f15fae5",
+        "featureBucket": "containment-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:41.413Z"
+    },
+    {
+      "itemId": "expanded-d686baff62709b87-21-visual-set-algebra-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 566,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "8faeadbbee5c8b0a",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:41.705Z"
+    },
+    {
+      "itemId": "expanded-2c36410713b65ebc-24-visual-set-algebra-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 538,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "16f3e7e8103fd04d",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:41.951Z"
+    },
+    {
+      "itemId": "expanded-c1f671fccb56cbf7-26-transformation-machine-v3",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 482,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "4e26624fd889eeaa",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:42.187Z"
+    },
+    {
+      "itemId": "expanded-8abba2a0354c4ee4-27-rule-switching-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 431,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "ad1d33f6d18966ce",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:42.382Z"
+    },
+    {
+      "itemId": "expanded-1455de372065afed-28-inverse-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 425,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "3f56e79fc6bba3de",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:42.612Z"
+    },
+    {
+      "itemId": "expanded-6b5123cbb9fdd6a8-29-transformation-machine-v3",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 484,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "2393f40610c085b7",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:42.866Z"
+    },
+    {
+      "itemId": "expanded-0eab8452ff044400-30-rule-switching-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 519,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "dc6c71159cd24406",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:43.131Z"
+    },
+    {
+      "itemId": "expanded-6ac7bfeb9b1473ec-6-compositional-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 498,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "9afadc6e6fcc9445",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:43.364Z"
+    },
+    {
+      "itemId": "expanded-2c036242ce03462e-7-spatial-transform-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 446,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "c6826eb97c7cb9e1",
+        "featureBucket": "spatial-transform-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:43.577Z"
+    },
+    {
+      "itemId": "expanded-b68f2e21bb1d2054-8-compositional-analogy-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 402,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "620445f9d3111370",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:43.766Z"
+    },
+    {
+      "itemId": "expanded-4cac15910c0530e3-11-second-order-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 414,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "3cbe9fbca4f3f6ba",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:43.991Z"
+    },
+    {
+      "itemId": "expanded-5dec0d533d221234-13-second-order-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 428,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "eab91c1c99222436",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:44.194Z"
+    },
+    {
+      "itemId": "expanded-3087b1370ebd6f67-15-second-order-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 427,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "a555ccd57e605236",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:44.418Z"
+    },
+    {
+      "itemId": "expanded-95996b7b1cef37db-16-relational-matrix-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 434,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "7025088df1c3bc97",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:44.628Z"
+    },
+    {
+      "itemId": "expanded-33edb84ad5da264a-19-relational-matrix-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 428,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "aa9497acad18f5c2",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:44.846Z"
+    },
+    {
+      "itemId": "expanded-b7d2cda386e43fbf-26-rule-switching-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 420,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "4520cb272e8bff43",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:45.048Z"
+    },
+    {
+      "itemId": "expanded-49e1b7bbe6b6e474-27-inverse-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 406,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "3cc441d6a2cc4c6a",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:45.252Z"
+    },
+    {
+      "itemId": "expanded-4cddd4f7c255c401-28-rule-switching-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 743,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "rule-switching-v2",
+        "programFingerprint": "dc6c71159cd24406",
+        "featureBucket": "rule-switching-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:45.791Z"
+    },
+    {
+      "itemId": "expanded-1445313487b56fa4-29-transformation-machine-v3",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 970,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "0b620cf90ae04e45",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:46.222Z"
+    },
+    {
+      "itemId": "expanded-a4494701f1738701-30-inverse-fold-punch-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 628,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "inverse-fold-punch-v2",
+        "programFingerprint": "88509720d8e6b6af",
+        "featureBucket": "inverse-fold-punch-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:46.419Z"
+    },
+    {
+      "itemId": "expanded-85e3809b9c3b562c-19-visual-set-algebra-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 389,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "8faeadbbee5c8b0a",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:46.612Z"
+    },
+    {
+      "itemId": "expanded-71604b2a854d4bf8-22-visual-set-algebra-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 441,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "a26b2ef5519bedd9",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:46.860Z"
+    },
+    {
+      "itemId": "expanded-b641115412bfedc4-2-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 443,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "71adedf5ed708d24",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:47.055Z"
+    },
+    {
+      "itemId": "expanded-eb63c3399caad8ba-1-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 507,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "9d2cd2b216dea813",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:47.367Z"
+    },
+    {
+      "itemId": "expanded-e7f9bb4860cefb42-22-relational-matrix-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 561,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "aa9497acad18f5c2",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:47.616Z"
+    },
+    {
+      "itemId": "expanded-988da71bbe32417d-4-attribute-pairing-v1",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 446,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "be03680b10b85e72",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:47.813Z"
+    },
+    {
+      "itemId": "expanded-5289e91f76ed3113-3-relational-sequence-v2",
+      "chosen": null,
+      "correct": false,
+      "outcome": "transport-failure",
+      "evaluationSet": "public",
+      "latencyMs": 330,
+      "generation": {
+        "generatorVersion": "scene-families-v10",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "281373a004ccca8c",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+      "ts": "2026-08-25T09:11:47.946Z"
+    }
+  ]
+}

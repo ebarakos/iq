@@ -1,12 +1,15 @@
 /**
  * Verify the committed item bank: schema, expanded-seed replay or legacy rule
- * check, fingerprint and id integrity, uniqueness, and fallback coverage for
+ * check, fingerprint and id integrity, uniqueness, four items for every
+ * family/band/bucket key the registry can schedule, and fallback coverage for
  * both public lengths.
  */
 import { readFileSync } from "node:fs";
 import {
+  BANK_ITEMS_PER_KEY,
   BankFileSchema,
   bankIdFor,
+  expandedBankCoverage,
   fingerprintPuzzle,
   sampleExpandedBankQuiz,
 } from "../src/items/bank";
@@ -82,6 +85,36 @@ if (!parsed.success) {
     if (seen.has(item.fingerprint)) errors.push(`${id}: duplicate fingerprint ${item.fingerprint}`);
     seen.add(item.fingerprint);
   }
+  // Per-key coverage. The fallback sampler answers a slot from the exact
+  // family/band/bucket the schedule asked for; every rung below that exists
+  // only for a bank that has fallen behind the registry. Checking the built
+  // file for four items per enabled key — and for items that no longer belong
+  // to any enabled key — is what keeps those rungs unreachable in practice.
+  const coverage = expandedBankCoverage(
+    parsed.data.items,
+    CURRENT_FAMILY_PROMOTION_REGISTRY,
+    withdrawn,
+  );
+  for (const { key, have } of coverage.short) {
+    errors.push(`${key}: bank holds ${have} current-version items, needs ${BANK_ITEMS_PER_KEY}`);
+  }
+  for (const stray of coverage.strays) {
+    errors.push(`${stray}: expanded item outside every enabled family/band/bucket key`);
+  }
+  const overStocked = [...coverage.countsByKey]
+    .filter(([, have]) => have > BANK_ITEMS_PER_KEY)
+    .map(([key, have]) => `${key} ${have}`);
+  if (overStocked.length > 0) {
+    errors.push(
+      `coverage should be exactly ${BANK_ITEMS_PER_KEY} items per key; over-stocked: ${overStocked.join(", ")}. ` +
+        "Rebuild with --replace rather than topping an existing expanded bank up.",
+    );
+  }
+  console.log(
+    `bank: ${coverage.countsByKey.size} enabled keys x ${BANK_ITEMS_PER_KEY} items ` +
+      `= ${coverage.countsByKey.size * BANK_ITEMS_PER_KEY} expected`,
+  );
+
   for (const profile of EXPANDED_PROFILES) {
     for (let run = 0; run < 100; run++) {
       try {

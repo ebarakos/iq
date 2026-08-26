@@ -35,7 +35,27 @@ export const ROTATIONS = [0, 90, 180, 270] as const;
  */
 export const ORIENTABLE_SHAPES = ["triangle"] as const;
 
+/**
+ * Scene-only shape vocabulary: the legacy six plus the `arrow`.
+ *
+ * The compact-cell vocabulary (`SHAPES`, `Shape`, `CellSchema`) is frozen — two
+ * sha256 goldens in generate.test.ts pin the legacy generator's exact output, so
+ * a new member there would change every seeded quiz ever replayed. Scenes are
+ * younger and unpinned, so the arrow lives here instead: it is the one shape
+ * whose four quarter turns are all unmistakable, which is what makes a visible
+ * token turn readable as a puzzle step.
+ */
+export const SCENE_SHAPES = [...SHAPES, "arrow"] as const;
+
+/**
+ * Shapes whose orientation reads instantly INSIDE A SCENE — the triangle, plus
+ * the scene-only arrow. Kept apart from `ORIENTABLE_SHAPES` so the legacy cell
+ * path keeps its exact triangle-only rule.
+ */
+export const SCENE_ORIENTABLE_SHAPES = ["triangle", "arrow"] as const;
+
 export type Shape = (typeof SHAPES)[number];
+export type SceneShape = (typeof SCENE_SHAPES)[number];
 export type Fill = (typeof FILLS)[number];
 export type Size = (typeof SIZES)[number];
 
@@ -98,6 +118,66 @@ export function isInstantlyDistinct(a: CellSpec, b: CellSpec): boolean {
     (ORIENTABLE_SHAPES as readonly string[]).includes(a.shape) &&
     (ORIENTABLE_SHAPES as readonly string[]).includes(b.shape) &&
     visualSignature(a) !== visualSignature(b)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Rotational symmetry of each SCENE shape, in degrees. Same idea as
+ * `ROTATION_PERIOD`, extended with the arrow: an arrow has no rotational
+ * symmetry at all (period 360), so all four quarter turns — up, right, down,
+ * left — are four different pictures. That is exactly why the `turn` operation
+ * needs it.
+ */
+export const SCENE_ROTATION_PERIOD: Record<SceneShape, number> = {
+  ...ROTATION_PERIOD,
+  arrow: 360, // no symmetry: 0/90/180/270 are four distinct glyphs
+};
+
+/** A drawable spec whose shape may be scene-only. Superset of `CellSpec`. */
+export interface SceneCellSpec extends Omit<CellSpec, "shape"> {
+  shape: SceneShape;
+}
+
+/** One scene token's visible attributes. Scenes place one token per slot, so there is no count. */
+export interface SceneTokenSpec {
+  shape: SceneShape;
+  rotation: number;
+  fill: Fill;
+  size: Size;
+}
+
+/** Does this scene shape point somewhere, so that its rotation is readable? */
+export function isSceneShapeOrientable(shape: string): boolean {
+  return (SCENE_ORIENTABLE_SHAPES as readonly string[]).includes(shape);
+}
+
+/** A signature that is equal for two scene tokens iff they render identically. */
+export function sceneTokenSignature(token: SceneTokenSpec): string {
+  const period = SCENE_ROTATION_PERIOD[token.shape];
+  const rot = ((token.rotation % period) + period) % period;
+  return `${token.shape}|${token.fill}|${token.size}|${rot}`;
+}
+
+/**
+ * Legibility doctrine for scene tokens — the scene-side twin of
+ * `isInstantlyDistinct`, with the same rules (categorical shape/fill, only
+ * small-vs-large on size, rotation only between orientable shapes) over the
+ * scene shape vocabulary. It exists separately because the legacy helper reads
+ * `ROTATION_PERIOD`, which has no entry for the arrow.
+ */
+export function isSceneTokenInstantlyDistinct(a: SceneTokenSpec, b: SceneTokenSpec): boolean {
+  if (a.shape !== b.shape) return true;
+  if (a.fill !== b.fill) return true;
+  const sizes = [a.size, b.size];
+  if (a.size !== b.size && sizes.includes("s") && sizes.includes("l")) return true;
+  if (
+    a.rotation !== b.rotation &&
+    isSceneShapeOrientable(a.shape) &&
+    isSceneShapeOrientable(b.shape) &&
+    sceneTokenSignature(a) !== sceneTokenSignature(b)
   ) {
     return true;
   }

@@ -1,0 +1,188 @@
+{
+  "capturedAt": "2026-08-26",
+  "measuredFromCommit": "72ffdb3",
+  "generatorVersion": "scene-families-v8",
+  "note": "Answer-to-served-distractor distances as the battery stood BEFORE closeness-ranked selection: commit 72ffdb3, the last commit before the escalate-the-quiz batch, whose selectDistractors samples the wrong options uniformly from each family's grammar. The plan and the docs call that pre-batch state v10, which is where this file's name comes from; the generator constant in that commit reads scene-families-v8. The tuples were re-measured on 2026-08-26 with the corrected coordinate-based metric (one position per board coordinate, crease guides as atoms only), so they are comparable with what scripts/scene-family-verify.ts reports today. Lexicographic (positions, atoms).",
+  "seedNamespace": "scene-family-verify-v1",
+  "seedStream": "<familyId>:<seed> for seeds 0-199, the bucket-free stream the verifier has always used",
+  "percentileRule": "nearest rank over lexicographically sorted (positions, atoms) tuples: sorted[min(n-1, ceil(n*fraction)-1)]",
+  "distanceSource": "the five non-answer options of the final shuffled puzzle, never copied candidate metadata",
+  "howThisWasRegenerated": [
+    "git archive 72ffdb3 | tar -x -C <scratch>/v10   (read-only; the v10 selector is not in the working tree)",
+    "ln -s <repo>/node_modules <scratch>/v10/node_modules",
+    "cp <repo>/src/items/scene-distance.ts <scratch>/v10/src/items/scene-distance.ts   (the metric changes, the measured population does not)",
+    "in <scratch>/v10, for every SCENE_FAMILY_IDS family and every seed 0-199: generateSceneFamilyCandidate(familyId, seededRng('scene-family-verify-v1', `${familyId}:${seed}`)) -- the v10 generator takes no bucket argument",
+    "for each candidate, measure sceneEditDistance(option, options[answerIndex]) for every option except the answer: 200 seeds x 5 distractors = 1000 tuples per family",
+    "assign each family's 1000 tuples to every `${familyId}:${band}:${difficultyBucket}` key that eligibleFamiliesForBand(CURRENT_FAMILY_PROMOTION_REGISTRY, band) enables at 72ffdb3, withdrawals ignored exactly as the verifier ignores them",
+    "take the nearest-rank p50 and p90 of each key's tuples"
+  ],
+  "keysNotCarried": {
+    "composed-transform-v2:composition:composed-transform-d4": "No v10 baseline. At 72ffdb3 the family is composed-transform-v1, and v11 both renamed it and deepened its grammar with the two token turns, so its d4 population is not the same population. For the record, v10's composed-transform-v1 measured p50 (2, 2) and p90 (5, 21).",
+    "every other key the current registry serves": "compositional-analogy-d4, parallel-evolution-d3, parallel-evolution-d4, fold-punch-d5, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10, and neither did the two d6 buckets added on 2026-08-26, composed-transform-d6 and transformation-machine-d6. The verifier reports their percentiles with comparable: false and invents no baseline for them."
+  },
+  "withdrawnKeysNote": "Keys that once had a v10 baseline and are no longer served, kept with the numbers they were recorded with. A withdrawal is a normal event and must leave a record: deleting the row would make the gate green by forgetting, and the aggregate no-regression comparison runs over the keys still in \"keys\" either way. scripts/scene-family-verify.ts fails if a key appears in both objects, or if a key listed here turns up in a run.",
+  "withdrawnKeys": {
+    "containment-analogy-v2:constraint-spatial:containment-analogy-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 12
+      },
+      "p90": {
+        "positions": 2,
+        "atoms": 12
+      },
+      "v10Key": "containment-analogy-v2:composition:containment-analogy-d4",
+      "note": "Same family, same bucket, same v10 generator path; only the band label moved from composition to constraint-spatial during this batch.",
+      "withdrawnOn": "2026-08-26",
+      "withdrawnReason": "containment-analogy-v2 was withdrawn from every band on 2026-08-26 on the human pilot's notation evidence (src/items/family-promotion.ts, data/pilot/README.md), so no run of scripts/scene-family-verify.ts measures this key any more. The numbers are kept exactly as they were recorded rather than deleted: the record of what the key measured is evidence, and a baseline file that quietly loses rows cannot be audited. The verifier skips it in the no-regression comparison and fails if the key is ever served again without this row moving back into \"keys\"."
+    }
+  },
+  "keys": {
+    "attribute-pairing-v1:warmup:attribute-pairing-d2": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 2,
+        "atoms": 10
+      }
+    },
+    "compositional-analogy-v2:composition:compositional-analogy-d3": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 20
+      },
+      "p90": {
+        "positions": 4,
+        "atoms": 20
+      }
+    },
+    "fold-punch-v2:constraint-spatial:fold-punch-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 3,
+        "atoms": 15
+      }
+    },
+    "inverse-analogy-v2:composition:inverse-analogy-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 20
+      },
+      "p90": {
+        "positions": 4,
+        "atoms": 20
+      }
+    },
+    "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 12
+      },
+      "p90": {
+        "positions": 2,
+        "atoms": 14
+      }
+    },
+    "relational-matrix-v2:constraint-spatial:relational-matrix-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 3,
+        "atoms": 15
+      }
+    },
+    "relational-sequence-v2:warmup:relational-sequence-d2": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 2,
+        "atoms": 10
+      }
+    },
+    "rule-switching-v2:induction-transfer:rule-switching-d5": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 20
+      },
+      "p90": {
+        "positions": 4,
+        "atoms": 20
+      }
+    },
+    "second-order-sequence-v2:composition:second-order-sequence-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 2,
+        "atoms": 10
+      }
+    },
+    "spatial-transform-v2:composition:spatial-transform-d3": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 20
+      },
+      "p90": {
+        "positions": 4,
+        "atoms": 20
+      }
+    },
+    "transformation-machine-v3:induction-transfer:transformation-machine-d5": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 12
+      },
+      "p90": {
+        "positions": 5,
+        "atoms": 21
+      }
+    },
+    "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 3,
+        "atoms": 15
+      }
+    }
+  }
+}

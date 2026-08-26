@@ -1,4 +1,4 @@
-// @relay-template: relay-api-helpers@4
+// @relay-template: relay-api-helpers@5
 
 /**
  * Server-side helpers for Next.js API routes consuming llm-relay.
@@ -16,22 +16,36 @@ import { isRateLimitError, parseRateLimitError } from "./relay-errors";
 /** Overrides that can be passed to getModel()/generatePuzzles(). */
 export type ModelOverrides = {
   apiKey?: string;
+  /** Set when the browser marked its BYO key as a free-tier key; forwarded as X-User-Key-Tier. */
+  userKeyTier?: "free";
   provider?: string;
   model?: string;
   thinkingBudget?: number;
   customUrl?: string;
+  /** X-No-Fallback: fail instead of letting the relay substitute another provider/model. */
+  noFallback?: boolean;
 };
 
-/** Read per-request overrides injected by the llm-relay widget. */
+/** Read per-request overrides injected by the llm-relay widget (relay-client@9 sends
+ *  X-Provider + X-Relay-Expected-Model; the old X-Relay-Provider / X-Relay-Model names are
+ *  still read as a rolling-deploy fallback). */
 export function readWidgetOverrides(req: NextRequest): ModelOverrides | undefined {
   const apiKey = req.headers.get("x-user-api-key") ?? undefined;
-  const provider = req.headers.get("x-relay-provider") ?? undefined;
-  const model = req.headers.get("x-relay-model") ?? undefined;
+  const userKeyTier = apiKey && req.headers.get("x-user-key-tier") === "free"
+    ? "free"
+    : undefined;
+  const provider = req.headers.get("x-provider")
+    ?? req.headers.get("x-relay-provider")
+    ?? undefined;
+  const model = req.headers.get("x-relay-expected-model")
+    ?? req.headers.get("x-relay-model")
+    ?? undefined;
   const budget = req.headers.get("x-thinking-budget");
   const thinkingBudget = budget ? parseInt(budget, 10) || undefined : undefined;
   const customUrl = req.headers.get("x-custom-url") ?? undefined;
-  if (!apiKey && !provider && !model && !thinkingBudget && !customUrl) return undefined;
-  return { apiKey, provider, model, thinkingBudget, customUrl };
+  const noFallback = req.headers.get("x-no-fallback") === "true" || undefined;
+  if (!apiKey && !provider && !model && !thinkingBudget && !customUrl && !noFallback) return undefined;
+  return { apiKey, userKeyTier, provider, model, thinkingBudget, customUrl, noFallback };
 }
 
 /**

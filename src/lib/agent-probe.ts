@@ -3,6 +3,7 @@ import {
   type FamilyPromotionRegistry,
 } from "@/items/family-promotion";
 import { eligibleFamiliesForBand } from "@/items/expanded-quiz";
+import { requireSceneFamilyBucket, type SceneFamilyId } from "@/items/scene-families";
 import type { GenerationMetadata, Puzzle, Visual } from "@/items/schema";
 
 /**
@@ -28,10 +29,6 @@ export interface ProbeCoverageReport {
   missingProgramComplexities: { key: string; have: number; need: number }[];
 }
 
-function programDepth(band: (typeof EXPANDED_PROFILE_BANDS)[number]): number {
-  return band === "warmup" ? 1 : band === "composition" ? 2 : 3;
-}
-
 /** Stable stratum used to keep shallow and deep generated programs represented. */
 export function programComplexityBucket(generation: GenerationMetadata): string {
   return `complexity-${generation.features.ruleComplexity}-depth-${generation.features.programDepth}`;
@@ -48,7 +45,14 @@ export function standardProbeRequirements(
   for (const band of EXPANDED_PROFILE_BANDS) {
     for (const family of eligibleFamiliesForBand(registry, band, withdrawnFamilyIds)) {
       families.add(family.familyId);
-      programComplexities.add(`complexity-${family.difficulty}-depth-${programDepth(band)}`);
+      // Depth belongs to the family's bucket, not to the band it sits in: a
+      // three-gate composition and a one-transform analogy are both
+      // "composition" but are not the same program to run.
+      const bucket = requireSceneFamilyBucket(
+        family.familyId as SceneFamilyId,
+        family.difficultyBucket,
+      );
+      programComplexities.add(`complexity-${family.difficulty}-depth-${bucket.programDepth}`);
     }
   }
 

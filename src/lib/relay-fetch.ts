@@ -1,133 +1,136 @@
-// @relay-template: relay-fetch@6
+// @relay-template: relay-fetch@8
 
 /**
- * Custom fetch wrapper for the AI SDK's createOpenAI() client.
+ * Custom fetch for the OpenAI-compatible / Vercel AI SDK client that talks to llm-relay.
  *
- * Handles two relay-specific concerns:
- *   1. Injects the provider name into every request body so the relay routes correctly
- *   2. Intercepts relay 429 responses immediately — prevents the AI SDK from retrying
- *      (which wastes rate-limit quota and delays the user-visible error by ~9 round-trips)
+ * What it does:
+ *   1. Injects the provider name into every JSON request body so the relay routes correctly
+ *   2. Asserts the widget-selected model with X-Relay-Expected-Model — the relay rejects a
+ *      request whose body model differs (409 widget_model_mismatch), so a stale SDK default
+ *      can never silently replace the user's visible choice
+ *   3. Adds the BYO key / free-tier / thinking / custom-URL / no-fallback headers
+ *   4. Reports per-request attribution to `onAttribution` (provider that actually answered,
+ *      and whether the relay fell back to another provider or healed a retired model id)
+ *   5. Throws a typed error on a relay-originated 429 so rate limits are distinguishable
+ *
+ * Attribution is delivered per request through the optional `onAttribution` sink —
+ * NOT module-global state — so concurrent requests never misattribute each other.
  *
  * ADAPT: Import and use this in your LLM client file where you call createOpenAI().
+ * Build the relay client once PER REQUEST and close over a request-local variable
+ * in `onAttribution` if you need attribution under concurrency.
  *
  * Usage:
- *   import { createRelayFetch } from "./relay-fetch";
+ *   import { createRelayFetch, type RelayAttribution } from "./relay-fetch";
  *
+ *   let attribution: RelayAttribution | null = null;
  *   const client = createOpenAI({
  *     apiKey: "none",
  *     baseURL: process.env.RELAY_BASE_URL,
- *     fetch: createRelayFetch({ provider: "cerebras" }),
+ *     fetch: createRelayFetch({
+ *       provider: "openrouter",
+ *       expectedModel: modelId,           // the same id you pass to client.chat(modelId)
+ *       onAttribution: (info) => { attribution = info; },
+ *     }),
  *   });
+ *   // …after the LLM call, `attribution?.providerUsed` is this request's provider.
  */
-
-export interface RelayFetchOptions {
-  /** Provider name injected into the request body (e.g. "cerebras", "openrouter", "groq") */
-  provider: string;
-  /** BYO API key — forwarded as X-User-Api-Key header to bypass relay rate limits */
-  apiKey?: string;
-  /** Thinking budget — forwarded as X-Thinking-Budget header for supported models */
-  thinkingBudget?: number;
-  /** Custom provider URL — forwarded as X-Custom-Url header for "custom" provider */
-  customUrl?: string;
-  /** Request-scoped attribution sink. Called once per relay response with the
-   *  provider that served the request and any fallback. Replaces the old
-   *  module-global `consumeLastProviderUsed()` / `consumeLastFallback()` so
-   *  concurrent requests cannot read each other's values. */
-  onAttribution?: (info: RelayAttribution) => void;
-}
-
 /** Fallback info captured from a relay response. */
 export interface RelayFallbackInfo {
   provider: string;
   model: string;
+  reason: "fallback" | "model-heal";
 }
 
-/** Per-request attribution handed to `onAttribution` for each relay response. */
+/** Per-request relay attribution. */
 export interface RelayAttribution {
-  /** Provider that actually served the request (always set by the relay via the
-   *  `X-Relay-Provider-Used` response header). Pair with `formatModelId()` to
-   *  render attribution like `"{provider} - {model}"`. */
   providerUsed: string | null;
-  /** Set only when the relay fell back to a different provider/model. */
   fallback: RelayFallbackInfo | null;
 }
 
+export interface RelayFetchOptions {
+  provider: string;
+  /** Exact widget-selected model. The relay rejects a mismatching request body. */
+  expectedModel: string;
+  apiKey?: string;
+  userKeyTier?: "free";
+  thinkingBudget?: number;
+  customUrl?: string;
+  noFallback?: boolean;
+  onAttribution?: (info: RelayAttribution) => void;
+}
+
 /**
- * Returns a fetch function suitable for the AI SDK's `createOpenAI({ fetch })` option.
+ * Build the AI SDK fetch adapter for llm-relay.
  *
- * The returned function:
- *   - Injects `body.provider` so the relay routes to the correct backend
- *   - Forwards BYO API key, thinking budget, and custom URL as relay headers
- *   - Intercepts relay 429s (where `source === "relay"`) and throws immediately,
- *     preventing any SDK retry loop from wasting quota
- *   - Passes through provider 429s as-is (SDK retry is disabled; relay handles retries)
+ * Provider and model are asserted in both the request and headers so a stale
+ * SDK/default value can never silently replace the widget's visible choice.
  */
 export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
   return async (url: RequestInfo | URL, init?: RequestInit) => {
     let options = init;
 
-    // Inject provider into the request body, but ONLY when it is a JSON object we
-    // can parse. Non-string bodies (Buffer, FormData, URLSearchParams, streams),
-    // non-object JSON (arrays/primitives), and unparseable strings are forwarded
-    // unchanged — provider injection is skipped, header injection below is kept.
-    // An unguarded JSON.parse here would throw and crash the request before it
-    // ever reached the relay.
     if (typeof options?.body === "string") {
       try {
-        const parsed: unknown = JSON.parse(options.body);
+        const parsed = JSON.parse(options.body);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           (parsed as Record<string, unknown>).provider = opts.provider;
           options = { ...options, body: JSON.stringify(parsed) };
         }
       } catch {
-        // Body is not JSON — forward the request unchanged (skip provider injection)
+        // Non-JSON requests are forwarded unchanged; exact headers still apply.
       }
     }
 
-    // Forward relay-specific headers
-    const extraHeaders: Record<string, string> = {};
+    const extraHeaders: Record<string, string> = {
+      "X-Provider": opts.provider,
+      "X-Relay-Expected-Model": opts.expectedModel,
+    };
     if (opts.apiKey) extraHeaders["X-User-Api-Key"] = opts.apiKey;
+    if (opts.apiKey && opts.userKeyTier === "free") {
+      extraHeaders["X-User-Key-Tier"] = "free";
+    }
     if (opts.thinkingBudget) extraHeaders["X-Thinking-Budget"] = String(opts.thinkingBudget);
     if (opts.customUrl) extraHeaders["X-Custom-Url"] = opts.customUrl;
-    if (Object.keys(extraHeaders).length) {
-      options = {
-        ...options,
-        headers: { ...options?.headers, ...extraHeaders },
-      };
-    }
+    if (opts.noFallback) extraHeaders["X-No-Fallback"] = "true";
+    const headers = new Headers(options?.headers);
+    for (const [name, value] of Object.entries(extraHeaders)) headers.set(name, value);
+    options = { ...options, headers };
 
     const res = await fetch(url, options);
 
-    // Request-scoped attribution: read THIS response's headers and hand them to
-    // the caller's sink. No module-global state, so concurrent requests cannot
-    // overwrite each other's provider/model — the agent harness runs several at
-    // once by default.
     if (opts.onAttribution) {
-      const fbProvider = res.headers.get("X-Relay-Fallback-Provider");
-      const fbModel = res.headers.get("X-Relay-Fallback-Model");
+      const fallbackProvider = res.headers.get("X-Relay-Fallback-Provider");
+      const fallbackModel = res.headers.get("X-Relay-Fallback-Model");
+      const providerUsed = res.headers.get("X-Relay-Provider-Used");
+      const modelUsed = res.headers.get("X-Relay-Model-Used");
+      const healed = res.headers.get("X-Relay-Model-Healed");
+      const automaticSwitch = fallbackProvider && fallbackModel
+        ? { provider: fallbackProvider, model: fallbackModel, reason: "fallback" as const }
+        : healed && providerUsed && modelUsed
+          ? { provider: providerUsed, model: modelUsed, reason: "model-heal" as const }
+          : null;
       opts.onAttribution({
-        providerUsed: res.headers.get("X-Relay-Provider-Used"),
-        fallback: fbProvider && fbModel ? { provider: fbProvider, model: fbModel } : null,
+        providerUsed,
+        fallback: automaticSwitch,
       });
     }
 
-    // Intercept relay rate-limit responses immediately.
-    // The relay returns { source: "relay", limitType: "minute"|"daily", message, reset }.
-    // Throwing here prevents the AI SDK from retrying (which wastes quota).
     if (res.status === 429) {
       const text = await res.text();
       let body: Record<string, unknown> | null = null;
-      try { body = JSON.parse(text); } catch { /* not JSON */ }
-      if (body?.source === "relay") {
-        const err = new Error(typeof body.message === "string" ? body.message : "Rate limited by relay") as Error & {
-          statusCode?: number;
-          data?: unknown;
-        };
+      try { body = JSON.parse(text); } catch { /* provider returned plain text */ }
+      const error = body?.error && typeof body.error === "object"
+        ? body.error as Record<string, unknown>
+        : body;
+      if (error?.source === "relay") {
+        const err = new Error(
+          typeof error.message === "string" ? error.message : "Rate limited by relay",
+        ) as Error & { statusCode: number; data: Record<string, unknown> };
         err.statusCode = 429;
-        err.data = body;
+        err.data = error;
         throw err;
       }
-      // Provider 429 — return as-is (SDK retry is disabled; relay handles retries)
       return new Response(text, { status: res.status, headers: res.headers });
     }
 
