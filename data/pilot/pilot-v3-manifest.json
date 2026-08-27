@@ -1,10 +1,10 @@
 {
   "schemaVersion": "prototype-pilot-packets-v3",
-  "itemCount": 21,
+  "itemCount": 19,
   "packets": [
     {
       "packetId": "pilot-v3-a",
-      "contentFingerprint": "e209f27079a43459",
+      "contentFingerprint": "de321fb8322e8f35",
       "items": [
         {
           "itemId": "relational-sequence-v2:warmup:relational-sequence-d2:r1",
@@ -55,14 +55,6 @@
           "bandTimeBudgetSeconds": 55
         },
         {
-          "itemId": "composed-transform-v2:induction-transfer:composed-transform-d6:r1",
-          "familyId": "composed-transform-v2",
-          "band": "induction-transfer",
-          "difficultyBucket": "composed-transform-d6",
-          "difficulty": 6,
-          "bandTimeBudgetSeconds": 55
-        },
-        {
           "itemId": "relational-matrix-v2:constraint-spatial:relational-matrix-d4:r1",
           "familyId": "relational-matrix-v2",
           "band": "constraint-spatial",
@@ -100,14 +92,6 @@
           "band": "induction-transfer",
           "difficultyBucket": "transformation-machine-d5",
           "difficulty": 5,
-          "bandTimeBudgetSeconds": 55
-        },
-        {
-          "itemId": "transformation-machine-v3:induction-transfer:transformation-machine-d6:r1",
-          "familyId": "transformation-machine-v3",
-          "band": "induction-transfer",
-          "difficultyBucket": "transformation-machine-d6",
-          "difficulty": 6,
           "bandTimeBudgetSeconds": 55
         },
         {

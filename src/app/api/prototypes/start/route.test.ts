@@ -44,6 +44,31 @@ describe("prototype start route", () => {
     });
   });
 
+  it("serves items that carry no answer, which is the whole protection", async () => {
+    // Since 2026-08-27 the GRADE names the answer, so the page can highlight
+    // it — every explanation says "the highlighted option". That makes this the
+    // only line of defence left: what a sitting hands the browser before an
+    // answer is locked must be the answer-free public puzzle, with no key
+    // anywhere in it, at any depth.
+    const { items } = openPrototypePilotSitting(packet, orderPrototypePilotPacket(packet, "leak-check"));
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      const serialised = JSON.stringify(item);
+      expect(serialised, item.itemId).not.toContain("answerIndex");
+      expect(serialised, item.itemId).not.toContain("explanation");
+      const walk = (value: unknown): void => {
+        if (Array.isArray(value)) return value.forEach(walk);
+        if (value && typeof value === "object") {
+          for (const [name, child] of Object.entries(value)) {
+            expect(name, `${item.itemId} key`).not.toMatch(/answer|solution|correct/i);
+            walk(child);
+          }
+        }
+      };
+      walk(item);
+    }
+  });
+
   it("says so rather than restarting the clock when an item is started twice", async () => {
     const sitting = openSitting();
     await post(sitting);

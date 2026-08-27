@@ -382,6 +382,7 @@ export function heldOutBucketPool(
       candidate = generateHeldOutComposedTransformCandidate(
         seededRng(seed, `held-out:${entry.bucket.bucket}:${drawIndex}`),
         entry.gateCount,
+        entry.bucket.bucket,
       );
     } catch (error) {
       rejections.push(error instanceof Error ? error.message : String(error));

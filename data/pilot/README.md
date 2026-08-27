@@ -124,3 +124,30 @@ wrong, did not describe the intended relationship, and reported a defensible
 alternative — the ill-posed signature. The participant judged the rest of the
 battery good and asked to keep it, so it stays on one observation; a second
 sitting showing the same pattern should withdraw it.
+
+## 2026-08-27 — pilot-v3-a again (19 items), and the end of pilot sittings
+
+Aggregate: `2026-08-27-pilot-v3-b.json`. 15 of 21 correct, six clean misses, both
+d6 items among them and no notation report on either — so the written d6 success
+test passed.
+
+**Do not read that as evidence, and do not run this packet again.** The
+participant said plainly that they were doing other things while sitting it, that
+they now know every mechanism instantly, and that their wrong answers come from
+boredom rather than difficulty. The timing bears it out: the five-gate
+`composed-transform-d6` item — the whole point of that batch — was answered wrong
+inside five seconds, which is not long enough to read an eighteen-panel table.
+A clean miss is supposed to mean "understood the rule and still chose wrong";
+here it meant "did not engage". The metric cannot tell those apart.
+
+Two decisions followed, both the owner's:
+
+1. **Never more than three gates.** More gates is more procedure, not more
+   reasoning. Both d6 buckets were withdrawn the same day.
+2. **No more repeat sittings.** Invite a sitting only when a genuinely new
+   mechanism exists to try; otherwise the owner runs the real test themselves.
+
+The useful signal from this sitting was not numeric. It was the report that the
+explanations say "the highlighted option" while nothing on the pilot screen was
+highlighted (now fixed), and that the set-algebra items were "too easy/toy"
+(the family was rebuilt on 2026-08-27).

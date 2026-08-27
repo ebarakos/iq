@@ -32,7 +32,7 @@ const RequestSchema = z.object({
  * sending the answer key to the browser.
  *
  * Request body: `{ sittingId, itemId, contentFingerprint, selectedOption, elapsedSeconds }`.
- * Response 200: `{ correct, explanation, late, timeBudgetSeconds, elapsedSeconds,
+ * Response 200: `{ correct, answerIndex, explanation, late, timeBudgetSeconds, elapsedSeconds,
  * clientElapsedSeconds, clientTimingDisagreementSeconds, clientTimingDisagrees }`,
  * where `elapsedSeconds` is the server's measurement and `clientElapsedSeconds`
  * is the browser's, echoed for comparison only.

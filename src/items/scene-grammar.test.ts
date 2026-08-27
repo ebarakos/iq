@@ -78,7 +78,7 @@ describe("scene grammar", () => {
     expect(reflected?.objects[0]).toMatchObject({ row: 0, column: 2 });
   });
 
-  it("supports exact aligned set operations and rejects conflicting unions", () => {
+  it("gives every one of the eight set operations a defined result on a clash", () => {
     const left = scene([
       { row: 0, column: 0, object: token("circle") },
       { row: 1, column: 1, object: token("square") },
@@ -88,13 +88,43 @@ describe("scene grammar", () => {
       { row: 2, column: 2, object: token("triangle") },
     ]);
 
-    expect(applySceneBinary(left, right, "union")?.objects).toHaveLength(3);
+    // The two boards agree wherever they overlap, so identity makes no
+    // difference here and the counts are the plain set-algebra ones.
+    expect(applySceneBinary(left, right, "union-left")?.objects).toHaveLength(3);
+    expect(applySceneBinary(left, right, "union-right")?.objects).toHaveLength(3);
     expect(applySceneBinary(left, right, "intersection")?.objects).toHaveLength(1);
+    expect(applySceneBinary(left, right, "overlap-left")?.objects).toHaveLength(1);
     expect(applySceneBinary(left, right, "subtract")?.objects).toHaveLength(1);
-    expect(applySceneBinary(left, right, "xor")?.objects).toHaveLength(2);
+    expect(applySceneBinary(left, right, "mask-out")?.objects).toHaveLength(1);
+    expect(applySceneBinary(left, right, "exclusive")?.objects).toHaveLength(2);
 
-    const conflict = scene([{ row: 0, column: 0, object: token("star") }]);
-    expect(applySceneBinary(left, conflict, "union")).toBeNull();
+    // A clash — both boards occupy (0,0) with different tokens — is where the
+    // eight operations separate. Until 2026-08-27 union simply refused this
+    // draw, which is why the family could only ever use inputs that agreed and
+    // the owner called the results toys. Every operation now answers.
+    const conflict = scene([
+      { row: 0, column: 0, object: token("star") },
+      { row: 1, column: 1, object: token("square") },
+    ]);
+    const shapesAt = (operation: Parameters<typeof applySceneBinary>[2], row: number, column: number) =>
+      applySceneBinary(left, conflict, operation)?.objects
+        .filter((placement) => placement.row === row && placement.column === column)
+        .map((placement) => (placement.object as { shape?: string }).shape ?? "?") ?? [];
+
+    // Clash resolution: the same position, two different answers.
+    expect(shapesAt("union-left", 0, 0)).toEqual(["circle"]);
+    expect(shapesAt("union-right", 0, 0)).toEqual(["star"]);
+    expect(shapesAt("overlap-left", 0, 0)).toEqual(["circle"]);
+    expect(shapesAt("overlap-right", 0, 0)).toEqual(["star"]);
+    // Identity: `intersection` and `subtract` compare whole tokens, so the
+    // clashing position is not shared and not removed; `overlap-*` and
+    // `mask-out` care only that something is there.
+    expect(shapesAt("intersection", 0, 0)).toEqual([]);
+    expect(shapesAt("intersection", 1, 1)).toEqual(["square"]);
+    expect(shapesAt("subtract", 0, 0)).toEqual(["circle"]);
+    expect(shapesAt("subtract", 1, 1)).toEqual([]);
+    expect(shapesAt("mask-out", 0, 0)).toEqual([]);
+    expect(shapesAt("exclusive", 0, 0)).toEqual([]);
   });
 
   it("composes bounded expressions and checks worked examples", () => {

@@ -72,7 +72,7 @@ describe("loadBank", () => {
       });
       // The top-up draws on both public lengths and records which one each item
       // came from, so a key no length reaches is caught rather than silently
-      // left thin. As of the v12 battery a long test reaches all 21 keys on its
+      // left thin. As of the v12 battery a long test reaches all 19 keys on its
       // own and a short one reaches 15 — a 5-question test asks each band for
       // one or two questions, so it only ever gets a family's entry-point
       // bucket.
@@ -91,10 +91,12 @@ describe("loadBank", () => {
     expect(coverage.short).toEqual([]);
     expect(coverage.strays).toEqual([]);
     expect([...coverage.countsByKey.values()].every((have) => have === BANK_ITEMS_PER_KEY)).toBe(true);
-    // The v12 battery: 21 enabled keys x 4 items. It was 20 until 2026-08-26,
+    // The v12 battery: 19 enabled keys x 4 items. It was 20 until 2026-08-26,
     // when `containment-analogy-v2` was withdrawn (-1) and the two d6 buckets
-    // were added (+2). See docs/plans/raise-the-ceiling-v12.md.
-    expect(coverage.countsByKey.size).toBe(21);
+    // were added (+2) — and 19 again from 2026-08-27, when both d6 buckets were
+    // withdrawn (-2) under the owner's three-gate rule.
+    // See docs/plans/raise-the-ceiling-v12.md.
+    expect(coverage.countsByKey.size).toBe(19);
     expect(loadBank()).toHaveLength(coverage.countsByKey.size * BANK_ITEMS_PER_KEY);
   });
 });

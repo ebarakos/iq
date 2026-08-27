@@ -11,7 +11,7 @@ if (process.env.ENABLE_LLM_RULE_PROPOSALS !== "1") {
   throw new Error("ENABLE_LLM_RULE_PROPOSALS=1 is required");
 }
 
-const operations = ["union", "intersection", "subtract", "xor"] as const;
+const operations = ["union-left", "union-right", "intersection", "overlap-left", "overlap-right", "subtract", "mask-out", "exclusive"] as const;
 const percentile = (values: readonly number[], fraction: number) => {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((left, right) => left - right);

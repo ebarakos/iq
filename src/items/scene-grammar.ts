@@ -31,7 +31,50 @@ export type SceneUnaryOperation =
   | { kind: "duplicate"; from: ScenePosition; to: ScenePosition }
   | { kind: "remove"; at: ScenePosition };
 
-export type SceneBinaryOperation = "union" | "intersection" | "subtract" | "xor";
+/**
+ * How two boards combine at each aligned position.
+ *
+ * Expanded from four operations to eight on 2026-08-27, on the owner's report
+ * that the four made "too easy/toy" items. Two things were wrong with the
+ * original set, and both came from the same cause — it could not say what to do
+ * when the two boards held DIFFERENT tokens at one position:
+ *
+ * 1. `union` and `xor` simply refused such a draw (returned null), so the
+ *    generator could only ever use input pairs that agreed wherever they
+ *    overlapped. That is what made the boards look like toys: the interesting
+ *    inputs were all being thrown away.
+ * 2. `intersection` and `subtract` silently demanded identical tokens, so the
+ *    solver was never asked whether identity mattered — it always did.
+ *
+ * Both are now dimensions the solver has to work out, which is difficulty from
+ * the rule rather than from clutter:
+ *
+ * - **which token wins a clash** — `-left` takes the first board's, `-right`
+ *   the second's. Only ever visible where the boards genuinely differ, so it is
+ *   read off two clearly distinct shapes, never off a subtle margin.
+ * - **whether identity counts** — `intersection` and `subtract` compare whole
+ *   tokens; `overlap-*` and `mask-out` care only about occupancy.
+ *
+ * Every combination is total: no pair of boards is rejected any more, and the
+ * only failure left is an output with nothing on it.
+ */
+export type SceneBinaryOperation =
+  /** Every occupied position from either board; a clash takes the first board's token. */
+  | "union-left"
+  /** Every occupied position from either board; a clash takes the second board's token. */
+  | "union-right"
+  /** Positions where both boards hold the SAME token. Identity counts. */
+  | "intersection"
+  /** Positions where both boards hold any token; the first board's token survives. */
+  | "overlap-left"
+  /** Positions where both boards hold any token; the second board's token survives. */
+  | "overlap-right"
+  /** The first board's tokens, minus those the second board repeats exactly. */
+  | "subtract"
+  /** The first board's tokens, minus every position the second board occupies at all. */
+  | "mask-out"
+  /** Positions exactly one board occupies. */
+  | "exclusive";
 
 export type SceneCompositionPrimitive =
   | {
@@ -553,12 +596,17 @@ export function applySceneBinary(
   for (const position of positions) {
     const l = leftByPosition.get(position);
     const r = rightByPosition.get(position);
-    const same = l && r && objectKey(l.object) === objectKey(r.object);
-    if (l && r && !same && (operation === "union" || operation === "xor")) return null;
-    if (operation === "union" && (l || r)) objects.push((l ?? r)!);
-    if (operation === "intersection" && same) objects.push(l!);
-    if (operation === "subtract" && l && !same) objects.push(l);
-    if (operation === "xor" && !same && Boolean(l) !== Boolean(r)) objects.push((l ?? r)!);
+    const same = Boolean(l && r && objectKey(l.object) === objectKey(r.object));
+    switch (operation) {
+      case "union-left": if (l || r) objects.push((l ?? r)!); break;
+      case "union-right": if (l || r) objects.push((r ?? l)!); break;
+      case "intersection": if (same) objects.push(l!); break;
+      case "overlap-left": if (l && r) objects.push(l); break;
+      case "overlap-right": if (l && r) objects.push(r); break;
+      case "subtract": if (l && !same) objects.push(l); break;
+      case "mask-out": if (l && !r) objects.push(l); break;
+      case "exclusive": if (Boolean(l) !== Boolean(r)) objects.push((l ?? r)!); break;
+    }
   }
   if (objects.length === 0) return null;
   return normalize({ kind: "scene", rows: left.rows, columns: left.columns, objects, tiles: [] });

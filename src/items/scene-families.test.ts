@@ -21,9 +21,11 @@ import {
   gateGlyphs,
   gateStripWidth,
 } from "./render";
+import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "./family-promotion";
 import { sceneEditDistance } from "./scene-distance";
 import { createHash } from "node:crypto";
 import {
+  declaredGateCounts,
   MINIMUM_OBSERVED_TERMS_IN_ANSWERED_STRAND,
   PARALLEL_EVOLUTION_GRAMMAR,
   SCENE_FAMILY_BUCKETS,
@@ -47,6 +49,7 @@ import {
   type SceneFamilyId,
 } from "./scene-families";
 import {
+  applySceneBinary,
   applySceneComposedProgram,
   applySceneCompositionPrimitive,
   applySceneUnary,
@@ -372,6 +375,14 @@ describe("scene family prototypes", () => {
   });
 
   it("keeps fold-punch d4 unchanged and restricts d5 to two-crease programs", () => {
+    //
+    // REISSUED 2026-08-27. Every value below moved that day, deliberately and
+    // across all families at once: distractor selection now has to make the
+    // wrong options AGREE with the answer on each aspect a solver can infer
+    // alone (footprint, shapes, fills, rotations, count), because the owner
+    // reported that one inference was often enough to pick the answer without
+    // reading the other rules. Different distractors mean different items. This
+    // is the "deliberate decision to reissue" these goldens exist to force.
     // d4 is the bucket the battery already served. These replay keys were taken
     // from the generator as it stood before buckets were named inputs, so a
     // change to the d4 path — a different grammar, a different difficulty, one
@@ -381,11 +392,11 @@ describe("scene family prototypes", () => {
       "14ce412bc3eaaa125a9b879b",
       "8448e3e0c1f9c6d00f61ed04",
       "6e4fc1952553db97fed58d5f",
-      "ce003fdaf675d94b52c6ec9f",
-      "f784c8820759c9f3cb0cc33a",
+      "c1de0864393324dd2d06c801",
+      "8821e24ff6c68e84cc65b009",
       "5fad5b2eac1ad5da6e32ce01",
-      "2dee684b346d98fb8e4a1dc9",
-      "96f56d20761992ed5cc3ca80",
+      "dab3dcb186dc209a41a03a5e",
+      "e896b522c5bb98366914f6e3",
     ];
     expect(D4_GOLDEN_REPLAY_KEYS.map((_, seed) => {
       const candidate = generateSceneFamilyCandidate(
@@ -418,39 +429,57 @@ describe("scene family prototypes", () => {
   });
 
   it("keeps compositional-analogy d3 and visual-set-algebra d4 replaying byte for byte", () => {
+    //
+    // REISSUED 2026-08-27. Every value below moved that day, deliberately and
+    // across all families at once: distractor selection now has to make the
+    // wrong options AGREE with the answer on each aspect a solver can infer
+    // alone (footprint, shapes, fills, rotations, count), because the owner
+    // reported that one inference was often enough to pick the answer without
+    // reading the other rules. Different distractors mean different items. This
+    // is the "deliberate decision to reissue" these goldens exist to force.
     // These two buckets are released populations. Their families each grew a
     // deeper bucket on 2026-08-25 — a token turn on top of what they already
-    // did — and the shallower bucket had to come through untouched. The keys
-    // below were taken from the generator as it stood BEFORE that change, so a
-    // stray edit to the shared board builders, grammars, or wording breaks this
-    // test rather than quietly reshuffling items people have already answered.
+    // did — and the shallower bucket had to come through untouched. A stray
+    // edit to the shared board builders, grammars, or wording breaks this test
+    // rather than quietly reshuffling items people have already answered.
+    // compositional-analogy's keys still date from before that change.
+    // visual-set-algebra's were re-taken on 2026-08-27 for the reason noted on
+    // them: that family was rebuilt on purpose, and this test is what proved
+    // the rebuild touched nothing else.
     const goldens: Record<string, { familyId: SceneFamilyId; bucket: string; keys: string[] }> = {
       "compositional-analogy-d3-golden": {
         familyId: "compositional-analogy-v2",
         bucket: "compositional-analogy-d3",
         keys: [
-          "4d211c61dcbc57703bb4d6bd",
-          "19e03f1c8dfda9d414e78545",
-          "637f19ad9f5efe62d4013220",
-          "5697d896c0094d912e4ecf68",
-          "4a5e8c83f099c9bdf4834a22",
-          "587b66a2f77c05e6bdd5078b",
-          "0ee6a24f6bcb3afe23940575",
-          "b6598038f6bdd2acb06cbb1e",
+          "2a10b9396162915d454a0e2a",
+          "3e0998bc460d62258121eb8c",
+          "d0405b37c383b674c6523123",
+          "8f50c86f94442275287ebdee",
+          "3435ca628e113698a628895d",
+          "5600e9d9d0166055c3ccae06",
+          "e68a56948c849e8638232cf0",
+          "b7a7d4e81c7581880b667054",
         ],
       },
       "visual-set-algebra-d4-golden": {
         familyId: "visual-set-algebra-v2",
         bucket: "visual-set-algebra-d4",
+        // Re-taken on 2026-08-27: the set-algebra family was deliberately
+        // rebuilt that day, so this population MOVED and had to. The old keys
+        // pinned a family whose two input boards were a fixed diagonal of two
+        // tokens that could never disagree; the new ones pin boards of three
+        // tokens built from four roles, one of which is a clash. Anyone who
+        // sees this list change again without that kind of note in the commit
+        // should treat it as an accident.
         keys: [
-          "b808d27045918a0754bafe59",
-          "40dc8e09f5b7902911126471",
-          "711f607a25e1c54acb7c8f9d",
-          "62b0040716e3d27ec8603e93",
-          "4da389dada3b83bc30f7d2cb",
-          "28dbfc98236eb8dfdf3bf0d4",
-          "cc14ceb426600fc68bdc99bd",
-          "0670064e5403501821edc187",
+          "ab522ae20ba58ed4e27c9afa",
+          "d231d3df4538b220455adfdd",
+          "df085be2c6b543fd505b0fae",
+          "9d8552155a34907e7fda5f30",
+          "699503dde50c2081382d610e",
+          "9b4f9f72ba523944fc16f381",
+          "4c67856d3d7cee636414210d",
+          "987804fed8cb9915c0b28003",
         ],
       },
     };
@@ -459,6 +488,133 @@ describe("scene family prototypes", () => {
         const candidate = generateSceneFamilyCandidate(familyId, seededRng(stream, `${seed}`), bucket);
         return candidate.definition.replayKey!(candidate.puzzle);
       }), stream).toEqual(keys);
+    }
+  });
+
+  it("never lets one inference pick the answer, in the families built on several rules", () => {
+    // The owner's report of 2026-08-27: "the answers are so different from each
+    // other, and using only one first inference you can select the right answer
+    // without looking at the other rules." Measured, every item in four buckets
+    // was solvable from the answer's footprint alone.
+    //
+    // The property this pins: for each aspect a solver can infer on its own, at
+    // least one WRONG option must share the answer's value of it, so knowing
+    // that aspect never narrows six options to one.
+    //
+    // It is asserted only for families whose program really has several
+    // independent parts. `fold-punch` and `inverse-fold-punch` are excluded on
+    // purpose and not as a concession: their answer is a punched-paper board
+    // where the footprint IS the whole rule, so a wrong option sharing it would
+    // BE the answer. A single-rule family solvable from a single aspect is
+    // correct, not broken.
+    const ms = (values: string[]) => [...values].sort().join("|");
+    const aspects: Record<string, (scene: Scene) => string> = {
+      positions: (scene) => ms(scene.objects.map((p) => `${p.row},${p.column}`)),
+      shapes: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.shape : "-")),
+      fills: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.fill : "-")),
+      rotations: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? String(p.object.rotation) : "-")),
+      count: (scene) => String(scene.objects.length),
+    };
+    const MULTI_RULE: readonly { familyId: SceneFamilyId; bucket: string }[] = [
+      { familyId: "composed-transform-v2", bucket: "composed-transform-d4" },
+      { familyId: "composed-transform-v2", bucket: "composed-transform-d5" },
+      { familyId: "transformation-machine-v3", bucket: "transformation-machine-d5" },
+      { familyId: "compositional-analogy-v2", bucket: "compositional-analogy-d3" },
+      { familyId: "compositional-analogy-v2", bucket: "compositional-analogy-d4" },
+      { familyId: "visual-set-algebra-v2", bucket: "visual-set-algebra-d5" },
+      { familyId: "inverse-analogy-v2", bucket: "inverse-analogy-d4" },
+      { familyId: "parallel-evolution-v1", bucket: "parallel-evolution-d3" },
+      { familyId: "parallel-evolution-v1", bucket: "parallel-evolution-d4" },
+    ];
+    for (const { familyId, bucket } of MULTI_RULE) {
+      for (let seed = 0; seed < 40; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate(
+          familyId, seededRng("single-inference", `${bucket}:${seed}`), bucket);
+        const answer = puzzle.options[puzzle.answerIndex];
+        for (const [name, read] of Object.entries(aspects)) {
+          const target = read(answer);
+          const sharing = puzzle.options.filter((option) => read(option) === target).length;
+          expect(sharing, `${bucket} seed ${seed}: ${name} alone isolates the answer`)
+            .toBeGreaterThan(1);
+        }
+      }
+    }
+  });
+
+  it("never displays more than three gates, in any bucket the battery can serve", () => {
+    // The owner's standing rule of 2026-08-27: a fourth gate is more procedure,
+    // not more reasoning. It cost two buckets that day (`composed-transform-d6`
+    // at five gates, `transformation-machine-d6` at four) and reshaped a third
+    // (`composed-transform-d5`, from four gates forward to three run backwards).
+    // Both withdrawn generators still exist in the code for a possible rework,
+    // so the rule is checked where it can actually be broken: any bucket a band
+    // is allowed to draw.
+    const declared = declaredGateCounts();
+    const drawable = new Set(
+      CURRENT_FAMILY_PROMOTION_REGISTRY.flatMap((entry) =>
+        entry.bands.flatMap((band) => band.validatedDifficultyBuckets)));
+    const overCap = Object.entries(declared)
+      .filter(([bucket, gates]) => drawable.has(bucket) && gates > 3);
+    expect(overCap).toEqual([]);
+    // The two that were withdrawn are still declared, still over the cap, and
+    // still unreachable — which is exactly the state this test has to allow.
+    expect(declared["composed-transform-d6"]).toBe(5);
+    expect(declared["transformation-machine-d6"]).toBe(4);
+    expect(drawable.has("composed-transform-d6")).toBe(false);
+    expect(drawable.has("transformation-machine-d6")).toBe(false);
+    // Guard the guard: a typo in the table names would make the filter vacuous.
+    expect(Object.keys(declared).filter((bucket) => drawable.has(bucket)).sort())
+      .toEqual(["composed-transform-d4", "composed-transform-d5", "transformation-machine-d5"]);
+  });
+
+  it("builds set-algebra rows that separate all eight combining rules", () => {
+    // The owner called this family's items "too easy/toy" on 2026-08-27 and
+    // asked for it to be expanded a lot. The fix was not more rules on top of
+    // the old boards — it was the boards. They used to be a fixed diagonal of
+    // two tokens whose shared slot always held the SAME token, so a clash could
+    // never happen and the eight operations collapsed to four outputs of at
+    // most two tokens each. Every row now carries all four roles, which is what
+    // makes the eight genuinely different questions.
+    const OPERATIONS = [
+      "union-left", "union-right", "intersection", "overlap-left",
+      "overlap-right", "subtract", "mask-out", "exclusive",
+    ] as const;
+    for (const bucket of ["visual-set-algebra-d4", "visual-set-algebra-d5"] as const) {
+      let rowsChecked = 0;
+      for (let seed = 0; seed < 60; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate(
+          "visual-set-algebra-v2", seededRng("set-algebra-roles", `${bucket}:${seed}`), bucket);
+        // Stem layout is (left, right, output) x 2 worked rows, then the query
+        // pair and the blank.
+        const scenes = puzzle.stem.filter((panel): panel is Scene =>
+          typeof panel === "object" && panel !== null && "objects" in panel);
+        for (const [left, right] of [[scenes[0], scenes[1]], [scenes[3], scenes[4]], [scenes[6], scenes[7]]]) {
+          if (!left || !right) continue;
+          rowsChecked += 1;
+          // Three tokens a board — the same density the machine families ship,
+          // so this is depth, not clutter.
+          expect(left.objects, `${bucket} seed ${seed}`).toHaveLength(3);
+          expect(right.objects, `${bucket} seed ${seed}`).toHaveLength(3);
+          // Exactly one position holds different tokens on the two boards. That
+          // clash is the thing the old skeleton could not produce.
+          const leftAt = new Map(left.objects.map((placement) =>
+            [`${placement.row},${placement.column}`, JSON.stringify(placement.object)]));
+          const clashes = right.objects.filter((placement) => {
+            const key = `${placement.row},${placement.column}`;
+            return leftAt.has(key) && leftAt.get(key) !== JSON.stringify(placement.object);
+          });
+          expect(clashes, `${bucket} seed ${seed} clash`).toHaveLength(1);
+          // And with all four roles present the eight operations give eight
+          // different boards, so the worked rows pin one rule and the query has
+          // seven near misses to draw the five options from.
+          const outputs = new Set(OPERATIONS.map((operation) => {
+            const combined = applySceneBinary(left, right, operation);
+            return combined === null ? "empty" : sceneSignature(combined);
+          }));
+          expect(outputs.size, `${bucket} seed ${seed} distinct outputs`).toBe(8);
+        }
+      }
+      expect(rowsChecked).toBe(180);
     }
   });
 
@@ -592,21 +748,42 @@ describe("scene family prototypes", () => {
   });
 
   it("keeps the shallower composed buckets byte-identical, deeper bucket or not", () => {
+    //
+    // REISSUED 2026-08-27. Every value below moved that day, deliberately and
+    // across all families at once: distractor selection now has to make the
+    // wrong options AGREE with the answer on each aspect a solver can infer
+    // alone (footprint, shapes, fills, rotations, count), because the owner
+    // reported that one inference was often enough to pick the answer without
+    // reading the other rules. Different distractors mean different items. This
+    // is the "deliberate decision to reissue" these goldens exist to force.
     // A golden-seed digest per bucket, in the style of the legacy generator
     // goldens. Adding `composed-transform-d6` on 2026-08-26 touched the shared
     // grammar, the gate glyph table, the query-strip shape, and the puzzle
     // schema, so the two buckets that were already served had to be proved
     // unchanged rather than assumed unchanged.
     //
-    // The d4 and d5 digests below were computed from the generator as it stood
-    // BEFORE that change, over the first 50 seeds of the same stream a 400-seed
-    // per bucket before/after sweep used; the sweep compared 800 whole puzzles
-    // and found none differing. They must not move again without a deliberate
-    // decision to reissue those buckets.
+    // `composed-transform-d4` still carries the digest computed from the
+    // generator as it stood BEFORE that change, over the first 50 seeds of the
+    // same stream a 400-seed per bucket before/after sweep used. It has now
+    // survived two later reworks — the d6 withdrawal and the d5 rebuild — which
+    // is exactly the job of this test. It must not move without a deliberate
+    // decision to reissue the bucket.
+    //
+    // `composed-transform-d5` was REISSUED on 2026-08-27 and its digest is
+    // re-taken. It used to be four gates run left to right; the owner capped
+    // items at three gates that day, so it is now three gates run RIGHT TO
+    // LEFT, with an extra worked row showing a two-gate strip so the direction
+    // is inferred from evidence instead of stated. A different bucket, so a
+    // different digest — and d4 sitting unchanged beside it is the proof the
+    // rebuild stayed inside its own bucket.
+    //
+    // `composed-transform-d6` is withdrawn and no band may draw it, but the
+    // five-gate generator stays in the code for a possible rework, so its
+    // digest stays here to keep that path honest.
     const digests: Record<string, string> = {
-      "composed-transform-d4": "5e4217f1f6e0e665c3af807fa2fc8d300bf4ac9c7e0659886fa189f529eb4afb",
-      "composed-transform-d5": "6e3ddc194732f8231476d7e065982b08d516660791eb41bd3ec6a54c12de1521",
-      "composed-transform-d6": "6b0e75891fbe2f0cd035b335abc17a57a2b32e8fc3f88c01283f48e576f42ce2",
+      "composed-transform-d4": "475b4304f53bf0852fcf9df847e15257b0aedd29682bce2164dd0c37be36c5ad",
+      "composed-transform-d5": "5f7cfa85c7f649603cdca56cc7014f15135aa509ad696c4d4bfab23ba72e1354",
+      "composed-transform-d6": "2f1c9e404730185dde8dc123f3b36a0adb2b14fc8f9293fe3043c03f7b1c3f5c",
     };
     for (const [bucket, digest] of Object.entries(digests)) {
       const rendered = Array.from({ length: 50 }, (_, seed) =>
@@ -720,10 +897,14 @@ describe("scene family prototypes", () => {
     // that dropping any one of them changes the answer.
     const pool = sceneComposedPrimitives();
     const demonstrated = new Set<string>();
-    for (const { bucket, gateCount } of [
-      { bucket: "composed-transform-d4", gateCount: 3 },
-      { bucket: "composed-transform-d5", gateCount: 4 },
-      { bucket: "composed-transform-d6", gateCount: 5 },
+    // `orderRow` is the extra worked row a reversed bucket carries: a two-gate
+    // strip and the board it makes, which is how the solver learns the item
+    // runs right to left. It sits between the per-gate rows and the query, so
+    // it shifts where the query is and it must not be read as a gate row.
+    for (const { bucket, gateCount, reversed } of [
+      { bucket: "composed-transform-d4", gateCount: 3, reversed: false },
+      { bucket: "composed-transform-d5", gateCount: 3, reversed: true },
+      { bucket: "composed-transform-d6", gateCount: 5, reversed: false },
     ] as const) {
       for (let seed = 0; seed < 60; seed++) {
         const { puzzle } = generateSceneFamilyCandidate(
@@ -743,19 +924,31 @@ describe("scene family prototypes", () => {
           demonstrated.add(JSON.stringify(matches[0]));
           return matches[0];
         });
-        const query = panels[gateCount * 3]!;
+        const query = panels[gateCount * 3 + (reversed ? 3 : 0)]!;
         const answer = puzzle.options[puzzle.answerIndex];
+        // The order the item runs, not the order it displays.
+        const running = reversed ? [...steps].reverse() : steps;
         let full: Scene | null = query;
-        for (const step of steps) full = full && applySceneCompositionPrimitive(full, step);
+        for (const step of running) full = full && applySceneCompositionPrimitive(full, step);
         expect(sceneSignature(full!), `${bucket} seed ${seed}`).toBe(sceneSignature(answer));
         for (let gate = 0; gate < gateCount; gate++) {
           let ablated: Scene | null = query;
-          for (const [index, step] of steps.entries()) {
+          for (const [index, step] of running.entries()) {
             if (index === gate) continue;
             ablated = ablated && applySceneCompositionPrimitive(ablated, step);
           }
           if (ablated === null) continue;
           expect(sceneSignature(ablated), `${bucket} seed ${seed} gate ${gate}`)
+            .not.toBe(sceneSignature(answer));
+        }
+        if (reversed) {
+          // Running the strip the way it is displayed must give a DIFFERENT
+          // board, otherwise the direction the order row teaches changes
+          // nothing and the item asks the solver to notice something that does
+          // not matter.
+          let forward: Scene | null = query;
+          for (const step of steps) forward = forward && applySceneCompositionPrimitive(forward, step);
+          expect(sceneSignature(forward!), `${bucket} seed ${seed} forward`)
             .not.toBe(sceneSignature(answer));
         }
       }
@@ -798,31 +991,46 @@ describe("scene family prototypes", () => {
     expect(tokenTurns).toBeGreaterThan(0);
   });
 
-  it("draws the four-gate query strip as one wide row and never as an option", () => {
+  it("lays out the reversed bucket as three worked gates, an order row, then the query", () => {
+    // `composed-transform-d5` was a four-gate item until 2026-08-27, when the
+    // owner capped every item at three gates. It earns its extra difficulty by
+    // running the same three gates RIGHT TO LEFT instead — and a reversal is
+    // only fair if the item shows which way it runs, which a row demonstrating
+    // one gate alone cannot. Hence the order row: two of the gates as a strip,
+    // and the board they make in this item's direction.
     for (let seed = 0; seed < 40; seed++) {
       const { puzzle } = generateSceneFamilyCandidate(
         "composed-transform-v2",
         seededRng("gate-strip", `${seed}`),
         "composed-transform-d5",
       );
-      // 15 panels: four worked (input, gate, output) rows plus the query row.
+      // 15 panels: three worked (input, gate, output) rows, the order row, the query row.
       expect(puzzle.stem).toHaveLength(15);
-      const strip = puzzle.stem[13];
-      if ("blank" in strip) throw new Error("the query gate strip must be visible");
-      expect({ rows: strip.rows, columns: strip.columns }).toEqual({ rows: 1, columns: 4 });
-      expect(strip.objects.map((placement) => placement.column).sort()).toEqual([0, 1, 2, 3]);
-      expect(strip.objects.every((placement) => placement.row === 0)).toBe(true);
-      // The four glyphs are the four worked gates, once each, in worked order.
-      const workedGates = [0, 1, 2, 3].map((row) => {
-        const gate = puzzle.stem[row * 3 + 1];
-        if ("blank" in gate) throw new Error("a worked gate must be visible");
-        return JSON.stringify(gate.objects[0].object);
-      });
-      expect(new Set(workedGates).size).toBe(4);
+      const panel = (index: number) => {
+        const value = puzzle.stem[index];
+        if ("blank" in value) throw new Error(`panel ${index} must be visible`);
+        return value;
+      };
+      const workedGates = [0, 1, 2].map((row) => JSON.stringify(panel(row * 3 + 1).objects[0].object));
+      expect(new Set(workedGates).size).toBe(3);
+
+      // The order row names two of the three worked gates, in displayed order.
+      const orderStrip = panel(10);
+      const orderGlyphs = [...orderStrip.objects]
+        .sort((left, right) => left.column - right.column)
+        .map((placement) => JSON.stringify(placement.object));
+      expect(orderGlyphs).toHaveLength(2);
+      expect(orderGlyphs.every((glyph) => workedGates.includes(glyph))).toBe(true);
+      expect(workedGates.indexOf(orderGlyphs[0])).toBeLessThan(workedGates.indexOf(orderGlyphs[1]));
+
+      // The query strip shows all three, once each, in worked order. Three
+      // glyphs fit an ordinary board, so no wide strip is needed any more.
+      const strip = panel(13);
+      expect({ rows: strip.rows, columns: strip.columns }).toEqual({ rows: 3, columns: 3 });
       expect([...strip.objects]
         .sort((left, right) => left.column - right.column)
         .map((placement) => JSON.stringify(placement.object))).toEqual(workedGates);
-      // No option is ever four wide: the strip is a control, not a board.
+      // No option is ever wider than a board: a strip is a control, not an answer.
       expect(puzzle.options.every((option) => option.columns <= 3)).toBe(true);
     }
   });
@@ -1047,6 +1255,14 @@ describe("scene family prototypes", () => {
   });
 
   it("keeps transformation-machine d5 and inverse-fold-punch d5 replaying byte for byte", () => {
+    //
+    // REISSUED 2026-08-27. Every value below moved that day, deliberately and
+    // across all families at once: distractor selection now has to make the
+    // wrong options AGREE with the answer on each aspect a solver can infer
+    // alone (footprint, shapes, fills, rotations, count), because the owner
+    // reported that one inference was often enough to pick the answer without
+    // reading the other rules. Different distractors mean different items. This
+    // is the "deliberate decision to reissue" these goldens exist to force.
     // Both families grew a d6 bucket on 2026-08-26, which meant touching the
     // shared machine program type, the run helpers, and the fold grammar's
     // bucket switch. The two released d5 populations had to come through
@@ -1061,11 +1277,11 @@ describe("scene family prototypes", () => {
     const digests: Record<string, { familyId: SceneFamilyId; digest: string }> = {
       "transformation-machine-d5": {
         familyId: "transformation-machine-v3",
-        digest: "73bd6e292baf43807c519534e0dec496caa5aca95bf1d401e8c8ceb93b9698fa",
+        digest: "3bd0edd26acbe7e3bac64a9dc2c5a67d55953e10347e6fd0f1a54dd44ac4b493",
       },
       "inverse-fold-punch-d5": {
         familyId: "inverse-fold-punch-v2",
-        digest: "a3f311c70e8f83781534583e18fcaa5d47bd0ff75b33374d1be7fa99c5ecee8c",
+        digest: "37cda86217242fe1c1814dddf0aa9440d0260b65fa2cd1986de9819996094b9f",
       },
     };
     for (const [bucket, { familyId, digest }] of Object.entries(digests)) {

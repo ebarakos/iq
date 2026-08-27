@@ -84,13 +84,53 @@ import {
  * "a long test usually ends on the hardest thing the battery has" into "always".
  * And `containment-analogy-v2` is withdrawn on the pilot's notation evidence,
  * which drops `constraint-spatial` from four families to three — exactly its
- * draw size, so that band no longer subsamples. The battery is 21 enabled
- * family/band/bucket keys over pools of two warmup, six composition, three
- * constraint-spatial and four induction-transfer families. `v11` and `v12`
- * results are different populations and must never be pooled. See
+ * draw size, so that band no longer subsamples. `v11` and `v12` results are
+ * different populations and must never be pooled. See
  * docs/plans/raise-the-ceiling-v12.md.
+ *
+ * `v13` is the owner's correction of 2026-08-27, one day after v12, and it
+ * moves the population twice:
+ *
+ * - **Both d6 buckets are withdrawn.** The rule is now **never more than three
+ *   gates**: a fourth or fifth adds procedure, not reasoning. The owner knew
+ *   the mechanism instantly and answered the five-gate item wrong in under five
+ *   seconds because applying it once more was boring. The ladder tops out at d5
+ *   again, and the leftover-question rule from v12 stays but redirects nothing
+ *   until some family holds two buckets in one band again.
+ * - **`visual-set-algebra-v2` is rebuilt.** Its inputs were a fixed diagonal of
+ *   two tokens that could never disagree, which the owner called toys. Boards
+ *   are now three tokens drawn into four roles — shared, clashing, left-only,
+ *   right-only — and the combining vocabulary went from four operations to
+ *   eight, because a clash finally makes "which side wins" and "does identity
+ *   count" real questions. `relational-matrix-v2` moves with it: it draws from
+ *   the same widened operation set.
+ *
+ * The battery is 19 enabled family/band/bucket keys over pools of two warmup,
+ * six composition, three constraint-spatial and four induction-transfer
+ * families.
+ *
+ * `v14`, later the same day, changes what the WRONG options are in every
+ * family at once. The owner reported that "using only one first inference you
+ * can select the right answer without looking at the other rules", and it
+ * measured true of every item in four buckets: the answer was the only board
+ * with its footprint, so working out where the tokens go finished the item
+ * without ever reading a shape or a fill. Distractor selection now takes, for
+ * each aspect a solver can infer on its own — footprint, shapes, fills,
+ * rotations, token count — the closest wrong option that AGREES with the answer
+ * on it, before filling the remaining slots by closeness as before. Knowing one
+ * aspect therefore no longer narrows six options to one. `relational-matrix-v2`
+ * needed its inputs widened for the same reason `visual-set-algebra-v2` did a
+ * few hours earlier: its four corner atoms were fixed, so two input boards
+ * could never disagree and no wrong option could share the answer's footprint.
+ *
+ * Every family's option lists moved, so `v13` and `v14` are different
+ * populations. Measured over 120 seeds a bucket, items solvable from a single
+ * aspect fell from 13 buckets to 8, and the five multi-rule families that
+ * carried the ladder — composed-transform, transformation-machine,
+ * compositional-analogy, visual-set-algebra d5 and inverse-analogy — went to
+ * zero. What remains is recorded in TODO.md.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v12" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v14" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -383,22 +423,21 @@ export function eligibleFamiliesForBand(
  * inside each of the two groups is still the seeded shuffle, so the choice
  * stays random wherever it is free.
  *
- * This is what makes the d6 tail reachable instead of likely. Induction-transfer
- * asks five questions of three drawn families, so the base share is one and the
- * two families holding a d6 bucket — `composed-transform-v2` and
- * `transformation-machine-v3` — only ever reach it on a second occurrence. Under
- * the old random leftover a long test ended on a d6 item 8,289 times in 10,000;
- * a drawn d6 family now always gets its second question, and the pool of four
- * makes at least one of those two families present in every draw of three, so
- * it is 10,000 in 10,000.
+ * Added on 2026-08-26 to make the d6 tail reachable instead of likely: a drawn
+ * d6 family always got the second question its deeper bucket needed, which took
+ * long tests ending on a d6 item from 8,289 in 10,000 to all 10,000.
  *
- * Nothing else in the battery moves: it changes an allocation only when some
- * drawn family has more validated buckets in this band than the base share, and
- * induction-transfer in a long test is the only band where that is true today.
- * Where the base share is zero — every band of the short test — every family
- * qualifies, so the order is the plain shuffle it always was.
+ * Both d6 buckets were withdrawn on 2026-08-27 under the owner's three-gate
+ * rule, and that left every family in every band holding exactly one bucket
+ * there — so this rule currently redirects nothing at all and the allocation is
+ * the plain seeded shuffle it always was. It is kept rather than reverted
+ * because the property stands on its own: when a family is asked twice in one
+ * band, the second question should be a bucket nobody has been asked yet rather
+ * than a rerun of the first. It starts working again the moment any family
+ * holds two buckets in one band. A test walks every band of both lengths and
+ * asserts that today no band qualifies, so the change surfaces there.
  */
-function evenSplit(
+export function evenSplit(
   count: number,
   families: readonly EligibleFamily[],
   rng: Rng,

@@ -201,18 +201,32 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     // rule in expanded-quiz.ts keeps that from happening when another family
     // is free.
     //
-    // The five-gate `composed-transform-d6` bucket joined the SAME
-    // induction-transfer band on 2026-08-26 (raise-the-ceiling-v12). Every d6
-    // bucket lives in induction-transfer because the long test is ordered
-    // easiest-first and that band is last: a deeper bucket anywhere else would
-    // still be answered before the end. Within the band, slot difficulty
-    // orders occurrences, so a second draw of this family serves d5 and a
-    // third serves d6.
+    // The five-gate `composed-transform-d6` bucket was added on 2026-08-26 and
+    // withdrawn on 2026-08-27, one day later, on the owner's instruction:
+    // **never more than three gates**. Their reason is the one the pilot data
+    // agrees with — a fourth or fifth gate adds procedure, not reasoning. The
+    // owner knew the mechanism instantly and answered the five-gate item in
+    // under five seconds, wrong, because applying it once more was boring
+    // rather than hard.
+    //
+    // KNOWN VIOLATION, left in deliberately and awaiting the owner's call:
+    // `composed-transform-d5` displays FOUR gates (this family's `programDepth`
+    // IS its gate count), so it breaks the same three-gate rule. Withdrawing it
+    // was tried on 2026-08-27 and reverted the same hour, because it costs more
+    // than it fixes: induction-transfer drops to three families against a draw
+    // of three, so the last band loses all subsampling variety, and the mean
+    // analogy-layout questions in a long test rises to exactly its 10.0 cap
+    // (10.017 measured over the acceptance test's 10,000 seeds). A test that is
+    // MORE format-repetitive is the opposite of what the owner asked for. The
+    // fix that costs nothing is the reversed-order three-gate bucket they also
+    // asked for — it keeps the family in this band without a fourth gate. See
+    // TODO.md. The five-gate generator and the ablation proofs stay in the code
+    // for that rework.
     familyId: "composed-transform-v2",
     primaryReasoningFamily: "ordered-composition",
     bands: [
       codeValidBand("composition", ["composed-transform-d4"]),
-      codeValidBand("induction-transfer", ["composed-transform-d5", "composed-transform-d6"]),
+      codeValidBand("induction-transfer", ["composed-transform-d5"]),
     ],
   },
   {
@@ -276,12 +290,13 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     // Two buckets in one band since 2026-08-26 (raise-the-ceiling-v12). d5
     // demonstrates three gates and applies them along the query path; d6
     // demonstrates a fourth, a swap of two named slots, and applies that too.
-    // Both live in induction-transfer because every d6 bucket does: the long
-    // test is ordered easiest-first and that band is last, so a deeper bucket
-    // anywhere else would still be answered before the end.
+    // `transformation-machine-d6` was withdrawn on 2026-08-27 under the same
+    // three-gate rule that withdrew `composed-transform-d6`. The four-gate
+    // generator and its ablation proof stay in the code for a later rework;
+    // no band may draw the bucket.
     familyId: "transformation-machine-v3",
     primaryReasoningFamily: "operator-induction",
-    bands: [codeValidBand("induction-transfer", ["transformation-machine-d5", "transformation-machine-d6"])],
+    bands: [codeValidBand("induction-transfer", ["transformation-machine-d5"])],
   },
   {
     familyId: "rule-switching-v2",

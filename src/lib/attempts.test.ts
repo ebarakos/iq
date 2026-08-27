@@ -208,10 +208,20 @@ describe("held-out source of the agent harness", () => {
   });
 
   it("enforces its own reserved-primitive and program-complexity coverage", () => {
-    const items = heldOutSourcePool("held-out-source-seed", buckets.length * 4);
+    // Six items a bucket, not four. Until 2026-08-27 the two held-out buckets
+    // ran at three and four gates, so four items gave 12 and 16 gate slots
+    // against a reserved pool of 8 primitives. `composed-transform-d5` is now
+    // three gates run backwards rather than four run forwards, so both buckets
+    // are three gates and four items is 12 slots either side — enough on
+    // average, not enough to guarantee. That is a property of the sample, not a
+    // fault in the harness: the very next test checks a thin run is REPORTED
+    // rather than passed.
+    const PER_BUCKET = 6;
+    const items = heldOutSourcePool("held-out-source-seed", buckets.length * PER_BUCKET);
     const coverage = heldOutCoverage(items);
     expect(heldOutCoverageComplete(coverage)).toBe(true);
-    expect(coverage.itemsPerBucket).toEqual(buckets.map((entry) => ({ bucket: entry.bucket.bucket, items: 4 })));
+    expect(coverage.itemsPerBucket)
+      .toEqual(buckets.map((entry) => ({ bucket: entry.bucket.bucket, items: PER_BUCKET })));
     // Every reserved primitive really is required, not just listed.
     for (const entry of buckets) {
       expect(reservedHeldOutPrimitives(entry.gateCount).length).toBeGreaterThan(0);

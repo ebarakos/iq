@@ -31,11 +31,11 @@ describe("LLM rule proposal experiment", () => {
           version: "scene-rule-proposal-v1",
           familyId: "visual-set-algebra-v1",
           variationSeed: "model_seed_123",
-          program: { kind: "set-algebra", operation: "xor" },
+          program: { kind: "set-algebra", operation: "exclusive" },
         }),
       }),
     });
-    expect(result).toMatchObject({ source: "llm", attempts: 2, proposal: { program: { operation: "xor" } } });
+    expect(result).toMatchObject({ source: "llm", attempts: 2, proposal: { program: { operation: "exclusive" } } });
     expect(result.rejectionReasons).toHaveLength(1);
   });
 });

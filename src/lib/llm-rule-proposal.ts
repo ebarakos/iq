@@ -56,7 +56,16 @@ function fallbackProposal(seed: string): SceneRuleProposal {
     variationSeed: safeSeed,
     program: {
       kind: "set-algebra",
-      operation: pick(seededRng(safeSeed, "fallback-operation"), ["union", "intersection", "subtract", "xor"] as const),
+      operation: pick(seededRng(safeSeed, "fallback-operation"), [
+        "union-left",
+        "union-right",
+        "intersection",
+        "overlap-left",
+        "overlap-right",
+        "subtract",
+        "mask-out",
+        "exclusive",
+      ] as const),
     },
   };
 }

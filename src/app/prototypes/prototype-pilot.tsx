@@ -10,6 +10,8 @@ import type {
 
 interface GradeResult {
   correct: boolean;
+  /** Which option was right. Arrives only with the grade, never before it. */
+  answerIndex: number;
   explanation: string;
   late: boolean;
   timeBudgetSeconds: number;
@@ -281,6 +283,7 @@ export function PrototypePilot({
       });
       const body = await response.json() as {
         correct?: boolean;
+        answerIndex?: number;
         explanation?: string;
         late?: boolean;
         timeBudgetSeconds?: number;
@@ -296,7 +299,8 @@ export function PrototypePilot({
         return;
       }
       if (
-        !response.ok || typeof body.correct !== "boolean" || typeof body.explanation !== "string" ||
+        !response.ok || typeof body.correct !== "boolean" || typeof body.answerIndex !== "number" ||
+        typeof body.explanation !== "string" ||
         typeof body.late !== "boolean" || typeof body.timeBudgetSeconds !== "number" ||
         typeof body.elapsedSeconds !== "number"
       ) {
@@ -304,6 +308,7 @@ export function PrototypePilot({
       }
       setGrade({
         correct: body.correct,
+        answerIndex: body.answerIndex,
         explanation: body.explanation,
         late: body.late,
         timeBudgetSeconds: body.timeBudgetSeconds,
@@ -404,12 +409,39 @@ export function PrototypePilot({
               type="button"
               disabled={grade !== null || grading || itemState !== "ready"}
               onClick={() => setSelected(optionIndex)}
-              aria-label={`Option ${LETTERS[optionIndex]} — ${describeVisual(option)}`}
+              aria-label={`Option ${LETTERS[optionIndex]} — ${describeVisual(option)}${
+                grade === null
+                  ? ""
+                  : grade.answerIndex === optionIndex
+                    ? " — correct answer"
+                    : selected === optionIndex
+                      ? " — your incorrect choice"
+                      : ""
+              }`}
               className={`rounded-xl border-2 p-3 ${
-                selected === optionIndex ? "border-gray-900 bg-gray-100" : "border-gray-200"
+                // Before grading, the only mark is which option the participant
+                // picked. After grading the answer is marked green and a wrong
+                // pick red, the same way the real test's review screen does it —
+                // every explanation says "the highlighted option", so something
+                // on screen has to be highlighted.
+                grade !== null && grade.answerIndex === optionIndex
+                  ? "border-green-500 bg-green-50"
+                  : grade !== null && selected === optionIndex
+                    ? "border-red-400 bg-red-50"
+                    : selected === optionIndex
+                      ? "border-gray-900 bg-gray-100"
+                      : "border-gray-200"
               }`}
             >
-              <span className="text-xs font-semibold text-gray-500">{LETTERS[optionIndex]}</span>
+              <span className="text-xs font-semibold text-gray-500">
+                {LETTERS[optionIndex]}
+                {grade !== null && grade.answerIndex === optionIndex && (
+                  <span className="ml-1 font-normal text-green-700">correct</span>
+                )}
+                {grade !== null && grade.answerIndex !== optionIndex && selected === optionIndex && (
+                  <span className="ml-1 font-normal text-red-700">your choice</span>
+                )}
+              </span>
               <VisualGraphic visual={option} className="mx-auto mt-2 h-20 w-20" />
             </button>
           ))}

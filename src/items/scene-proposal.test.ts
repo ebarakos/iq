@@ -6,7 +6,7 @@ const proposal = {
   version: "scene-rule-proposal-v1" as const,
   familyId: "visual-set-algebra-v1" as const,
   variationSeed: "proposal_seed_123",
-  program: { kind: "set-algebra" as const, operation: "xor" as const },
+  program: { kind: "set-algebra" as const, operation: "exclusive" as const },
 };
 
 describe("scene rule proposals", () => {

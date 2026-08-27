@@ -54,7 +54,7 @@ describe("prototype answer route", () => {
     resetPrototypePilotSittings();
   });
 
-  it("grades a shown item and returns the server's own solve time, never the answer index", async () => {
+  it("grades a shown item and returns the server's own solve time and the answer", async () => {
     const sitting = await shownItem();
     vi.setSystemTime(START_MS + 12_000);
     const response = await post("answer", { ...sitting, selectedOption: puzzle.answerIndex, elapsedSeconds: 12 });
@@ -62,6 +62,7 @@ describe("prototype answer route", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       correct: true,
+      answerIndex: puzzle.answerIndex,
       explanation: puzzle.explanation,
       late: false,
       timeBudgetSeconds: key.bandTimeBudgetSeconds,
@@ -70,18 +71,22 @@ describe("prototype answer route", () => {
       clientTimingDisagreementSeconds: 0,
       clientTimingDisagrees: false,
     });
-    expect(body).not.toHaveProperty("answerIndex");
   });
 
-  it("grades a wrong answer without saying which option was right", async () => {
+  it("grades a wrong answer and shows which option was right, once", async () => {
     const sitting = await shownItem();
     const wrong = (puzzle.answerIndex + 1) % puzzle.options.length;
     const response = await post("answer", { ...sitting, selectedOption: wrong, elapsedSeconds: 12 });
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.correct).toBe(false);
-    expect(body).not.toHaveProperty("answerIndex");
-    expect(JSON.stringify(body)).not.toContain(`"${puzzle.answerIndex}"`);
+    // The explanation already describes the answer in words; naming the option
+    // it belongs to is what lets the page mark it. The protection that matters
+    // is that this arrives once — a second grade of the same item is refused.
+    expect(body.answerIndex).toBe(puzzle.answerIndex);
+    const second = await post("answer", { ...sitting, selectedOption: puzzle.answerIndex, elapsedSeconds: 12 });
+    expect(second.status).toBe(409);
+    expect((await second.json()).reason).toBe("already-recorded");
   });
 
   it("uses the server's clock for the late marker even when the body says otherwise", async () => {
@@ -133,17 +138,28 @@ describe("prototype answer route", () => {
     expect((await restart.json()).reason).toBe("already-recorded");
   });
 
-  it("cannot be walked through every option to read the answer out of the grader", async () => {
-    const seen: unknown[] = [];
+  it("names the answer only in a grade, and exactly one option across every probe", async () => {
+    // Until 2026-08-27 this test asserted that no grade ever carries
+    // `answerIndex`. That was defence that defended nothing: a probe opens a
+    // FRESH sitting each time, so `correct` alone identifies the answer in at
+    // most six tries whether or not the index is named. Meanwhile the missing
+    // index broke the page — every explanation says "the highlighted option"
+    // and nothing on screen was highlighted, which is what the 2026-08-27
+    // sitting reported. The real contract is the one below and in the start
+    // route's test: nothing reveals the answer BEFORE it is locked.
+    const graded: { option: number; correct: boolean; answerIndex: number }[] = [];
     for (let option = 0; option < puzzle.options.length; option += 1) {
-      // A fresh sitting per probe is the only way left to try each option, and
-      // even then no response ever names the answer.
       const sitting = await shownItem();
       const body = await (await post("answer", { ...sitting, selectedOption: option, elapsedSeconds: 5 })).json();
-      seen.push(body);
-      expect(body).not.toHaveProperty("answerIndex");
+      graded.push({ option, correct: body.correct, answerIndex: body.answerIndex });
     }
-    expect(JSON.stringify(seen)).not.toContain("answerIndex");
+    // Every probe agrees on the same answer, and it is the one option that
+    // graded correct — so the index the page highlights is the graded truth,
+    // not a second copy that could drift from it.
+    const named = new Set(graded.map((entry) => entry.answerIndex));
+    expect(named.size).toBe(1);
+    expect(graded.filter((entry) => entry.correct).map((entry) => entry.option))
+      .toEqual([...named]);
   });
 
   it("refuses to grade an item the server never recorded showing", async () => {

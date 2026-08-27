@@ -11,6 +11,7 @@ import {
   type Puzzle,
   type Scene,
   type SceneObject,
+  type ScenePlacement,
   type SceneToken,
 } from "./schema";
 import {
@@ -137,7 +138,7 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   // servable at any depth, so a five-gate item really costs five reading steps.
   "composed-transform-v2": [
     { bucket: "composed-transform-d4", difficulty: 4, programDepth: 3 },
-    { bucket: "composed-transform-d5", difficulty: 5, programDepth: 4 },
+    { bucket: "composed-transform-d5", difficulty: 5, programDepth: 3 },
     { bucket: "composed-transform-d6", difficulty: 6, programDepth: 5 },
   ],
   "relational-outlier-v2": [{ bucket: "relational-outlier-d2", difficulty: 2, programDepth: 1 }],
@@ -407,6 +408,49 @@ export function resetWidenedDistractorSelections(): void {
  * the same options, but two items built from one grammar do not always serve
  * the same near misses.
  */
+/**
+ * The aspects a solver can infer one at a time.
+ *
+ * The owner's report of 2026-08-27: "the answers are so different from each
+ * other, and using only one first inference you can select the right answer
+ * without looking at the other rules." Measured, that was true of EVERY item in
+ * four buckets — work out where the tokens go and `fold-punch`, `relational-
+ * matrix` and `second-order-sequence` were solved without ever reading a shape
+ * or a fill.
+ *
+ * Closeness ranking alone cannot fix that. A distractor can sit close to the
+ * answer overall and still be the only board with the answer's exact footprint,
+ * which hands the whole item to one inference. What stops it is agreement: for
+ * every aspect below, at least one WRONG option must match the answer on that
+ * aspect, so knowing that aspect alone never narrows the six to one.
+ */
+const DISTRACTOR_ASPECTS: readonly { readonly name: string; readonly of: (scene: Scene) => string }[] = [
+  { name: "positions", of: (scene) => sceneAspectKey(scene, (placement) => `${placement.row},${placement.column}`) },
+  { name: "shapes", of: (scene) => sceneAspectKey(scene, (placement) => tokenOf(placement)?.shape ?? "-") },
+  { name: "fills", of: (scene) => sceneAspectKey(scene, (placement) => tokenOf(placement)?.fill ?? "-") },
+  { name: "rotations", of: (scene) => sceneAspectKey(scene, (placement) => String(tokenOf(placement)?.rotation ?? 0)) },
+  { name: "count", of: (scene) => String(scene.objects.length) },
+];
+
+function tokenOf(placement: ScenePlacement): SceneToken | null {
+  return placement.object.kind === "token" ? placement.object : null;
+}
+
+/** An order-free fingerprint of one aspect, so two boards agree on it or do not. */
+function sceneAspectKey(scene: Scene, read: (placement: ScenePlacement) => string): string {
+  return [...scene.objects].map(read).sort().join("|");
+}
+
+/**
+ * Wrong options that left some aspect of the answer unmatched, because the
+ * family's near-miss pool held nothing that agreed on it. Zero is the goal; a
+ * test reports the families that cannot reach it rather than letting the gap
+ * pass unseen.
+ */
+let uncoveredAspectSelections = 0;
+export function uncoveredDistractorAspects(): number { return uncoveredAspectSelections; }
+export function resetUncoveredDistractorAspects(): void { uncoveredAspectSelections = 0; }
+
 function selectDistractors(
   pool: readonly Scene[],
   rng: Rng,
@@ -469,13 +513,38 @@ function selectDistractors(
   for (let window = nearestWindow; window <= ranked.length; window++) {
     if (window > nearestWindow) widenedSelections += 1;
     const selected = [...kept];
+    const admits = (candidate: Scene) =>
+      areScenesCategoricallyDistinct(answer, candidate) &&
+      selected.every((chosen) => areScenesCategoricallyDistinct(chosen, candidate));
+
+    // First, agreement. For every aspect the answer has, take the CLOSEST wrong
+    // option that matches the answer on it, searching the whole ranked pool
+    // rather than the nearest window — an item is only worth solving if no
+    // single inference narrows the six to one, and the candidate that supplies
+    // that agreement is sometimes just outside the window. Aspects are visited
+    // in a fixed order, so the choice replays with the seed.
+    for (const aspect of DISTRACTOR_ASPECTS) {
+      if (selected.length === DISTRACTORS_PER_ITEM) break;
+      const target = aspect.of(answer);
+      if (selected.some((chosen) => aspect.of(chosen) === target)) continue;
+      const agreeing = ranked.find((candidate) =>
+        aspect.of(candidate) === target && !selected.includes(candidate) && admits(candidate));
+      if (agreeing) selected.push(agreeing);
+    }
+
+    // Then closeness, for whatever slots the agreement pass left.
     for (const candidate of shuffled(rng, ranked.slice(0, window))) {
       if (selected.length === DISTRACTORS_PER_ITEM) break;
-      const legible = areScenesCategoricallyDistinct(answer, candidate) &&
-        selected.every((chosen) => areScenesCategoricallyDistinct(chosen, candidate));
-      if (legible) selected.push(candidate);
+      if (selected.includes(candidate)) continue;
+      if (admits(candidate)) selected.push(candidate);
     }
-    if (selected.length === DISTRACTORS_PER_ITEM) return selected;
+    if (selected.length === DISTRACTORS_PER_ITEM) {
+      for (const aspect of DISTRACTOR_ASPECTS) {
+        const target = aspect.of(answer);
+        if (!selected.some((chosen) => aspect.of(chosen) === target)) uncoveredAspectSelections += 1;
+      }
+      return selected;
+    }
   }
   throw new Error(
     `${familyName} needs ${DISTRACTORS_PER_ITEM} near misses but its grammar produced ` +
@@ -1374,7 +1443,23 @@ function relationalOutlierDemonstrated(rng: Rng): SceneFamilyCandidate {
   return asCandidate(family, puzzle);
 }
 
-const SCENE_BINARY_GRAMMAR = ["union", "intersection", "subtract", "xor"] as const;
+/**
+ * The eight ways two boards combine. See `SceneBinaryOperation` for why this
+ * doubled on 2026-08-27; the short version is that the old four could not say
+ * what happens when the boards hold different tokens at one position, so the
+ * generator threw away every input pair that disagreed and the survivors looked
+ * like toys.
+ */
+const SCENE_BINARY_GRAMMAR = [
+  "union-left",
+  "union-right",
+  "intersection",
+  "overlap-left",
+  "overlap-right",
+  "subtract",
+  "mask-out",
+  "exclusive",
+] as const;
 
 interface RelationalMatrixProgram {
   rowOperation: SceneBinaryOperation;
@@ -1396,25 +1481,59 @@ const RELATIONAL_MATRIX_MASKS: readonly number[] = Array.from({ length: 15 }, (_
 /** Input draws tried before this family gives up on the sampled rule pair. */
 const RELATIONAL_MATRIX_INPUT_ATTEMPTS = 300;
 
+/** Which of each corner's two tokens a board holds — one bit per corner. */
+const RELATIONAL_MATRIX_VARIANTS: readonly number[] = Array.from({ length: 16 }, (_, index) => index);
+
 function binaryOperationDescription(operation: SceneBinaryOperation): string {
-  return operation === "union"
-    ? "keeps every occupied position from either input"
-    : operation === "intersection"
-      ? "keeps only positions shared by both inputs"
-      : operation === "subtract"
-        ? "keeps positions from the first input that are absent from the second"
-        : "keeps positions found in exactly one input";
+  switch (operation) {
+    case "union-left":
+      return "keeps every occupied position from either input, and where the two disagree it keeps the first input's token";
+    case "union-right":
+      return "keeps every occupied position from either input, and where the two disagree it keeps the second input's token";
+    case "intersection":
+      return "keeps only the positions where both inputs hold the very same token";
+    case "overlap-left":
+      return "keeps every position both inputs occupy, whatever the tokens are, showing the first input's token";
+    case "overlap-right":
+      return "keeps every position both inputs occupy, whatever the tokens are, showing the second input's token";
+    case "subtract":
+      return "keeps the first input's tokens except where the second input repeats the very same token";
+    case "mask-out":
+      return "keeps the first input's tokens except wherever the second input has anything at all";
+    case "exclusive":
+      return "keeps the positions exactly one input occupies";
+  }
 }
 
 function relationalMatrix(rng: Rng): SceneFamilyCandidate {
   const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const atoms = [
-    { row: 0, column: 0, object: token(shapes[0]) },
-    { row: 0, column: 2, object: token(shapes[1]) },
-    { row: 2, column: 0, object: token(shapes[2]) },
-    { row: 2, column: 2, object: token(shapes[3]) },
+  // Two tokens per corner, not one.
+  //
+  // Until 2026-08-27 each corner held a single fixed token, so any two input
+  // boards agreed wherever they overlapped and a CLASH was impossible. That had
+  // the same two costs it had in `visual-set-algebra`: the eight combining
+  // operations collapsed back to four, and — measured — every single item was
+  // solvable from the answer's footprint alone, without ever reading a shape.
+  // A solver only had to infer one of the two rules. With two tokens per corner
+  // the operations separate, and the option list can hold a board that occupies
+  // exactly the answer's cells while getting a token wrong, so knowing where
+  // the tokens go no longer picks the answer on its own.
+  const corners = [
+    { row: 0, column: 0 },
+    { row: 0, column: 2 },
+    { row: 2, column: 0 },
+    { row: 2, column: 2 },
   ] as const;
-  const fromMask = (mask: number) => scene(atoms.filter((_, index) => (mask & (1 << index)) !== 0));
+  const atomAt = (index: number, variant: number) =>
+    ({ ...corners[index], object: token(shapes[(index + variant) % shapes.length]) });
+  /**
+   * `mask` says which corners a board occupies; `variants` says which of the
+   * corner's two tokens it holds there. Two boards sharing a corner but not a
+   * variant are the clash the old fixed atoms could never produce.
+   */
+  const fromDraw = (mask: number, variants: number) =>
+    scene(corners.flatMap((_, index) =>
+      (mask & (1 << index)) === 0 ? [] : [atomAt(index, (variants >> index) & 1)]));
 
   /**
    * Build the whole board from four input masks, or reject the draw.
@@ -1425,8 +1544,12 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
    * the option list. Rejecting here rather than at acceptance keeps a thin draw
    * from costing the assembler a whole retry.
    */
-  const build = (program: RelationalMatrixProgram, masks: readonly number[]) => {
-    const [topLeft, topMiddle, middleLeft, middleMiddle] = masks.map(fromMask);
+  const build = (
+    program: RelationalMatrixProgram,
+    draws: readonly { mask: number; variants: number }[],
+  ) => {
+    const [topLeft, topMiddle, middleLeft, middleMiddle] =
+      draws.map((draw) => fromDraw(draw.mask, draw.variants));
     const topRight = applySceneBinary(topLeft, topMiddle, program.rowOperation);
     const middleRight = applySceneBinary(middleLeft, middleMiddle, program.rowOperation);
     const bottomLeft = applySceneBinary(topLeft, middleLeft, program.columnOperation);
@@ -1501,7 +1624,10 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
   let board: ReturnType<typeof build> = null;
   for (const candidateProgram of shuffled(rng, RELATIONAL_MATRIX_GRAMMAR)) {
     for (let attempt = 0; attempt < RELATIONAL_MATRIX_INPUT_ATTEMPTS && !board; attempt++) {
-      board = build(candidateProgram, [0, 0, 0, 0].map(() => pick(rng, RELATIONAL_MATRIX_MASKS)));
+      board = build(candidateProgram, [0, 0, 0, 0].map(() => ({
+        mask: pick(rng, RELATIONAL_MATRIX_MASKS),
+        variants: pick(rng, RELATIONAL_MATRIX_VARIANTS),
+      })));
     }
     if (board) {
       program = candidateProgram;
@@ -1633,26 +1759,97 @@ function setOperationExplanation(program: SetAlgebraProgram): string {
 }
 
 /**
- * Board pair for the d5 bucket, whose rule ends in a token turn.
+ * The four roles a board position can play in a set-algebra row, and the reason
+ * the family builds every row to contain all four.
  *
- * A turn is only visible on a token that has a direction, and each of the four
- * binary operations keeps a different part of the pair: intersection keeps only
- * the shared slot, subtraction only the left-hand one. So both of those slots
- * carry an orientable token — an arrow and a triangle — and the third slot
- * carries the shape that varies from row to row. Whatever the operation does,
- * something on the combined board can be seen to turn.
+ * Until 2026-08-27 the two input boards were a fixed diagonal: two tokens each,
+ * at (0,0)+(1,1) and (1,1)+(2,2), with the SAME token in the shared slot. The
+ * owner called the results toys and they were, for a reason worth writing down.
+ * On that skeleton a clash is impossible, so `union-left` and `union-right`
+ * agree, `overlap-left`, `overlap-right` and `intersection` all agree, and
+ * `subtract` and `mask-out` agree — eight operations collapse to four outputs,
+ * and each output holds at most two tokens.
+ *
+ * A row that contains one of each role below separates all eight, because each
+ * operation keeps a different subset of the roles:
+ *
+ * | role                      | uL | uR | int | oL | oR | sub | mask | excl |
+ * |---------------------------|----|----|-----|----|----|-----|------|------|
+ * | shared, same token        | y  | y  |  y  | y  | y  |  .  |  .   |  .   |
+ * | shared, different tokens  | L  | R  |  .  | L  | R  |  L  |  .   |  .   |
+ * | left only                 | y  | y  |  .  | .  | .  |  y  |  y   |  y   |
+ * | right only                | y  | y  |  .  | .  | .  |  .  |  .   |  y   |
+ *
+ * No two columns match, so the worked rows pin exactly one operation and the
+ * query yields seven distinct near misses — five of which the option list
+ * needs. Boards go from two tokens to three, and answers from at most two to
+ * as many as four, which is the "expand this a lot" the owner asked for. Three
+ * tokens on a 3x3 board is the same density the machine families already ship,
+ * so nothing here is a legibility change.
  */
-function setAlgebraTurnPair(shapes: readonly SceneToken["shape"][], offset: number): [Scene, Scene] {
+interface SetAlgebraRoles {
+  /** Same position, same token on both boards. */
+  shared: ScenePosition;
+  /** Same position, DIFFERENT tokens — the clash the old skeleton could not show. */
+  clash: ScenePosition;
+  leftOnly: ScenePosition;
+  rightOnly: ScenePosition;
+}
+
+/** Every position of the 3x3 board, as draw material for the four roles. */
+const SET_ALGEBRA_POSITIONS: readonly ScenePosition[] =
+  [0, 1, 2].flatMap((row) => [0, 1, 2].map((column) => ({ row, column })));
+
+/** One complete draw: two worked rows and the query, all built from roles. */
+interface SetAlgebraRows {
+  leftA: Scene; rightA: Scene; outputA: Scene;
+  leftB: Scene; rightB: Scene; outputB: Scene;
+  queryLeft: Scene; queryRight: Scene; answer: Scene;
+}
+
+/** Role draws tried before this family gives up on the sampled program. */
+const SET_ALGEBRA_INPUT_ATTEMPTS = 300;
+
+/** Draw four distinct positions and hand each one a role. */
+function setAlgebraRoles(rng: Rng): SetAlgebraRoles {
+  const [shared, clash, leftOnly, rightOnly] = shuffled(rng, SET_ALGEBRA_POSITIONS).slice(0, 4);
+  return { shared, clash, leftOnly, rightOnly };
+}
+
+/**
+ * Build one row's input pair from the four roles.
+ *
+ * `orientable` is the d5 bucket, whose rule ends in a token turn: a turn shows
+ * only on a token that has a direction, and every operation keeps at least one
+ * role, so every role has to carry an arrow or a triangle for the turn to be
+ * visible whatever the operation turns out to be.
+ */
+function setAlgebraPair(
+  roles: SetAlgebraRoles,
+  shapes: readonly SceneToken["shape"][],
+  offset: number,
+  orientable: boolean,
+): [Scene, Scene] {
   const rotation = SET_ALGEBRA_TURN_ROTATIONS[offset % SET_ALGEBRA_TURN_ROTATIONS.length];
-  const shared: SceneToken = { ...token("triangle"), rotation };
+  const at = (shape: SceneToken["shape"]): SceneToken =>
+    orientable ? { ...token(shape), rotation } : token(shape);
+  // The clash has to be READ, so its two tokens are always plainly different
+  // shapes — never the same shape in two fills.
+  const sharedToken = at(orientable ? "triangle" : shapes[offset % shapes.length]);
+  const clashLeft = at(orientable ? "arrow" : shapes[(offset + 1) % shapes.length]);
+  const clashRight = at(orientable ? "triangle" : shapes[(offset + 2) % shapes.length]);
+  const leftToken = at(orientable ? "arrow" : shapes[(offset + 3) % shapes.length]);
+  const rightToken = at(orientable ? "arrow" : shapes[(offset + 4) % shapes.length]);
   return [
     scene([
-      { row: 0, column: 0, object: { ...token("arrow"), rotation } },
-      { row: 1, column: 1, object: shared },
+      { ...roles.shared, object: sharedToken },
+      { ...roles.clash, object: clashLeft },
+      { ...roles.leftOnly, object: leftToken },
     ]),
     scene([
-      { row: 1, column: 1, object: shared },
-      { row: 2, column: 2, object: token(shapes[offset % shapes.length]) },
+      { ...roles.shared, object: sharedToken },
+      { ...roles.clash, object: clashRight },
+      { ...roles.rightOnly, object: rightToken },
     ]),
   ];
 }
@@ -1670,22 +1867,53 @@ function setAlgebra(
   const program = pick(rng, grammar.filter((candidate) =>
     forcedOperation === undefined || candidate.operation === forcedOperation));
   const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const pair = (offset: number): [Scene, Scene] => turning ? setAlgebraTurnPair(shapes, offset) : [
-    scene([
-      { row: 0, column: 0, object: token(shapes[offset % shapes.length]) },
-      { row: 1, column: 1, object: token(shapes[(offset + 1) % shapes.length]) },
-    ]),
-    scene([
-      { row: 1, column: 1, object: token(shapes[(offset + 1) % shapes.length]) },
-      { row: 2, column: 2, object: token(shapes[(offset + 2) % shapes.length]) },
-    ]),
-  ];
-  const [leftA, rightA] = pair(0);
-  const outputA = applySetAlgebraProgram(leftA, rightA, program)!;
-  const [leftB, rightB] = pair(2);
-  const outputB = applySetAlgebraProgram(leftB, rightB, program)!;
-  const [queryLeft, queryRight] = pair(1);
-  const answer = applySetAlgebraProgram(queryLeft, queryRight, program)!;
+  // Each row draws its own four positions, so the solver cannot read the rule
+  // off a fixed skeleton — only off what the operation does to the roles.
+  //
+  // Richer boards buy a problem the fixed diagonal never had: a role draw can
+  // let a SECOND program in the grammar reproduce both worked rows and then
+  // disagree about the query, which is an ambiguous item. Roughly one draw in
+  // twenty did that when the boards were first enriched. So the draw is
+  // repeated until the two worked rows pin exactly one predicted answer —
+  // the same bounded-redraw shape `relationalMatrix` already uses. The oracle
+  // below re-derives this from the finished puzzle and is what actually
+  // guarantees it; this loop only stops the family handing it a draw it would
+  // have to reject.
+  const rows = (() => {
+    let last: SetAlgebraRows | null = null;
+    for (let attempt = 0; attempt < SET_ALGEBRA_INPUT_ATTEMPTS; attempt++) {
+      const rowRoles = [setAlgebraRoles(rng), setAlgebraRoles(rng), setAlgebraRoles(rng)];
+      const pair = (offset: number): [Scene, Scene] =>
+        setAlgebraPair(rowRoles[offset % rowRoles.length], shapes, offset, turning);
+      const [leftA, rightA] = pair(0);
+      const [leftB, rightB] = pair(2);
+      const [queryLeft, queryRight] = pair(1);
+      const outputA = applySetAlgebraProgram(leftA, rightA, program);
+      const outputB = applySetAlgebraProgram(leftB, rightB, program);
+      const answer = applySetAlgebraProgram(queryLeft, queryRight, program);
+      if (!outputA || !outputB || !answer) continue;
+      const draw: SetAlgebraRows = { leftA, rightA, outputA, leftB, rightB, outputB, queryLeft, queryRight, answer };
+      last = draw;
+      const examples = [
+        { left: leftA, right: rightA, output: outputA },
+        { left: leftB, right: rightB, output: outputB },
+      ];
+      const survivors = grammar.filter((candidateProgram) => examples.every((example) => {
+        const output = applySetAlgebraProgram(example.left, example.right, candidateProgram);
+        return output !== null && sceneSignature(output) === sceneSignature(example.output);
+      }));
+      const predicted = distinctOutputs(survivors.map((candidateProgram) =>
+        applySetAlgebraProgram(queryLeft, queryRight, candidateProgram)));
+      if (predicted.length === 1) return draw;
+    }
+    // Every attempt was ambiguous, which the measured rate says should not
+    // happen. Hand back the last draw rather than throwing: acceptance rejects
+    // it and the assembler retries the slot on a fresh seed, which is the
+    // failure path every other family already uses.
+    return last;
+  })();
+  if (rows === null) throw new Error("set algebra could not build a single valid row draw");
+  const { leftA, rightA, outputA, leftB, rightB, outputB, queryLeft, queryRight, answer } = rows;
   const distractors = distinctOutputs(grammar
     .filter((candidateProgram) => JSON.stringify(candidateProgram) !== JSON.stringify(program))
     .map((candidateProgram) => applySetAlgebraProgram(queryLeft, queryRight, candidateProgram)))
@@ -2714,12 +2942,36 @@ const COMPOSED_TRANSFORM_D4_BUCKET = "composed-transform-d4";
 const COMPOSED_TRANSFORM_D5_BUCKET = "composed-transform-d5";
 const COMPOSED_TRANSFORM_D6_BUCKET = "composed-transform-d6";
 
-/** The displayed gate count each named bucket draws at. */
+/**
+ * The displayed gate count each named bucket draws at.
+ *
+ * `composed-transform-d5` used to draw FOUR gates. On 2026-08-27 the owner
+ * ruled that no item may ever display more than three — a fourth gate is more
+ * procedure, not more reasoning — so d5 is now three gates too, and earns its
+ * extra difficulty by running them BACKWARDS instead. See
+ * `COMPOSED_TRANSFORM_REVERSED_BUCKETS`.
+ */
 const COMPOSED_TRANSFORM_BUCKET_GATES: Readonly<Record<string, ComposedGateCount>> = {
   [COMPOSED_TRANSFORM_D4_BUCKET]: 3,
-  [COMPOSED_TRANSFORM_D5_BUCKET]: 4,
+  [COMPOSED_TRANSFORM_D5_BUCKET]: 3,
   [COMPOSED_TRANSFORM_D6_BUCKET]: 5,
 };
+
+/**
+ * Buckets whose query gates are applied right to left.
+ *
+ * Reversal is only a fair question if the item SHOWS which direction it uses,
+ * and per-gate worked rows cannot: a row demonstrating one gate alone says
+ * nothing about order. So a reversed item carries one extra worked row — a
+ * two-gate strip and the board it produces — and the solver reads the direction
+ * off that before applying the query's three gates the same way. The two gates
+ * in that row are always chosen so the two possible orders disagree; otherwise
+ * the row would be evidence of nothing.
+ *
+ * This is the shape the owner asked for on 2026-08-27: "try to reverse the
+ * gates, not only same sequence", under a hard cap of three gates.
+ */
+const COMPOSED_TRANSFORM_REVERSED_BUCKETS: ReadonlySet<string> = new Set([COMPOSED_TRANSFORM_D5_BUCKET]);
 
 /**
  * Every ordered program a solver could posit at each displayed depth — the
@@ -2783,17 +3035,25 @@ function composedGateOrders(gateCount: number): number[][] {
 }
 
 /** The orderings that are not the demonstrated left-to-right one. */
-function composedWrongGateOrders(gateCount: number): number[][] {
-  const displayed = composedGateIndexes(gateCount).join(",");
-  return composedGateOrders(gateCount).filter((order) => order.join(",") !== displayed);
+function composedWrongGateOrders(gateCount: number, runOrder?: readonly number[]): number[][] {
+  // "Wrong" is relative to the order the item RUNS, not to the order it
+  // displays. Those were the same thing until reversed buckets arrived on
+  // 2026-08-27; passing the run order keeps the correct board out of the near
+  // miss pool and puts the other direction into it, which is where a solver who
+  // misread the direction would land.
+  const correct = (runOrder ?? composedGateIndexes(gateCount)).join(",");
+  return composedGateOrders(gateCount).filter((order) => order.join(",") !== correct);
 }
 
 /**
  * Every proper, non-empty run of the gates in displayed order — that is, every
  * way to skip at least one gate but keep the rest in the order shown.
  */
-function composedGateOmissions(gateCount: number): { kept: number[]; skipped: number[] }[] {
-  const all = composedGateIndexes(gateCount);
+function composedGateOmissions(
+  gateCount: number,
+  runOrder?: readonly number[],
+): { kept: number[]; skipped: number[] }[] {
+  const all = runOrder ?? composedGateIndexes(gateCount);
   const omissions: { kept: number[]; skipped: number[] }[] = [];
   for (let mask = 1; mask < (1 << gateCount) - 1; mask++) {
     const kept = all.filter((index) => ((mask >> index) & 1) === 1);
@@ -2820,14 +3080,15 @@ function composedRunErrors(
   query: Scene,
   steps: readonly SceneCompositionPrimitive[],
   apply: ComposedStepper,
+  runOrder?: readonly number[],
 ): Array<{ output: Scene | null; reason: string }> {
   const gateCount = steps.length;
   return [
-    ...composedWrongGateOrders(gateCount).map((order) => ({
+    ...composedWrongGateOrders(gateCount, runOrder).map((order) => ({
       output: runComposedGates(query, steps, order, apply),
       reason: `applies the ${COMPOSED_GATE_COUNT_WORDS[gateCount as ComposedGateCount]} demonstrated gates in a wrong order`,
     })),
-    ...composedGateOmissions(gateCount).map(({ kept, skipped }) => ({
+    ...composedGateOmissions(gateCount, runOrder).map(({ kept, skipped }) => ({
       output: runComposedGates(query, steps, kept, apply),
       reason: `skips demonstrated gate ${composedGateList(skipped)}`,
     })),
@@ -2846,15 +3107,18 @@ function composedReadingErrors(
   query: Scene,
   steps: readonly SceneCompositionPrimitive[],
   apply: ComposedStepper,
+  runOrder?: readonly number[],
 ): Array<{ output: Scene | null; reason: string }> {
   const executions: Array<{ output: Scene | null; reason: string }> = [];
+  const order = runOrder ?? composedGateIndexes(steps.length);
   for (const index of composedGateIndexes(steps.length)) {
     for (const replacement of sceneComposedPrimitives()) {
       if (compositionPrimitiveKey(replacement) === compositionPrimitiveKey(steps[index])) continue;
       const misread = steps.map((step, position) => (position === index ? replacement : step));
       if (!isSceneComposedProgram(misread)) continue;
       executions.push({
-        output: runComposedGates(query, misread, composedGateIndexes(misread.length), apply),
+        // A misread gate is still run the way this item runs its gates.
+        output: runComposedGates(query, misread, order, apply),
         reason: "replaces one step with a primitive that fails its worked row",
       });
     }
@@ -2872,8 +3136,12 @@ function composedWrongExecutions(
   query: Scene,
   steps: readonly SceneCompositionPrimitive[],
   apply: ComposedStepper = applySceneCompositionPrimitive,
+  runOrder?: readonly number[],
 ): Array<{ output: Scene | null; reason: string }> {
-  return [...composedRunErrors(query, steps, apply), ...composedReadingErrors(query, steps, apply)];
+  return [
+    ...composedRunErrors(query, steps, apply, runOrder),
+    ...composedReadingErrors(query, steps, apply, runOrder),
+  ];
 }
 
 function compositionPrimitiveDescription(primitive: SceneCompositionPrimitive): string {
@@ -3107,26 +3375,79 @@ export function canonicalComposedTransformQuery(): Scene {
   return composedTransformQuery(CANONICAL_COMPOSED_SHAPES);
 }
 
+/**
+ * Every bucket that displays a gate strip, and how many gates it shows.
+ *
+ * The owner's standing rule of 2026-08-27 is that no item may display more than
+ * three gates: a fourth is more procedure, not more reasoning. A rule kept only
+ * in comments gets broken by the next batch, so a test walks this table against
+ * the promotion registry and fails if anything a band can draw shows a fourth.
+ * A new gate bucket has to be registered here to be covered — which is the
+ * point: the table is the single place gate counts are declared.
+ */
+export function declaredGateCounts(): Readonly<Record<string, number>> {
+  return { ...COMPOSED_TRANSFORM_BUCKET_GATES, ...TRANSFORMATION_MACHINE_BUCKET_GATES };
+}
+
 function composedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
   const gateCount = COMPOSED_TRANSFORM_BUCKET_GATES[bucket.bucket] ?? 3;
-  return composedTransformForProgram(pick(rng, partitionComposedTransformPrograms(gateCount).publicPrograms), rng);
+  return composedTransformForProgram(
+    pick(rng, partitionComposedTransformPrograms(gateCount).publicPrograms),
+    rng,
+    { bucketId: bucket.bucket, reversed: COMPOSED_TRANSFORM_REVERSED_BUCKETS.has(bucket.bucket) },
+  );
+}
+
+/**
+ * The worked row that reveals which direction a reversed item runs its gates.
+ *
+ * It shows two of the displayed gates as a strip and the board they produce
+ * when applied right to left, the same way the query will be. The pair is only
+ * usable if the two possible orders give DIFFERENT boards — a commuting pair
+ * would leave the direction exactly as unknowable as the single-gate rows do.
+ * The first usable pair in displayed order is taken, so the choice is
+ * deterministic and replays with the seed.
+ */
+function composedOrderRow(
+  steps: readonly SceneCompositionPrimitive[],
+  displayed: readonly number[],
+  shapes: readonly SceneToken["shape"][],
+): { input: Scene; output: Scene; gates: number[] } | null {
+  for (let first = 0; first < displayed.length; first++) {
+    for (let second = first + 1; second < displayed.length; second++) {
+      const pair = [displayed[first], displayed[second]];
+      // A board distinct from both the per-gate worked inputs and the query,
+      // so the row adds evidence rather than repeating a board already shown.
+      const input = composedTransformQuery([...shapes].reverse());
+      const rightToLeft = runComposedGates(input, steps, [...pair].reverse(), applySceneCompositionPrimitive);
+      const leftToRight = runComposedGates(input, steps, pair, applySceneCompositionPrimitive);
+      if (!rightToLeft || !leftToRight) continue;
+      if (sceneSignature(rightToLeft) === sceneSignature(leftToRight)) continue;
+      return { input, output: rightToLeft, gates: pair };
+    }
+  }
+  return null;
 }
 
 function composedTransformForProgram(
   program: SceneComposedProgram,
   rng: Rng,
+  options: { bucketId?: string; reversed?: boolean } = {},
 ): SceneFamilyCandidate {
   const steps = sceneComposedProgramSteps(program);
   const gateCount = steps.length as ComposedGateCount;
   const displayed = composedGateIndexes(gateCount);
   const gateIds = displayed.map((index) => COMPOSED_GATE_IDS[index]);
+  const reversed = options.reversed ?? false;
+  // The order the query gates actually run in. Displayed order is always left
+  // to right; a reversed bucket applies them right to left, and the extra
+  // worked row below is what tells the solver which of the two it is.
+  const runOrder = reversed ? [...displayed].reverse() : displayed;
   const bucket = requireSceneFamilyBucket(
     "composed-transform-v2",
-    gateCount === 5
+    options.bucketId ?? (gateCount === 5
       ? COMPOSED_TRANSFORM_D6_BUCKET
-      : gateCount === 4
-        ? COMPOSED_TRANSFORM_D5_BUCKET
-        : COMPOSED_TRANSFORM_D4_BUCKET,
+      : COMPOSED_TRANSFORM_D4_BUCKET),
   );
   const shapes = shuffled(rng, CANONICAL_COMPOSED_SHAPES);
   const worked = steps.map((step, index) => {
@@ -3136,15 +3457,27 @@ function composedTransformForProgram(
     return { input, output };
   });
   const query = composedTransformQuery(shapes);
-  const answer = runComposedGates(query, steps, displayed, applySceneCompositionPrimitive);
-  const reversed = runComposedGates(query, steps, [...displayed].reverse(), applySceneCompositionPrimitive);
-  if (!answer || !reversed || sceneSignature(reversed) === sceneSignature(answer)) {
+  const answer = runComposedGates(query, steps, runOrder, applySceneCompositionPrimitive);
+  const otherDirection = runComposedGates(
+    query, steps, [...runOrder].reverse(), applySceneCompositionPrimitive);
+  if (!answer || !otherDirection || sceneSignature(otherDirection) === sceneSignature(answer)) {
     throw new Error(`composed transform needs a servable ${gateCount}-step program`);
   }
-  const nearMissPool = distinctOutputs(composedWrongExecutions(query, steps).map((execution) => execution.output))
+  // The order row: two of the displayed gates and the board they produce when
+  // run in this item's direction. Its pair is chosen so the two orders
+  // disagree — a pair that commutes would prove nothing about direction.
+  const orderRow = reversed ? composedOrderRow(steps, displayed, shapes) : null;
+  if (reversed && !orderRow) {
+    throw new Error("a reversed composed transform needs a gate pair whose two orders disagree");
+  }
+  const nearMissPool = distinctOutputs(
+    composedWrongExecutions(query, steps, applySceneCompositionPrimitive, runOrder)
+      .map((execution) => execution.output))
     .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  // Keep the fully reversed board: it is the near miss that proves order matters.
-  const composedDistractors = selectDistractors(nearMissPool, rng, "composed transform", { answer, required: [reversed] });
+  // Keep the other-direction board: it is the near miss that proves order
+  // matters, and in a reversed item it is exactly what a solver who ignored the
+  // order row and ran the strip left to right would choose.
+  const composedDistractors = selectDistractors(nearMissPool, rng, "composed transform", { answer, required: [otherDirection] });
   const gateWord = COMPOSED_GATE_COUNT_WORDS[gateCount];
   const cueIds = [
     ...gateIds.map((gateId) => `worked-gate-${gateId}`),
@@ -3156,10 +3489,15 @@ function composedTransformForProgram(
     "prototype-composed-transform",
     "matrix",
     "machineTable",
-    `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`,
+    reversed
+      ? `Infer each worked gate, then work out from the two-gate row which way a strip runs before applying the ${gateWord} query gates.`
+      : `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`,
     bucket.difficulty,
     [
       ...worked.flatMap((row, index) => [row.input, gateVisual(gateIds[index]), row.output]),
+      ...(orderRow
+        ? [orderRow.input, gateVisual(...orderRow.gates.map((index) => gateIds[index])), orderRow.output]
+        : []),
       query,
       gateVisual(...gateIds),
       { blank: true },
@@ -3169,7 +3507,9 @@ function composedTransformForProgram(
     rng,
     `The ${gateWord} worked rows expose the primitives separately. ${steps
       .map((step, index) => `Gate ${COMPOSED_GATE_LETTERS[index]} ${compositionPrimitiveDescription(step)}`)
-      .join("; ")}. The query strip shows ${composedGateList(displayed)} in that order, so the ${gateWord} effects must be applied left to right to obtain the highlighted board. Every displayed gate is needed: dropping any one of them changes the result. The distractors run the gates in another order, skip one, or replace a step with another bounded primitive that fails its worked row.`,
+      .join("; ")}. ${orderRow
+      ? `The extra worked row shows ${composedGateList(orderRow.gates)} together, and its board is what those two produce applied RIGHT TO LEFT — left to right would give a different board, which is how the direction is known rather than guessed. The query strip shows ${composedGateList(displayed)}, so its effects run right to left too, to obtain the highlighted board.`
+      : `The query strip shows ${composedGateList(displayed)} in that order, so the ${gateWord} effects must be applied left to right to obtain the highlighted board.`} Every displayed gate is needed: dropping any one of them changes the result. The distractors run the gates in another order, skip one, or replace a step with another bounded primitive that fails its worked row.`,
   );
   const family = definition(
     "composed-transform-v2",
@@ -3177,7 +3517,8 @@ function composedTransformForProgram(
     sceneComposedProgramKey(program),
     (candidate) => {
       const empty = { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      if (candidate.stem.length !== gateCount * 3 + 3) return empty;
+      const orderRowPanels = orderRow ? 3 : 0;
+      if (candidate.stem.length !== gateCount * 3 + orderRowPanels + 3) return empty;
       const panels = candidate.stem.map(scenePanel);
       const workedRows: { input: Scene; output: Scene; gateKey: string }[] = [];
       for (const index of displayed) {
@@ -3188,8 +3529,23 @@ function composedTransformForProgram(
         if (!input || !output || !gateKey) return empty;
         workedRows.push({ input, output, gateKey });
       }
-      const queryInput = panels[gateCount * 3];
-      const queryGates = panels[gateCount * 3 + 1];
+      // The order row, read back off the board rather than trusted: its strip
+      // names two of the displayed gates, and its output is what those two make
+      // in one of the two possible orders. Which one is the direction evidence.
+      let orderEvidence: { input: Scene; output: Scene; gates: number[] } | null = null;
+      if (orderRow) {
+        const input = panels[gateCount * 3];
+        const strip = panels[gateCount * 3 + 1];
+        const output = panels[gateCount * 3 + 2];
+        if (!input || !strip || !output) return empty;
+        const named = [...strip.objects]
+          .sort((left, right) => left.column - right.column)
+          .map((placement) => workedRows.findIndex((row) => row.gateKey === JSON.stringify(placement.object)));
+        if (named.length !== 2 || named.some((index) => index < 0)) return empty;
+        orderEvidence = { input, output, gates: named };
+      }
+      const queryInput = panels[gateCount * 3 + orderRowPanels];
+      const queryGates = panels[gateCount * 3 + orderRowPanels + 1];
       if (!queryInput || !queryGates) return empty;
 
       // The query strip must show exactly the worked gates, once each, left to
@@ -3224,10 +3580,30 @@ function composedTransformForProgram(
       };
       build(0, []);
 
-      const predictions = distinctOutputs(survivors.map((candidateProgram) =>
-        applySceneComposedProgram(queryInput, candidateProgram)));
+      // A survivor predicts the query only through a direction the shown
+      // evidence actually pins. Without an order row the convention is left to
+      // right, as the instruction says. With one, the survivor must reproduce
+      // that row in exactly one of the two orders, and the query then runs the
+      // same way; a survivor whose pair commutes there proves no direction and
+      // predicts nothing.
+      const predictFor = (candidateProgram: SceneComposedProgram): Scene | null => {
+        const candidateSteps = sceneComposedProgramSteps(candidateProgram);
+        if (!orderEvidence) return applySceneComposedProgram(queryInput, candidateProgram);
+        const forwardPair = orderEvidence.gates;
+        const backwardPair = [...forwardPair].reverse();
+        const asShown = runComposedGates(orderEvidence.input, candidateSteps, forwardPair, applySceneCompositionPrimitive);
+        const asReversed = runComposedGates(orderEvidence.input, candidateSteps, backwardPair, applySceneCompositionPrimitive);
+        const target = sceneSignature(orderEvidence.output);
+        const fitsShown = asShown !== null && sceneSignature(asShown) === target;
+        const fitsReversed = asReversed !== null && sceneSignature(asReversed) === target;
+        if (fitsShown === fitsReversed) return null;
+        const order = fitsReversed ? [...displayed].reverse() : displayed;
+        return runComposedGates(queryInput, candidateSteps, order, applySceneCompositionPrimitive);
+      };
+      const predictions = distinctOutputs(survivors.map(predictFor));
       const wrongExecutions = survivors.flatMap((survivor) =>
-        composedWrongExecutions(queryInput, sceneComposedProgramSteps(survivor)));
+        composedWrongExecutions(
+          queryInput, sceneComposedProgramSteps(survivor), applySceneCompositionPrimitive, runOrder));
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
@@ -4908,12 +5284,19 @@ export function validateSceneFamilyCandidate(
 export function generateHeldOutComposedTransformCandidate(
   rng: Rng,
   gateCount: ComposedGateCount = 3,
+  bucketId: string = COMPOSED_TRANSFORM_D4_BUCKET,
 ): SceneFamilyCandidate {
   const { heldOutPrograms } = partitionComposedTransformPrograms(gateCount);
   if (heldOutPrograms.length === 0) {
     throw new Error(`no held-out composed-transform programs at ${gateCount} gates`);
   }
-  return composedTransformForProgram(pick(rng, heldOutPrograms), rng);
+  // The held-out item has to be the same KIND of item as the public bucket it
+  // stands in for, direction included: a reserved program rendered left to
+  // right would not measure the bucket a taker actually meets.
+  return composedTransformForProgram(pick(rng, heldOutPrograms), rng, {
+    bucketId,
+    reversed: COMPOSED_TRANSFORM_REVERSED_BUCKETS.has(bucketId),
+  });
 }
 
 /** Materialize the only currently supported LLM-proposed rule through pure code. */

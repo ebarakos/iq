@@ -12,7 +12,16 @@ export const SceneRuleProposalSchema = z.object({
   variationSeed: z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/),
   program: z.object({
     kind: z.literal("set-algebra"),
-    operation: z.enum(["union", "intersection", "subtract", "xor"]),
+    operation: z.enum([
+      "union-left",
+      "union-right",
+      "intersection",
+      "overlap-left",
+      "overlap-right",
+      "subtract",
+      "mask-out",
+      "exclusive",
+    ]),
   }).strict(),
 }).strict();
 export type SceneRuleProposal = z.infer<typeof SceneRuleProposalSchema>;

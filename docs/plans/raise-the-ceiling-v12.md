@@ -1,5 +1,14 @@
 # Raise the ceiling: a d6 tier for the tail
 
+Status: **the d6 tier was withdrawn on 2026-08-27, the day after it shipped.** The
+owner's correction was that difficulty must come from a mechanism the solver has to
+work out, never from more steps of one they already know, and set a standing rule:
+never more than three gates in any item. Both d6 buckets (`composed-transform-d6`,
+five gates, and `transformation-machine-d6`, four) are gone, and `composed-transform-d5`
+was rebuilt from four forward gates to three reversed ones. The ceiling constant, the
+band arithmetic and the withdrawal of `containment-analogy-v2` below all still hold;
+the tier this plan designs does not. Read it as the record of a reversed decision.
+
 Owner direction, 2026-08-26, after the v11 pilot passed its escalation test:
 "I like hard tests, the harder the better. And even more hard than these would be
 good towards the end." The v11 battery tops out at difficulty 5 and the

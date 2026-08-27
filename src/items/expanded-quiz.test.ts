@@ -24,6 +24,7 @@ import {
   questionCount,
   sceneFamilyLayout,
   type ExpandedProfile,
+  evenSplit,
 } from "./expanded-quiz";
 import { OPTIONS_PER_ITEM, VisualPuzzleSetSchema, visualElementSignature } from "./schema";
 import {
@@ -69,31 +70,29 @@ describe("eligible family pool", () => {
       .not.toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the twenty-one family/band/bucket keys the v12 battery serves", () => {
+  it("holds exactly the nineteen family/band/bucket keys the v12 battery serves", () => {
     // Was 20 keys over pools of 2/6/4/4 under the "dual proof fails" row of the
     // table in docs/plans/escalate-the-quiz.md, Phase 5. Two things moved it on
     // 2026-08-26 (docs/plans/raise-the-ceiling-v12.md): `containment-analogy-v2`
     // was withdrawn on the pilot's notation evidence, taking constraint-spatial
     // from four families to three and the battery to 19 keys, and the two d6
     // buckets — `composed-transform-d6` and `transformation-machine-d6` — were
-    // added to induction-transfer, bringing it to 21. Both numbers are derived
-    // from the registry here, so adding or withdrawing a family without
-    // revisiting the plan fails this test rather than quietly moving the
-    // population the pilot packet and the emergency bank are sized against.
+    // added to induction-transfer, bringing it to 21, and both were withdrawn
+    // again on 2026-08-27 under the owner's three-gate rule, bringing it to 19.
+    // The number is derived from the registry here, so adding or withdrawing a
+    // family without revisiting the plan fails this test rather than quietly
+    // moving the population the pilot packet and emergency bank are sized to.
     const keys = EXPANDED_PROFILE_BANDS.flatMap((band) =>
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => `${family.familyId}:${band}:${bucket.bucket}`)));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(21);
+    expect(keys).toHaveLength(19);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
       .toEqual([2, 6, 3, 4]);
-    // Exactly two of those keys are d6, and both sit in induction-transfer —
-    // the last band of the long test, which is the whole point of the tier.
-    expect(keys.filter((key) => key.endsWith("-d6")).sort())
-      .toEqual([
-        "composed-transform-v2:induction-transfer:composed-transform-d6",
-        "transformation-machine-v3:induction-transfer:transformation-machine-d6",
-      ]);
+    // No key is d6 any more. The two that were are withdrawn, so the ladder
+    // tops out at d5 until a mechanism earns a sixth rung some way other than
+    // by adding gates — the lever the owner ruled out on 2026-08-27.
+    expect(keys.filter((key) => key.endsWith("-d6"))).toEqual([]);
     // The same row's draw sizes and long-test floors.
     expect(EXPANDED_PROFILE_BANDS.map((band) => FAMILY_SUBSAMPLE_SIZES[band]))
       .toEqual([undefined, 4, 3, 3]);
@@ -101,7 +100,7 @@ describe("eligible family pool", () => {
       .toEqual([2, 4, 3, 3]);
   });
 
-  it("reads difficulty 6 out of a bucket name and refuses anything outside 1 to 6", () => {
+  it("still reads difficulty 6 out of a bucket name, though no bucket declares one", () => {
     // The bucket suffix is the ramp input the whole assembler orders by, so it
     // had to widen with the puzzle schema on 2026-08-26. A `-d6` bucket that
     // still failed to parse would have thrown on every draw.
@@ -111,16 +110,13 @@ describe("eligible family pool", () => {
     for (const bad of ["some-family-d0", "some-family-d7", "some-family-d10", "some-family", "d6"]) {
       expect(() => bucketDifficulty(bad), bad).toThrow(/must end in -d1 through -d6/);
     }
-    // The only d6 bucket this wave adds, read through the registry rather than
-    // through its name.
+    // The parser keeps accepting -d6 even though the two buckets that used it
+    // were withdrawn on 2026-08-27: the range is a schema fact, not a claim
+    // that anything currently reaches the top of it. Read through the registry
+    // rather than through a name, this family now stops at d5.
     const buckets = eligibleFamiliesForBand(REGISTRY, "induction-transfer")
       .find((family) => family.familyId === "composed-transform-v2")?.bandBuckets ?? [];
-    expect(buckets).toEqual([
-      { bucket: "composed-transform-d5", difficulty: 5 },
-      { bucket: "composed-transform-d6", difficulty: 6 },
-    ]);
-    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d6"))
-      .toEqual({ bucket: "composed-transform-d6", difficulty: 6, programDepth: 5 });
+    expect(buckets).toEqual([{ bucket: "composed-transform-d5", difficulty: 5 }]);
   });
 
   it("drops withdrawn families", () => {
@@ -363,16 +359,15 @@ describe("assembleExpandedQuiz", () => {
     // test draws twelve family slots against a floor of eleven, so it can
     // afford to spend one distinct family on serving that bucket.
     //
-    // Since 2026-08-26 induction-transfer holds two composed buckets, four
-    // gates and five. A first occurrence in that band is the four-gate bucket
-    // and a second is the five-gate one, so a long test reaches all three keys
-    // while a short test — one induction-transfer question — never gets past
-    // the four-gate one.
+    // Induction-transfer briefly held two composed buckets (four gates and
+    // five) between 2026-08-26 and 2026-08-27. The five-gate one is withdrawn,
+    // so both profiles now reach the same two keys and the long test's extra
+    // reach is no longer about this family.
     const shortBands = [
       "composition:composed-transform-d4",
       "induction-transfer:composed-transform-d5",
     ];
-    const longBands = [...shortBands, "induction-transfer:composed-transform-d6"];
+    const longBands = shortBands;
     for (const profile of EXPANDED_PROFILES) {
       const seen = new Set<string>();
       let withFourGates = 0;
@@ -427,9 +422,13 @@ describe("assembleExpandedQuiz", () => {
     // has applied three ordered gates since the -v2 rewrite.
     const composed = requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d4");
     expect(composed.programDepth).toBe(3);
-    // The four-gate bucket in induction-transfer is the deepest thing the
-    // battery serves, and it reports four steps rather than the band's guess.
-    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d5").programDepth).toBe(4);
+    // The induction-transfer bucket is the deepest thing the battery serves and
+    // reports its own step count rather than the band's guess. It reports THREE
+    // since 2026-08-27: it used to display four gates, and the owner capped
+    // every item at three, so it now runs the same three backwards instead.
+    // Depth is the gate count, so the depth fell even though the difficulty did
+    // not — which is the whole point of the rebuild.
+    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d5").programDepth).toBe(3);
     expect(requireSceneFamilyBucket("fold-punch-v2", "fold-punch-d4").programDepth).toBe(1);
     expect(requireSceneFamilyBucket("fold-punch-v2", "fold-punch-d5").programDepth).toBe(2);
     expect(requireSceneFamilyBucket("compositional-analogy-v2", "compositional-analogy-d3").programDepth).toBe(2);
@@ -560,23 +559,14 @@ describe("format-aware family subsampling", () => {
     expect(draws("induction-transfer", usedComposed, 0)[0]
       .map((family) => family.familyId).sort())
       .toEqual(["inverse-fold-punch-v2", "rule-switching-v2", "transformation-machine-v3"]);
-    // The yield is about a bucket this band alone can serve. A family with an
-    // unserved bucket left here is still forgiven, even after two of its
-    // buckets have been served: since 2026-08-26 composed-transform-v2 holds
-    // both composed-transform-d5 and -d6 in this band, so a schedule that has
-    // served d4 and d5 can still come back for a question nobody has asked.
-    expect(draws("induction-transfer",
-      { "composed-transform-v2": ["composed-transform-d4", "composed-transform-d5"] }, 1))
-      .toHaveLength(4);
-    // Once every bucket the family holds here has been served, there is no
-    // different question left to come back for and the forgiveness stops,
-    // slack or not — the draw avoiding it is the only one offered.
+    // The yield is about a bucket this band alone can serve. Once every bucket
+    // the family holds here has been served, there is no different question
+    // left to come back for and the forgiveness stops, slack or not — the draw
+    // avoiding it is the only one offered. Until 2026-08-27 this band held two
+    // composed buckets, so serving d4 and d5 still left d6 to come back for;
+    // with d6 withdrawn, d4 plus d5 is the whole family and the yield ends.
     const composedFullyServed = {
-      "composed-transform-v2": [
-        "composed-transform-d4",
-        "composed-transform-d5",
-        "composed-transform-d6",
-      ],
+      "composed-transform-v2": ["composed-transform-d4", "composed-transform-d5"],
     };
     expect(draws("induction-transfer", composedFullyServed, 1)).toHaveLength(1);
     expect(draws("induction-transfer", composedFullyServed, 1)[0]
@@ -605,6 +595,11 @@ describe("format-aware family subsampling", () => {
 
   it("proves both profiles and every schedule target over 10,000 seeds", () => {
     const SCHEDULES = 10_000;
+    // The deepest difficulty anything in the battery can serve, read off the
+    // registry so the tail test tracks the ladder instead of restating it.
+    const deepestDifficultyInBattery = Math.max(...EXPANDED_PROFILE_BANDS.flatMap((band) =>
+      eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
+        family.bandBuckets.map((bucket) => bucket.difficulty))));
     // docs/plans/escalate-the-quiz.md, Phase 5, "dual proof fails" row: the
     // mean number of analogy-layout questions in a 30-question test must be at
     // or under 10.0. That row expected 115/12 = 9.5833 and measured 9.5837.
@@ -616,21 +611,23 @@ describe("format-aware family subsampling", () => {
     // - `containment-analogy-v2` was withdrawn, so constraint-spatial draws its
     //   whole three-family pool. It still contributes exactly one analogy
     //   family (fold-punch-v2) instead of one of two, so its 10/3 is unchanged.
-    // - a band's leftover questions now go first to the families that reach a
-    //   new bucket with them. In induction-transfer that means the two d6
-    //   families always take the two leftovers, and inverse-fold-punch-v2 —
-    //   the one analogy family in that pool — no longer competes for them.
+    // - a band's leftover questions go first to the families that reach a new
+    //   bucket with them. That rule is currently inert: withdrawing the two d6
+    //   buckets on 2026-08-27 left every induction-transfer family holding one
+    //   bucket, so no family can reach a new one with a leftover and the
+    //   allocation falls through to the seeded shuffle it always used.
     //
-    // The closed form is 28/3 exactly. Per band the expectation is
+    // The closed form is 115/12 exactly — the same value the battery had
+    // before the d6 tier existed, which is the arithmetic confirming the tier
+    // is fully out. Per band the expectation is
     // (questions / families drawn) x (analogy families drawn):
     // warmup 5/2 x 1 = 5/2, composition 10/4 x 1 = 5/2, constraint-spatial
-    // 10/3 x 1 = 10/3, induction-transfer 1. That last 1 is the average over
-    // the four equally likely draws of three from its pool of four: the draw
-    // without inverse-fold-punch-v2 contributes 0; the draw of it with both d6
-    // families contributes exactly 1, because both leftovers are spent on them;
-    // and each of the two draws holding one d6 family contributes 1.5, because
-    // one leftover is spent on the d6 family and the other falls to a coin
-    // toss between the two single-bucket families. (0 + 1 + 1.5 + 1.5) / 4 = 1.
+    // 10/3 x 1 = 10/3, induction-transfer 5/4. That last 5/4 is the average
+    // over the four equally likely draws of three from its pool of four: the
+    // draw without inverse-fold-punch-v2 contributes 0, and each of the three
+    // draws holding it contributes 1 + 2/3 = 5/3, its base question plus its
+    // even share of the two leftovers spread across three drawn families.
+    // (0 + 3 x 5/3) / 4 = 5/4.
     // The draws are equally likely because the cross-band rule yields to
     // composed-transform-v2 there rather than making its four-gate bucket
     // unreachable — the owner's decision of 2026-08-25, paid for by the long
@@ -642,7 +639,7 @@ describe("format-aware family subsampling", () => {
     // asserted above, which is what holds the number under the cap in the first
     // place, is checked on every one of these seeds with no tolerance at all.
     const ANALOGY_ITEMS_PER_LONG_TEST_CAP = 10.0;
-    const ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED = 28 / 3;
+    const ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED = 115 / 12;
     const MEAN_TOLERANCE = 0.05;
 
     let analogyItems = 0;
@@ -701,31 +698,21 @@ describe("format-aware family subsampling", () => {
 
         if (profile !== "long-30") continue;
         analogyItems += schedule.filter((slot) => isAnalogyLayoutFamily(slot.familyId)).length;
-        // The d6 tail (docs/plans/raise-the-ceiling-v12.md): EVERY long test
-        // ends on the deepest thing the battery generates, not most of them.
-        // Two mechanisms together make that a guarantee rather than a
-        // probability. Induction-transfer draws three of its four families, and
-        // only two of the four lack a d6 bucket, so at least one d6 family is in
-        // every draw. Its five questions over three families leave two spare,
-        // and `evenSplit` spends spares on the families that reach a new bucket
-        // with them — which in that band is exactly the d6 families — so a drawn
-        // d6 family always gets the second question its d6 bucket needs.
-        // Ordering then puts it last, because the band is arranged by slot
-        // difficulty and nothing in the battery is deeper.
-        //
-        // MEASURED over these 10,000 seeds: 10,000 tests end on a d6 item, and
-        // the d6 items are always the final questions — position 30 in all
-        // 10,000, position 29 in the 5,035 tests that hold two. With the same
-        // registry and a randomly allocated leftover it was 8,289 in 10,000:
-        // ordering was never the problem, availability was.
+        // EVERY long test ends on the deepest thing the battery generates, not
+        // most of them. The target is read off the registry rather than
+        // written down, because the depth it names has already changed twice:
+        // d6 between 2026-08-26 and 2026-08-27, d5 before and after. Today
+        // every induction-transfer bucket is d5 and that band is last, so the
+        // guarantee holds by construction; when a mechanism next earns a
+        // deeper rung, this test starts demanding it without being edited.
         const last = schedule[schedule.length - 1];
-        expect(last.difficulty, `seed ${seed} final item`).toBe(6);
+        expect(last.difficulty, `seed ${seed} final item`).toBe(deepestDifficultyInBattery);
         finalItemFamilies.set(last.familyId, (finalItemFamilies.get(last.familyId) ?? 0) + 1);
 
         // The two hardest bands must keep at least six questions at d5 or
         // deeper. Measured minimum over these seeds: 9, and never more than 10.
         // Induction-transfer contributes all five of its questions whichever
-        // three families it draws — every bucket in that band is d5 or d6 — and
+        // three families it draws — every bucket in that band is d5 — and
         // constraint-spatial adds at least four more, two each from
         // visual-set-algebra-v2 and fold-punch-v2 once their d4 entry point is
         // spent.
@@ -741,30 +728,31 @@ describe("format-aware family subsampling", () => {
     expect(Math.abs(meanAnalogyItems - ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED))
       .toBeLessThanOrEqual(MEAN_TOLERANCE);
 
-    // What guaranteeing the tail costs: the last question is always one of two
-    // mechanisms. It must not narrow to one — a test whose final question is
-    // always the same family stops measuring reasoning at the top of the ladder
-    // and starts measuring familiarity with one machine — so both d6 families
-    // are required to take a real share of the finals.
-    //
-    // MEASURED: composed-transform-v2 5,029 (50.29%) and
-    // transformation-machine-v3 4,971 (49.71%). The split is even because the
-    // four draws of three from the induction-transfer pool are equally likely
-    // and each d6 family is missing from exactly one of them.
-    expect([...finalItemFamilies.keys()].sort())
-      .toEqual(["composed-transform-v2", "transformation-machine-v3"]);
+    // The final question must not narrow to one mechanism. A test whose last
+    // question is always the same family stops measuring reasoning at the top
+    // of the ladder and starts measuring familiarity with one machine, so the
+    // finals have to spread over the induction-transfer pool. While the d6
+    // tier existed this was pinned to exactly two families at roughly 50/50;
+    // with the tier withdrawn every family the band can draw may finish a test,
+    // so the requirement is stated as spread rather than as a fixed pair.
+    expect(finalItemFamilies.size, "distinct families that can finish a long test")
+      .toBeGreaterThanOrEqual(3);
     for (const [familyId, count] of finalItemFamilies) {
-      expect(count / SCHEDULES, `${familyId} share of final items`).toBeGreaterThan(0.4);
+      expect(count / SCHEDULES, `${familyId} share of final items`).toBeLessThan(0.75);
     }
   }, 300_000);
 
   it("spends a band's leftover questions only where they reach a new bucket", () => {
-    // The rule that guarantees the d6 tail is deliberately inert everywhere
-    // else: a leftover question is redirected only when some drawn family has
-    // more validated buckets in this band than the base share `floor(questions /
-    // families drawn)` already gives it. This walks every band of both lengths
-    // and names the one place that is true, so a future pool change that starts
-    // biasing another band's split shows up here rather than in a drifting mean.
+    // A leftover question is redirected only when some drawn family has more
+    // validated buckets in this band than the base share `floor(questions /
+    // families drawn)` already gives it. The rule was added on 2026-08-26 to
+    // guarantee the d6 tail; withdrawing both d6 buckets a day later left no
+    // band where it applies, so it currently redirects nothing anywhere. It is
+    // kept rather than reverted because the property is worth having on its own
+    // — a repeated family should show a bucket nobody has been asked yet — and
+    // it starts working again the moment any family holds two buckets in one
+    // band. This walks every band of both lengths so that change surfaces here
+    // rather than as a quietly drifting analogy mean.
     const biting: string[] = [];
     for (const profile of EXPANDED_PROFILES) {
       for (const band of EXPANDED_PROFILE_BANDS) {
@@ -777,7 +765,21 @@ describe("format-aware family subsampling", () => {
         if (base > 0 && base < deepest) biting.push(`${profile} ${band}`);
       }
     }
-    expect(biting).toEqual(["long-30 induction-transfer"]);
+    expect(biting).toEqual([]);
+
+    // ...and the rule itself still does what it says when it does apply. Three
+    // questions over two drawn families gives a base share of 1 each with one
+    // left over. `deep` holds two buckets here, so its second question reaches
+    // a bucket the base share never would; `flat` holds one, so a second
+    // question would only repeat its first. The leftover must go to `deep`
+    // every time, never to a coin toss.
+    const deep = { familyId: "deep", bandBuckets: [{ bucket: "deep-d4", difficulty: 4 }, { bucket: "deep-d5", difficulty: 5 }] };
+    const flat = { familyId: "flat", bandBuckets: [{ bucket: "flat-d4", difficulty: 4 }] };
+    for (let seed = 0; seed < 50; seed++) {
+      const split = evenSplit(3, [deep, flat] as never, seededRng("leftover-rule", `${seed}`));
+      expect(split.get("deep"), `seed ${seed}`).toBe(2);
+      expect(split.get("flat"), `seed ${seed}`).toBe(1);
+    }
   });
 });
 

@@ -16,3 +16,7 @@ data/bank/items.json
 
 # tsx compile cache.
 .tmp/
+
+# Agent probe run logs, written by `npm run agent:run` and read only by
+# `scripts/pilot-report.ts`. 756K of JSON across 17 runs; query it with jq.
+data/attempts/
