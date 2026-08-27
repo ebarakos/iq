@@ -1,0 +1,22 @@
+{
+  "_comment": "Sandbox trial (2026-08-26): Bash commands run inside bubblewrap with writes confined to this repo, /tmp and the listed caches, and network limited to the listed hosts. Needs `sudo apt-get install socat` on Linux; until then Claude Code warns and runs unsandboxed (failIfUnavailable is off on purpose). New hosts prompt (auto mode: classifier). The dev server is excluded so the browser can reach it. Every unsandboxed retry prompts via the ask rule, so the trial shows exactly what the sandbox would have blocked.",
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "excludedCommands": ["npm run dev", "npm run dev *", "next dev", "next dev *", "npm run start", "next start"],
+    "filesystem": {
+      "allowWrite": ["/tmp", "~/.npm", "~/.cache/ms-playwright"]
+    },
+    "network": {
+      "allowedDomains": [
+        "llm-relay.ebarakos.workers.dev",
+        "registry.npmjs.org", "*.npmjs.org",
+        "github.com", "*.github.com",
+        "cdn.playwright.dev", "playwright.download.prss.microsoft.com"
+      ]
+    }
+  },
+  "permissions": {
+    "ask": ["Bash(dangerouslyDisableSandbox:true)"]
+  }
+}
