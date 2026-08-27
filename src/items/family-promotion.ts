@@ -163,11 +163,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [candidateBand("constraint-spatial")],
   },
   {
-    familyId: "operator-induction-v1",
-    primaryReasoningFamily: "operator-induction",
-    bands: [],
-  },
-  {
     familyId: "relational-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
     bands: [codeValidBand("warmup", ["relational-sequence-d2"])],
@@ -185,20 +180,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     familyId: "compositional-analogy-v2",
     primaryReasoningFamily: "analogical-transformation",
     bands: [codeValidBand("composition", ["compositional-analogy-d3", "compositional-analogy-d4"])],
-  },
-  {
-    // Withdrawn 2026-08-26 on human evidence: the pilot flagged it for unclear
-    // notation, and the participant named it unprompted as the one thing they
-    // disliked — "tiny shapes encircled in triangles"
-    // (data/pilot/2026-08-26-pilot-v3-a.json). It is the only family that draws
-    // a token INSIDE another shape, so it is the only one that shrinks a token
-    // below the size every other family draws it at; the legibility doctrine
-    // says a visual difference must read at a glance, and this one did not.
-    // Containment as a relation leaves the battery with it. Previously moved
-    // from composition into constraint-spatial on 2026-08-24.
-    familyId: "containment-analogy-v2",
-    primaryReasoningFamily: "analogical-transformation",
-    bands: [],
   },
   {
     // Extended from two to three ordered steps on 2026-08-24 (raise-the-ceiling
@@ -243,26 +224,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     ],
   },
   {
-    // Withdrawn by the human gate on 2026-08-23. The item shows no stem at all — six options and nothing else, so
-    // there is no worked evidence to infer a rule from — the solver has to guess
-    // which property matters. An IQ-style item must demonstrate its rule before
-    // asking for it applied. No eligible band until a redesign shows at least two
-    // worked panels.
-    familyId: "relational-outlier-v2",
-    primaryReasoningFamily: "classification-relation",
-    bands: [],
-  },
-  {
-    // The -v3 redesign demonstrated the shared relation with three example
-    // boards, fixing -v2's no-evidence defect — and still failed its human
-    // pilot on 2026-08-24: wrong answer, notation-misunderstanding report, 45
-    // seconds (data/pilot/2026-08-24-pilot-v2-a.json). Withdrawn the same day.
-    // The battery again has no odd-one-out format.
-    familyId: "relational-outlier-v3",
-    primaryReasoningFamily: "classification-relation",
-    bands: [],
-  },
-  {
     familyId: "relational-matrix-v2",
     primaryReasoningFamily: "matrix-reasoning",
     bands: [codeValidBand("constraint-spatial", ["relational-matrix-d4"])],
@@ -274,25 +235,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     familyId: "visual-set-algebra-v2",
     primaryReasoningFamily: "set-combination",
     bands: [codeValidBand("constraint-spatial", ["visual-set-algebra-d4", "visual-set-algebra-d5"])],
-  },
-  {
-    // Withdrawn by the human gate on 2026-08-23. The item shows one board and six completions of it, so
-    // there is no worked evidence to infer a rule from — the solver has to guess
-    // which property matters. An IQ-style item must demonstrate its rule before
-    // asking for it applied. No eligible band until a redesign shows at least two
-    // worked panels.
-    familyId: "constraint-mosaic-v2",
-    primaryReasoningFamily: "constraint-satisfaction",
-    bands: [],
-  },
-  {
-    // Withdrawn by the human gate on 2026-08-19: the rendered item admits two
-    // defensible readings — continue the visible line, or form the closed
-    // shape — so the answer is ambiguous by sight. Both calibrated models also
-    // scored 0% on it. No eligible band until a redesign passes the gate.
-    familyId: "topology-path-v1",
-    primaryReasoningFamily: "topological-reasoning",
-    bands: [],
   },
   {
     familyId: "spatial-transform-v2",
@@ -317,16 +259,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("induction-transfer", ["rule-switching-d5"])],
   },
   {
-    // Withdrawn by the human gate on 2026-08-23, after the first pilot. The
-    // check-marked and crossed example groups are a labelled-set classification,
-    // not a rule demonstrated and then applied: the pilot could not tell what
-    // the task was asking, and the mixed shapes across examples read as noise
-    // rather than evidence. No eligible band until a redesign shows the rule.
-    familyId: "concept-induction-v2",
-    primaryReasoningFamily: "concept-induction",
-    bands: [],
-  },
-  {
     // Two buckets in one band since 2026-08-25 (escalate-the-quiz, Phase 3).
     // d4 draws the whole crease grammar, so half its items need a single
     // unfold; d5 draws two-crease programs only, so every d5 item needs two.
@@ -345,31 +277,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     familyId: "inverse-fold-punch-v2",
     primaryReasoningFamily: "spatial-transformation",
     bands: [codeValidBand("induction-transfer", ["inverse-fold-punch-d5"])],
-  },
-  {
-    // Withdrawn 2026-08-23 on structural grounds. The row interleaves two
-    // strands, and the strand containing the blank shows only two terms — one
-    // observed transition — on every seed. A solver cannot check whether the
-    // step repeats, only assume it, and the uniqueness oracle silently assumes
-    // it too. No human ever saw this family (its pilot packet was never run);
-    // the strong vision model answered it wrongly four times in five — see
-    // data/pilot/README.md. A redesign needs a longer row so the answered
-    // strand shows three terms; until then, no eligible band.
-    familyId: "interleaved-sequence-v2",
-    primaryReasoningFamily: "sequential-relation",
-    bands: [],
-  },
-  {
-    // The -v3 redesign fixed -v2's structural defect (eight panels, every step
-    // observed at least twice), and the 2026-08-24 pilot answered it correctly
-    // in 30 seconds — but reported a notation misunderstanding and did not
-    // describe the intended two-strand relationship
-    // (data/pilot/2026-08-24-pilot-v2-a.json). A right answer without the
-    // intended reading does not prove the item measures its rule, so the user
-    // withdrew it the same day rather than admit it on a pass.
-    familyId: "interleaved-sequence-v3",
-    primaryReasoningFamily: "sequential-relation",
-    bands: [],
   },
   {
     familyId: "second-order-sequence-v2",
@@ -393,16 +300,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     familyId: "parallel-evolution-v1",
     primaryReasoningFamily: "sequential-relation",
     bands: [codeValidBand("composition", ["parallel-evolution-d3", "parallel-evolution-d4"])],
-  },
-  {
-    // Withdrawn by the human gate on 2026-08-23. The item shows one faulty board and six repairs of it, so
-    // there is no worked evidence to infer a rule from — the solver has to guess
-    // which property matters. An IQ-style item must demonstrate its rule before
-    // asking for it applied. No eligible band until a redesign shows at least two
-    // worked panels.
-    familyId: "minimal-repair-v3",
-    primaryReasoningFamily: "constraint-satisfaction",
-    bands: [],
   },
 ];
 

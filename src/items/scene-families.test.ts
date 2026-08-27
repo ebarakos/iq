@@ -151,24 +151,6 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("never asks a relational outlier to be judged on token size", () => {
-    // Medium versus large is the one difference this project refuses to call
-    // visible (isInstantlyDistinct in domains.ts). A size relation would turn
-    // this family into an eyesight test, so both tokens in every option must
-    // always share a size and no size relation may be sampled.
-    for (let seed = 0; seed < 200; seed++) {
-      const { puzzle } = generateSceneFamilyCandidate(
-        "relational-outlier-v2",
-        seededRng(`outlier-size:${seed}`),
-        entryBucket("relational-outlier-v2"),
-      );
-      for (const option of puzzle.options) {
-        const sizes = new Set(option.objects.map((placement) => (placement.object as SceneToken).size));
-        expect(sizes.size, `seed ${seed}`).toBe(1);
-      }
-    }
-  });
-
   it("keeps every option visually unique", () => {
     for (const { familyId, bucket } of FAMILY_BUCKETS) {
       const { puzzle } = generateSceneFamilyCandidate(familyId, seededRng(`unique:${familyId}:${bucket}`), bucket);
@@ -193,14 +175,6 @@ describe("scene family prototypes", () => {
       const visibleIndexes = tampered.stem.flatMap((panel, panelIndex) => "blank" in panel ? [] : [panelIndex]);
       if (familyId === "rule-switching-v2") {
         tampered.stem[5] = tampered.stem[3];
-      } else if (familyId === "relational-outlier-v3") {
-        // Duplicating an example board leaves the demonstrated relation intact
-        // (examples are set evidence, not a sequence), so the honest tamper is
-        // planting the breaker among the examples: the demonstrated relation
-        // can no longer be the one the answer breaks.
-        tampered.stem[0] = tampered.options[tampered.answerIndex];
-      } else if (tampered.layout === "conceptGroups") {
-        tampered.stem[0] = tampered.options[wrongIndex];
       } else if (visibleIndexes.length >= 2) {
         tampered.stem[visibleIndexes[1]] = tampered.stem[visibleIndexes[0]];
       } else if (visibleIndexes.length === 1) {
@@ -223,18 +197,11 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("samples all bounded concept relations and spatial transform classes", () => {
-    const conceptExplanations = new Set<string>();
+  it("samples every spatial transform class", () => {
+    // The concept-induction half of this test went with that family on
+    // 2026-08-27; the spatial half is unchanged.
     const spatialClasses = new Set<string>();
     for (let seed = 0; seed < 40; seed++) {
-      const concept = generateSceneFamilyCandidate(
-        "concept-induction-v2",
-        seededRng(`concept-variety:${seed}`),
-        entryBucket("concept-induction-v2"),
-      );
-      conceptExplanations.add(concept.puzzle.explanation);
-      expect(validateSceneFamilyCandidate(concept).accepted).toBe(true);
-
       const spatial = generateSceneFamilyCandidate(
         "spatial-transform-v2",
         seededRng(`spatial-variety:${seed}`),
@@ -251,58 +218,10 @@ describe("scene family prototypes", () => {
       );
       expect(validateSceneFamilyCandidate(spatial).accepted).toBe(true);
     }
-    expect(conceptExplanations.size).toBe(8);
     // Turning the board and turning the tokens are separate classes since
     // 2026-08-25; lumping them together is exactly the confusion this family
     // now exists to test.
     expect(spatialClasses).toEqual(new Set(["board-rotation", "token-turn", "reflection", "translation"]));
-  });
-
-  it("makes every minimal-repair fingerprint a distinct visible repair pattern", () => {
-    const mechanismByFingerprint = new Map<string, string>();
-    for (let seed = 0; seed < 200; seed++) {
-      const candidate = generateSceneFamilyCandidate(
-        "minimal-repair-v3",
-        seededRng("scene-family-verify-v1", `minimal-repair-v3:${seed}`),
-        entryBucket("minimal-repair-v3"),
-      );
-      const { puzzle } = candidate;
-      const faulty = puzzle.stem[0];
-      const answer = puzzle.options[puzzle.answerIndex];
-      if ("blank" in faulty) throw new Error("minimal repair needs a visible faulty board");
-      const faultyByPosition = new Map(faulty.objects.map((placement) => [
-        `${placement.row}:${placement.column}`,
-        placement.object,
-      ]));
-      const changed = answer.objects.filter((placement) =>
-        JSON.stringify(placement.object) !== JSON.stringify(faultyByPosition.get(`${placement.row}:${placement.column}`)));
-      expect(changed).toHaveLength(1);
-      const before = faultyByPosition.get(`${changed[0].row}:${changed[0].column}`);
-      const after = changed[0].object;
-      if (!before || before.kind !== "token" || after.kind !== "token") {
-        throw new Error("minimal repair must change one token");
-      }
-      const projection = before.shape !== after.shape ? "shape" : "fill";
-      expect(projection === "shape" ? before.fill : before.shape)
-        .toBe(projection === "shape" ? after.fill : after.shape);
-      const labels = new Map<string, number>();
-      const pattern = [...answer.objects]
-        .sort((left, right) => left.row - right.row || left.column - right.column)
-        .map((placement) => {
-          if (placement.object.kind !== "token") throw new Error("minimal repair boards must contain only tokens");
-          const value = placement.object[projection];
-          if (!labels.has(value)) labels.set(value, labels.size);
-          return labels.get(value);
-        })
-        .join("");
-      const fingerprint = candidate.definition.programFingerprint?.(puzzle);
-      expect(fingerprint).toBeTruthy();
-      const mechanism = `${projection}:${pattern}`;
-      expect(mechanismByFingerprint.get(fingerprint!) ?? mechanism).toBe(mechanism);
-      mechanismByFingerprint.set(fingerprint!, mechanism);
-    }
-    expect(mechanismByFingerprint.size).toBe(8);
-    expect(new Set(mechanismByFingerprint.values()).size).toBe(8);
   });
 
   it("makes every machine, switching, and composition fingerprint change the query answer", () => {
@@ -1660,7 +1579,6 @@ describe("answered strand declarations", () => {
   const ROW_FAMILIES = [
     { familyId: "relational-sequence-v2", panelIndexes: [0, 1, 2] },
     { familyId: "second-order-sequence-v2", panelIndexes: [0, 1, 2, 3, 4] },
-    { familyId: "interleaved-sequence-v3", panelIndexes: [1, 3, 5] },
     { familyId: "parallel-evolution-v1", panelIndexes: [0, 1, 2, 3, 4] },
   ] as const;
 
@@ -1696,22 +1614,25 @@ describe("answered strand declarations", () => {
   });
 
   it("rejects a declaration the stem does not support", () => {
-    // The interleaved row shows a0 b0 a1 b1 a2 b2 a3 and then the blank, so the
-    // answered strand is panels 1, 3, 5 and one more stride of two lands on 7.
+    // Retargeted on 2026-08-27 from `interleaved-sequence-v3`, withdrawn and
+    // then deleted. `second-order-sequence-v2` shows five landings and then the
+    // blank, so its answered strand is panels 0-4 at a stride of one and the
+    // next stride lands on the blank at 5. Every error branch the checker has is
+    // still exercised; only the shape of the row it is exercised on changed.
     const row = generateSceneFamilyCandidate(
-      "interleaved-sequence-v3",
+      "second-order-sequence-v2",
       seededRng("strand:tampered"),
-      entryBucket("interleaved-sequence-v3"),
+      entryBucket("second-order-sequence-v2"),
     );
     expect(checkAnsweredStrand(row).problem).toBeNull();
 
     const cases: { panelIndexes: number[] | undefined; problem: RegExp }[] = [
-      { panelIndexes: [1, 3, 9], problem: /panel index 9 is outside the 8-panel stem/ },
-      { panelIndexes: [5, 3, 1], problem: /must strictly increase, but 5 is followed by 3/ },
-      { panelIndexes: [3, 5, 7], problem: /panel 7 is blank/ },
-      { panelIndexes: [0, 2, 5], problem: /do not share one stride/ },
-      { panelIndexes: [0, 2, 4], problem: /lands on 6, not on the blank at 7/ },
-      { panelIndexes: [1, 3], problem: /only 2 observed terms/ },
+      { panelIndexes: [0, 1, 9], problem: /panel index 9 is outside the 6-panel stem/ },
+      { panelIndexes: [4, 3, 2], problem: /must strictly increase, but 4 is followed by 3/ },
+      { panelIndexes: [3, 4, 5], problem: /panel 5 is blank/ },
+      { panelIndexes: [0, 1, 4], problem: /do not share one stride/ },
+      { panelIndexes: [0, 1, 2], problem: /lands on 3, not on the blank at 5/ },
+      { panelIndexes: [0, 1], problem: /only 2 observed terms/ },
       { panelIndexes: undefined, problem: /no answeredStrandPanelIndexes declared/ },
     ];
     for (const { panelIndexes, problem } of cases) {
@@ -1719,5 +1640,4 @@ describe("answered strand declarations", () => {
       expect(check.problem ?? "", JSON.stringify(panelIndexes)).toMatch(problem);
     }
   });
-
 });

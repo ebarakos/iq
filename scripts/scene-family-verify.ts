@@ -47,26 +47,20 @@ const DISTANCE_BASELINE_PATH = "data/fixtures/scene-distance-v10.json";
  */
 const CONVERTED_FAMILY_IDS = new Set<string>([
   "relational-sequence-v2",
-  "relational-outlier-v2",
-  "relational-outlier-v3",
   "attribute-pairing-v1",
-  "interleaved-sequence-v3",
   "second-order-sequence-v2",
   "compositional-analogy-v2",
-  "containment-analogy-v2",
   "inverse-analogy-v2",
   "relational-matrix-v2",
   "visual-set-algebra-v2",
-  "constraint-mosaic-v2",
   "fold-punch-v2",
   "inverse-fold-punch-v2",
   "spatial-transform-v2",
-  "minimal-repair-v3",
   "transformation-machine-v3",
   "rule-switching-v2",
-  "concept-induction-v2",
   "composed-transform-v2",
   "parallel-evolution-v1",
+  "combining-machine-v1",
 ]);
 
 const seedsArg = process.argv.find((argument) => argument.startsWith("--seeds="));

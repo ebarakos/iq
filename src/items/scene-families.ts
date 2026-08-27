@@ -26,7 +26,6 @@ import {
   applySceneComposedProgram,
   applySceneCompositionPrimitive,
   applySceneUnary,
-  enumerateSceneConcepts,
   enumerateSceneOrderedFiveStepCompositions,
   enumerateSceneOrderedFourStepCompositions,
   enumerateSceneOrderedThreeStepCompositions,
@@ -35,40 +34,29 @@ import {
   sceneComposedProgramFromSteps,
   sceneComposedProgramKey,
   sceneComposedProgramSteps,
-  sceneSatisfiesConcept,
   type SceneBinaryOperation,
   type SceneComposedProgram,
   type SceneComposedProgramLength,
   type SceneCompositionPrimitive,
-  type SceneConcept,
   type ScenePosition,
   type SceneUnaryOperation,
 } from "./scene-grammar";
 import { rankByCloseness } from "./scene-distance";
-import { topologyFailures, type TopologyGoal } from "./topology";
 
 export const SCENE_FAMILY_IDS = [
   "relational-sequence-v2",
   "attribute-pairing-v1",
   "compositional-analogy-v2",
-  "containment-analogy-v2",
   "composed-transform-v2",
-  "relational-outlier-v2",
-  "relational-outlier-v3",
   "relational-matrix-v2",
   "visual-set-algebra-v2",
-  "constraint-mosaic-v2",
-  "topology-path-v1",
   "spatial-transform-v2",
   "transformation-machine-v3",
   "rule-switching-v2",
-  "concept-induction-v2",
   "fold-punch-v2",
   "inverse-fold-punch-v2",
-  "interleaved-sequence-v3",
   "second-order-sequence-v2",
   "inverse-analogy-v2",
-  "minimal-repair-v3",
   "parallel-evolution-v1",
   "combining-machine-v1",
 ] as const;
@@ -131,7 +119,6 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "compositional-analogy-d4", difficulty: 4, programDepth: 3 },
   ],
   // Containment change, then a move of the finished container.
-  "containment-analogy-v2": [{ bucket: "containment-analogy-d4", difficulty: 4, programDepth: 2 }],
   // d4 shows three ordered gates, d5 four, and d6 five, each worked separately
   // in its own row and then applied left to right; the depth counts those
   // displayed gates — nothing else. Since 2026-08-25 every gate is provably
@@ -142,8 +129,6 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "composed-transform-d5", difficulty: 5, programDepth: 3 },
     { bucket: "composed-transform-d6", difficulty: 6, programDepth: 5 },
   ],
-  "relational-outlier-v2": [{ bucket: "relational-outlier-d2", difficulty: 2, programDepth: 1 }],
-  "relational-outlier-v3": [{ bucket: "relational-outlier-v3-d2", difficulty: 2, programDepth: 1 }],
   // A row rule and a column rule, both needed for the missing corner.
   "relational-matrix-v2": [{ bucket: "relational-matrix-d4", difficulty: 4, programDepth: 2 }],
   // Two or three combining gates, never more: the three-gate ceiling of
@@ -158,8 +143,6 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "visual-set-algebra-d4", difficulty: 4, programDepth: 2 },
     { bucket: "visual-set-algebra-d5", difficulty: 5, programDepth: 3 },
   ],
-  "constraint-mosaic-v2": [{ bucket: "constraint-mosaic-d4", difficulty: 4, programDepth: 1 }],
-  "topology-path-v1": [{ bucket: "topology-path-d4", difficulty: 4, programDepth: 1 }],
   // One spatial transformation of the whole arrangement.
   "spatial-transform-v2": [{ bucket: "spatial-transform-d3", difficulty: 3, programDepth: 1 }],
   // Worked gates applied in the order the query path shows them: d5 shows
@@ -173,7 +156,6 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   ],
   // Two gates are demonstrated, but the query selects exactly one to apply.
   "rule-switching-v2": [{ bucket: "rule-switching-d5", difficulty: 5, programDepth: 1 }],
-  "concept-induction-v2": [{ bucket: "concept-induction-d5", difficulty: 5, programDepth: 1 }],
   // d4 draws the whole crease grammar, so only one unfold is guaranteed. d5
   // draws two-crease programs only: two unfolds, every time.
   "fold-punch-v2": [
@@ -194,12 +176,10 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   "inverse-fold-punch-v2": [
     { bucket: "inverse-fold-punch-d5", difficulty: 5, programDepth: 1 },
   ],
-  "interleaved-sequence-v3": [{ bucket: "interleaved-sequence-d4", difficulty: 4, programDepth: 2 }],
   // A step rule plus the rule governing how that step grows.
   "second-order-sequence-v2": [{ bucket: "second-order-sequence-d4", difficulty: 4, programDepth: 2 }],
   // Two changes, run in reverse to recover the missing input.
   "inverse-analogy-v2": [{ bucket: "inverse-analogy-d4", difficulty: 4, programDepth: 2 }],
-  "minimal-repair-v3": [{ bucket: "minimal-repair-d5", difficulty: 5, programDepth: 1 }],
   // Depth counts the separate rule applications that turn the last shown
   // board into the answer, one per token. d3 draws single-aspect rules, so
   // that is three (one aspect each); d4 always includes at least one
@@ -1048,433 +1028,6 @@ function compositionalAnalogy(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyC
   return asCandidate(family, puzzle);
 }
 
-interface ContainmentAnalogyProgram {
-  containerShape: "circle" | "square" | "diamond" | "hexagon";
-  movement: "right" | "down" | "diagonal";
-}
-
-const CONTAINMENT_ANALOGY_GRAMMAR: readonly ContainmentAnalogyProgram[] =
-  (["circle", "square", "diamond", "hexagon"] as const).flatMap((containerShape) =>
-    (["right", "down", "diagonal"] as const).map((movement) => ({ containerShape, movement })));
-
-function applyContainmentAnalogy(input: Scene, program: ContainmentAnalogyProgram): Scene | null {
-  const placement = singleTokenPlacement(input);
-  if (!placement) return null;
-  const contained = applySceneUnary(input, {
-    kind: "contain",
-    at: { row: placement.row, column: placement.column },
-    containerShape: program.containerShape,
-  });
-  if (!contained) return null;
-  const movement = program.movement === "right"
-    ? { rowDelta: 0 as const, columnDelta: 1 as const }
-    : program.movement === "down"
-      ? { rowDelta: 1 as const, columnDelta: 0 as const }
-      : { rowDelta: 1 as const, columnDelta: 1 as const };
-  return applySceneUnary(contained, { kind: "translate", ...movement, wrap: false });
-}
-
-function containmentAnalogy(rng: Rng): SceneFamilyCandidate {
-  const program = pick(rng, CONTAINMENT_ANALOGY_GRAMMAR);
-  const [firstShape, secondShape] = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const input = one(firstShape, 0, 0);
-  const output = applyContainmentAnalogy(input, program)!;
-  const query = one(secondShape, 0, 0, "solid");
-  const answer = applyContainmentAnalogy(query, program)!;
-  const distractors = distinctOutputs(CONTAINMENT_ANALOGY_GRAMMAR
-    .filter((candidateProgram) => JSON.stringify(candidateProgram) !== JSON.stringify(program))
-    .map((candidateProgram) => applyContainmentAnalogy(query, candidateProgram)))
-    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  const selectedDistractors = selectDistractors(distractors, rng, "containment analogy", { answer });
-  const puzzle = makePuzzle(
-    "prototype-containment-analogy",
-    "analogy",
-    "analogy",
-    "Apply both demonstrated relationship changes.",
-    4,
-    [input, output, query],
-    answer,
-    selectedDistractors,
-    rng,
-    `The worked pair changes both relationship and position. First the loose token is placed inside a ${program.containerShape}; then the complete container moves ${program.movement === "right" ? "one slot right" : program.movement === "down" ? "one slot down" : "one slot down and right"}. Repeating both visible changes on the third board gives the highlighted option. Each distractor uses a different container or movement program that fails the worked pair.`,
-  );
-  const family = definition(
-    "containment-analogy-v2",
-    ["worked-containment-pair", "containment-and-movement", "board-slots"],
-    JSON.stringify(program),
-    (candidate) => {
-      const [workedInput, workedOutput, queryInput] = candidate.stem.map(scenePanel);
-      if (!workedInput || !workedOutput || !queryInput) {
-        return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      }
-      const survivors = CONTAINMENT_ANALOGY_GRAMMAR.filter((candidateProgram) => {
-        const predicted = applyContainmentAnalogy(workedInput, candidateProgram);
-        return predicted !== null && sceneSignature(predicted) === sceneSignature(workedOutput);
-      });
-      const predictions = distinctOutputs(survivors.map((candidateProgram) =>
-        applyContainmentAnalogy(queryInput, candidateProgram)));
-      return {
-        derivedAnswer: predictions.length === 1 ? predictions[0] : null,
-        solutionCount: predictions.length,
-        usedCueIds: ["worked-containment-pair", "containment-and-movement", "board-slots"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
-          const failedProgram = CONTAINMENT_ANALOGY_GRAMMAR.find((candidateProgram) => {
-            const queryOutput = applyContainmentAnalogy(queryInput, candidateProgram);
-            const worked = applyContainmentAnalogy(workedInput, candidateProgram);
-            return queryOutput !== null && sceneSignature(queryOutput) === sceneSignature(option) &&
-              (worked === null || sceneSignature(worked) !== sceneSignature(workedOutput));
-          });
-          return failedProgram ? "this containment or movement program fails the worked pair" : null;
-        }),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-/**
- * Size is deliberately absent as a relation. A scene token may only be medium or
- * large, and this project treats that difference as too small to read at answer
- * size — `isInstantlyDistinct` in domains.ts refuses to call two tokens distinct
- * on size alone. An item asking which pair differs in size would therefore be an
- * eyesight test, which is the one thing difficulty here may never come from.
- * Size is still held constant inside every option, so it cannot become the
- * discriminator by accident either.
- */
-type OutlierRelationProgram =
-  | { kind: "position"; relation: "same-row" | "same-column" | "adjacent" | "diagonal" | "opposite" }
-  | { kind: "attribute"; attribute: "shape" | "fill"; relation: PairingRelation };
-
-const OUTLIER_RELATION_GRAMMAR: readonly OutlierRelationProgram[] = [
-  { kind: "position", relation: "same-row" },
-  { kind: "position", relation: "same-column" },
-  { kind: "position", relation: "adjacent" },
-  { kind: "position", relation: "diagonal" },
-  { kind: "position", relation: "opposite" },
-  { kind: "attribute", attribute: "shape", relation: "same" },
-  { kind: "attribute", attribute: "shape", relation: "different" },
-  { kind: "attribute", attribute: "fill", relation: "same" },
-  { kind: "attribute", attribute: "fill", relation: "different" },
-] as const;
-
-type PositionPair = readonly [
-  { readonly row: number; readonly column: number },
-  { readonly row: number; readonly column: number },
-];
-
-/** Every unordered pair of distinct board slots — the position vocabulary here. */
-const OUTLIER_POSITION_PAIRS: readonly PositionPair[] = (() => {
-  const slots = [0, 1, 2].flatMap((row) => [0, 1, 2].map((column) => ({ row, column })));
-  return slots.flatMap((first, index) =>
-    slots.slice(index + 1).map((second) => [first, second] as PositionPair));
-})();
-
-/** The two slots every attribute item uses, so only the attributes vary between options. */
-const OUTLIER_ATTRIBUTE_POSITIONS: PositionPair = [{ row: 1, column: 0 }, { row: 1, column: 2 }];
-
-/** The attributes an option may vary. Size is excluded on purpose — see above. */
-const OUTLIER_ATTRIBUTES = ["shape", "fill"] as const;
-
-function outlierScene(pair: PositionPair, first: SceneToken, second: SceneToken): Scene {
-  return scene([
-    { ...pair[0], object: first },
-    { ...pair[1], object: second },
-  ]);
-}
-
-/**
- * Every option this family may show for one relation, split into the ones that
- * keep it and the ones that break it.
- *
- * The construction is what makes the item well posed. For a position relation
- * both tokens in an option are identical, so every attribute relation holds
- * equally across the whole option list and none of them can single anything out.
- * For an attribute relation every option uses the same two slots, holds size
- * fixed, and shares the attribute the relation does not name, so only the named
- * attribute can.
- */
-function outlierOptionUniverse(
-  program: OutlierRelationProgram,
-  shapes: readonly SceneToken["shape"][],
-): { satisfying: Scene[]; breaking: Scene[] } {
-  const all: Scene[] = [];
-  if (program.kind === "position") {
-    for (const pair of OUTLIER_POSITION_PAIRS) {
-      for (const shape of shapes) all.push(outlierScene(pair, token(shape), token(shape)));
-    }
-  } else {
-    for (const shape of shapes) {
-      for (const otherShape of shapes) {
-        for (const fill of RELATIONAL_FILLS) {
-          for (const otherFill of RELATIONAL_FILLS) {
-            const differs = { shape: shape !== otherShape, fill: fill !== otherFill };
-            if (OUTLIER_ATTRIBUTES.some((attribute) =>
-              attribute !== program.attribute && differs[attribute])) continue;
-            all.push(outlierScene(
-              OUTLIER_ATTRIBUTE_POSITIONS,
-              token(shape, fill),
-              token(otherShape, otherFill),
-            ));
-          }
-        }
-      }
-    }
-  }
-  return {
-    satisfying: all.filter((option) => sceneSatisfiesOutlierRelation(option, program)),
-    breaking: all.filter((option) => !sceneSatisfiesOutlierRelation(option, program)),
-  };
-}
-
-/**
- * Take options from the pool until `count` of them are held, skipping any that
- * a viewer could not tell apart from one already taken at a glance.
- */
-function takeDistinctScenes(pool: readonly Scene[], count: number, held: readonly Scene[]): Scene[] {
-  const chosen = [...held];
-  for (const candidate of pool) {
-    if (chosen.length >= count + held.length) break;
-    if (chosen.every((other) => areScenesCategoricallyDistinct(candidate, other))) chosen.push(candidate);
-  }
-  return chosen.slice(held.length);
-}
-
-function outlierPair(value: Scene): readonly [
-  Scene["objects"][number] & { object: SceneToken },
-  Scene["objects"][number] & { object: SceneToken },
-] | null {
-  if (value.objects.length !== 2 || value.tiles.length > 0 ||
-      value.objects[0].object.kind !== "token" || value.objects[1].object.kind !== "token") return null;
-  return [
-    { ...value.objects[0], object: value.objects[0].object },
-    { ...value.objects[1], object: value.objects[1].object },
-  ];
-}
-
-function sceneSatisfiesOutlierRelation(value: Scene, program: OutlierRelationProgram): boolean {
-  const pair = outlierPair(value);
-  if (!pair) return false;
-  const [first, second] = pair;
-  if (program.kind === "attribute") {
-    const matches = first.object[program.attribute] === second.object[program.attribute];
-    return matches === (program.relation === "same");
-  }
-  const rowDelta = Math.abs(first.row - second.row);
-  const columnDelta = Math.abs(first.column - second.column);
-  if (program.relation === "same-row") return rowDelta === 0;
-  if (program.relation === "same-column") return columnDelta === 0;
-  if (program.relation === "adjacent") return rowDelta + columnDelta === 1;
-  if (program.relation === "diagonal") return rowDelta > 0 && rowDelta === columnDelta;
-  return first.row + second.row === 2 && first.column + second.column === 2;
-}
-
-/** Draws tried per relation before this family moves on to the next relation. */
-const OUTLIER_OPTION_ATTEMPTS = 40;
-
-function relationalOutlier(rng: Rng): SceneFamilyCandidate {
-  const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-
-  /**
-   * Draw one option list for a relation, or reject the draw.
-   *
-   * Rejected when any other relation in the grammar also singles out exactly one
-   * option and it is not the same one: that is a second defensible answer, and
-   * the item has to be thrown away rather than shipped ambiguous.
-   */
-  const draw = (program: OutlierRelationProgram): Scene[] | null => {
-    const universe = outlierOptionUniverse(program, shapes);
-    const breaker = shuffled(rng, universe.breaking)[0];
-    if (!breaker) return null;
-    const keepers = takeDistinctScenes(
-      shuffled(rng, universe.satisfying),
-      DISTRACTORS_PER_ITEM,
-      [breaker],
-    );
-    if (keepers.length !== DISTRACTORS_PER_ITEM) return null;
-    const options = [...keepers, breaker];
-    const singledOut = OUTLIER_RELATION_GRAMMAR.flatMap((candidateProgram) => {
-      const failures = options.flatMap((option, index) =>
-        sceneSatisfiesOutlierRelation(option, candidateProgram) ? [] : [index]);
-      return failures.length === 1 ? failures : [];
-    });
-    return singledOut.length > 0 && singledOut.every((index) => index === options.length - 1)
-      ? options
-      : null;
-  };
-
-  let program: OutlierRelationProgram | null = null;
-  let options: Scene[] | null = null;
-  for (const candidateProgram of shuffled(rng, OUTLIER_RELATION_GRAMMAR)) {
-    for (let attempt = 0; attempt < OUTLIER_OPTION_ATTEMPTS && !options; attempt++) {
-      options = draw(candidateProgram);
-    }
-    if (options) {
-      program = candidateProgram;
-      break;
-    }
-  }
-  if (!options || !program) throw new Error("relational outlier found no well-posed option list");
-
-  const breakerIndex = options.length - 1;
-  const order = shuffled(rng, options.map((_, index) => index));
-  const shuffledOptions = order.map((index) => options![index]);
-  const answerIndex = order.indexOf(breakerIndex);
-  const relationText = program.kind === "position"
-    ? program.relation === "same-row" ? "sit in the same row"
-      : program.relation === "same-column" ? "sit in the same column"
-        : program.relation === "adjacent" ? "share a horizontal or vertical edge"
-          : program.relation === "diagonal" ? "sit on one diagonal line"
-            : "sit opposite each other across the board centre"
-    : `have ${program.relation} ${program.attribute}`;
-  const puzzle: Puzzle<Scene> = {
-    id: "prototype-relational-outlier",
-    type: "oddOneOut",
-    layout: "row",
-    instruction: "Which scene breaks the shared relationship?",
-    difficulty: 2,
-    stem: [],
-    options: shuffledOptions,
-    answerIndex,
-    explanation: `Compare the relationship inside each two-token scene. In every option but one, the tokens ${relationText}; the clearly separated board positions, shapes, and fills provide the evidence. The highlighted option is the only one that breaks that shared relationship. Every other bounded relation in this family either agrees on the same outlier or does not isolate one option.`,
-  };
-  const family = definition(
-    "relational-outlier-v2",
-    ["two-token-scenes", "relative-token-relation"],
-    JSON.stringify(program),
-    (candidate) => {
-      const matchingPrograms = OUTLIER_RELATION_GRAMMAR.filter((candidateProgram) => {
-        const results = candidate.options.map((option) => sceneSatisfiesOutlierRelation(option, candidateProgram));
-        return results.filter((result) => !result).length === 1;
-      });
-      const predicted = new Set(matchingPrograms.map((candidateProgram) =>
-        candidate.options.findIndex((option) => !sceneSatisfiesOutlierRelation(option, candidateProgram)),
-      ));
-      return {
-        derivedAnswer: predicted.size === 1 ? candidate.options[[...predicted][0]] : null,
-        solutionCount: predicted.size,
-        usedCueIds: ["two-token-scenes", "relative-token-relation"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
-          const sharedProgram = matchingPrograms.find((candidateProgram) =>
-            sceneSatisfiesOutlierRelation(option, candidateProgram));
-          return sharedProgram ? `satisfies the shared relation ${JSON.stringify(sharedProgram)}` : null;
-        }),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-/**
- * The sound odd-one-out (raise-the-ceiling plan, Lever 3). Its withdrawn
- * predecessor showed six options and nothing else, so there was no worked
- * evidence to infer the rule from. Here the stem DEMONSTRATES the shared
- * relation with three example boards that all satisfy it; the solver then
- * picks the one option that breaks what the examples showed. Well-posedness is
- * checked against the stem-consistent relations only: every relation the
- * examples still allow must either single out the same breaker or single out
- * nothing.
- */
-function relationalOutlierDemonstrated(rng: Rng): SceneFamilyCandidate {
-  const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-
-  interface Draw {
-    stemExamples: Scene[];
-    options: Scene[];
-    survivors: OutlierRelationProgram[];
-  }
-
-  const draw = (program: OutlierRelationProgram): Draw | null => {
-    const universe = outlierOptionUniverse(program, shapes);
-    const satisfying = shuffled(rng, universe.satisfying);
-    const stemExamples = takeDistinctScenes(satisfying, 3, []);
-    if (stemExamples.length !== 3) return null;
-    const breaker = shuffled(rng, universe.breaking)[0];
-    if (!breaker) return null;
-    const keepers = takeDistinctScenes(satisfying, DISTRACTORS_PER_ITEM, [breaker, ...stemExamples]);
-    if (keepers.length !== DISTRACTORS_PER_ITEM) return null;
-    const options = [...keepers, breaker];
-    const survivors = OUTLIER_RELATION_GRAMMAR.filter((candidateProgram) =>
-      stemExamples.every((example) => sceneSatisfiesOutlierRelation(example, candidateProgram)));
-    const singledOut = survivors.flatMap((candidateProgram) => {
-      const failures = options.flatMap((option, index) =>
-        sceneSatisfiesOutlierRelation(option, candidateProgram) ? [] : [index]);
-      return failures.length === 1 ? failures : [];
-    });
-    return singledOut.length > 0 && singledOut.every((index) => index === options.length - 1)
-      ? { stemExamples, options, survivors }
-      : null;
-  };
-
-  let program: OutlierRelationProgram | null = null;
-  let accepted: Draw | null = null;
-  for (const candidateProgram of shuffled(rng, OUTLIER_RELATION_GRAMMAR)) {
-    for (let attempt = 0; attempt < OUTLIER_OPTION_ATTEMPTS && !accepted; attempt++) {
-      accepted = draw(candidateProgram);
-    }
-    if (accepted) {
-      program = candidateProgram;
-      break;
-    }
-  }
-  if (!accepted || !program) throw new Error("demonstrated outlier found no well-posed draw");
-
-  const breakerIndex = accepted.options.length - 1;
-  const order = shuffled(rng, accepted.options.map((_, index) => index));
-  const shuffledOptions = order.map((index) => accepted!.options[index]);
-  const answerIndex = order.indexOf(breakerIndex);
-  const relationText = program.kind === "position"
-    ? program.relation === "same-row" ? "sit in the same row"
-      : program.relation === "same-column" ? "sit in the same column"
-        : program.relation === "adjacent" ? "share a horizontal or vertical edge"
-          : program.relation === "diagonal" ? "sit on one diagonal line"
-            : "sit opposite each other across the board centre"
-    : `have ${program.relation} ${program.attribute}`;
-  const puzzle: Puzzle<Scene> = {
-    id: "prototype-relational-outlier-demonstrated",
-    type: "oddOneOut",
-    layout: "row",
-    instruction: "The three example boards share one rule. Pick the option that breaks it.",
-    difficulty: 2,
-    stem: accepted.stemExamples,
-    options: shuffledOptions,
-    answerIndex,
-    explanation: `In each of the three example boards, the tokens ${relationText} — that is the demonstrated rule. Five options keep it; the highlighted option is the only one that breaks it. Every other bounded relation the examples still allow either agrees on the same outlier or does not isolate one option.`,
-  };
-  const family = definition(
-    "relational-outlier-v3",
-    ["worked-example-boards", "two-token-scenes", "relative-token-relation"],
-    JSON.stringify(program),
-    (candidate) => {
-      const stemScenes = candidate.stem.map(scenePanel);
-      if (stemScenes.length !== 3 || stemScenes.some((panel) => !panel)) {
-        return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      }
-      const survivors = OUTLIER_RELATION_GRAMMAR.filter((candidateProgram) =>
-        stemScenes.every((example) => sceneSatisfiesOutlierRelation(example!, candidateProgram)));
-      const matchingPrograms = survivors.filter((candidateProgram) => {
-        const results = candidate.options.map((option) => sceneSatisfiesOutlierRelation(option, candidateProgram));
-        return results.filter((result) => !result).length === 1;
-      });
-      const predicted = new Set(matchingPrograms.map((candidateProgram) =>
-        candidate.options.findIndex((option) => !sceneSatisfiesOutlierRelation(option, candidateProgram)),
-      ));
-      return {
-        derivedAnswer: predicted.size === 1 ? candidate.options[[...predicted][0]] : null,
-        solutionCount: predicted.size,
-        usedCueIds: ["worked-example-boards", "two-token-scenes", "relative-token-relation"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
-          const sharedProgram = matchingPrograms.find((candidateProgram) =>
-            sceneSatisfiesOutlierRelation(option, candidateProgram));
-          return sharedProgram
-            ? `keeps the demonstrated relation ${JSON.stringify(sharedProgram)}`
-            : null;
-        }),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
 /**
  * The eight ways two boards combine. See `SceneBinaryOperation` for why this
  * doubled on 2026-08-27; the short version is that the old four could not say
@@ -2075,54 +1628,6 @@ function setAlgebra(
   return asCandidate(family, puzzle);
 }
 
-type MosaicProjection = "shape" | "fill";
-type MosaicPattern = "rows" | "columns" | "diagonals" | "all-same";
-
-interface MosaicProgram {
-  projection: MosaicProjection;
-  pattern: MosaicPattern;
-}
-
-const MOSAIC_GRAMMAR: readonly MosaicProgram[] = (["shape", "fill"] as const).flatMap((projection) =>
-  (["rows", "columns", "diagonals", "all-same"] as const).map((pattern) => ({ projection, pattern })));
-
-function mosaicGroups(pattern: MosaicPattern): readonly [number, number, number, number] {
-  if (pattern === "rows") return [0, 0, 1, 1];
-  if (pattern === "columns") return [0, 1, 0, 1];
-  if (pattern === "diagonals") return [0, 1, 1, 0];
-  return [0, 0, 0, 0];
-}
-
-function mosaicValues(value: Scene, projection: MosaicProjection): string[] | null {
-  const byPosition = new Map(value.objects.map((placement) => [
-    `${placement.row}:${placement.column}`,
-    placement.object.kind === "token" ? placement.object[projection] : null,
-  ]));
-  const values = ["0:0", "0:1", "1:0", "1:1"].map((position) => byPosition.get(position));
-  return values.some((entry) => typeof entry !== "string") ? null : values as string[];
-}
-
-function valuesMatchGroups(values: readonly string[], groups: readonly number[]): boolean {
-  return values.every((value, left) => values.every((other, right) =>
-    (value === other) === (groups[left] === groups[right])));
-}
-
-function mosaicVisibleFits(template: Scene, program: MosaicProgram): boolean {
-  const byPosition = new Map(template.objects.map((placement) => [
-    `${placement.row}:${placement.column}`,
-    placement.object.kind === "token" ? placement.object[program.projection] : null,
-  ]));
-  const visibleValues = ["0:0", "0:1", "1:0"].map((position) => byPosition.get(position));
-  if (visibleValues.some((value) => typeof value !== "string")) return false;
-  const visibleGroups = mosaicGroups(program.pattern).slice(0, 3);
-  return valuesMatchGroups(visibleValues as string[], visibleGroups);
-}
-
-function mosaicCompletedFits(value: Scene, program: MosaicProgram): boolean {
-  const values = mosaicValues(value, program.projection);
-  return values !== null && valuesMatchGroups(values, mosaicGroups(program.pattern));
-}
-
 
 /**
  * The glyph keys a combining machine's gate panel shows, in the order they are
@@ -2182,6 +1687,52 @@ function combiningMachinePair(
 }
 
 /**
+ * The answer with the clash cell's other token, and the answer with its
+ * exclusive token moved to the other exclusive cell.
+ *
+ * These are the only two ways a board can sit near this family's answer: the
+ * clash cell is the one position whose token differs between the two operands,
+ * and the left-only and right-only cells are the one pair that carries the same
+ * shape. So the first keeps the answer's footprint and changes a shape, and the
+ * second keeps the answer's shapes and changes the footprint — exactly the two
+ * agreements the near-miss pool could not otherwise reach.
+ *
+ * Both name a mistake a solver makes: reading the clash the wrong way round, and
+ * keeping the token only the other board had. Each returns null when the answer
+ * does not occupy the cell in question, in which case there is nothing to swap.
+ */
+function clashSwapped(answer: Scene, roles: SetAlgebraRoles, left: Scene, right: Scene): Scene | null {
+  const at = (board: Scene, position: ScenePosition) => board.objects.find(
+    (placement) => placement.row === position.row && placement.column === position.column);
+  const here = at(answer, roles.clash);
+  if (!here) return null;
+  const fromLeft = at(left, roles.clash);
+  const fromRight = at(right, roles.clash);
+  if (!fromLeft || !fromRight) return null;
+  const other = JSON.stringify(here.object) === JSON.stringify(fromLeft.object) ? fromRight : fromLeft;
+  if (JSON.stringify(other.object) === JSON.stringify(here.object)) return null;
+  return scene(answer.objects.map((placement) =>
+    placement === here ? { ...placement, object: other.object } : placement));
+}
+
+function exclusiveSwapped(answer: Scene, roles: SetAlgebraRoles, left: Scene, right: Scene): Scene | null {
+  const at = (board: Scene, position: ScenePosition) => board.objects.find(
+    (placement) => placement.row === position.row && placement.column === position.column);
+  const onLeft = at(answer, roles.leftOnly);
+  const onRight = at(answer, roles.rightOnly);
+  // Exactly one of the two must be present, or there is no move to make.
+  if (Boolean(onLeft) === Boolean(onRight)) return null;
+  const present = (onLeft ?? onRight)!;
+  const target = onLeft ? roles.rightOnly : roles.leftOnly;
+  const source = onLeft ? at(right, roles.rightOnly) : at(left, roles.leftOnly);
+  if (!source) return null;
+  return scene([
+    ...answer.objects.filter((placement) => placement !== present),
+    { ...target, object: source.object },
+  ]);
+}
+
+/**
  * Every ordered tuple of DISTINCT combining operations of the given length.
  *
  * Distinct because two identical gates would give the query two glyphs that
@@ -2217,10 +1768,17 @@ const COMBINING_MACHINE_BUCKET_GATES: Readonly<Record<string, number>> = {
  * the throw below is a rejected attempt the assembler retries on a fresh seed,
  * which is the failure path every other family already uses.
  */
-const COMBINING_MACHINE_INPUT_ATTEMPTS = 25;
-const COMBINING_MACHINE_GATE_ORDERS_TRIED = 48;
-/** Gate orders searched for full aspect coverage before settling for a sound draw. */
-const COMBINING_MACHINE_COVERAGE_ORDERS = 12;
+const COMBINING_MACHINE_INPUT_ATTEMPTS = 40;
+const COMBINING_MACHINE_GATE_ORDERS_TRIED = 140;
+/**
+ * Gate orders searched for full aspect coverage before settling for a sound
+ * draw. Deliberately large: it takes a wide search to find a three-gate chain
+ * whose answer some OTHER chain can sit beside, and the payoff is real — d5 items
+ * decided by a single aspect fall from 47% at 40 orders to 8% at 120. The cost is
+ * roughly 700ms an item, which is fine while this family is a prototype the
+ * assembler never calls, and the first thing to revisit if it is ever promoted.
+ */
+const COMBINING_MACHINE_COVERAGE_ORDERS = 120;
 
 /**
  * A machine whose gates COMBINE two boards instead of transforming one.
@@ -2312,6 +1870,38 @@ function combiningMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandi
       runOnBoards(queryLeft, ordered, queryLeft),
       runOnBoards(queryRight, ordered, queryLeft),
       queryLeft, queryRight,
+      // The two boards that sit exactly where the answer sits, or carry exactly
+      // the answer's shapes, and differ in one readable way. Measured, the
+      // chains above could not reach either: with four role cells, the answer's
+      // own footprint was reachable only by the correct chain, so the answer was
+      // the only option in its cells in 60% of items and where the tokens go
+      // finished it. Both are real mistakes rather than manufactured contrast —
+      // taking the losing side of the clash, and keeping the wrong board's
+      // exclusive token — which is why each earns a witness below.
+      clashSwapped(answer, queryRoles, queryLeft, queryRight),
+      exclusiveSwapped(answer, queryRoles, queryLeft, queryRight),
+      // Two more, added 2026-08-27 because the pool above holds only whole-chain
+      // variants and the answer of a chain often lands where no other whole
+      // chain does — leaving the answer alone in its cells. These go wrong at
+      // ONE step and run the rest correctly, so they land beside the answer
+      // rather than somewhere else entirely: feeding the left board in as the
+      // second operand at one step, and combining that step's two boards the
+      // wrong way round, which changes the result for every operation that is
+      // not symmetric.
+      ...ordered.flatMap((_, index) => {
+        let value: Scene | null = queryLeft;
+        for (let step = 0; step < index; step++) value = value && applySceneBinary(value, queryRight, ordered[step]);
+        if (!value) return [];
+        const slipped = applySceneBinary(value, queryLeft, ordered[index]);
+        const reversed = applySceneBinary(queryRight, value, ordered[index]);
+        return [slipped, reversed].map((after) => {
+          let rest: Scene | null = after;
+          for (let step = index + 1; step < ordered.length; step++) {
+            rest = rest && applySceneBinary(rest, queryRight, ordered[step]);
+          }
+          return rest;
+        });
+      }),
     ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
     if (pool.length < DISTRACTORS_PER_ITEM) return null;
 
@@ -2442,197 +2032,59 @@ function combiningMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandi
           if (is(runOn(readLeft, readGates, readLeft)) || is(runOn(readRight, readGates, readLeft))) {
             return "chains onto the left board instead of the right one";
           }
+          // One step wrong, the rest right. Checked after the whole-chain
+          // mistakes above so a board either of those explains keeps the
+          // sharper name.
+          for (let index = 0; index < readGates.length; index++) {
+            let value: Scene | null = readLeft;
+            for (let step = 0; step < index; step++) {
+              value = value && applySceneBinary(value, readRight, readGates[step]);
+            }
+            if (!value) break;
+            for (const after of [
+              applySceneBinary(value, readLeft, readGates[index]),
+              applySceneBinary(readRight, value, readGates[index]),
+            ]) {
+              let rest: Scene | null = after;
+              for (let step = index + 1; step < readGates.length; step++) {
+                rest = rest && applySceneBinary(rest, readRight, readGates[step]);
+              }
+              if (is(rest)) return "goes wrong at one gate and runs the rest correctly";
+            }
+          }
           if (is(readLeft) || is(readRight)) return "copies one of the two boards instead of combining them";
+          // The two boards built beside the answer. The roles are readable off
+          // the visible query pair: the clash is the one cell both boards fill
+          // differently, and the exclusive cells are the ones only one fills.
+          if (predicted) {
+            const cellOf = (board: Scene, position: ScenePosition) => board.objects.find(
+              (placement) => placement.row === position.row && placement.column === position.column);
+            const positions = [...readLeft.objects, ...readRight.objects]
+              .map((placement) => ({ row: placement.row, column: placement.column }));
+            const clashAt = positions.find((position) => {
+              const onLeft = cellOf(readLeft, position);
+              const onRight = cellOf(readRight, position);
+              return onLeft && onRight &&
+                JSON.stringify(onLeft.object) !== JSON.stringify(onRight.object);
+            });
+            const leftOnlyAt = positions.find((position) =>
+              cellOf(readLeft, position) && !cellOf(readRight, position));
+            const rightOnlyAt = positions.find((position) =>
+              !cellOf(readLeft, position) && cellOf(readRight, position));
+            if (clashAt && leftOnlyAt && rightOnlyAt) {
+              const roles: SetAlgebraRoles = {
+                shared: clashAt, clash: clashAt, leftOnly: leftOnlyAt, rightOnly: rightOnlyAt,
+              };
+              if (is(clashSwapped(predicted, roles, readLeft, readRight))) {
+                return "takes the losing side where the two boards disagree";
+              }
+              if (is(exclusiveSwapped(predicted, roles, readLeft, readRight))) {
+                return "keeps the token only the other board had";
+              }
+            }
+          }
           return null;
         }),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-function constraintMosaic(rng: Rng): SceneFamilyCandidate {
-  const program = pick(rng, MOSAIC_GRAMMAR);
-  const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const fills = shuffled(rng, RELATIONAL_FILLS);
-  const groups = mosaicGroups(program.pattern);
-  const shapeAt = (index: number): SceneToken["shape"] => program.projection === "shape"
-    ? shapes[groups[index]]
-    : shapes[index];
-  const fillAt = (index: number): SceneToken["fill"] => program.projection === "fill"
-    ? fills[groups[index]]
-    : fills[index % 3];
-  const placements = [
-    { row: 0, column: 0, object: token(shapeAt(0), fillAt(0)) },
-    { row: 0, column: 1, object: token(shapeAt(1), fillAt(1)) },
-    { row: 1, column: 0, object: token(shapeAt(2), fillAt(2)) },
-  ];
-  const board = scene(placements, 2, 2);
-  const answerToken = token(shapeAt(3), fillAt(3));
-  const inserted = (object: SceneToken) => scene([
-    ...placements,
-    { row: 1, column: 1, object },
-  ], 2, 2);
-  const answerBoard = inserted(answerToken);
-  // A wrong tile is any token that visibly breaks the grouping — under every
-  // grouping the three shown tiles still allow, not just the sampled one, since
-  // the solver can only rule out what the visible board rules out.
-  const survivingPrograms = MOSAIC_GRAMMAR.filter((candidateProgram) =>
-    mosaicVisibleFits(board, candidateProgram));
-  const wrongBoards = shapes.flatMap((shape) => fills.map((fill) => inserted(token(shape, fill))))
-    .filter((option) => survivingPrograms.every((candidateProgram) =>
-      !mosaicCompletedFits(option, candidateProgram)));
-  const nearMisses = takeDistinctScenes(shuffled(rng, wrongBoards), DISTRACTORS_PER_ITEM, [answerBoard]);
-  if (!mosaicCompletedFits(answerBoard, program) || nearMisses.length !== DISTRACTORS_PER_ITEM) {
-    throw new Error(`constraint mosaic needs one completion and ${DISTRACTORS_PER_ITEM} near misses`);
-  }
-  const options = [answerBoard, ...nearMisses];
-  const order = shuffled(rng, options.map((_, index) => index));
-  const shuffledOptions = order.map((index) => options[index]);
-  const answerIndex = order.indexOf(0);
-  const patternText = program.pattern === "rows" ? "each row repeats one value"
-    : program.pattern === "columns" ? "each column repeats one value"
-      : program.pattern === "diagonals" ? "matching values sit on opposite diagonals"
-        : "all four cells repeat one value";
-  const puzzle: Puzzle<Scene> = {
-    id: "prototype-constraint-mosaic",
-    type: "matrix",
-    layout: "singleScene",
-    instruction: "Which completed board continues the visible grouping?",
-    difficulty: 4,
-    stem: [board],
-    options: shuffledOptions,
-    answerIndex,
-    explanation: `Treat the four cells as one 2×2 board and compare their ${program.projection}. The three shown cells establish that ${patternText}, so the lower-right value is fixed by the same grouping. The highlighted completion preserves every shown cell and supplies that value. Each distractor changes only the missing tile but breaks at least one visible equality or difference in the grouping.`,
-  };
-  const family = definition(
-    "constraint-mosaic-v2",
-    ["upper-left-mosaic", "categorical-grouping", "missing-lower-right-tile"],
-    JSON.stringify(program),
-    (candidate) => {
-      const template = scenePanel(candidate.stem[0]);
-      if (!template) return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      const survivors = MOSAIC_GRAMMAR.filter((candidateProgram) => mosaicVisibleFits(template, candidateProgram));
-      const evaluated = candidate.options.map((option) => {
-        const fixed = new Map(template.objects.map((placement) => [
-          `${placement.row}:${placement.column}`,
-          JSON.stringify(placement.object),
-        ]));
-        const preservesTemplate = option.rows === template.rows && option.columns === template.columns &&
-          option.objects.length === template.objects.length + 1 &&
-          [...fixed].every(([position, object]) => option.objects.some((placement) =>
-            `${placement.row}:${placement.column}` === position && JSON.stringify(placement.object) === object));
-        const insertedAtTarget = option.objects.some((placement) => placement.row === 1 && placement.column === 1) &&
-          !fixed.has("1:1");
-        const matchingPrograms = survivors.filter((candidateProgram) => mosaicCompletedFits(option, candidateProgram));
-        const failures = !preservesTemplate || !insertedAtTarget
-          ? ["does not fill only the missing lower-right tile"]
-          : matchingPrograms.length === 0
-            ? ["breaks the grouping shown by the three fixed tiles"]
-            : [];
-        return { option, failures, matchingPrograms };
-      });
-      const selections = survivors.map((candidateProgram) => evaluated.flatMap((entry, optionIndex) =>
-        entry.failures.length === 0 && entry.matchingPrograms.includes(candidateProgram) ? [optionIndex] : []));
-      const everyProgramSelectsOne = selections.length > 0 && selections.every((matches) => matches.length === 1);
-      const predictedIndexes = new Set(selections.flat());
-      const unique = everyProgramSelectsOne && predictedIndexes.size === 1;
-      return {
-        derivedAnswer: unique ? candidate.options[[...predictedIndexes][0]] : null,
-        solutionCount: unique ? 1 : predictedIndexes.size,
-        usedCueIds: ["upper-left-mosaic", "categorical-grouping", "missing-lower-right-tile"],
-        distractorWitnesses: candidate.options.flatMap((_, optionIndex) =>
-          optionIndex === candidate.answerIndex || !evaluated[optionIndex]?.failures[0]
-            ? []
-            : [{ optionIndex, witness: evaluated[optionIndex].failures[0] }]),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-function topologyPath(rng: Rng): SceneFamilyCandidate {
-  const fixedTiles: Scene["tiles"] = [
-    { row: 0, column: 0, edges: ["east", "south"] },
-    { row: 0, column: 1, edges: ["south", "west"] },
-    { row: 1, column: 0, edges: ["north", "east"] },
-  ];
-  const baseIncomplete: Scene = { kind: "scene", rows: 2, columns: 2, objects: [], tiles: fixedTiles };
-  // Every way two edges of the missing tile can be joined. Exactly one of them
-  // meets both exposed ends; the rest leave an open end or a mismatched seam.
-  const optionEdges: Scene["tiles"][number]["edges"][] = [
-    ["north", "east"],
-    ["north", "south"],
-    ["north", "west"],
-    ["east", "south"],
-    ["east", "west"],
-    ["south", "west"],
-  ];
-  const baseOptions = optionEdges.map((edges): Scene => ({
-    kind: "scene",
-    rows: 2,
-    columns: 2,
-    objects: [],
-    tiles: [...fixedTiles, { row: 1, column: 1, edges }],
-  }));
-  const quarterTurns = pick(rng, [0, 1, 2, 3] as const);
-  const rotateScene = (candidate: Scene) => quarterTurns === 0
-    ? candidate
-    : applySceneUnary(candidate, { kind: "rotate", quarterTurns })!;
-  const incomplete = rotateScene(baseIncomplete);
-  const options = baseOptions.map(rotateScene);
-  const goal: TopologyGoal = "singleLoop";
-  const valid = options.map((candidate) => topologyFailures(candidate, goal).length === 0);
-  const validIndexes = valid.flatMap((isValid, index) => isValid ? [index] : []);
-  const canonicalAnswer = validIndexes[0] ?? 0;
-  const order = shuffled(rng, options.map((_, index) => index));
-  const puzzle: Puzzle<Scene> = {
-    id: "prototype-topology-path",
-    type: "matrix",
-    layout: "singleScene",
-    instruction: "Which completed board makes one closed loop?",
-    difficulty: 4,
-    stem: [incomplete],
-    options: order.map((index) => options[index]),
-    answerIndex: order.indexOf(canonicalAnswer),
-    explanation: "Follow each line through the completed 2×2 board. At every shared edge, a line must meet a line on the neighbouring tile; no line may stop at a seam or leave the outside boundary. The highlighted completion connects the two exposed ends and makes one closed loop. Each other tile leaves an open end, creates a mismatch, or fails to form a single loop.",
-  };
-  const family = definition(
-    "topology-path-v1",
-    ["edge-connections", "loop-goal"],
-    goal,
-    (candidate) => {
-      const template = scenePanel(candidate.stem[0]);
-      if (!template) return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      const fixed = new Map(template.tiles.map((tile) => [
-        `${tile.row}:${tile.column}`,
-        tile.edges.join(","),
-      ]));
-      const missingPositions = Array.from({ length: template.rows * template.columns }, (_, index) => ({
-        row: Math.floor(index / template.columns),
-        column: index % template.columns,
-      })).filter((position) => !fixed.has(`${position.row}:${position.column}`));
-      const evaluated = candidate.options.map((option) => {
-        const preservesTemplate = option.rows === template.rows && option.columns === template.columns &&
-          option.tiles.length === template.tiles.length + 1 &&
-          [...fixed].every(([position, edges]) => option.tiles.some((tile) =>
-            `${tile.row}:${tile.column}` === position && tile.edges.join(",") === edges));
-        const target = missingPositions[0];
-        const fillsTarget = missingPositions.length === 1 && target &&
-          option.tiles.some((tile) => tile.row === target.row && tile.column === target.column);
-        const failures = topologyFailures(option, goal).map((failure) => failure.message);
-        if (!preservesTemplate || !fillsTarget) failures.unshift("changes a fixed tile instead of filling the one empty slot");
-        return { option, failures };
-      });
-      const validOptions = evaluated.filter((entry) => entry.failures.length === 0);
-      return {
-        derivedAnswer: validOptions.length === 1 ? validOptions[0].option : null,
-        solutionCount: validOptions.length,
-        usedCueIds: ["edge-connections", "loop-goal"],
-        distractorWitnesses: candidate.options.flatMap((_, optionIndex) =>
-          optionIndex === candidate.answerIndex || !evaluated[optionIndex]?.failures[0]
-            ? []
-            : [{ optionIndex, witness: evaluated[optionIndex].failures[0] }]),
       };
     },
   );
@@ -4097,387 +3549,6 @@ function composedTransformForProgram(
   return asCandidate(family, puzzle);
 }
 
-function contained(shape: SceneToken["shape"], inner: SceneToken["shape"], row: number, column: number): Scene {
-  return scene([{
-    row,
-    column,
-    object: {
-      kind: "container",
-      // Pointy shapes (now including the scene-only arrow) are never container outlines.
-      shape: shape === "triangle" || shape === "star" || shape === "arrow" ? "circle" : shape,
-      contents: [token(inner)],
-    },
-  }]);
-}
-
-/**
- * Simple boards this family can offer as extra wrong options: one token in each
- * slot, and two tokens in a spread of arrangements and attribute combinations.
- * Nothing here is wrong by construction — `conceptCandidate` keeps only the
- * boards that fail every concept the shown examples still allow.
- */
-function conceptNearMissPool(shapes: readonly SceneToken["shape"][]): Scene[] {
-  const slots = [0, 1, 2].flatMap((row) => [0, 1, 2].map((column) => ({ row, column })));
-  const singles = slots.flatMap((slot, index) =>
-    RELATIONAL_FILLS.map((fill) => scene([{ ...slot, object: token(shapes[index % shapes.length], fill) }])));
-  const pairs = slots.flatMap((first, firstIndex) => slots.slice(firstIndex + 1).flatMap((second) =>
-    shapes.flatMap((shape, shapeIndex) => [
-      scene([
-        { ...first, object: token(shape) },
-        { ...second, object: token(shapes[(shapeIndex + 1) % shapes.length], "solid") },
-      ]),
-      scene([
-        { ...first, object: token(shape) },
-        { ...second, object: token(shape, "solid") },
-      ]),
-    ])));
-  return [...singles, ...pairs];
-}
-
-function conceptCandidate(
-  rng: Rng,
-  shapes: readonly SceneToken["shape"][],
-  ruleKey: string,
-  relationCue: string,
-  positives: readonly Scene[],
-  negatives: readonly Scene[],
-  answer: Scene,
-  authoredDistractors: readonly Scene[],
-  explanation: string,
-): SceneFamilyCandidate {
-  // A wrong option has to fail every concept still consistent with the shown
-  // examples — exactly the test the validator applies — or the item would have a
-  // second defensible answer. The hand-written near misses come first because
-  // they are the ones chosen to look tempting; the pool only tops up the rest.
-  const survivors = enumerateSceneConcepts().filter((concept) =>
-    positives.every((example) => sceneSatisfiesConcept(example, concept)) &&
-    negatives.every((example) => !sceneSatisfiesConcept(example, concept)));
-  const failsEverySurvivor = (option: Scene) =>
-    survivors.length > 0 && survivors.every((concept) => !sceneSatisfiesConcept(option, concept));
-  const distractors = takeDistinctScenes(
-    [
-      ...authoredDistractors.filter(failsEverySurvivor),
-      ...shuffled(rng, conceptNearMissPool(shapes).filter(failsEverySurvivor)),
-    ],
-    DISTRACTORS_PER_ITEM,
-    [answer],
-  );
-  if (distractors.length !== DISTRACTORS_PER_ITEM) {
-    throw new Error(`concept induction needs ${DISTRACTORS_PER_ITEM} boards that break the concept`);
-  }
-  const rawOptions = [answer, ...distractors];
-  const order = shuffled(rng, rawOptions.map((_, index) => index));
-  const options = order.map((index) => rawOptions[index]);
-  const answerIndex = order.indexOf(0);
-  const puzzle: Puzzle<Scene> = {
-    id: "prototype-concept-induction",
-    type: "oddOneOut",
-    layout: "conceptGroups",
-    instruction: "The top scenes belong; the lower scenes do not. Which option belongs?",
-    difficulty: 5,
-    stem: [...positives, ...negatives],
-    options,
-    answerIndex,
-    explanation,
-  };
-  const family = definition(
-    "concept-induction-v2",
-    ["positive-group", "negative-group", relationCue],
-    ruleKey,
-    (candidate) => {
-      const examples = candidate.stem.map(scenePanel);
-      if (examples.some((example) => !example)) {
-        return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      }
-      const positiveExamples = examples.slice(0, 3) as Scene[];
-      const negativeExamples = examples.slice(3, 6) as Scene[];
-      const survivors = enumerateSceneConcepts().filter((concept) =>
-        positiveExamples.every((example) => sceneSatisfiesConcept(example, concept)) &&
-        negativeExamples.every((example) => !sceneSatisfiesConcept(example, concept)),
-      );
-      const classifications = survivors.map((concept) =>
-        candidate.options.flatMap((option, optionIndex) =>
-          sceneSatisfiesConcept(option, concept) ? [optionIndex] : []));
-      const everyConceptSelectsOne = classifications.length > 0 &&
-        classifications.every((matches) => matches.length === 1);
-      const predictedAnswers = new Set(classifications.flat());
-      const unique = everyConceptSelectsOne && predictedAnswers.size === 1;
-      return {
-        derivedAnswer: unique ? candidate.options[[...predictedAnswers][0]] : null,
-        solutionCount: unique ? 1 : predictedAnswers.size,
-        usedCueIds: ["positive-group", "negative-group", relationCue],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
-          survivors.length > 0 && survivors.every((concept) => !sceneSatisfiesConcept(option, concept))
-            ? "fails every concept consistent with the positive and negative examples"
-            : null),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-type AttributeConceptRelation = "same" | "different";
-type AttributeConceptAttribute = "shape" | "fill";
-
-function attributeConceptScene(
-  shapes: readonly SceneToken["shape"][],
-  attribute: AttributeConceptAttribute,
-  values: readonly string[],
-  variant: 0 | 1 | 2,
-): Scene {
-  const positions = variant === 0
-    ? [{ row: 0, column: 0 }, { row: 0, column: 1 }]
-    : variant === 1
-      ? [{ row: 0, column: 0 }, { row: 2, column: 2 }]
-      : [{ row: 0, column: 0 }, { row: 0, column: 2 }, { row: 2, column: 1 }];
-  const nuisanceShapes = variant === 0 ? [shapes[0], shapes[1]]
-    : variant === 1 ? [shapes[2], shapes[2]]
-      : [shapes[0], shapes[3], shapes[4]];
-  const nuisanceFills = variant === 0 ? ["outline", "solid"] as const
-    : variant === 1 ? ["half", "half"] as const
-      : ["outline", "half", "solid"] as const;
-  const sizes = variant === 0 ? ["m", "l"] as const
-    : variant === 1 ? ["l", "l"] as const
-      : ["l", "m", "l"] as const;
-  return scene(positions.map((position, index) => ({
-    ...position,
-    object: token(
-      attribute === "shape" ? values[index] as SceneToken["shape"] : nuisanceShapes[index],
-      attribute === "fill" ? values[index] as SceneToken["fill"] : nuisanceFills[index],
-      sizes[index],
-    ),
-  })));
-}
-
-function attributeConceptCandidate(
-  rng: Rng,
-  shapes: readonly SceneToken["shape"][],
-  relation: AttributeConceptRelation,
-  attribute: AttributeConceptAttribute,
-): SceneFamilyCandidate {
-  const domain: readonly string[] = attribute === "shape" ? shapes : RELATIONAL_FILLS;
-  const positives = relation === "same"
-    ? [
-        attributeConceptScene(shapes, attribute, [domain[0], domain[0]], 0),
-        attributeConceptScene(shapes, attribute, [domain[1], domain[1]], 1),
-        attributeConceptScene(shapes, attribute, [domain[2], domain[2], domain[2]], 2),
-      ]
-    : [
-        attributeConceptScene(shapes, attribute, [domain[0], domain[1]], 0),
-        attributeConceptScene(shapes, attribute, [domain[1], domain[2]], 1),
-        attributeConceptScene(shapes, attribute, [domain[0], domain[1], domain[2]], 2),
-      ];
-  const negatives = relation === "same"
-    ? [
-        attributeConceptScene(shapes, attribute, [domain[0], domain[1]], 0),
-        attributeConceptScene(shapes, attribute, [domain[1], domain[2]], 1),
-        attributeConceptScene(shapes, attribute, [domain[0], domain[0], domain[1]], 2),
-      ]
-    : [
-        attributeConceptScene(shapes, attribute, [domain[0], domain[0]], 0),
-        attributeConceptScene(shapes, attribute, [domain[1], domain[1]], 1),
-        attributeConceptScene(shapes, attribute, [domain[0], domain[1], domain[0]], 2),
-      ];
-  const answerValues = relation === "same"
-    ? [domain[2], domain[2]]
-    : [domain[0], domain[1], domain[2]];
-  const answerOption = relation === "same"
-    ? attributeConceptScene(shapes, attribute, answerValues, 1)
-    : attributeConceptScene(shapes, attribute, answerValues, 2);
-  const authoredDistractors: readonly Scene[] = relation === "same"
-    ? [
-        attributeConceptScene(shapes, attribute, [domain[0], domain[1]], 0),
-        attributeConceptScene(shapes, attribute, [domain[1], domain[2]], 1),
-        attributeConceptScene(shapes, attribute, [domain[0], domain[0], domain[1]], 2),
-      ]
-    : [
-        attributeConceptScene(shapes, attribute, [domain[0], domain[0]], 0),
-        attributeConceptScene(shapes, attribute, [domain[1], domain[1]], 1),
-        attributeConceptScene(shapes, attribute, [domain[0], domain[1], domain[0]], 2),
-      ];
-  const concept: SceneConcept = { all: [{ kind: relation, attribute }] };
-  const relationText = relation === "same" ? "the same" : "a different";
-  const failureText = relation === "same" ? "mixes at least two values" : "repeats at least one value";
-  return conceptCandidate(
-    rng,
-    shapes,
-    JSON.stringify({ concept }),
-    `${relation}-${attribute}-relation`,
-    positives,
-    negatives,
-    answerOption,
-    authoredDistractors,
-    `Compare only the ${attribute} of each top-level token. Every check-marked scene gives every token ${relationText} ${attribute}, while each crossed scene ${failureText}; position, the other token attributes, and token count vary to rule out shortcuts. The highlighted option follows that complete relation. Every distractor visibly breaks it even when another feature looks regular.`,
-  );
-}
-
-function conceptInduction(rng: Rng): SceneFamilyCandidate {
-  const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const variant = pick(rng, [
-    "contains",
-    "adjacent",
-    "symmetry",
-    "equal-row-counts",
-    "same-shape",
-    "same-fill",
-    "different-shape",
-    "different-fill",
-  ] as const);
-
-  if (variant === "same-shape") return attributeConceptCandidate(rng, shapes, "same", "shape");
-  if (variant === "same-fill") return attributeConceptCandidate(rng, shapes, "same", "fill");
-  if (variant === "different-shape") return attributeConceptCandidate(rng, shapes, "different", "shape");
-  if (variant === "different-fill") return attributeConceptCandidate(rng, shapes, "different", "fill");
-
-  if (variant === "adjacent") {
-    const positives = [
-      scene([{ row: 0, column: 0, object: token(shapes[0]) }, { row: 0, column: 1, object: token(shapes[1]) }]),
-      scene([{ row: 0, column: 2, object: token(shapes[2]) }, { row: 1, column: 2, object: token(shapes[2], "solid") }]),
-      scene([
-        { row: 2, column: 0, object: token(shapes[3]) },
-        { row: 2, column: 1, object: token(shapes[4], "solid") },
-        { row: 0, column: 2, object: token(shapes[3]) },
-      ]),
-    ];
-    const negatives = [
-      scene([{ row: 0, column: 0, object: token(shapes[0]) }, { row: 2, column: 2, object: token(shapes[1]) }]),
-      scene([{ row: 0, column: 2, object: token(shapes[2]) }, { row: 2, column: 2, object: token(shapes[2]) }]),
-      one(shapes[4], 1, 1),
-    ];
-    return conceptCandidate(
-      rng,
-      shapes,
-      JSON.stringify({ concept: { all: [{ kind: "adjacent" }] } satisfies SceneConcept }),
-      "adjacency-relation",
-      positives,
-      negatives,
-      scene([{ row: 1, column: 0, object: token(shapes[0]) }, { row: 1, column: 1, object: token(shapes[2], "solid") }]),
-      [
-        scene([{ row: 0, column: 0, object: token(shapes[1]) }, { row: 2, column: 2, object: token(shapes[3]) }]),
-        one(shapes[4], 0, 2),
-        scene([
-          { row: 0, column: 0, object: token(shapes[0]) },
-          { row: 0, column: 2, object: token(shapes[1], "solid") },
-        ]),
-      ],
-      "The check-marked examples all contain at least one pair of top-level tokens in neighbouring slots: the two tokens share a horizontal or vertical edge. The crossed examples have no such pair. The highlighted option has two adjacent tokens and therefore follows the concept; each distractor keeps its tokens separated or has only one token.",
-    );
-  }
-
-  if (variant === "symmetry") {
-    const mirrorPair = (row: number, shape: SceneToken["shape"]) => scene([
-      { row, column: 0, object: token(shape) },
-      { row, column: 2, object: token(shape) },
-    ]);
-    const positives = [mirrorPair(0, shapes[0]), mirrorPair(2, shapes[1]), one(shapes[2], 1, 1, "solid")];
-    const negatives = [
-      one(shapes[0], 0, 0),
-      scene([{ row: 1, column: 0, object: token(shapes[1]) }, { row: 1, column: 2, object: token(shapes[2]) }]),
-      scene([{ row: 0, column: 0, object: token(shapes[3]) }, { row: 1, column: 0, object: token(shapes[3]) }]),
-    ];
-    return conceptCandidate(
-      rng,
-      shapes,
-      JSON.stringify({ concept: { all: [{ kind: "symmetry", axis: "horizontal" }] } satisfies SceneConcept }),
-      "symmetry-relation",
-      positives,
-      negatives,
-      mirrorPair(1, shapes[4]),
-      [
-        scene([{ row: 0, column: 0, object: token(shapes[4]) }, { row: 2, column: 0, object: token(shapes[4]) }]),
-        one(shapes[2], 0, 0),
-        scene([{ row: 2, column: 0, object: token(shapes[0]) }, { row: 2, column: 2, object: token(shapes[1]) }]),
-      ],
-      "The check-marked examples are unchanged when the board is reflected from left to right. A centred token reflects onto itself, while a matching pair at equal distances from the centre swaps into the same arrangement. The crossed examples lose that match. The highlighted option is the only candidate with the required left-right symmetry.",
-    );
-  }
-
-  if (variant === "equal-row-counts") {
-    const positives = [
-      scene([
-        { row: 0, column: 0, object: token(shapes[0]) },
-        { row: 1, column: 1, object: token(shapes[1], "solid") },
-        { row: 2, column: 2, object: token(shapes[2]) },
-      ]),
-      scene([
-        { row: 0, column: 0, object: token(shapes[0]) }, { row: 0, column: 2, object: token(shapes[1]) },
-        { row: 1, column: 0, object: token(shapes[2], "solid") }, { row: 1, column: 2, object: token(shapes[3]) },
-        { row: 2, column: 0, object: token(shapes[4]) }, { row: 2, column: 2, object: token(shapes[0], "solid") },
-      ]),
-      scene([
-        { row: 0, column: 2, object: token(shapes[3]) },
-        { row: 1, column: 0, object: token(shapes[3]) },
-        { row: 2, column: 1, object: token(shapes[3]) },
-      ]),
-    ];
-    const negatives = [
-      one(shapes[0], 0, 0),
-      scene([{ row: 0, column: 0, object: token(shapes[1]) }, { row: 1, column: 1, object: token(shapes[2]) }]),
-      scene([
-        { row: 1, column: 0, object: token(shapes[2]) },
-        { row: 2, column: 0, object: token(shapes[3]) },
-        { row: 2, column: 2, object: token(shapes[4]) },
-      ]),
-    ];
-    return conceptCandidate(
-      rng,
-      shapes,
-      JSON.stringify({ concept: { all: [{ kind: "count", comparison: "equal" }] } satisfies SceneConcept }),
-      "row-count-relation",
-      positives,
-      negatives,
-      scene([
-          { row: 0, column: 1, object: token(shapes[4]) },
-          { row: 1, column: 2, object: token(shapes[0]) },
-          { row: 2, column: 0, object: token(shapes[2], "solid") },
-        ]),
-      [
-        scene([{ row: 0, column: 0, object: token(shapes[1]) }, { row: 1, column: 1, object: token(shapes[2]) }]),
-        scene([
-          { row: 1, column: 0, object: token(shapes[2]) },
-          { row: 2, column: 0, object: token(shapes[3]) },
-          { row: 2, column: 2, object: token(shapes[4]) },
-        ]),
-        scene([
-          { row: 0, column: 0, object: token(shapes[0]) },
-          { row: 0, column: 2, object: token(shapes[1], "solid") },
-        ]),
-      ],
-      "Count only top-level tokens in each of the three rows. Every check-marked example has the same count in row one, row two, and row three; the crossed examples do not. The highlighted option places one token in each row, so its row counts are 1–1–1. Each distractor leaves at least one row with a different count.",
-    );
-  }
-
-  const positives = [
-    contained(shapes[0], shapes[1], 1, 1),
-    contained(shapes[1], shapes[2], 0, 0),
-    scene([
-      { row: 2, column: 2, object: { kind: "container", shape: "hexagon", contents: [token(shapes[3])] } },
-      { row: 0, column: 0, object: token(shapes[0], "solid") },
-      { row: 0, column: 2, object: token(shapes[1]) },
-    ]),
-  ];
-  const negatives = [
-    one(shapes[0], 1, 1),
-    scene([{ row: 0, column: 0, object: token(shapes[1]) }, { row: 0, column: 1, object: token(shapes[2]) }]),
-    scene([{ row: 0, column: 0, object: token(shapes[2]) }, { row: 2, column: 2, object: token(shapes[3], "solid") }]),
-  ];
-  return conceptCandidate(
-    rng,
-      shapes,
-    JSON.stringify({ concept: { all: [{ kind: "contains" }] } satisfies SceneConcept }),
-    "containment-relation",
-    positives,
-    negatives,
-      contained(shapes[3], shapes[4], 2, 1),
-      [
-        one(shapes[4], 2, 1),
-        scene([{ row: 1, column: 0, object: token(shapes[0]) }, { row: 1, column: 1, object: token(shapes[1]) }]),
-        scene([{ row: 0, column: 0, object: token(shapes[2]) }, { row: 2, column: 2, object: token(shapes[2]) }]),
-      ],
-    "The check-marked examples all show a true containment relationship: one outlined shape visibly encloses another token. None of the crossed examples contains a token, even when two shapes are near each other. The highlighted option includes an enclosing shape with a token inside it; the distractors show only separate, adjacent, or distant tokens.",
-    );
-}
-
 type CreaseGuide = NonNullable<Scene["guides"]>[number];
 
 interface FoldProgram {
@@ -4760,135 +3831,6 @@ function inverseFoldPunch(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandi
   return asCandidate(family, puzzle);
 }
 
-function applySingleTokenStep(input: Scene, program: RelationalStepProgram): Scene | null {
-  const placement = singleTokenPlacement(input);
-  if (!placement) return null;
-  const positionIndex = RELATIONAL_RING_POSITIONS.findIndex((position) =>
-    position.row === placement.row && position.column === placement.column);
-  const fillIndex = RELATIONAL_FILLS.indexOf(placement.object.fill);
-  if (positionIndex === -1 || fillIndex === -1) return null;
-  const position = RELATIONAL_RING_POSITIONS[
-    (positionIndex + program.positionDelta + RELATIONAL_RING_POSITIONS.length) % RELATIONAL_RING_POSITIONS.length
-  ];
-  const fill = RELATIONAL_FILLS[(fillIndex + program.fillDelta) % RELATIONAL_FILLS.length];
-  return scene([{ ...position, object: { ...placement.object, fill } }]);
-}
-
-function matchingSingleTokenSteps(
-  examples: readonly { input: Scene; output: Scene }[],
-): RelationalStepProgram[] {
-  return RELATIONAL_STEP_GRAMMAR.filter((program) => examples.every((example) => {
-    const output = applySingleTokenStep(example.input, program);
-    return output !== null && sceneSignature(output) === sceneSignature(example.output);
-  }));
-}
-
-function tokenStepDescription(program: RelationalStepProgram): string {
-  const direction = program.positionDelta > 0 ? "clockwise" : "counter-clockwise";
-  const distance = Math.abs(program.positionDelta);
-  const fill = program.fillDelta === 0
-    ? "keeps its fill"
-    : program.fillDelta === 1
-      ? "cycles outline to half to solid"
-      : "cycles outline to solid to half";
-  return `moves ${distance} perimeter slot${distance === 1 ? "" : "s"} ${direction} and ${fill}`;
-}
-
-function interleavedSequence(rng: Rng): SceneFamilyCandidate {
-  // Redesigned as -v3 on 2026-08-24 (raise-the-ceiling plan, Lever 1). The -v2
-  // row showed the answered strand only twice — one observed transition — so a
-  // solver could only assume the step repeats. Both strands now show enough
-  // terms that every rule is observed at least twice before it must be applied.
-  const [a, b] = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const programA = pick(rng, RELATIONAL_STEP_GRAMMAR);
-  const programB = pick(rng, RELATIONAL_STEP_GRAMMAR.filter((program) =>
-    JSON.stringify(program) !== JSON.stringify(programA)));
-  const startA = pick(rng, RELATIONAL_RING_POSITIONS);
-  const startB = pick(rng, RELATIONAL_RING_POSITIONS);
-  const strandA = [one(a, startA.row, startA.column, pick(rng, RELATIONAL_FILLS))];
-  strandA.push(applySingleTokenStep(strandA[0], programA)!);
-  strandA.push(applySingleTokenStep(strandA[1], programA)!);
-  strandA.push(applySingleTokenStep(strandA[2], programA)!);
-  const strandB = [one(b, startB.row, startB.column, pick(rng, RELATIONAL_FILLS))];
-  strandB.push(applySingleTokenStep(strandB[0], programB)!);
-  strandB.push(applySingleTokenStep(strandB[1], programB)!);
-  strandB.push(applySingleTokenStep(strandB[2], programB)!);
-  const answer = strandB[3];
-  const shownBTransitions = [
-    { input: strandB[0], output: strandB[1] },
-    { input: strandB[1], output: strandB[2] },
-  ];
-  const distractors = distinctOutputs(RELATIONAL_STEP_GRAMMAR
-    .filter((program) => !shownBTransitions.every((example) => {
-      const predicted = applySingleTokenStep(example.input, program);
-      return predicted !== null && sceneSignature(predicted) === sceneSignature(example.output);
-    }))
-    .map((program) => applySingleTokenStep(strandB[2], program)))
-    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  const selectedDistractors = selectDistractors(distractors, rng, "interleaved sequence", { answer });
-  const puzzle = makePuzzle(
-    "prototype-interleaved-sequence",
-    "sequence",
-    "row",
-    "Split the panels into two alternating rules. What comes next?",
-    4,
-    [
-      strandA[0], strandB[0], strandA[1], strandB[1],
-      strandA[2], strandB[2], strandA[3], { blank: true },
-    ],
-    answer,
-    selectedDistractors,
-    rng,
-    `Split the row into odd and even panels. In the odd-panel strand, the ${a} token ${tokenStepDescription(programA)}, shown three times; in the even-panel strand, the ${b} token ${tokenStepDescription(programB)}, shown twice. The missing panel belongs to the even strand, so applying its rule once more gives the highlighted option. Each distractor is a prediction from another bounded step rule that fails one of the two shown even transitions.`,
-  );
-  const family = definition(
-    "interleaved-sequence-v3",
-    ["alternating-slots", "perimeter-order", "two-step-rules", "fill-states"],
-    JSON.stringify({ strandA: programA, strandB: programB }),
-    (candidate) => {
-      const panels = candidate.stem.map(scenePanel);
-      const [a0, b0, a1, b1, a2, b2, a3] = panels;
-      if (!a0 || !b0 || !a1 || !b1 || !a2 || !b2 || !a3) {
-        return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      }
-      const strandAExamples = [
-        { input: a0, output: a1 },
-        { input: a1, output: a2 },
-        { input: a2, output: a3 },
-      ];
-      const strandBExamples = [
-        { input: b0, output: b1 },
-        { input: b1, output: b2 },
-      ];
-      const strandASurvivors = matchingSingleTokenSteps(strandAExamples);
-      const strandBSurvivors = matchingSingleTokenSteps(strandBExamples);
-      const predictions = distinctOutputs(strandASurvivors.flatMap(() =>
-        strandBSurvivors.map((program) => applySingleTokenStep(b2, program))));
-      return {
-        derivedAnswer: predictions.length === 1 ? predictions[0] : null,
-        solutionCount: predictions.length,
-        usedCueIds: ["alternating-slots", "perimeter-order", "two-step-rules", "fill-states"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
-          const failedRule = RELATIONAL_STEP_GRAMMAR.find((program) => {
-            const queryOutput = applySingleTokenStep(b2, program);
-            const failsAShownTransition = strandBExamples.some((example) => {
-              const predicted = applySingleTokenStep(example.input, program);
-              return predicted === null || sceneSignature(predicted) !== sceneSignature(example.output);
-            });
-            return queryOutput !== null && sceneSignature(queryOutput) === sceneSignature(option) && failsAShownTransition;
-          });
-          return failedRule
-            ? `the ${failedRule.positionDelta}, ${failedRule.fillDelta} step rule fails a shown even transition`
-            : null;
-        }),
-      };
-    },
-  );
-  // Two interleaved strands: the answered one takes every second panel from
-  // index 1, so its stride of two lands the next term on the trailing blank.
-  return asCandidate(family, puzzle, [1, 3, 5]);
-}
-
 const RING_POSITIONS = [
   { row: 0, column: 0 },
   { row: 0, column: 1 },
@@ -5105,237 +4047,6 @@ function inverseAnalogy(rng: Rng): SceneFamilyCandidate {
           });
           return failedProgram ? "this input works only under a program that fails the inverse worked pair" : null;
         }),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-type RepairProjection = "shape" | "fill";
-type RepairRule = "latin" | "horizontal-stripes" | "vertical-stripes" | "checkerboard";
-
-interface RepairProgram {
-  projection: RepairProjection;
-  rule: RepairRule;
-}
-
-const REPAIR_GRAMMAR: readonly RepairProgram[] = (["shape", "fill"] as const).flatMap((projection) =>
-  (["latin", "horizontal-stripes", "vertical-stripes", "checkerboard"] as const)
-    .map((rule) => ({ projection, rule })));
-
-const REPAIR_SHAPE_DOMAIN: readonly SceneToken["shape"][] = [
-  "circle",
-  "square",
-  "triangle",
-  "diamond",
-  "star",
-] as const;
-
-function repairTokenGrid(value: Scene): SceneToken[][] | null {
-  if (value.rows !== 3 || value.columns !== 3 || value.objects.length !== 9 || value.tiles.length > 0) return null;
-  const byPosition = new Map(value.objects.map((placement) => [
-    `${placement.row}:${placement.column}`,
-    placement.object.kind === "token" ? placement.object : null,
-  ]));
-  const grid = [0, 1, 2].map((row) => [0, 1, 2].map((column) => byPosition.get(`${row}:${column}`)));
-  return grid.some((row) => row.some((entry) => !entry)) ? null : grid as SceneToken[][];
-}
-
-function repairProgramFailures(value: Scene, program: RepairProgram): string[] {
-  const grid = repairTokenGrid(value);
-  if (!grid) return ["board is not a complete 3 by 3 token grid"];
-  const projected = grid.map((row) => row.map((entry) => entry[program.projection]));
-  if (program.rule === "latin") {
-    const failures: string[] = [];
-    for (let index = 0; index < 3; index++) {
-      if (new Set(projected[index]).size !== 3) {
-        failures.push(`row ${index + 1} repeats a ${program.projection}`);
-      }
-      if (new Set(projected.map((row) => row[index])).size !== 3) {
-        failures.push(`column ${index + 1} repeats a ${program.projection}`);
-      }
-    }
-    const counts = new Map<string, number>();
-    for (const entry of projected.flat()) counts.set(entry, (counts.get(entry) ?? 0) + 1);
-    if (counts.size !== 3 || [...counts.values()].some((count) => count !== 3)) {
-      failures.push(`the Latin board does not use exactly three ${program.projection} values three times each`);
-    }
-    return failures;
-  }
-  if (program.rule === "horizontal-stripes") {
-    const representatives = projected.map((row) => row[0]);
-    const rowsAreUniform = projected.every((row) => row.every((entry) => entry === row[0]));
-    return rowsAreUniform && new Set(representatives).size === 3
-      ? []
-      : [`${program.projection} values do not form three different horizontal stripes`];
-  }
-  if (program.rule === "vertical-stripes") {
-    const representatives = projected[0];
-    const columnsAreUniform = [0, 1, 2].every((column) =>
-      projected.every((row) => row[column] === projected[0][column]));
-    return columnsAreUniform && new Set(representatives).size === 3
-      ? []
-      : [`${program.projection} values do not form three different vertical stripes`];
-  }
-  const even = projected.flatMap((row, rowIndex) => row.filter((_, columnIndex) =>
-    (rowIndex + columnIndex) % 2 === 0));
-  const odd = projected.flatMap((row, rowIndex) => row.filter((_, columnIndex) =>
-    (rowIndex + columnIndex) % 2 === 1));
-  return new Set(even).size === 1 && new Set(odd).size === 1 && even[0] !== odd[0]
-    ? []
-    : [`${program.projection} values do not alternate as a two-value checkerboard`];
-}
-
-function repairProjectionDomain(projection: RepairProjection): readonly string[] {
-  return projection === "shape" ? REPAIR_SHAPE_DOMAIN : RELATIONAL_FILLS;
-}
-
-function withRepairProjection(tokenValue: SceneToken, projection: RepairProjection, value: string): SceneToken {
-  return projection === "shape"
-    ? { ...tokenValue, shape: value as SceneToken["shape"] }
-    : { ...tokenValue, fill: value as SceneToken["fill"] };
-}
-
-function oneTileRepairChanges(value: Scene, projection: RepairProjection): Scene[] {
-  const grid = repairTokenGrid(value);
-  if (!grid) return [];
-  return grid.flatMap((row, rowIndex) => row.flatMap((entry, columnIndex) =>
-    repairProjectionDomain(projection)
-      .filter((replacement) => replacement !== entry[projection])
-      .map((replacement) => scene(grid.flatMap((tokenRow, placedRow) =>
-        tokenRow.map((cell, placedColumn) => ({
-          row: placedRow,
-          column: placedColumn,
-          object: placedRow === rowIndex && placedColumn === columnIndex
-            ? withRepairProjection(cell, projection, replacement)
-            : cell,
-        }))), 3, 3))));
-}
-
-function programRepairs(value: Scene, program: RepairProgram): Scene[] {
-  return oneTileRepairChanges(value, program.projection)
-    .filter((candidate) => repairProgramFailures(candidate, program).length === 0);
-}
-
-function repairRuleDescription(program: RepairProgram): string {
-  if (program.rule === "latin") {
-    return `every row and column contains three different ${program.projection} values`;
-  }
-  if (program.rule === "horizontal-stripes") {
-    return `each row repeats one ${program.projection}, while the three rows use different values`;
-  }
-  if (program.rule === "vertical-stripes") {
-    return `each column repeats one ${program.projection}, while the three columns use different values`;
-  }
-  return `${program.projection} values alternate between two values like a checkerboard`;
-}
-
-function minimalRepair(rng: Rng): SceneFamilyCandidate {
-  // v3 keeps v2's visible 3x3 one-tile repair, but every sampled program now
-  // changes the projected pattern that determines the repaired tile and value.
-  const program = pick(rng, REPAIR_GRAMMAR);
-  const shapes = shuffled(rng, REPAIR_SHAPE_DOMAIN);
-  const fills = shuffled(rng, RELATIONAL_FILLS);
-  const projectedValues: readonly string[] = program.projection === "shape" ? shapes : fills;
-  const valueIndexAt = (row: number, column: number): number =>
-    program.rule === "latin" ? (row + column) % 3
-      : program.rule === "horizontal-stripes" ? row
-        : program.rule === "vertical-stripes" ? column
-          : (row + column) % 2;
-  const validTokenAt = (row: number, column: number): SceneToken => {
-    const projectedValue = projectedValues[valueIndexAt(row, column)];
-    return program.projection === "shape"
-      ? token(projectedValue as SceneToken["shape"], fills[0])
-      : token(shapes[3], projectedValue as SceneToken["fill"]);
-  };
-  const faultRow = pick(rng, [0, 1, 2]);
-  const faultColumn = pick(rng, [0, 1, 2]);
-  const validGrid = [0, 1, 2].map((row) => [0, 1, 2].map((column) => validTokenAt(row, column)));
-  const original = validGrid[faultRow][faultColumn][program.projection];
-  const usedValueCount = program.rule === "checkerboard" ? 2 : 3;
-  const wrong = pick(rng, projectedValues.slice(0, usedValueCount).filter((value) => value !== original));
-  const faultyGrid = validGrid.map((row) => row.map((entry) => ({ ...entry })));
-  faultyGrid[faultRow][faultColumn] = withRepairProjection(
-    faultyGrid[faultRow][faultColumn],
-    program.projection,
-    wrong,
-  );
-  const faulty = scene(faultyGrid.flatMap((row, rowIndex) => row.map((cell, columnIndex) => ({
-    row: rowIndex,
-    column: columnIndex,
-    object: cell,
-  }))), 3, 3);
-  const repairs = REPAIR_GRAMMAR.flatMap((candidateProgram) => programRepairs(faulty, candidateProgram));
-  const distinctRepairs = distinctOutputs(repairs);
-  const answer = scene(validGrid.flatMap((row, rowIndex) => row.map((cell, columnIndex) => ({
-    row: rowIndex,
-    column: columnIndex,
-    object: cell,
-  }))), 3, 3);
-  if (distinctRepairs.length !== 1 || sceneSignature(distinctRepairs[0]) !== sceneSignature(answer)) {
-    throw new Error("minimal-repair grammar must predict one visible repair");
-  }
-  const distractors = selectDistractors(
-    oneTileRepairChanges(faulty, program.projection)
-      .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer)),
-    rng,
-    "minimal repair",
-    { answer },
-  );
-  const alternatives = [answer, ...distractors];
-  const order = shuffled(rng, alternatives.map((_, index) => index));
-  const puzzle: Puzzle<Scene> = {
-    id: "prototype-minimal-repair",
-    type: "oddOneOut",
-    layout: "singleScene",
-    instruction: "Each option changes exactly one tile. Which change repairs the faulty board?",
-    difficulty: 5,
-    stem: [faulty],
-    options: order.map((index) => alternatives[index]),
-    answerIndex: order.indexOf(0),
-    explanation: `Read the board by its ${program.projection}: ${repairRuleDescription(program)}. One tile breaks that visible pattern. Restoring ${original} at its position repairs the complete board with exactly one change, which is the highlighted option. Every distractor also changes only one tile, but it changes the wrong position or inserts a value that leaves the sampled pattern visibly broken.`,
-  };
-  const family = definition(
-    "minimal-repair-v3",
-    ["faulty-board", "one-change-options", "projected-pattern"],
-    JSON.stringify(program),
-    (candidate) => {
-      const faultyBoard = scenePanel(candidate.stem[0]);
-      if (!faultyBoard) return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      const faultyByPosition = new Map(faultyBoard.objects.map((placement) => [
-        `${placement.row}:${placement.column}`,
-        JSON.stringify(placement.object),
-      ]));
-      const survivors = REPAIR_GRAMMAR.map((candidateProgram) => ({
-        program: candidateProgram,
-        repairs: programRepairs(faultyBoard, candidateProgram),
-      })).filter((entry) => entry.repairs.length > 0);
-      const predictions = distinctOutputs(survivors.flatMap((entry) => entry.repairs));
-      const evaluated = candidate.options.map((option) => {
-        const optionByPosition = new Map(option.objects.map((placement) => [
-          `${placement.row}:${placement.column}`,
-          JSON.stringify(placement.object),
-        ]));
-        const positions = new Set([...faultyByPosition.keys(), ...optionByPosition.keys()]);
-        const changedPositions = [...positions].filter((position) =>
-          faultyByPosition.get(position) !== optionByPosition.get(position));
-        const matchingPrograms = survivors.filter((entry) =>
-          entry.repairs.some((repair) => sceneSignature(repair) === sceneSignature(option)));
-        const failures = matchingPrograms.length > 0 ? []
-          : survivors.flatMap((entry) => repairProgramFailures(option, entry.program)).slice(0, 1);
-        if (option.rows !== faultyBoard.rows || option.columns !== faultyBoard.columns || changedPositions.length !== 1) {
-          failures.unshift(`changes ${changedPositions.length} tiles instead of exactly one`);
-        }
-        return { option, failures, matchingPrograms };
-      });
-      return {
-        derivedAnswer: predictions.length === 1 ? predictions[0] : null,
-        solutionCount: predictions.length,
-        usedCueIds: ["faulty-board", "one-change-options", "projected-pattern"],
-        distractorWitnesses: candidate.options.flatMap((_, optionIndex) =>
-          optionIndex === candidate.answerIndex || !evaluated[optionIndex]?.failures[0]
-            ? []
-            : [{ optionIndex, witness: evaluated[optionIndex].failures[0] }]),
       };
     },
   );
@@ -5727,24 +4438,16 @@ export function generateSceneFamilyCandidate(
     case "relational-sequence-v2": return relationalSequence(rng);
     case "attribute-pairing-v1": return attributePairing(rng);
     case "compositional-analogy-v2": return compositionalAnalogy(rng, bucket);
-    case "containment-analogy-v2": return containmentAnalogy(rng);
     case "composed-transform-v2": return composedTransform(rng, bucket);
-    case "relational-outlier-v2": return relationalOutlier(rng);
-    case "relational-outlier-v3": return relationalOutlierDemonstrated(rng);
     case "relational-matrix-v2": return relationalMatrix(rng);
     case "visual-set-algebra-v2": return setAlgebra(rng, { bucket });
-    case "constraint-mosaic-v2": return constraintMosaic(rng);
-    case "topology-path-v1": return topologyPath(rng);
     case "spatial-transform-v2": return spatialTransform(rng);
     case "transformation-machine-v3": return transformationMachine(rng, bucket);
     case "rule-switching-v2": return ruleSwitching(rng);
-    case "concept-induction-v2": return conceptInduction(rng);
     case "fold-punch-v2": return foldPunch(rng, bucket);
     case "inverse-fold-punch-v2": return inverseFoldPunch(rng, bucket);
-    case "interleaved-sequence-v3": return interleavedSequence(rng);
     case "second-order-sequence-v2": return secondOrderSequence(rng);
     case "inverse-analogy-v2": return inverseAnalogy(rng);
-    case "minimal-repair-v3": return minimalRepair(rng);
     case "parallel-evolution-v1": return parallelEvolution(rng, bucket);
     case "combining-machine-v1": return combiningMachine(rng, bucket);
   }

@@ -157,8 +157,18 @@ import {
  * and a machine row of (input, gate, output) cannot show a second operand, so it
  * ships with a new row shape where the gate glyph sits between its operands. It
  * is registered as a PROTOTYPE, not code-valid, so the assembler does not serve
- * it: no human has seen it, and one aspect still decides 63% of its d4 items.
- * That means this version's served battery is the same 19 keys as `v14`.
+ * it: no human has seen it. Its aspect gap was closed the same day — d4 to 0%
+ * and d5 to 8%, from 63% and 90% — by giving the pool the two boards that sit
+ * beside the answer: the clash read the wrong way round, and the exclusive token
+ * kept from the wrong board.
+ *
+ * `v15` also DELETES the ten families that were carried in the registry but
+ * served in no test: operator-induction-v1, containment-analogy-v2, both
+ * relational-outliers, constraint-mosaic-v2, topology-path-v1,
+ * concept-induction-v2, both interleaved-sequences and minimal-repair-v3. Each
+ * had been withdrawn on evidence recorded in git and in data/pilot/README.md, so
+ * the code carried nothing the history does not. The served battery is unchanged
+ * at the same 19 keys as `v14`.
  */
 export const EXPANDED_GENERATOR_VERSION = "scene-families-v15" as const;
 

@@ -67,9 +67,11 @@ describe("family promotion registry", () => {
 
     expect(promotions.length).toBeGreaterThan(0);
     expect(promotions.every((promotion) => promotion.state !== "enabled")).toBe(true);
-    expect(
-      CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "operator-induction-v1")?.bands,
-    ).toEqual([]);
+    // `operator-induction-v1` used to stand here as the family with no eligible
+    // band. It and the nine other never-served families were deleted on
+    // 2026-08-27; every family left is either code-valid or a prototype, so the
+    // property to check is that none of them is ENABLED, which is the line
+    // above.
     expect(
       CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "transformation-machine-v3")?.bands[0],
     ).toMatchObject({ state: "code-valid", band: "induction-transfer" });
@@ -247,7 +249,10 @@ describe("family withdrawal", () => {
   });
 
   it("names withdrawn ids that match no registered family", () => {
-    const withdrawn = new Set(["topology-path-v1", "typo-family-v9"]);
+    // One id that IS registered and one that is not. `topology-path-v1` played
+    // the registered half until it was deleted on 2026-08-27; a live family
+    // takes over the role.
+    const withdrawn = new Set(["spatial-transform-v2", "typo-family-v9"]);
     expect(unknownWithdrawnFamilyIds(CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn))
       .toEqual(["typo-family-v9"]);
   });
