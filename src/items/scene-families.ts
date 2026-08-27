@@ -94,9 +94,11 @@ export interface SceneFamilyBucket {
 /**
  * Every bucket every family supports, easiest first.
  *
- * Withdrawn families keep a verifier-only bucket so the build sweep still
- * covers them; a bucket here is not a promise that anything is served, only
- * that the generator can produce it. What may be served is decided by
+ * A bucket here is not a promise that anything is served, only that the
+ * generator can produce it — a prototype family declares its buckets like any
+ * other. Withdrawn families used to keep a verifier-only bucket so the build
+ * sweep still covered them; the ten that were never served were deleted outright
+ * on 2026-08-27, so no such bucket remains. What may be served is decided by
  * `CURRENT_FAMILY_PROMOTION_REGISTRY`, and the parity check in
  * `scripts/scene-family-verify.ts` proves every enabled registry bucket appears
  * here with the same difficulty.

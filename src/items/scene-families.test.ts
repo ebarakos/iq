@@ -1276,6 +1276,42 @@ describe("scene family prototypes", () => {
       .toEqual(["inverse-fold-punch-d5"]);
   });
 
+  it("holds the combining machine to zero single-inference d4 items and a stated d5 residual", () => {
+    // The regression gate for the aspect work of 2026-08-27, on fixed seeds so a
+    // change in the family moves this number rather than passing silently.
+    //
+    // d4 reaches zero: the near-miss pool holds the board that sits exactly
+    // where the answer sits (the clash read the wrong way round) and the board
+    // that carries exactly its shapes (the exclusive token kept from the wrong
+    // board). d5 does NOT reach zero and is not expected to — a three-gate chain
+    // more often lands on a board no other chain can sit beside, so the draw
+    // search settles for a sound item instead. The residual is stated here as a
+    // ceiling rather than left unmeasured: 4 of 40 at the time of writing, and
+    // the gate fails if it grows.
+    const RESIDUAL_CEILING = { "combining-machine-d4": 0, "combining-machine-d5": 6 } as const;
+    const ms = (values: string[]) => [...values].sort().join("|");
+    const aspects: Record<string, (scene: Scene) => string> = {
+      positions: (scene) => ms(scene.objects.map((p) => `${p.row},${p.column}`)),
+      shapes: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.shape : "-")),
+      fills: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.fill : "-")),
+      rotations: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? String(p.object.rotation) : "-")),
+      count: (scene) => String(scene.objects.length),
+    };
+    for (const [bucket, ceiling] of Object.entries(RESIDUAL_CEILING)) {
+      let leaking = 0;
+      for (let seed = 0; seed < 40; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate(
+          "combining-machine-v1", seededRng("single-inference", `${bucket}:${seed}`), bucket);
+        const answer = puzzle.options[puzzle.answerIndex];
+        const decided = Object.values(aspects).some((read) =>
+          puzzle.options.filter((option) => read(option) === read(answer)).length === 1);
+        if (decided) leaking += 1;
+      }
+      expect(leaking, `${bucket}: ${leaking} of 40 items decided by one aspect`)
+        .toBeLessThanOrEqual(ceiling);
+    }
+  });
+
   it("builds the combining machine as gates that take two boards, and proves each gate is readable", () => {
     // New family, 2026-08-27: the first item in the battery where a named,
     // reusable gate combines TWO boards. The row shape had to be new for it —

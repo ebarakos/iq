@@ -151,13 +151,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
   },
   {
     // New on 2026-08-27, and deliberately a PROTOTYPE rather than code-valid:
-    // the assembler serves code-valid families, and nothing here has been seen
-    // by a human yet. It also does not meet the single-inference bar the rest
-    // of the battery was held to the same day — measured over 120 seeds, one
-    // aspect still decides 63% of its d4 items and 90% of its d5 ones, because
-    // a chain of combining gates lands on a board no other chain reaches. That
-    // is the work to do before promoting it, not a reason to withhold it from
-    // the prototype gallery where it can be looked at.
+    // code-valid is served immediately, and no person has looked at this family
+    // yet. It now meets the single-inference bar the rest of the battery was
+    // held to the same day — 0 of 40 d4 items decided by one aspect, 4 of 40 at
+    // d5, pinned by a test — so what is left before promotion is a human
+    // reading one, not more generator work. Note that nothing currently SHOWS a
+    // prototype family to a person: the pilot packet is built from enabled keys
+    // and skips this state (`enabledPrototypePilotKeys`), so promoting it needs
+    // a surface first. TODO.md carries that.
     familyId: "combining-machine-v1",
     primaryReasoningFamily: "operator-induction",
     bands: [candidateBand("constraint-spatial")],
