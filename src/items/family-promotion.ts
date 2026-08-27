@@ -150,6 +150,19 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [candidateBand("composition")],
   },
   {
+    // New on 2026-08-27, and deliberately a PROTOTYPE rather than code-valid:
+    // the assembler serves code-valid families, and nothing here has been seen
+    // by a human yet. It also does not meet the single-inference bar the rest
+    // of the battery was held to the same day — measured over 120 seeds, one
+    // aspect still decides 63% of its d4 items and 90% of its d5 ones, because
+    // a chain of combining gates lands on a board no other chain reaches. That
+    // is the work to do before promoting it, not a reason to withhold it from
+    // the prototype gallery where it can be looked at.
+    familyId: "combining-machine-v1",
+    primaryReasoningFamily: "operator-induction",
+    bands: [candidateBand("constraint-spatial")],
+  },
+  {
     familyId: "operator-induction-v1",
     primaryReasoningFamily: "operator-induction",
     bands: [],

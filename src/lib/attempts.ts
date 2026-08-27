@@ -169,6 +169,16 @@ export const AttemptFileSchema = z.object({
    */
   thinkingBudget: z.number().int().positive().nullable().optional(),
   /**
+   * Reasoning effort the run asked the harness providers for, on the same
+   * three-state contract as the thinking budget above: a value, an explicit
+   * null for "asked for no particular effort", absent for an artifact written
+   * before the field existed. Added 2026-08-27 with the `codex` default, whose
+   * answers change as much between low and high effort as they would between
+   * two different models — so two harness runs at different efforts are two
+   * populations, not one.
+   */
+  effort: z.enum(["low", "medium", "high"]).nullable().optional(),
+  /**
    * Attempts requested per item (`--repeat`) and how many ran at once
    * (`--concurrency`). With source, profile, runSeed, channel, provider,
    * model, and the thinking budget, these complete the command that produced

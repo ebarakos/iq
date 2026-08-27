@@ -373,6 +373,28 @@ export function PuzzleImage({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<
       );
     }
     cursorY -= GAP;
+  } else if (puzzle.layout === "combineTable") {
+    // (left, gate, right, output). The gate sits BETWEEN the two operands
+    // because it combines them; a machine row's gate sits before one board
+    // because it transforms it.
+    const rows = puzzle.stem.length / 4;
+    for (let row = 0; row < rows; row++) {
+      const [left, gate, right, output] = puzzle.stem.slice(row * 4, row * 4 + 4);
+      const glyphs = gate ? gateGlyphs(gate) : [];
+      cursorY = drawStemRow(
+        [
+          cellPiece(left),
+          glyphs.length > 0 ? { kind: "gate", glyphs } : cellPiece(gate),
+          cellPiece(right),
+          { kind: "sep", text: "→" },
+          cellPiece(output),
+        ],
+        cursorY,
+        `combine-${row}`,
+        elems,
+      );
+    }
+    cursorY -= GAP;
   } else if (puzzle.layout === "grid3x3") {
     const gridW = CELL * 3 + GAP * 2;
     const startX = (WIDTH - gridW) / 2;

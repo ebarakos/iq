@@ -128,9 +128,39 @@ import {
  * aspect fell from 13 buckets to 8, and the five multi-rule families that
  * carried the ladder — composed-transform, transformation-machine,
  * compositional-analogy, visual-set-algebra d5 and inverse-analogy — went to
- * zero. What remains is recorded in TODO.md.
+ * zero.
+ *
+ * `v15` finishes that job in the four buckets `v14` left leaking, each at the
+ * source of its near misses rather than in the shared selection:
+ *
+ * - **`relational-matrix-d4`** (88% of items decided by one aspect) gets three
+ *   tokens per corner instead of two, so a shape has three possible homes and a
+ *   wrong option can carry the answer's shapes in other cells; and a fourth
+ *   witnessed mistake, combining the right rule with the wrong two boards of the
+ *   grid, which is the commonest real error on a 3x3.
+ * - **`spatial-transform-d3`** (64%) pairs every board move with an extra token
+ *   turn, so the option list holds the board the solver gets by moving correctly
+ *   and turning the tokens as well — the exact mix-up the family tests.
+ * - **`rule-switching-d5`** (48%) adds the correct board carried one operation
+ *   further, which keeps the answer's cells and changes only the fill.
+ * - **`visual-set-algebra-d4`** (45%) redraws its inputs until the pool can
+ *   cover every aspect, the way its `-d5` sibling already did for free through
+ *   its third turning step.
+ *
+ * Every servable bucket that can hide its answer now does. Four cannot and are
+ * not defects: `fold-punch` d4/d5, `inverse-fold-punch-d5` and
+ * `second-order-sequence-d4` offer one token or one punched sheet at different
+ * places, so an option agreeing on the footprint would BE the answer.
+ *
+ * `v15` also adds `combining-machine-v1`, the first family whose gates take TWO
+ * boards — the owner asked for the set-algebra idea inside the gate machines,
+ * and a machine row of (input, gate, output) cannot show a second operand, so it
+ * ships with a new row shape where the gate glyph sits between its operands. It
+ * is registered as a PROTOTYPE, not code-valid, so the assembler does not serve
+ * it: no human has seen it, and one aspect still decides 63% of its d4 items.
+ * That means this version's served battery is the same 19 keys as `v14`.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v14" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v15" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];

@@ -45,6 +45,15 @@ export type SolverOpts = {
    * attempt then records transport-failure. Pass a budget to enable reasoning.
    */
   thinkingBudget?: number;
+  /**
+   * Reasoning effort for the harness providers (`claude-code`, `codex`), which
+   * take it as a request BODY field rather than a header — see
+   * `createRelayFetch`. Hosted providers ignore it. Without it a codex run
+   * reasons at whatever the bridge defaults to, which is not what a recorded
+   * probe should leave unstated, so `agent-run` writes the value it used into
+   * the run artifact beside the thinking budget.
+   */
+  effort?: string;
 };
 
 export interface SolveOutcome {
@@ -136,6 +145,7 @@ export async function solveItem(
     model: opts?.model,
     apiKey: opts?.apiKey,
     thinkingBudget: opts?.thinkingBudget,
+    effort: opts?.effort,
   });
   // An explicit timeoutMs stays authoritative; otherwise a Claude Code / Codex
   // turn gets the long harness budget and everything else the 60s default.

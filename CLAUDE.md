@@ -66,7 +66,13 @@ Configure via env vars only — never hardcode URLs, providers, or model names:
 RELAY_BASE_URL   # required — relay endpoint, e.g. https://llm-relay.ebarakos.workers.dev/v1
 RELAY_PROVIDER   # required — provider the relay routes to, e.g. cerebras
 RELAY_MODEL      # required — model name, e.g. llama3.1-8b
+RELAY_EFFORT     # harness providers only — low|medium|high, default for agent:run
 ```
+
+**Project default since 2026-08-27: `codex` / `sol` at effort `high`**, over the
+LOCAL relay (`http://localhost:8787/v1`). That needs `../llm-relay` running under
+`wrangler dev` AND the codex harness bridge up; without both, `agent:run` fails to
+connect and the hosted OpenRouter line in `.env.example` is the fallback.
 
 - Production relay: `https://llm-relay.ebarakos.workers.dev/v1`
 - Local relay (running `../llm-relay` via `wrangler dev`): `http://localhost:8787/v1`

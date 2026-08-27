@@ -620,19 +620,26 @@ describe("pilot report gates", () => {
     expect(report.escalation).toEqual({ pass: false, branch: null });
   });
 
-  it("prints a PASS or FAIL line per gate with the numbers behind it", () => {
-    const failing = formatPilotReport(
+  it("prints the miss and time numbers without turning them into a difficulty verdict", () => {
+    // Changed on 2026-08-27, when the owner's instruction changed what this
+    // report is allowed to claim. It used to print `RESULT PASS` when two clean
+    // misses landed among the deep items, and read that as the human ceiling
+    // having risen. The only participant these aggregates have does other things
+    // while sitting them, so a miss from boredom is recorded exactly like a miss
+    // from difficulty and the gate measured engagement. The numbers still print
+    // — they are data; the verdict does not.
+    const swept = formatPilotReport(
       analysePrototypePilotAggregate(manifest, aggregateFor()),
       "fixture.json",
       PILOT_MANIFEST_PATH,
     );
-    expect(failing).toContain("Withdrawal review");
-    expect(failing).toContain(`Escalation branch 1 — at least ${ESCALATION_MINIMUM_CLEAN_MISSES} clean misses`);
-    expect(failing).toContain("Escalation branch 2");
-    expect(failing).toContain("RESULT  FAIL");
-    expect(failing).toContain(packet.contentFingerprint);
+    expect(swept).toContain("Withdrawal review");
+    expect(swept).toContain("NOT difficulty evidence");
+    expect(swept).toContain("Clean misses among d4/d5 items");
+    expect(swept).toContain("d5 solve times against their band budgets");
+    expect(swept).toContain(packet.contentFingerprint);
 
-    const passing = formatPilotReport(
+    const withCleanMisses = formatPilotReport(
       analysePrototypePilotAggregate(manifest, aggregateFor({
         [deepItemIds[0]]: cleanMiss,
         [deepItemIds[1]]: cleanMiss,
@@ -640,7 +647,13 @@ describe("pilot report gates", () => {
       "fixture.json",
       PILOT_MANIFEST_PATH,
     );
-    expect(passing).toContain("RESULT  PASS");
-    expect(passing).toContain("branch 1, clean misses");
+    // Two clean misses used to be the passing case. It must now read the same as
+    // the swept sitting: no verdict either way, and never the word PASS.
+    expect(withCleanMisses).toContain("2 clean misses");
+    for (const rendered of [swept, withCleanMisses]) {
+      expect(rendered).not.toContain("RESULT  PASS");
+      expect(rendered).not.toContain("RESULT  FAIL");
+      expect(rendered).toContain("The withdrawal review above is the finding");
+    }
   });
 });

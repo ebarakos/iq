@@ -1,164 +1,164 @@
 {
-  "schemaVersion": "prototype-pilot-packets-v3",
-  "itemCount": 19,
-  "packets": [
+ "schemaVersion": "prototype-pilot-packets-v3",
+ "itemCount": 19,
+ "packets": [
+  {
+   "packetId": "pilot-v3-a",
+   "contentFingerprint": "4fbb351aefb7f111",
+   "items": [
     {
-      "packetId": "pilot-v3-a",
-      "contentFingerprint": "de321fb8322e8f35",
-      "items": [
-        {
-          "itemId": "relational-sequence-v2:warmup:relational-sequence-d2:r1",
-          "familyId": "relational-sequence-v2",
-          "band": "warmup",
-          "difficultyBucket": "relational-sequence-d2",
-          "difficulty": 2,
-          "bandTimeBudgetSeconds": 25
-        },
-        {
-          "itemId": "attribute-pairing-v1:warmup:attribute-pairing-d2:r1",
-          "familyId": "attribute-pairing-v1",
-          "band": "warmup",
-          "difficultyBucket": "attribute-pairing-d2",
-          "difficulty": 2,
-          "bandTimeBudgetSeconds": 25
-        },
-        {
-          "itemId": "compositional-analogy-v2:composition:compositional-analogy-d3:r1",
-          "familyId": "compositional-analogy-v2",
-          "band": "composition",
-          "difficultyBucket": "compositional-analogy-d3",
-          "difficulty": 3,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "compositional-analogy-v2:composition:compositional-analogy-d4:r1",
-          "familyId": "compositional-analogy-v2",
-          "band": "composition",
-          "difficultyBucket": "compositional-analogy-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "composed-transform-v2:composition:composed-transform-d4:r1",
-          "familyId": "composed-transform-v2",
-          "band": "composition",
-          "difficultyBucket": "composed-transform-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "composed-transform-v2:induction-transfer:composed-transform-d5:r1",
-          "familyId": "composed-transform-v2",
-          "band": "induction-transfer",
-          "difficultyBucket": "composed-transform-d5",
-          "difficulty": 5,
-          "bandTimeBudgetSeconds": 55
-        },
-        {
-          "itemId": "relational-matrix-v2:constraint-spatial:relational-matrix-d4:r1",
-          "familyId": "relational-matrix-v2",
-          "band": "constraint-spatial",
-          "difficultyBucket": "relational-matrix-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 50
-        },
-        {
-          "itemId": "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d4:r1",
-          "familyId": "visual-set-algebra-v2",
-          "band": "constraint-spatial",
-          "difficultyBucket": "visual-set-algebra-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 50
-        },
-        {
-          "itemId": "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d5:r1",
-          "familyId": "visual-set-algebra-v2",
-          "band": "constraint-spatial",
-          "difficultyBucket": "visual-set-algebra-d5",
-          "difficulty": 5,
-          "bandTimeBudgetSeconds": 50
-        },
-        {
-          "itemId": "spatial-transform-v2:composition:spatial-transform-d3:r1",
-          "familyId": "spatial-transform-v2",
-          "band": "composition",
-          "difficultyBucket": "spatial-transform-d3",
-          "difficulty": 3,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "transformation-machine-v3:induction-transfer:transformation-machine-d5:r1",
-          "familyId": "transformation-machine-v3",
-          "band": "induction-transfer",
-          "difficultyBucket": "transformation-machine-d5",
-          "difficulty": 5,
-          "bandTimeBudgetSeconds": 55
-        },
-        {
-          "itemId": "rule-switching-v2:induction-transfer:rule-switching-d5:r1",
-          "familyId": "rule-switching-v2",
-          "band": "induction-transfer",
-          "difficultyBucket": "rule-switching-d5",
-          "difficulty": 5,
-          "bandTimeBudgetSeconds": 55
-        },
-        {
-          "itemId": "fold-punch-v2:constraint-spatial:fold-punch-d4:r1",
-          "familyId": "fold-punch-v2",
-          "band": "constraint-spatial",
-          "difficultyBucket": "fold-punch-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 50
-        },
-        {
-          "itemId": "fold-punch-v2:constraint-spatial:fold-punch-d5:r1",
-          "familyId": "fold-punch-v2",
-          "band": "constraint-spatial",
-          "difficultyBucket": "fold-punch-d5",
-          "difficulty": 5,
-          "bandTimeBudgetSeconds": 50
-        },
-        {
-          "itemId": "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5:r1",
-          "familyId": "inverse-fold-punch-v2",
-          "band": "induction-transfer",
-          "difficultyBucket": "inverse-fold-punch-d5",
-          "difficulty": 5,
-          "bandTimeBudgetSeconds": 55
-        },
-        {
-          "itemId": "second-order-sequence-v2:composition:second-order-sequence-d4:r1",
-          "familyId": "second-order-sequence-v2",
-          "band": "composition",
-          "difficultyBucket": "second-order-sequence-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "inverse-analogy-v2:composition:inverse-analogy-d4:r1",
-          "familyId": "inverse-analogy-v2",
-          "band": "composition",
-          "difficultyBucket": "inverse-analogy-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "parallel-evolution-v1:composition:parallel-evolution-d3:r1",
-          "familyId": "parallel-evolution-v1",
-          "band": "composition",
-          "difficultyBucket": "parallel-evolution-d3",
-          "difficulty": 3,
-          "bandTimeBudgetSeconds": 40
-        },
-        {
-          "itemId": "parallel-evolution-v1:composition:parallel-evolution-d4:r1",
-          "familyId": "parallel-evolution-v1",
-          "band": "composition",
-          "difficultyBucket": "parallel-evolution-d4",
-          "difficulty": 4,
-          "bandTimeBudgetSeconds": 40
-        }
-      ]
+     "itemId": "relational-sequence-v2:warmup:relational-sequence-d2:r1",
+     "familyId": "relational-sequence-v2",
+     "band": "warmup",
+     "difficultyBucket": "relational-sequence-d2",
+     "difficulty": 2,
+     "bandTimeBudgetSeconds": 25
+    },
+    {
+     "itemId": "attribute-pairing-v1:warmup:attribute-pairing-d2:r1",
+     "familyId": "attribute-pairing-v1",
+     "band": "warmup",
+     "difficultyBucket": "attribute-pairing-d2",
+     "difficulty": 2,
+     "bandTimeBudgetSeconds": 25
+    },
+    {
+     "itemId": "compositional-analogy-v2:composition:compositional-analogy-d3:r1",
+     "familyId": "compositional-analogy-v2",
+     "band": "composition",
+     "difficultyBucket": "compositional-analogy-d3",
+     "difficulty": 3,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "compositional-analogy-v2:composition:compositional-analogy-d4:r1",
+     "familyId": "compositional-analogy-v2",
+     "band": "composition",
+     "difficultyBucket": "compositional-analogy-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "composed-transform-v2:composition:composed-transform-d4:r1",
+     "familyId": "composed-transform-v2",
+     "band": "composition",
+     "difficultyBucket": "composed-transform-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "composed-transform-v2:induction-transfer:composed-transform-d5:r1",
+     "familyId": "composed-transform-v2",
+     "band": "induction-transfer",
+     "difficultyBucket": "composed-transform-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 55
+    },
+    {
+     "itemId": "relational-matrix-v2:constraint-spatial:relational-matrix-d4:r1",
+     "familyId": "relational-matrix-v2",
+     "band": "constraint-spatial",
+     "difficultyBucket": "relational-matrix-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 50
+    },
+    {
+     "itemId": "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d4:r1",
+     "familyId": "visual-set-algebra-v2",
+     "band": "constraint-spatial",
+     "difficultyBucket": "visual-set-algebra-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 50
+    },
+    {
+     "itemId": "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d5:r1",
+     "familyId": "visual-set-algebra-v2",
+     "band": "constraint-spatial",
+     "difficultyBucket": "visual-set-algebra-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 50
+    },
+    {
+     "itemId": "spatial-transform-v2:composition:spatial-transform-d3:r1",
+     "familyId": "spatial-transform-v2",
+     "band": "composition",
+     "difficultyBucket": "spatial-transform-d3",
+     "difficulty": 3,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "transformation-machine-v3:induction-transfer:transformation-machine-d5:r1",
+     "familyId": "transformation-machine-v3",
+     "band": "induction-transfer",
+     "difficultyBucket": "transformation-machine-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 55
+    },
+    {
+     "itemId": "rule-switching-v2:induction-transfer:rule-switching-d5:r1",
+     "familyId": "rule-switching-v2",
+     "band": "induction-transfer",
+     "difficultyBucket": "rule-switching-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 55
+    },
+    {
+     "itemId": "fold-punch-v2:constraint-spatial:fold-punch-d4:r1",
+     "familyId": "fold-punch-v2",
+     "band": "constraint-spatial",
+     "difficultyBucket": "fold-punch-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 50
+    },
+    {
+     "itemId": "fold-punch-v2:constraint-spatial:fold-punch-d5:r1",
+     "familyId": "fold-punch-v2",
+     "band": "constraint-spatial",
+     "difficultyBucket": "fold-punch-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 50
+    },
+    {
+     "itemId": "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5:r1",
+     "familyId": "inverse-fold-punch-v2",
+     "band": "induction-transfer",
+     "difficultyBucket": "inverse-fold-punch-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 55
+    },
+    {
+     "itemId": "second-order-sequence-v2:composition:second-order-sequence-d4:r1",
+     "familyId": "second-order-sequence-v2",
+     "band": "composition",
+     "difficultyBucket": "second-order-sequence-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "inverse-analogy-v2:composition:inverse-analogy-d4:r1",
+     "familyId": "inverse-analogy-v2",
+     "band": "composition",
+     "difficultyBucket": "inverse-analogy-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "parallel-evolution-v1:composition:parallel-evolution-d3:r1",
+     "familyId": "parallel-evolution-v1",
+     "band": "composition",
+     "difficultyBucket": "parallel-evolution-d3",
+     "difficulty": 3,
+     "bandTimeBudgetSeconds": 40
+    },
+    {
+     "itemId": "parallel-evolution-v1:composition:parallel-evolution-d4:r1",
+     "familyId": "parallel-evolution-v1",
+     "band": "composition",
+     "difficultyBucket": "parallel-evolution-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 40
     }
-  ]
+   ]
+  }
+ ]
 }

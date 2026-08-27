@@ -690,6 +690,35 @@ export function StemView({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Vis
     );
   }
 
+  if (puzzle.layout === "combineTable") {
+    // (left, gate, right, output) per row. The gate glyph sits BETWEEN the two
+    // boards it combines, which is the whole difference from a machine table:
+    // there the gate transforms one board and stands before it.
+    const rows = Array.from({ length: puzzle.stem.length / 4 }, (_, index) =>
+      puzzle.stem.slice(index * 4, index * 4 + 4),
+    );
+    return (
+      <div
+        className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3"
+        aria-label="Worked combinations followed by one query combination"
+      >
+        {rows.map(([left, gate, right, output], index) => (
+          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-1 sm:gap-2">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+              <div className="w-20 shrink-0">{left && <PanelBox panel={left} />}</div>
+            </div>
+            {gate && <GateBox panel={gate} />}
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+              <div className="w-20 shrink-0">{right && <PanelBox panel={right} />}</div>
+              <span className="text-xl text-gray-400" aria-hidden="true">→</span>
+              <div className="w-20 shrink-0">{output && <PanelBox panel={output} />}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (puzzle.layout === "analogy") {
     // [A, B, C] rendered as  A : B  ::  C : ?
     const [a, b, c] = puzzle.stem;

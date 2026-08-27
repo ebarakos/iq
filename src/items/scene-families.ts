@@ -70,6 +70,7 @@ export const SCENE_FAMILY_IDS = [
   "inverse-analogy-v2",
   "minimal-repair-v3",
   "parallel-evolution-v1",
+  "combining-machine-v1",
 ] as const;
 export type SceneFamilyId = (typeof SCENE_FAMILY_IDS)[number];
 
@@ -145,6 +146,12 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   "relational-outlier-v3": [{ bucket: "relational-outlier-v3-d2", difficulty: 2, programDepth: 1 }],
   // A row rule and a column rule, both needed for the missing corner.
   "relational-matrix-v2": [{ bucket: "relational-matrix-d4", difficulty: 4, programDepth: 2 }],
+  // Two or three combining gates, never more: the three-gate ceiling of
+  // 2026-08-27 applies here like everywhere else.
+  "combining-machine-v1": [
+    { bucket: "combining-machine-d4", difficulty: 4, programDepth: 2 },
+    { bucket: "combining-machine-d5", difficulty: 5, programDepth: 3 },
+  ],
   // d4 combines the two boards and then transforms the combined result. d5 adds
   // a third visible step: every orientable token on that result turns in place.
   "visual-set-algebra-v2": [
@@ -450,6 +457,31 @@ function sceneAspectKey(scene: Scene, read: (placement: ScenePlacement) => strin
 let uncoveredAspectSelections = 0;
 export function uncoveredDistractorAspects(): number { return uncoveredAspectSelections; }
 export function resetUncoveredDistractorAspects(): void { uncoveredAspectSelections = 0; }
+
+/**
+ * Can this near-miss pool supply the agreement the option list needs?
+ *
+ * `selectDistractors` takes, per aspect, the closest wrong option that matches
+ * the answer on it — but it can only take one if the pool holds one. When the
+ * pool does not, the item ships with an aspect that picks the answer on its own,
+ * and no amount of re-choosing fixes it. Families whose inputs are drawn rather
+ * than enumerated can do better than ship it: check the pool here and draw
+ * again, the same way a draw with two defensible answers is redrawn.
+ *
+ * Only for families that CAN satisfy it. Where a family's whole rule shows up in
+ * one aspect — `fold-punch` and `second-order-sequence`, whose options are one
+ * token at different places — a board agreeing on that aspect would be the
+ * answer, and asking for one would reject every draw forever.
+ */
+function poolCoversEveryAspect(answer: Scene, pool: readonly Scene[]): boolean {
+  return DISTRACTOR_ASPECTS.every((aspect) => {
+    const target = aspect.of(answer);
+    return pool.some((candidate) =>
+      aspect.of(candidate) === target &&
+      sceneSignature(candidate) !== sceneSignature(answer) &&
+      areScenesCategoricallyDistinct(answer, candidate));
+  });
+}
 
 function selectDistractors(
   pool: readonly Scene[],
@@ -1481,8 +1513,20 @@ const RELATIONAL_MATRIX_MASKS: readonly number[] = Array.from({ length: 15 }, (_
 /** Input draws tried before this family gives up on the sampled rule pair. */
 const RELATIONAL_MATRIX_INPUT_ATTEMPTS = 300;
 
-/** Which of each corner's two tokens a board holds — one bit per corner. */
-const RELATIONAL_MATRIX_VARIANTS: readonly number[] = Array.from({ length: 16 }, (_, index) => index);
+/**
+ * Which of each corner's three tokens a board holds — one base-3 digit per
+ * corner, so 3^4 draws.
+ *
+ * It was two per corner until 2026-08-27. With two, a shape could sit at only
+ * two of the four corners, so a board carrying the answer's shapes almost always
+ * carried them in the answer's cells too — the same board. That left the answer
+ * as the only option with its shape multiset in 80% of items, and a solver who
+ * worked out which tokens survive was finished without ever working out where
+ * they go. A third token per corner gives every shape three homes, which is what
+ * lets a wrong option agree with the answer on shapes and still differ on
+ * position.
+ */
+const RELATIONAL_MATRIX_VARIANTS: readonly number[] = Array.from({ length: 81 }, (_, index) => index);
 
 function binaryOperationDescription(operation: SceneBinaryOperation): string {
   switch (operation) {
@@ -1507,7 +1551,7 @@ function binaryOperationDescription(operation: SceneBinaryOperation): string {
 
 function relationalMatrix(rng: Rng): SceneFamilyCandidate {
   const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  // Two tokens per corner, not one.
+  // Three tokens per corner, not one.
   //
   // Until 2026-08-27 each corner held a single fixed token, so any two input
   // boards agreed wherever they overlapped and a CLASH was impossible. That had
@@ -1533,7 +1577,7 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
    */
   const fromDraw = (mask: number, variants: number) =>
     scene(corners.flatMap((_, index) =>
-      (mask & (1 << index)) === 0 ? [] : [atomAt(index, (variants >> index) & 1)]));
+      (mask & (1 << index)) === 0 ? [] : [atomAt(index, Math.floor(variants / 3 ** index) % 3)]));
 
   /**
    * Build the whole board from four input masks, or reject the draw.
@@ -1597,12 +1641,33 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
       })));
     if (predictions.length !== 1 || sceneSignature(predictions[0]) !== sceneSignature(answer)) return null;
 
-    // Three kinds of near miss, each witnessed by a mistake a solver can
+    // Four kinds of near miss, each witnessed by a mistake a solver can
     // actually make: applying an operation that fails a worked row or column;
     // applying the right operation to the two boards in the wrong order (order
     // matters for subtract — for the commutative operations the swapped result
-    // repeats the forward one and is deduplicated away); and copying one of the
-    // two boards being combined instead of combining them.
+    // repeats the forward one and is deduplicated away); copying one of the
+    // two boards being combined instead of combining them; and combining a
+    // wrong PAIR of the visible boards.
+    //
+    // That fourth kind was added on 2026-08-27. The first three draw only on the
+    // four boards that border the blank, and measured, that pool was too narrow
+    // to hold a board carrying the answer's own shapes: in 80% of items the
+    // answer was the only option with its shape multiset, so reading the row
+    // rule alone finished the item and the column rule was decoration. Reaching
+    // for the wrong two boards is the commonest real mistake on a 3x3 grid, and
+    // it widens the pool enough that the option list can agree with the answer
+    // on shapes while still differing on where those shapes sit.
+    const visible = [topLeft, topMiddle, topRight, middleLeft, middleMiddle, middleRight, bottomLeft, bottomMiddle];
+    const correctPair = new Set([
+      `${sceneSignature(bottomLeft)}>${sceneSignature(bottomMiddle)}`,
+      `${sceneSignature(topRight)}>${sceneSignature(middleRight)}`,
+    ]);
+    const wrongPairOutputs = visible.flatMap((left) =>
+      visible.flatMap((right) => {
+        if (sceneSignature(left) === sceneSignature(right)) return [];
+        if (correctPair.has(`${sceneSignature(left)}>${sceneSignature(right)}`)) return [];
+        return SCENE_BINARY_GRAMMAR.map((operation) => applySceneBinary(left, right, operation));
+      }));
     const distractors = distinctOutputs([
       ...SCENE_BINARY_GRAMMAR.flatMap((operation) => [
         applySceneBinary(bottomLeft, bottomMiddle, operation),
@@ -1611,8 +1676,14 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
         applySceneBinary(middleRight, topRight, operation),
       ]),
       bottomLeft, bottomMiddle, topRight, middleRight,
+      ...wrongPairOutputs,
+      ...visible,
     ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
     if (distractors.length < DISTRACTORS_PER_ITEM) return null;
+    // The draw must also be able to hide the answer. A grid whose pool holds no
+    // board carrying the answer's own shapes hands the item to whoever works out
+    // which tokens survive, without ever working out where they land.
+    if (!poolCoversEveryAspect(answer, distractors)) return null;
 
     return { topLeft, topMiddle, topRight, middleLeft, middleMiddle, middleRight, bottomLeft, bottomMiddle, answer, distractors };
   };
@@ -1705,9 +1776,22 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
           if (swappedRow) return `${swappedRow} predicts this board only with the two boards in the wrong order`;
           const swappedColumn = SCENE_BINARY_GRAMMAR.find((operation) => predicts(rowB, rowA, operation));
           if (swappedColumn) return `${swappedColumn} predicts this board only with the two boards in the wrong order`;
-          const copied = [colA, colB, rowA, rowB].some((board) =>
+          const copied = [a, b, rowA, c, d, rowB, colA, colB].some((board) =>
             sceneSignature(board) === sceneSignature(option));
-          return copied ? "copies one of the two boards instead of combining them" : null;
+          if (copied) return "copies a board from the grid instead of combining the two beside the blank";
+          // Last, the widest category: the right kind of rule applied to the
+          // wrong two boards of the grid. It is checked last so a board that any
+          // sharper mistake explains is named by that mistake instead.
+          const visible = [a, b, rowA, c, d, rowB, colA, colB];
+          for (const left of visible) {
+            for (const right of visible) {
+              if (sceneSignature(left) === sceneSignature(right)) continue;
+              const operation = SCENE_BINARY_GRAMMAR.find((candidateOperation) =>
+                predicts(left, right, candidateOperation));
+              if (operation) return `${operation} applied to the wrong two boards of the grid`;
+            }
+          }
+          return null;
         }),
       };
     },
@@ -1879,8 +1963,15 @@ function setAlgebra(
   // below re-derives this from the finished puzzle and is what actually
   // guarantees it; this loop only stops the family handing it a draw it would
   // have to reject.
+  /** The near misses a draw can offer: every other program run on the query pair. */
+  const poolFor = (queryLeft: Scene, queryRight: Scene, answer: Scene) => distinctOutputs(grammar
+    .filter((candidateProgram) => JSON.stringify(candidateProgram) !== JSON.stringify(program))
+    .map((candidateProgram) => applySetAlgebraProgram(queryLeft, queryRight, candidateProgram)))
+    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
+
   const rows = (() => {
     let last: SetAlgebraRows | null = null;
+    let lastWellPosed: SetAlgebraRows | null = null;
     for (let attempt = 0; attempt < SET_ALGEBRA_INPUT_ATTEMPTS; attempt++) {
       const rowRoles = [setAlgebraRoles(rng), setAlgebraRoles(rng), setAlgebraRoles(rng)];
       const pair = (offset: number): [Scene, Scene] =>
@@ -1904,20 +1995,27 @@ function setAlgebra(
       }));
       const predicted = distinctOutputs(survivors.map((candidateProgram) =>
         applySetAlgebraProgram(queryLeft, queryRight, candidateProgram)));
-      if (predicted.length === 1) return draw;
+      if (predicted.length !== 1) continue;
+      lastWellPosed = draw;
+      // Well posed is not yet enough. The d5 bucket turns the combined board as
+      // a third step, so two programs differing only in that turn land in the
+      // same cells and the option list always holds a board sharing the answer's
+      // footprint. The d4 bucket has no such step, and measured on 2026-08-27 it
+      // left the answer alone in its cells in 45% of items — one inference,
+      // where the tokens go, and the combining rule never had to be read. Draw
+      // again until the pool can cover every aspect.
+      const pool = poolFor(queryLeft, queryRight, answer);
+      if (pool.length >= DISTRACTORS_PER_ITEM && poolCoversEveryAspect(answer, pool)) return draw;
     }
-    // Every attempt was ambiguous, which the measured rate says should not
-    // happen. Hand back the last draw rather than throwing: acceptance rejects
-    // it and the assembler retries the slot on a fresh seed, which is the
-    // failure path every other family already uses.
-    return last;
+    // No draw satisfied everything. Prefer the last unambiguous one and fall
+    // back to the last draw at all: acceptance rejects an unusable board and the
+    // assembler retries the slot on a fresh seed, which is the failure path
+    // every other family already uses.
+    return lastWellPosed ?? last;
   })();
   if (rows === null) throw new Error("set algebra could not build a single valid row draw");
   const { leftA, rightA, outputA, leftB, rightB, outputB, queryLeft, queryRight, answer } = rows;
-  const distractors = distinctOutputs(grammar
-    .filter((candidateProgram) => JSON.stringify(candidateProgram) !== JSON.stringify(program))
-    .map((candidateProgram) => applySetAlgebraProgram(queryLeft, queryRight, candidateProgram)))
-    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
+  const distractors = poolFor(queryLeft, queryRight, answer);
   const selectedDistractors = selectDistractors(distractors, rng, "set algebra", { answer });
   const cueIds = turning
     ? ["shared-coordinate-frame", "worked-combinations", "spatial-output-step", "token-orientation"]
@@ -2023,6 +2121,334 @@ function mosaicVisibleFits(template: Scene, program: MosaicProgram): boolean {
 function mosaicCompletedFits(value: Scene, program: MosaicProgram): boolean {
   const values = mosaicValues(value, program.projection);
   return values !== null && valuesMatchGroups(values, mosaicGroups(program.pattern));
+}
+
+
+/**
+ * The glyph keys a combining machine's gate panel shows, in the order they are
+ * drawn left to right — one for a worked row, two or three for the query strip.
+ *
+ * The oracle matches the query strip's glyphs against the worked rows' glyphs to
+ * decide which rule runs when. Without that the strip would be decoration: the
+ * answer would always be "the worked rows in the order they appear", the
+ * displayed order would carry nothing, and repainting a glyph would change no
+ * answer. Reading it here is what makes the gate labels load-bearing.
+ */
+function combineGateKeys(value: Scene): string[] | null {
+  if (value.tiles.length > 0 || value.objects.length === 0) return null;
+  const sorted = [...value.objects].sort((left, right) => left.column - right.column);
+  if (sorted.some((placement, index) => placement.column !== index)) return null;
+  return sorted.map((placement) => JSON.stringify(placement.object));
+}
+
+/**
+ * One row's operand pair for the combining machine.
+ *
+ * The same four roles `visual-set-algebra` uses, but the left-only and
+ * right-only tokens deliberately carry the SAME shape. That one change is what
+ * lets this family hide its answer.
+ *
+ * With a distinct shape per role — which is what `setAlgebraPair` gives — a
+ * board's shape multiset says exactly which roles survived, and which roles
+ * survived says exactly which cells are filled. Shape and footprint become the
+ * same fact, so the only board carrying the answer's shapes is the answer, and
+ * measured, one inference decided every item. Giving one shape two homes breaks
+ * that identity: a chain that keeps the left-only cell and a chain that keeps
+ * the right-only cell now show the same shapes in different places. It does not
+ * blur the gates at all — the eight operations are separated by which POSITIONS
+ * survive, and those are untouched.
+ */
+function combiningMachinePair(
+  roles: SetAlgebraRoles,
+  shapes: readonly SceneToken["shape"][],
+  offset: number,
+): [Scene, Scene] {
+  const sharedToken = token(shapes[offset % shapes.length]);
+  const clashLeft = token(shapes[(offset + 1) % shapes.length]);
+  const clashRight = token(shapes[(offset + 2) % shapes.length]);
+  const twoHomes = token(shapes[(offset + 3) % shapes.length]);
+  return [
+    scene([
+      { ...roles.shared, object: sharedToken },
+      { ...roles.clash, object: clashLeft },
+      { ...roles.leftOnly, object: twoHomes },
+    ]),
+    scene([
+      { ...roles.shared, object: sharedToken },
+      { ...roles.clash, object: clashRight },
+      { ...roles.rightOnly, object: twoHomes },
+    ]),
+  ];
+}
+
+/**
+ * Every ordered tuple of DISTINCT combining operations of the given length.
+ *
+ * Distinct because two identical gates would give the query two glyphs that
+ * mean the same thing, and a solver who noticed would rightly wonder why the
+ * item bothered. 8 x 7 = 56 two-gate orders and 8 x 7 x 6 = 336 three-gate ones,
+ * which is the search room the oracle needs and far more than the draw uses.
+ */
+function combiningGateOrders(gateCount: number): SceneBinaryOperation[][] {
+  const grow = (prefix: SceneBinaryOperation[]): SceneBinaryOperation[][] =>
+    prefix.length === gateCount
+      ? [prefix]
+      : SCENE_BINARY_GRAMMAR
+          .filter((operation) => !prefix.includes(operation))
+          .flatMap((operation) => grow([...prefix, operation]));
+  return grow([]);
+}
+
+/** How many combining gates each named bucket displays. */
+const COMBINING_MACHINE_BUCKET_GATES: Readonly<Record<string, number>> = {
+  "combining-machine-d4": 2,
+  "combining-machine-d5": 3,
+};
+
+/**
+ * Role draws tried before this family gives up on the sampled gate order, and
+ * how many gate orders it tries at all.
+ *
+ * Both are small on purpose. A draw is rejected unless every worked row pins its
+ * own gate AND the near-miss pool can cover every aspect, and there are 336
+ * three-gate orders — trying each of them a few hundred times is tens of
+ * thousands of builds for an item the assembler wanted in milliseconds. A dozen
+ * orders at forty draws each finds a good item comfortably; when it does not,
+ * the throw below is a rejected attempt the assembler retries on a fresh seed,
+ * which is the failure path every other family already uses.
+ */
+const COMBINING_MACHINE_INPUT_ATTEMPTS = 25;
+const COMBINING_MACHINE_GATE_ORDERS_TRIED = 48;
+/** Gate orders searched for full aspect coverage before settling for a sound draw. */
+const COMBINING_MACHINE_COVERAGE_ORDERS = 12;
+
+/**
+ * A machine whose gates COMBINE two boards instead of transforming one.
+ *
+ * Built 2026-08-27 on the owner's instruction to "add this common
+ * abstraction/sum in the big Gate transformations". `visual-set-algebra` already
+ * asks a solver to infer ONE hidden combining rule; a transformation machine
+ * already asks them to read several named gates off worked paths and run them in
+ * order. Neither asks for both, because a machine row is (input, gate, output)
+ * and a gate that eats two boards cannot be shown in it. This family gets the
+ * row shape it needs — `combineTable`, where the gate glyph sits BETWEEN its two
+ * operands — and is the first item in the battery where a named, reusable gate
+ * takes a pair.
+ *
+ * The rule, stated once and then never restated in the item: each gate combines
+ * what you have so far with the right-hand board. So a two-gate query is
+ * `b(a(left, right), right)`, and the right-hand board is read three times, not
+ * consumed. That is the one thing a solver has to work out that neither parent
+ * family teaches, which is the point — difficulty from a mechanism you have to
+ * discover, not from more steps of one you know.
+ */
+function combiningMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
+  const gateCount = COMBINING_MACHINE_BUCKET_GATES[bucket.bucket] ?? 2;
+  const shapes = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
+  const gateIds = COMPOSED_GATE_IDS.slice(0, gateCount) as ComposedGateId[];
+
+  /**
+   * One complete draw, or null.
+   *
+   * A draw is kept only when every worked row pins its own gate — exactly one
+   * operation in the grammar carries that row's pair to that row's output. If a
+   * row leaves two operations standing, the query has two defensible answers and
+   * the item is unsound, so it is discarded here rather than at acceptance.
+   */
+  const build = (gates: readonly SceneBinaryOperation[], runOrder: readonly number[]) => {
+    const rows = gates.map((gate, index) => {
+      const roles = setAlgebraRoles(rng);
+      const [left, right] = combiningMachinePair(roles, shapes, index);
+      const output = applySceneBinary(left, right, gate);
+      return output ? { gate, left, right, output } : null;
+    });
+    if (rows.some((row) => row === null)) return null;
+    const worked = rows as { gate: SceneBinaryOperation; left: Scene; right: Scene; output: Scene }[];
+    const pins = worked.every((row) => SCENE_BINARY_GRAMMAR.filter((operation) => {
+      const output = applySceneBinary(row.left, row.right, operation);
+      return output !== null && sceneSignature(output) === sceneSignature(row.output);
+    }).length === 1);
+    if (!pins) return null;
+
+    const queryRoles = setAlgebraRoles(rng);
+    const [queryLeft, queryRight] = combiningMachinePair(queryRoles, shapes, gateCount);
+    const run = (order: readonly SceneBinaryOperation[]): Scene[] | null => {
+      const stages: Scene[] = [];
+      let value: Scene | null = queryLeft;
+      for (const gate of order) {
+        value = value && applySceneBinary(value, queryRight, gate);
+        if (!value) return null;
+        stages.push(value);
+      }
+      return stages;
+    };
+    const stages = run(runOrder.map((index) => gates[index]));
+    if (!stages) return null;
+    const answer = stages[stages.length - 1];
+    // An answer that repeats one of the two boards it was built from hides the
+    // rule behind a copy, the same way a repeated board does in relational
+    // matrix.
+    if ([queryLeft, queryRight, ...stages.slice(0, -1)]
+      .some((board) => sceneSignature(board) === sceneSignature(answer))) return null;
+    if (answer.objects.length === 0) return null;
+
+    // Five kinds of mistake, each one a solver can actually make: stopping
+    // before the last gate; running the gates in another order; misreading one
+    // gate as a different operation; chaining onto the LEFT board instead of the
+    // right one, which is the rule this family is really testing; and copying an
+    // operand instead of combining.
+    const runOnBoards = (start: Scene, order: readonly SceneBinaryOperation[], right: Scene): Scene | null => {
+      let value: Scene | null = start;
+      for (const gate of order) value = value && applySceneBinary(value, right, gate);
+      return value;
+    };
+    const ordered = runOrder.map((index) => gates[index]);
+    const pool = distinctOutputs([
+      ...stages.slice(0, -1),
+      ...composedWrongGateOrders(gates.length).map((order) =>
+        runOnBoards(queryLeft, order.map((index) => ordered[index]), queryRight)),
+      ...ordered.flatMap((_, index) => SCENE_BINARY_GRAMMAR.map((operation) =>
+        runOnBoards(queryLeft, ordered.map((gate, at) => (at === index ? operation : gate)), queryRight))),
+      runOnBoards(queryLeft, ordered, queryLeft),
+      runOnBoards(queryRight, ordered, queryLeft),
+      queryLeft, queryRight,
+    ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
+    if (pool.length < DISTRACTORS_PER_ITEM) return null;
+
+    return { worked, queryLeft, queryRight, stages, answer, pool, runOrder };
+  };
+
+  // Prefer a draw whose near misses can cover every aspect a solver can infer
+  // alone, so no single inference picks the answer — the rule the whole battery
+  // was held to on 2026-08-27. Unlike `relational-matrix`, this family cannot
+  // insist on it: its boards are combinations of combinations, and the answer's
+  // footprint is often reachable by no other chain at all. So coverage is a
+  // preference with a well-posed fallback, and how often the fallback is taken
+  // is measured rather than assumed — see the aspect test.
+  let drawn: ReturnType<typeof build> = null;
+  let fallback: { draw: NonNullable<ReturnType<typeof build>>; gates: readonly SceneBinaryOperation[] } | null = null;
+  let gates: readonly SceneBinaryOperation[] = [];
+  const runOrder = shuffled(rng, gateIds.map((_, index) => index));
+  const orders = shuffled(rng, combiningGateOrders(gateCount)).slice(0, COMBINING_MACHINE_GATE_ORDERS_TRIED);
+  for (const [ordersTried, candidateGates] of orders.entries()) {
+    for (let attempt = 0; attempt < COMBINING_MACHINE_INPUT_ATTEMPTS && !drawn; attempt++) {
+      const candidate = build(candidateGates, runOrder);
+      if (!candidate) continue;
+      if (!fallback) fallback = { draw: candidate, gates: candidateGates };
+      if (poolCoversEveryAspect(candidate.answer, candidate.pool)) {
+        drawn = candidate;
+        gates = candidateGates;
+      }
+    }
+    if (drawn) break;
+    // Stop hunting for coverage once a usable item is in hand and the search has
+    // had a fair run. Most draws here cannot cover — the answer of a chain of
+    // combining gates often sits where no other chain lands — and without this
+    // bound a d5 item costs most of a second to build.
+    if (fallback && ordersTried + 1 >= COMBINING_MACHINE_COVERAGE_ORDERS) break;
+  }
+  if (!drawn && fallback) {
+    drawn = fallback.draw;
+    gates = fallback.gates;
+  }
+  if (!drawn) throw new Error("combining machine found no well-posed gate order");
+  const { worked, queryLeft, queryRight, answer, pool: distractors } = drawn;
+
+  const runOn = (start: Scene, order: readonly SceneBinaryOperation[], right: Scene): Scene | null => {
+    let value: Scene | null = start;
+    for (const gate of order) value = value && applySceneBinary(value, right, gate);
+    return value;
+  };
+  const wrongOrders = composedWrongGateOrders(gateCount);
+
+  const stem: Puzzle<Scene>["stem"] = [
+    ...worked.flatMap((row, index) => [row.left, gateVisual(gateIds[index]), row.right, row.output]),
+    queryLeft, gateVisual(...runOrder.map((index) => gateIds[index])), queryRight, { blank: true },
+  ];
+  const puzzle = makePuzzle(
+    "prototype-combining-machine",
+    "matrix",
+    "combineTable",
+    "Each gate combines two boards. Apply the query gates from left to right.",
+    bucket.difficulty,
+    stem,
+    answer,
+    selectDistractors(distractors, rng, "combining machine", { answer }),
+    rng,
+    `Each worked row shows one gate combining the two boards beside it. ${worked
+      .map((row, index) => `Gate ${gateIds[index].toUpperCase()} ${binaryOperationDescription(row.gate)}.`)
+      .join(" ")} The query names its gates in order; each one combines the board you have so far with the right-hand board, which is read again every time rather than used up. That gives the highlighted board. Distractors stop early, run the gates in another order, misread a gate, chain onto the left board, or copy an input.`,
+  );
+  const cueIds = [...gateIds.map((gateId) => `gate-${gateId}`), "left-to-right-order", "right-board-reused"];
+  const family = definition(
+    "combining-machine-v1",
+    cueIds,
+    JSON.stringify(gates),
+    (candidate) => {
+      const panels = candidate.stem.map(scenePanel);
+      const empty = { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
+      if (panels.some((panel, index) => index !== panels.length - 1 && panel === null)) return empty;
+      const rows = Array.from({ length: panels.length / 4 }, (_, index) =>
+        panels.slice(index * 4, index * 4 + 4) as Scene[]);
+      const workedRows = rows.slice(0, -1);
+      const [readLeft, queryStrip, readRight] = rows[rows.length - 1];
+      // Which operation each worked row leaves standing. A row that leaves two
+      // makes the whole item ambiguous, so the oracle reports no answer rather
+      // than guessing which the solver was meant to read.
+      const survivorsPerRow = workedRows.map(([left, , right, output]) =>
+        SCENE_BINARY_GRAMMAR.filter((operation) => {
+          const produced = applySceneBinary(left, right, operation);
+          return produced !== null && sceneSignature(produced) === sceneSignature(output);
+        }));
+      if (survivorsPerRow.some((survivors) => survivors.length !== 1)) return empty;
+      // Match the query strip's glyphs to the worked rows that display them, so
+      // the ORDER on screen is what runs. A glyph the worked rows never show, a
+      // glyph shown twice, or a strip of the wrong length all mean the visible
+      // evidence no longer determines an answer.
+      const byGlyph = new Map<string, SceneBinaryOperation>();
+      for (const [index, row] of workedRows.entries()) {
+        const keys = combineGateKeys(row[1]);
+        if (!keys || keys.length !== 1 || byGlyph.has(keys[0])) return empty;
+        byGlyph.set(keys[0], survivorsPerRow[index][0]);
+      }
+      const stripKeys = combineGateKeys(queryStrip);
+      if (!stripKeys || stripKeys.length !== workedRows.length) return empty;
+      if (new Set(stripKeys).size !== stripKeys.length) return empty;
+      const readGates: SceneBinaryOperation[] = [];
+      for (const key of stripKeys) {
+        const operation = byGlyph.get(key);
+        if (!operation) return empty;
+        readGates.push(operation);
+      }
+      const predicted = runOn(readLeft, readGates, readRight);
+      return {
+        derivedAnswer: predicted,
+        solutionCount: predicted ? 1 : 0,
+        usedCueIds: cueIds,
+        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
+          const is = (board: Scene | null) => board !== null && sceneSignature(board) === sceneSignature(option);
+          for (let stop = 1; stop < readGates.length; stop++) {
+            if (is(runOn(readLeft, readGates.slice(0, stop), readRight))) return "stops before the last gate";
+          }
+          if (wrongOrders.some((order) => is(runOn(readLeft, order.map((index) => readGates[index]), readRight)))) {
+            return "runs the demonstrated gates in another order";
+          }
+          for (let index = 0; index < readGates.length; index++) {
+            const misread = SCENE_BINARY_GRAMMAR.some((operation) =>
+              operation !== readGates[index] &&
+              is(runOn(readLeft, readGates.map((gate, at) => (at === index ? operation : gate)), readRight)));
+            if (misread) return "misreads one gate as a different combining rule";
+          }
+          if (is(runOn(readLeft, readGates, readLeft)) || is(runOn(readRight, readGates, readLeft))) {
+            return "chains onto the left board instead of the right one";
+          }
+          if (is(readLeft) || is(readRight)) return "copies one of the two boards instead of combining them";
+          return null;
+        }),
+      };
+    },
+  );
+  return asCandidate(family, puzzle);
 }
 
 function constraintMosaic(rng: Rng): SceneFamilyCandidate {
@@ -2276,8 +2702,23 @@ function spatialTransform(rng: Rng): SceneFamilyCandidate {
   const transformed = applySceneUnary(first, operation)!;
   const query = scene([{ row: 0, column: 1, object: token(b) }, { row: 1, column: 0, object: token(a, "solid") }]);
   const answer = applySceneUnary(query, operation)!;
+  // The pool is the other bounded operations, and each of them again with an
+  // extra token turn.
+  //
+  // The plain operations alone were too narrow, measured on 2026-08-27: a board
+  // rotation lands the tokens in cells no other operation reaches, so in 43% of
+  // items the answer was the only option with its footprint and reading where
+  // the tokens go finished the item without ever reading the arrow. Composing a
+  // move with a turn keeps the footprint and changes only the arrow, which is
+  // exactly the mix-up this family exists to test — the solver who moved the
+  // board correctly but turned the tokens as well.
+  const withExtraTurn = (base: Scene) => ([1, 2, 3] as const)
+    .map((quarterTurns) => applySceneUnary(base, { kind: "turn", quarterTurns }));
   const distractors = [...new Map(SPATIAL_TRANSFORM_GRAMMAR
-    .map((candidateOperation) => applySceneUnary(query, candidateOperation))
+    .flatMap((candidateOperation) => {
+      const moved = applySceneUnary(query, candidateOperation);
+      return moved ? [moved, ...withExtraTurn(moved)] : [];
+    })
     .filter((candidate): candidate is Scene => candidate !== null)
     .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer))
     .map((candidate) => [sceneSignature(candidate), candidate])).values()];
@@ -2332,7 +2773,20 @@ function spatialTransform(rng: Rng): SceneFamilyCandidate {
             return queryOutput !== null && sceneSignature(queryOutput) === sceneSignature(option) &&
               (workedOutput === null || sceneSignature(workedOutput) !== sceneSignature(output));
           });
-          return failedRule ? `${failedRule.kind} does not reproduce the worked spatial pair` : null;
+          if (failedRule) return `${failedRule.kind} does not reproduce the worked spatial pair`;
+          // Checked second, so a board a single operation already explains is
+          // named by that operation rather than by this wider category.
+          const movedAndTurned = SPATIAL_TRANSFORM_GRAMMAR.find((candidateOperation) => {
+            const moved = applySceneUnary(query, candidateOperation);
+            if (!moved) return false;
+            return ([1, 2, 3] as const).some((quarterTurns) => {
+              const turned = applySceneUnary(moved, { kind: "turn", quarterTurns });
+              return turned !== null && sceneSignature(turned) === sceneSignature(option);
+            });
+          });
+          return movedAndTurned
+            ? `${movedAndTurned.kind} with an extra token turn the worked pair does not show`
+            : null;
         }),
       };
     },
@@ -2843,6 +3297,17 @@ function ruleSwitching(rng: Rng): SceneFamilyCandidate {
     otherGateOutput,
     ...bothOrders,
     ...RULE_SWITCH_OPERATION_GRAMMAR.map((operation) => applySceneUnary(query, operation)),
+    // The correct board with one more bounded operation run on top of it.
+    //
+    // Added 2026-08-27. Every option above either sits where the query sits or
+    // where some single operation puts it, so when neither demonstrated gate was
+    // a recolour the answer was the only board in its cells — and in 48% of
+    // items, working out where the tokens land finished it. Running one more
+    // operation on the correct board keeps those cells and changes the fill,
+    // which is the near miss the pool was missing. It is the same mistake the
+    // pool already names when the other gate happens to be a recolour: carrying
+    // on past the gate the query actually shows.
+    ...RULE_SWITCH_OPERATION_GRAMMAR.map((operation) => applySceneUnary(answer, operation)),
   ]).filter((output) => sceneSignature(output) !== sceneSignature(answer));
   const nearMisses = selectDistractors(nearMissPool, rng, "rule switching", { answer });
   const puzzle = makePuzzle(
@@ -2859,7 +3324,7 @@ function ruleSwitching(rng: Rng): SceneFamilyCandidate {
     answer,
     nearMisses,
     rng,
-    `The worked rows define two separate gates. Gate A ${ruleSwitchOperationDescription(program.gateA)}, while gate B ${ruleSwitchOperationDescription(program.gateB)}. The query displays only gate ${program.queryGate.toUpperCase()}, so applying that demonstrated operation gives the highlighted board. The distractors omit the selected gate, use the other gate, combine both gates, or follow another bounded operation that fails the selected gate's worked row.`,
+    `The worked rows define two separate gates. Gate A ${ruleSwitchOperationDescription(program.gateA)}, while gate B ${ruleSwitchOperationDescription(program.gateB)}. The query displays only gate ${program.queryGate.toUpperCase()}, so applying that demonstrated operation gives the highlighted board. The distractors omit the selected gate, use the other gate, combine both gates, run the selected gate and then keep going, or follow another bounded operation that fails the selected gate's worked row.`,
   );
   const family = definition(
     "rule-switching-v2",
@@ -2917,6 +3382,17 @@ function ruleSwitching(rng: Rng): SceneFamilyCandidate {
                 output: applySceneUnary(queryInput, operation),
                 reason: "follows an operation that fails the selected gate's worked row",
               }];
+        }),
+        // Widest of all, so it is listed last: the selected gate run correctly
+        // and then carried one operation further.
+        ...survivors.flatMap((candidateProgram) => {
+          const selectedOutput = applySceneUnary(queryInput, selectedRuleSwitchOperation(candidateProgram));
+          return selectedOutput
+            ? RULE_SWITCH_OPERATION_GRAMMAR.map((operation) => ({
+                output: applySceneUnary(selectedOutput, operation),
+                reason: "runs the selected gate and then keeps going",
+              }))
+            : [];
         }),
       ];
       return {
@@ -3386,7 +3862,11 @@ export function canonicalComposedTransformQuery(): Scene {
  * point: the table is the single place gate counts are declared.
  */
 export function declaredGateCounts(): Readonly<Record<string, number>> {
-  return { ...COMPOSED_TRANSFORM_BUCKET_GATES, ...TRANSFORMATION_MACHINE_BUCKET_GATES };
+  return {
+    ...COMPOSED_TRANSFORM_BUCKET_GATES,
+    ...TRANSFORMATION_MACHINE_BUCKET_GATES,
+    ...COMBINING_MACHINE_BUCKET_GATES,
+  };
 }
 
 function composedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
@@ -5266,6 +5746,7 @@ export function generateSceneFamilyCandidate(
     case "inverse-analogy-v2": return inverseAnalogy(rng);
     case "minimal-repair-v3": return minimalRepair(rng);
     case "parallel-evolution-v1": return parallelEvolution(rng, bucket);
+    case "combining-machine-v1": return combiningMachine(rng, bucket);
   }
 }
 

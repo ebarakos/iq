@@ -4,19 +4,31 @@
  *   npm run pilot:report -- data/pilot/2026-08-25-pilot-v3-a.json
  *
  * Reads one aggregate-v2 export from the pilot screen, checks it against the
- * saved answer-free packet manifest, and applies the two evidence gates in
- * docs/plans/escalate-the-quiz.md:
+ * saved answer-free packet manifest, and reports two different things:
  *
  *   - the documented per-item withdrawal review, which FLAGS items for the
- *     owner's decision and never withdraws anything by itself; and
- *   - the escalation success test, which passes on either at least two clean
- *     misses among d4/d5 items or a tight median d5 time headroom.
+ *     owner's decision and never withdraws anything by itself. This is the part
+ *     that still carries weight: a wrong answer given for a stated reason, or an
+ *     item nobody could read, is a fact about the ITEM.
+ *   - the two escalation branches — clean misses among d4/d5 items, and median
+ *     d5 time headroom — which are printed as numbers and NOT as a verdict.
+ *
+ * Why no verdict, since 2026-08-27. Those branches read a miss as "the item was
+ * hard" and a slow solve as "the item was deep". The owner, who is the only
+ * participant these aggregates have, does other things while sitting the packet,
+ * and said so plainly: "I know ALL the mechanisms instantly and I make mistakes
+ * just because I am bored to apply them." A miss from boredom is recorded
+ * identically to a miss from difficulty, so the gate read engagement and called
+ * it hardness — and on the fourth sitting it would have reported a rising
+ * ceiling from a falling attention span. Times and misses here measure how
+ * engaged one person was on one afternoon. Difficulty evidence needs the
+ * multi-participant retention pilot, and until that exists the honest output is
+ * the numbers with no claim attached.
  *
  * Any identity mismatch — wrong packet, wrong fingerprint, wrong schema, a
  * different item set — is a hard error naming exactly what disagreed, and the
- * command exits 1 without printing a result. A valid aggregate always exits 0,
- * including when the escalation gate fails: a recorded failure is a result, not
- * a crash.
+ * command exits 1 without printing a result. A valid aggregate always exits 0:
+ * the report states what was seen and leaves the judgement to a reader.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -101,7 +113,6 @@ export function runPilotReport(aggregatePath: string, manifestPath = PILOT_MANIF
   return { report: analysePrototypePilotAggregate(manifest, aggregate), manifestPath };
 }
 
-const verdict = (pass: boolean) => (pass ? "PASS" : "FAIL");
 
 export function formatPilotReport(
   report: PrototypePilotReport,
@@ -134,8 +145,11 @@ export function formatPilotReport(
   const clean = report.cleanMissGate;
   lines.push(
     "",
-    `Escalation branch 1 — at least ${clean.minimum} clean misses among d4/d5 items`,
-    `  ${verdict(clean.pass)}   ${clean.cleanMisses} clean ${clean.cleanMisses === 1 ? "miss" : "misses"} across ${clean.deepItems} d4/d5 items`,
+    "Engagement numbers — NOT difficulty evidence. One participant who multitasks",
+    "during the sitting; a miss from boredom reads the same as a miss from depth.",
+    "",
+    `Clean misses among d4/d5 items (the old branch 1 counted ${clean.minimum}+ as escalation)`,
+    `  ${clean.cleanMisses} clean ${clean.cleanMisses === 1 ? "miss" : "misses"} across ${clean.deepItems} d4/d5 items`,
   );
   for (const contributor of clean.contributors) {
     lines.push(`           ${contributor.itemId}  ${contributor.cleanMisses}`);
@@ -144,8 +158,8 @@ export function formatPilotReport(
   const time = report.timeHeadroomGate;
   lines.push(
     "",
-    `Escalation branch 2 — every d5 item inside its band budget, median headroom at most ${time.maximumMedianHeadroomSeconds}s`,
-    `  ${verdict(time.pass)}   ${time.deepestItems - time.overBudget.length} of ${time.deepestItems} d5 items stayed inside their band budget`,
+    `d5 solve times against their band budgets (the old branch 2 wanted a median headroom of at most ${time.maximumMedianHeadroomSeconds}s)`,
+    `  ${time.deepestItems - time.overBudget.length} of ${time.deepestItems} d5 items stayed inside their band budget`,
   );
   for (const item of time.overBudget) {
     lines.push(`           ${item.itemId}  median ${item.medianSolveTimeSeconds}s against a ${item.bandTimeBudgetSeconds}s budget`);
@@ -160,9 +174,10 @@ export function formatPilotReport(
 
   lines.push(
     "",
-    report.escalation.pass
-      ? `RESULT  PASS — the combined batch shows a higher human ceiling (branch ${report.escalation.branch === "clean-misses" ? "1, clean misses" : "2, time headroom"})`
-      : "RESULT  FAIL — neither branch passed. Record the failure; the next change is more program depth, not looser correctness or legibility.",
+    "RESULT  The withdrawal review above is the finding. The numbers under it say",
+    "        how this sitting went, not how hard the test is — one participant, and",
+    "        one who is doing other things while answering. Difficulty evidence",
+    "        comes from the multi-participant retention pilot, which has not run.",
   );
   return lines.join("\n");
 }

@@ -5,6 +5,17 @@ JSON** produced it, named `<date>-<packetId>.json`. Nothing generates or edits
 these; they are the human half of the evidence, and the only reason a family
 gets withdrawn.
 
+**What these files are evidence OF, and what they are not.** They are evidence
+about *items*: that a family could not be read, that a notation misled, that two
+readings were both defensible. Those are facts a single sitting establishes, and
+they are the only reason to withdraw a family. They are **not** evidence about
+*difficulty*. Every aggregate here has one participant, who does other things
+while answering — so a slow solve may be an interruption and a wrong answer may
+be boredom. `npm run pilot:report` therefore prints the miss counts and solve
+times as numbers with no verdict attached; it stopped calling them an escalation
+result on 2026-08-27. Difficulty needs the multi-participant retention pilot,
+which has not run.
+
 Read `packetContentFingerprint` before comparing two files. It names the exact
 item set the packet held at the time. Packets change whenever a family is
 withdrawn, so two results with the same `packetId` and different fingerprints
@@ -97,20 +108,23 @@ One participant, one sitting, 20 items — one per enabled family/band/bucket ke
 Aggregate: `2026-08-26-pilot-v3-a.json`. Verify it with
 `npm run pilot:report -- data/pilot/2026-08-26-pilot-v3-a.json`.
 
-**Result: 15 of 20 correct, and the escalation test PASSED.** Four clean misses
-among the 15 d4/d5 items, against a bar of two: `visual-set-algebra-d5`,
-`composed-transform-d4`, `compositional-analogy-d4`, and `fold-punch-d5`. A clean
-miss is the outcome the escalation was built for — the participant understood the
-rule, described it correctly, reported no notation problem and no defensible
-alternative, and still chose wrong. That is difficulty coming from the rule, which
-is what the legibility doctrine asks for.
+**Result: 15 of 20 correct, with four clean misses** among the 15 d4/d5 items —
+`visual-set-algebra-d5`, `composed-transform-d4`, `compositional-analogy-d4` and
+`fold-punch-d5`. At the time this was recorded as the escalation test passing,
+against a bar of two clean misses. **Read now, it says less than that.** A clean
+miss was defined as "understood the rule, described it correctly, reported no
+notation problem and no defensible alternative, and still chose wrong", which
+sounded like difficulty coming from the rule. The next sitting showed the
+definition cannot tell that apart from not engaging: the same participant
+produced six clean misses while answering an eighteen-panel item in five seconds.
+The four misses here are a fact about the sitting, not a measurement of the
+ceiling.
 
 **Timing is not evidence in this sitting.** The participant said they were
 interrupted throughout, and the data shows it: one warmup item sat at 495 seconds
 against a 25-second budget. Every "median over budget" flag in the report is
-discounted for that reason, and the second escalation branch (median d5 time near
-its budget) is reported as failing only because solving was unhurried, not because
-the items were easy. Read branch 1 alone for this sitting.
+discounted for that reason. The report no longer draws a branch verdict from
+either number.
 
 **One family withdrawn: `containment-analogy-v2`.** It drew the single
 notation-misunderstanding report, and the participant independently named it as the

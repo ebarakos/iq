@@ -464,22 +464,29 @@ describe("scene family prototypes", () => {
       "visual-set-algebra-d4-golden": {
         familyId: "visual-set-algebra-v2",
         bucket: "visual-set-algebra-d4",
-        // Re-taken on 2026-08-27: the set-algebra family was deliberately
-        // rebuilt that day, so this population MOVED and had to. The old keys
-        // pinned a family whose two input boards were a fixed diagonal of two
-        // tokens that could never disagree; the new ones pin boards of three
-        // tokens built from four roles, one of which is a clash. Anyone who
-        // sees this list change again without that kind of note in the commit
-        // should treat it as an accident.
+        // Re-taken twice on 2026-08-27, both times because the family was
+        // deliberately changed and this population had to move with it.
+        //
+        // First the inputs: the old keys pinned a family whose two input boards
+        // were a fixed diagonal of two tokens that could never disagree, the new
+        // ones pin boards of three tokens built from four roles including a
+        // clash. Then the draw: `-d4` now redraws its inputs until the near-miss
+        // pool can cover every aspect a solver can infer alone, because without
+        // that the answer was the only board in its cells in 45% of items. Four
+        // of the eight keys moved on the second re-take; the four that did not
+        // are draws that already covered.
+        //
+        // Anyone who sees this list change again without that kind of note in
+        // the commit should treat it as an accident.
         keys: [
           "ab522ae20ba58ed4e27c9afa",
-          "d231d3df4538b220455adfdd",
+          "e7d55a391369d4f79526ff9d",
           "df085be2c6b543fd505b0fae",
-          "9d8552155a34907e7fda5f30",
-          "699503dde50c2081382d610e",
+          "2197f0e243e592a55be5327d",
+          "002f0fd5a305522d85df8a8d",
           "9b4f9f72ba523944fc16f381",
-          "4c67856d3d7cee636414210d",
-          "987804fed8cb9915c0b28003",
+          "b77b4b823266d00f0a753ae4",
+          "d6d573c72b5d39a0e1987d9b",
         ],
       },
     };
@@ -502,11 +509,19 @@ describe("scene family prototypes", () => {
     // that aspect never narrows six options to one.
     //
     // It is asserted only for families whose program really has several
-    // independent parts. `fold-punch` and `inverse-fold-punch` are excluded on
-    // purpose and not as a concession: their answer is a punched-paper board
-    // where the footprint IS the whole rule, so a wrong option sharing it would
-    // BE the answer. A single-rule family solvable from a single aspect is
-    // correct, not broken.
+    // independent parts. `fold-punch`, `inverse-fold-punch` and
+    // `second-order-sequence` are excluded on purpose and not as a concession:
+    // every option they offer is the same token or paper at a different place,
+    // so a wrong option sharing the answer's footprint would BE the answer. A
+    // family whose whole rule lands in one aspect is correct, not broken. The
+    // way to tell the two apart is whether the option set varies in more than
+    // one aspect at all — these three do not.
+    //
+    // The list below grew on 2026-08-27 by the four buckets that DID vary in
+    // several aspects and still let one of them decide: `relational-matrix-d4`
+    // (88% of items), `spatial-transform-d3` (64%), `rule-switching-d5` (48%)
+    // and `visual-set-algebra-d4` (45%). Each was fixed at the source of its
+    // near misses rather than by loosening anything here.
     const ms = (values: string[]) => [...values].sort().join("|");
     const aspects: Record<string, (scene: Scene) => string> = {
       positions: (scene) => ms(scene.objects.map((p) => `${p.row},${p.column}`)),
@@ -522,9 +537,13 @@ describe("scene family prototypes", () => {
       { familyId: "compositional-analogy-v2", bucket: "compositional-analogy-d3" },
       { familyId: "compositional-analogy-v2", bucket: "compositional-analogy-d4" },
       { familyId: "visual-set-algebra-v2", bucket: "visual-set-algebra-d5" },
+      { familyId: "visual-set-algebra-v2", bucket: "visual-set-algebra-d4" },
       { familyId: "inverse-analogy-v2", bucket: "inverse-analogy-d4" },
       { familyId: "parallel-evolution-v1", bucket: "parallel-evolution-d3" },
       { familyId: "parallel-evolution-v1", bucket: "parallel-evolution-d4" },
+      { familyId: "relational-matrix-v2", bucket: "relational-matrix-d4" },
+      { familyId: "spatial-transform-v2", bucket: "spatial-transform-d3" },
+      { familyId: "rule-switching-v2", bucket: "rule-switching-d5" },
     ];
     for (const { familyId, bucket } of MULTI_RULE) {
       for (let seed = 0; seed < 40; seed++) {
@@ -1337,6 +1356,42 @@ describe("scene family prototypes", () => {
     expect(SCENE_FAMILY_BUCKETS["inverse-fold-punch-v2"].map((entry) => entry.bucket))
       .toEqual(["inverse-fold-punch-d5"]);
   });
+
+  it("builds the combining machine as gates that take two boards, and proves each gate is readable", () => {
+    // New family, 2026-08-27: the first item in the battery where a named,
+    // reusable gate combines TWO boards. The row shape had to be new for it —
+    // a machine row is (input, gate, output) and cannot show a second operand —
+    // so this test pins the two things that make the row honest: every worked
+    // row leaves exactly ONE combining rule standing, and the answer really is
+    // the chain the query's gate strip spells out.
+    for (const bucket of ["combining-machine-d4", "combining-machine-d5"]) {
+      const gates = declaredGateCounts()[bucket];
+      for (let seed = 0; seed < 25; seed++) {
+        const candidate = generateSceneFamilyCandidate(
+          "combining-machine-v1", seededRng("combining", `${bucket}:${seed}`), bucket);
+        const { puzzle } = candidate;
+        expect(puzzle.layout, bucket).toBe("combineTable");
+        // One quad per worked gate, plus the query quad.
+        expect(puzzle.stem.length, `${bucket} seed ${seed}`).toBe((gates + 1) * 4);
+        expect(gates, "the three-gate ceiling of 2026-08-27").toBeLessThanOrEqual(3);
+
+        const report = candidate.definition.validate(puzzle);
+        // The oracle re-derives the answer from the finished puzzle alone. If a
+        // worked row left two rules standing it returns nothing, so a single
+        // solution here IS the proof that every gate is readable.
+        expect(report.solutionCount, `${bucket} seed ${seed}`).toBe(1);
+        expect(report.derivedAnswer, `${bucket} seed ${seed}`)
+          .toEqual(puzzle.options[puzzle.answerIndex]);
+
+        // Every wrong option names the mistake that produces it.
+        const witnessed = new Set(report.distractorWitnesses.map((witness) => witness.optionIndex));
+        for (let option = 0; option < puzzle.options.length; option++) {
+          if (option === puzzle.answerIndex) continue;
+          expect(witnessed.has(option), `${bucket} seed ${seed}: option ${option} has no witness`).toBe(true);
+        }
+      }
+    }
+  });
 });
 
 describe("parallel evolution", () => {
@@ -1664,4 +1719,5 @@ describe("answered strand declarations", () => {
       expect(check.problem ?? "", JSON.stringify(panelIndexes)).toMatch(problem);
     }
   });
+
 });

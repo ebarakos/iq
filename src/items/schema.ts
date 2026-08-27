@@ -277,7 +277,7 @@ export const PUZZLE_TYPES = ["matrix", "sequence", "analogy", "oddOneOut", "oper
 export type PuzzleType = (typeof PUZZLE_TYPES)[number];
 
 /** How the stem panels are arranged on screen. */
-export const LAYOUTS = ["grid3x3", "row", "analogy", "operatorTable", "machineTable", "conceptGroups", "singleScene"] as const;
+export const LAYOUTS = ["grid3x3", "row", "analogy", "operatorTable", "machineTable", "combineTable", "conceptGroups", "singleScene"] as const;
 export type Layout = (typeof LAYOUTS)[number];
 /**
  * Legal stem lengths for a `machineTable`: one triple per worked (input, gate,
@@ -285,6 +285,18 @@ export type Layout = (typeof LAYOUTS)[number];
  * five worked rows.
  */
 export const MACHINE_TABLE_PANEL_COUNTS: readonly number[] = [9, 12, 15, 18];
+
+/**
+ * Legal stem lengths for a `combineTable`: one quad per worked
+ * (left, gate, right, output) row, plus the query quad whose output is the
+ * blank. Two or three worked rows, so 12 or 16 panels.
+ *
+ * A machine table's gate transforms ONE board, so its row is a triple. This
+ * layout exists for a gate that COMBINES TWO, which a triple cannot show — the
+ * gate glyph sits between the two operands instead of before a single one. The
+ * three-gate ceiling of 2026-08-27 caps it at three worked rows.
+ */
+export const COMBINE_TABLE_PANEL_COUNTS: readonly number[] = [12, 16];
 
 export const REASONING_BANDS = ["warmup", "composition", "constraint-spatial", "induction-transfer"] as const;
 export type ReasoningBand = (typeof REASONING_BANDS)[number];
@@ -381,8 +393,13 @@ const RuntimePuzzleSchema = z
       const machine = p.layout === "machineTable" &&
         MACHINE_TABLE_PANEL_COUNTS.includes(p.stem.length) && blanks === 1 &&
         isBlank(p.stem[p.stem.length - 1]);
-      if (!grid && !board && !machine) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid, one incomplete scene, or a two- to five-row machine table" });
+      // Added 2026-08-27 for gates that combine two boards — see
+      // COMBINE_TABLE_PANEL_COUNTS.
+      const combine = p.layout === "combineTable" &&
+        COMBINE_TABLE_PANEL_COUNTS.includes(p.stem.length) && blanks === 1 &&
+        isBlank(p.stem[p.stem.length - 1]);
+      if (!grid && !board && !machine && !combine) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid, one incomplete scene, a two- to five-row machine table, or a two- to three-row combine table" });
       }
     } else if (p.type === "sequence") {
       // 4–8 panels total: 3–7 drawn cells + exactly one trailing blank. Variable
@@ -471,7 +488,10 @@ const RuntimePuzzleSchema = z
       // machine table's panels run (input, gate, output), so the gate column is
       // every index whose remainder is 1; anywhere else a four- or five-wide
       // board would be a playing surface, which this project does not have.
-      if (isGateStrip(panel) && (p.layout !== "machineTable" || index % 3 !== 1)) {
+      const gateColumn = p.layout === "machineTable" ? index % 3 === 1
+        : p.layout === "combineTable" ? index % 4 === 1
+          : false;
+      if (isGateStrip(panel) && !gateColumn) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["stem", index],

@@ -148,6 +148,10 @@ function readArgs() {
       // X-Thinking-Budget so those models can run; record the value used
       // alongside any accuracy comparison.
       "thinking-budget": { type: "string" },
+      // Reasoning effort for the harness providers (claude-code, codex), which
+      // read it as a body field. Defaults to RELAY_EFFORT so a project can pin
+      // one without repeating the flag; recorded in the artifact either way.
+      effort: { type: "string" },
     },
   }).values;
 }
@@ -612,6 +616,11 @@ async function main() {
     throw new Error("--thinking-budget must be a positive integer");
   }
 
+  const effort = args.effort ?? process.env.RELAY_EFFORT;
+  if (effort !== undefined && !["low", "medium", "high"].includes(effort)) {
+    throw new Error("--effort (or RELAY_EFFORT) must be low, medium, or high");
+  }
+
   const seed = args.seed ?? randomBytes(8).toString("hex");
   let items: Puzzle<Visual>[];
   if (source === "held-out") {
@@ -673,7 +682,8 @@ async function main() {
       : `generated ${profile} · seed ${seed}`;
   console.log(
     `agent:run — ${items.length} items × ${repeat} = ${work.length} attempts · ${sourceLabel} · ${channel} channel · ` +
-      `${provider}/${model} · concurrency ${concurrency} · thinking budget ${thinkingBudget ?? "off"}`,
+      `${provider}/${model} · concurrency ${concurrency} · thinking budget ${thinkingBudget ?? "off"} · ` +
+      `effort ${effort ?? "provider default"}`,
   );
 
   const attempts: Attempt[] = [];
@@ -691,7 +701,7 @@ async function main() {
       try {
         // The solver receives the same answer-free contract as a browser. The
         // canonical puzzle stays local only for scoring and artifact metadata.
-        const outcome = await solveItem(toPublicPuzzle(shuffled), channel, { provider, model, thinkingBudget });
+        const outcome = await solveItem(toPublicPuzzle(shuffled), channel, { provider, model, thinkingBudget, effort });
         const chosen = canonicalIndex(canonical, shuffled, outcome.chosen);
         const correct = chosen !== null && chosen === canonical.answerIndex;
         attempts.push({
@@ -751,6 +761,10 @@ async function main() {
     // voids any gemini-3.5-flash comparison whose budget differs, and that
     // check is impossible if the two look alike on disk.
     thinkingBudget: thinkingBudget ?? null,
+    // Same reasoning: an explicit null means "this run asked for no particular
+    // effort", not "this artifact predates the field". Comparing two harness
+    // runs at different efforts is comparing two different models.
+    effort: effort ?? null,
     repeat,
     concurrency,
     // Held-out items come out of the same live generator as public ones, so
