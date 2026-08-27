@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import type { ModelOverrides } from "./relay-api-helpers";
-import { relayModel } from "./model";
+import { relayModel, relayTimeoutMs } from "./model";
 import {
   materializeSceneRuleProposal,
   parseSceneRuleProposal,
@@ -110,7 +110,9 @@ export async function proposeValidatedSceneRule(
             prompt: USER_PROMPT,
             temperature: 0.7,
             maxRetries: 0,
-            abortSignal: AbortSignal.timeout(8_000),
+            // 8s is the hosted fail-fast budget for this experiment; a Claude
+            // Code / Codex turn takes minutes, so those get the harness budget.
+            abortSignal: AbortSignal.timeout(relayTimeoutMs(relay!.provider, 8_000)),
           }).then((result) => ({
             text: result.text,
             inputTokens: result.usage.inputTokens,

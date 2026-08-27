@@ -1,4 +1,4 @@
-// @relay-template: relay-api-helpers@5
+// @relay-template: relay-api-helpers@6
 
 /**
  * Server-side helpers for Next.js API routes consuming llm-relay.
@@ -21,10 +21,14 @@ export type ModelOverrides = {
   provider?: string;
   model?: string;
   thinkingBudget?: number;
+  /** Reasoning effort picked in the widget (X-Relay-Effort); harness providers only. */
+  effort?: string;
   customUrl?: string;
   /** X-No-Fallback: fail instead of letting the relay substitute another provider/model. */
   noFallback?: boolean;
 };
+
+const EFFORT_LEVEL = /^[a-z]{1,16}$/;
 
 /** Read per-request overrides injected by the llm-relay widget (relay-client@9 sends
  *  X-Provider + X-Relay-Expected-Model; the old X-Relay-Provider / X-Relay-Model names are
@@ -41,11 +45,13 @@ export function readWidgetOverrides(req: NextRequest): ModelOverrides | undefine
     ?? req.headers.get("x-relay-model")
     ?? undefined;
   const budget = req.headers.get("x-thinking-budget");
-  const thinkingBudget = budget ? parseInt(budget, 10) || undefined : undefined;
+  const thinkingBudget = budget ? (parseInt(budget, 10) || undefined) : undefined;
+  const effortHeader = req.headers.get("x-relay-effort") ?? "";
+  const effort = EFFORT_LEVEL.test(effortHeader) ? effortHeader : undefined;
   const customUrl = req.headers.get("x-custom-url") ?? undefined;
   const noFallback = req.headers.get("x-no-fallback") === "true" || undefined;
-  if (!apiKey && !provider && !model && !thinkingBudget && !customUrl && !noFallback) return undefined;
-  return { apiKey, userKeyTier, provider, model, thinkingBudget, customUrl, noFallback };
+  if (!apiKey && !provider && !model && !thinkingBudget && !effort && !customUrl && !noFallback) return undefined;
+  return { apiKey, userKeyTier, provider, model, thinkingBudget, effort, customUrl, noFallback };
 }
 
 /**

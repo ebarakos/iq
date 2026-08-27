@@ -1,9 +1,12 @@
-// @relay-template: relay-client@9
+// @relay-template: relay-client@11
 /**
  * Client-side fetch helper for browser apps using the llm-relay widget.
  *
  * Provides:
  *   - getWidgetHeaders() — reads widget state and returns headers for API requests
+ *     (the app's own API route hop always uses headers; for the local harness providers
+ *     the widget's effort pick travels as X-Relay-Effort and thinking as X-Thinking-Budget,
+ *     and the server-side relay-fetch turns them into the body fields the bridge reads)
  *   - RateLimitError — typed error class for 429s with structured info
  *   - apiFetch() — fetch wrapper that injects widget headers and throws typed errors
  *   - formatApiError() — user-friendly error messages for UI display
@@ -22,10 +25,18 @@
  *   4. Typed `RelayWidget` / `RelayWidgetState` interfaces and a
  *      `browserStorage()` accessor replace `(window as any)` / bare
  *      `localStorage` access, which can throw in private-mode Safari or when
- *      blocked by an extension.
+ *      blocked by an extension. The typing extends to the template's newer
+ *      `getRequestBodyFields()` call and to the per-provider `effort` map.
  */
 
-import { formatResetTimestamp, type RateLimitInfo } from "./relay-errors";
+import { formatResetTimestamp, parseRetryAfter, readHeader, type RateLimitInfo } from "./relay-errors";
+
+/** Request body fields the widget hands out for the local harness providers
+ *  (Claude Code / Codex). Empty for every hosted provider. */
+interface RelayRequestBodyFields {
+  reasoning_effort?: string;
+  thinking_budget?: number;
+}
 
 interface RelayWidgetState {
   provider?: string;
@@ -35,6 +46,8 @@ interface RelayWidgetState {
   freeKeys?: Record<string, boolean>;
   thinking?: boolean;
   thinkingBudget?: number;
+  /** Reasoning effort per provider; only the harness providers honour it. */
+  effort?: Record<string, string>;
   customUrl?: string;
   noFallback?: boolean;
   slots?: Record<string, { provider?: string; model?: string }>;
@@ -45,6 +58,7 @@ interface RelayWidget {
   setState?: (patch: Partial<RelayWidgetState>) => void;
   notify?: (message: string) => void;
   getRequestHeaders?: (opts?: { slot?: string; provider?: string }) => Record<string, string>;
+  getRequestBodyFields?: (opts?: { provider?: string }) => RelayRequestBodyFields | undefined;
   getSlot?: (name: string) => { provider?: string; model?: string } | undefined;
   setSlot?: (name: string, patch: { provider?: string; model?: string }) => void;
   applyAutomaticSwitch?: (
@@ -101,17 +115,13 @@ function unwrapErrorEnvelope(raw: unknown): Record<string, unknown> {
 
 /** Resolve a human-readable reset time from the relay's `reset` timestamp
  *  field, or the standard Retry-After header for 429s the relay did not
- *  produce. Only used when the payload carries no `retryAfter` string of its
- *  own — see normalizeRateLimitPayload(). */
+ *  produce (validated in relay-errors — seconds or an HTTP date, never a wait
+ *  longer than a day). Only used when the payload carries no `retryAfter`
+ *  string of its own — see normalizeRateLimitPayload(). */
 function readRetryAfter(res: Response, body: Record<string, unknown>): string | null {
   if (typeof body.reset === "string") return formatResetTimestamp(body.reset);
-  const header = res.headers?.get?.("Retry-After");
-  if (!header) return null;
-  const seconds = parseInt(header, 10);
-  if (!isNaN(seconds)) return formatResetTimestamp(new Date(Date.now() + seconds * 1000).toISOString());
-  // Retry-After also permits an HTTP date.
-  const at = Date.parse(header);
-  return isNaN(at) ? null : formatResetTimestamp(new Date(at).toISOString());
+  const at = parseRetryAfter(readHeader(res.headers, "Retry-After"));
+  return at ? formatResetTimestamp(at) : null;
 }
 
 /** Normalize a relay/provider 429 payload into RateLimitInfo. Validates
@@ -190,7 +200,15 @@ export function getWidgetHeaders(opts?: { slot?: string; provider?: string }): R
     // Prefer the live API — it does the slot resolution + tier flags + custom
     // URL handling identically to the widget's own fetch patch.
     if (relay?.getRequestHeaders) {
-      return relay.getRequestHeaders(opts || undefined);
+      const headers = relay.getRequestHeaders(opts || undefined);
+      // Harness providers: the widget keeps effort/thinking out of its headers (they
+      // are body fields on the relay hop), so carry them as headers on this hop.
+      const fields = relay.getRequestBodyFields?.({ provider: headers["X-Provider"] }) ?? {};
+      if (fields.reasoning_effort) headers["X-Relay-Effort"] = String(fields.reasoning_effort);
+      if (fields.thinking_budget && !headers["X-Thinking-Budget"]) {
+        headers["X-Thinking-Budget"] = String(fields.thinking_budget);
+      }
+      return headers;
     }
 
     // Widget not loaded: synthesize headers from raw storage so first-paint
@@ -243,6 +261,7 @@ export function getWidgetHeaders(opts?: { slot?: string; provider?: string }): R
     if (key) headers["X-User-Api-Key"] = key;
     if (key && state.freeKeys?.[provider]) headers["X-User-Key-Tier"] = "free";
     if (state.thinking) headers["X-Thinking-Budget"] = String(state.thinkingBudget || 8000);
+    if (state.effort?.[provider]) headers["X-Relay-Effort"] = state.effort[provider];
     if (provider === "custom" && state.customUrl) headers["X-Custom-Url"] = state.customUrl;
     if (state.noFallback) headers["X-No-Fallback"] = "true";
     if (typeof state.model === "string") headers["X-Relay-Expected-Model"] = model;

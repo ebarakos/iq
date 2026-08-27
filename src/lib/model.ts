@@ -30,6 +30,32 @@ function requireEnv(name: string): string {
   return v;
 }
 
+/**
+ * Providers the relay serves from the developer's own Claude Code / Codex CLI
+ * sign-ins through its local harness bridge (localhost only). Keep in sync with
+ * HARNESS_PROVIDERS in relay-fetch.ts, which routes their effort/thinking picks
+ * into the request body instead of the X-Thinking-Budget header.
+ */
+const HARNESS_PROVIDERS = new Set(["claude-code", "codex"]);
+
+/** True for a provider backed by the local harness bridge. */
+export function isHarnessProvider(provider: string | undefined): boolean {
+  return provider !== undefined && HARNESS_PROVIDERS.has(provider);
+}
+
+/**
+ * Longest a harness turn may take. A hosted provider answers in seconds; a
+ * Claude Code or Codex turn runs a whole CLI session and can take minutes, so
+ * the hosted fail-fast budget would abort every single one of them.
+ */
+export const HARNESS_TIMEOUT_MS = 300_000;
+
+/** Request budget for one relay call: the long one for harness providers, the
+ *  caller's hosted budget for everything else. */
+export function relayTimeoutMs(provider: string | undefined, hostedMs: number): number {
+  return isHarnessProvider(provider) ? HARNESS_TIMEOUT_MS : hostedMs;
+}
+
 export function relayModel(overrides?: ModelOverrides) {
   const baseURL = requireEnv("RELAY_BASE_URL");
   // Widget overrides (provider/model chosen in the browser) take priority over env defaults.
@@ -57,6 +83,10 @@ export function relayModel(overrides?: ModelOverrides) {
     userKeyTier: overrides?.userKeyTier,
     noFallback: overrides?.noFallback,
     thinkingBudget: overrides?.thinkingBudget,
+    // Reasoning effort from the widget (X-Relay-Effort on the app hop). For the
+    // harness providers createRelayFetch writes it, and the thinking budget,
+    // into the request body — the relay never forwards those as headers.
+    effort: overrides?.effort,
     customUrl: overrides?.customUrl,
   });
   let providerUsed = provider;
@@ -75,7 +105,10 @@ export function relayModel(overrides?: ModelOverrides) {
   // Use .chat() to force the OpenAI-compatible Chat Completions API. The default
   // client(model) targets the newer Responses API (/v1/responses), which the
   // relay does not implement (it is /v1/chat/completions only → 404).
-  return { model: client.chat(model), modelId: model, getProviderUsed: () => providerUsed };
+  // `provider` is the RESOLVED request provider (widget override, else env), so
+  // callers can size their own abort budget with relayTimeoutMs() before the
+  // response reveals which provider actually answered.
+  return { model: client.chat(model), modelId: model, provider, getProviderUsed: () => providerUsed };
 }
 
 /** Slice from the first '[' to the last ']' — a best-effort array boundary. */
@@ -177,7 +210,8 @@ export async function generatePuzzles(
   maxAttempts = 3,
   difficulty: DifficultyLevel = "standard",
 ): Promise<GenerateResult> {
-  const { model, modelId, getProviderUsed } = relayModel(overrides);
+  const { model, modelId, provider, getProviderUsed } = relayModel(overrides);
+  const timeoutMs = relayTimeoutMs(provider, 45_000);
   let lastError: unknown;
   let lastFeedback = ""; // specific issues from the previous attempt, fed back to the model
   // Build the (randomized) prompt once and reuse it across retries, so the Zod
@@ -192,7 +226,9 @@ export async function generatePuzzles(
         prompt: attempt === 1 ? userPrompt : `${userPrompt}\n\nYour previous answer was rejected:\n${lastFeedback}\nReturn ONLY a corrected JSON array of 5 objects.`,
         temperature: 0.3, // lower temp → tighter rule-following (fewer mismarked answers)
         maxRetries: 0, // relay handles provider reliability (retries + fallback)
-        abortSignal: AbortSignal.timeout(45_000), // fail fast on a hung relay call
+        // Fail fast on a hung relay call — but a Claude Code / Codex turn takes
+        // minutes, so those providers get HARNESS_TIMEOUT_MS instead of 45s.
+        abortSignal: AbortSignal.timeout(timeoutMs),
       });
 
       const parsed = parseJsonArray(text);

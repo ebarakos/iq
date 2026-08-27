@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import type { Puzzle, PublicPuzzle, Visual } from "@/items/schema";
 import type { Channel } from "./attempts";
-import { relayModel } from "./model";
+import { relayModel, relayTimeoutMs } from "./model";
 import { puzzleToSvg } from "@/items/compose-image";
 
 /**
@@ -131,13 +131,18 @@ export async function solveItem(
   channel: Channel,
   opts?: SolverOpts,
 ): Promise<SolveOutcome> {
-  const { model } = relayModel({
+  const { model, provider } = relayModel({
     provider: opts?.provider,
     model: opts?.model,
     apiKey: opts?.apiKey,
     thinkingBudget: opts?.thinkingBudget,
   });
-  const abortSignal = AbortSignal.timeout(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  // An explicit timeoutMs stays authoritative; otherwise a Claude Code / Codex
+  // turn gets the long harness budget and everything else the 60s default.
+  // `provider` is the resolved one, so a RELAY_PROVIDER of claude-code counts.
+  const abortSignal = AbortSignal.timeout(
+    opts?.timeoutMs ?? relayTimeoutMs(provider, DEFAULT_TIMEOUT_MS),
+  );
   const optionCount = puzzle.options.length;
 
   const started = Date.now();

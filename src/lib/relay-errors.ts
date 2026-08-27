@@ -1,5 +1,4 @@
-// @relay-template: relay-errors@6
-
+// @relay-template: relay-errors@7
 /**
  * Typed rate-limit error handling for llm-relay consumers.
  *
@@ -78,7 +77,10 @@ export function extractResponseBody(err: unknown): Record<string, unknown> | nul
     try {
       const parsed = JSON.parse(e.responseBody);
       if (parsed && typeof parsed === "object") return unwrapError(parsed as Record<string, unknown>);
-    } catch { /* not JSON */ }
+      // Non-object JSON (string, number, etc.) — fall through to other extractors
+    } catch {
+      // responseBody is not valid JSON — skip gracefully and fall through to e.data / e.cause
+    }
   }
 
   // Fall back to data (set by custom fetch throw or by SDK when schema matches)
@@ -88,6 +90,9 @@ export function extractResponseBody(err: unknown): Record<string, unknown> | nul
 
   // Walk cause chain (SDK or retry wrappers may nest the original error)
   if (e.cause) return extractResponseBody(e.cause);
+
+  // Direct object with relay fields (e.g. parsed 429 response body passed directly)
+  if ("source" in e || "error" in e) return unwrapError(e);
 
   return null;
 }
@@ -107,6 +112,56 @@ function findRetryAfter(err: unknown): string | null {
   return null;
 }
 
+/**
+ * Turn a `Retry-After` header value into an ISO timestamp, or null.
+ *
+ * RFC 9110 allows two forms: a whole number of seconds ("120") or an HTTP date
+ * ("Wed, 21 Oct 2015 07:28:00 GMT"). Both are validated rather than trusted —
+ * an unparseable value, a negative delay, or a wait longer than a day is a
+ * broken header, and showing "in 19790 days" is worse than showing nothing.
+ */
+export function parseRetryAfter(value: unknown): string | null {
+  if (typeof value === "number") return fromDeltaSeconds(value);
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  if (/^\d+$/.test(raw)) return fromDeltaSeconds(Number(raw));
+
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return null;
+  const seconds = (at - Date.now()) / 1000;
+  if (seconds < 0 || seconds > MAX_RETRY_AFTER_SECONDS) return null;
+  return new Date(at).toISOString();
+}
+
+/** A wait longer than this is treated as a broken header rather than a real delay. */
+const MAX_RETRY_AFTER_SECONDS = 86400;
+
+function fromDeltaSeconds(seconds: number): string | null {
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > MAX_RETRY_AFTER_SECONDS) return null;
+  return new Date(Date.now() + seconds * 1000).toISOString();
+}
+
+/** Read one header from either a plain object or a real `Headers` instance. */
+export function readHeader(headers: unknown, name: string): string | null {
+  if (!headers || typeof headers !== "object") return null;
+  const get = (headers as { get?: unknown }).get;
+  if (typeof get === "function") {
+    const v = (headers as Headers).get(name);
+    return typeof v === "string" ? v : null;
+  }
+  const bag = headers as Record<string, unknown>;
+  const lower = name.toLowerCase();
+  for (const key of Object.keys(bag)) {
+    if (key.toLowerCase() === lower) {
+      const v = bag[key];
+      return typeof v === "string" ? v : null;
+    }
+  }
+  return null;
+}
+
 function findResetField(err: unknown): string | null {
   if (!err || typeof err !== "object") return null;
   const e = err as Record<string, unknown>;
@@ -116,18 +171,18 @@ function findResetField(err: unknown): string | null {
   const body = extractResponseBody(err);
   if (body && typeof body.reset === "string") return body.reset;
 
-  // Standard headers
-  const headers = e.responseHeaders as Record<string, string> | undefined;
+  // Standard headers. `responseHeaders` may be a plain object or a real
+  // `Headers`, whose values are only reachable through get().
+  const headers = e.responseHeaders;
   if (headers) {
-    const retryAfter = headers["retry-after"] ?? headers["Retry-After"];
-    if (retryAfter) {
-      const s = parseInt(retryAfter, 10);
-      if (!isNaN(s)) return new Date(Date.now() + s * 1000).toISOString();
-    }
-    const reset = headers["x-ratelimit-reset"] ?? headers["X-RateLimit-Reset"];
-    if (reset) {
-      const ts = parseInt(reset, 10);
-      if (!isNaN(ts)) return new Date(ts * 1000).toISOString();
+    const retryAfter = parseRetryAfter(readHeader(headers, "retry-after"));
+    if (retryAfter) return retryAfter;
+    const reset = readHeader(headers, "x-ratelimit-reset");
+    if (reset && /^\d+$/.test(reset.trim())) {
+      const ts = Number(reset.trim());
+      const iso = new Date(ts * 1000).toISOString();
+      const seconds = (ts * 1000 - Date.now()) / 1000;
+      if (seconds >= 0 && seconds <= MAX_RETRY_AFTER_SECONDS) return iso;
     }
   }
 

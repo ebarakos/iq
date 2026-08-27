@@ -1,4 +1,4 @@
-// @relay-template: relay-fetch@8
+// @relay-template: relay-fetch@9
 
 /**
  * Custom fetch for the OpenAI-compatible / Vercel AI SDK client that talks to llm-relay.
@@ -8,7 +8,10 @@
  *   2. Asserts the widget-selected model with X-Relay-Expected-Model — the relay rejects a
  *      request whose body model differs (409 widget_model_mismatch), so a stale SDK default
  *      can never silently replace the user's visible choice
- *   3. Adds the BYO key / free-tier / thinking / custom-URL / no-fallback headers
+ *   3. Adds the BYO key / free-tier / thinking / custom-URL / no-fallback headers — except
+ *      for the local harness providers (Claude Code / Codex), which take thinking and
+ *      reasoning effort as request BODY fields; the relay never forwards X-Thinking-Budget
+ *      to a harness process
  *   4. Reports per-request attribution to `onAttribution` (provider that actually answered,
  *      and whether the relay fell back to another provider or healed a retired model id)
  *   5. Throws a typed error on a relay-originated 429 so rate limits are distinguishable
@@ -55,10 +58,18 @@ export interface RelayFetchOptions {
   apiKey?: string;
   userKeyTier?: "free";
   thinkingBudget?: number;
+  /** Reasoning effort level (e.g. "low" … "max"). Only the harness providers honour it. */
+  effort?: string;
   customUrl?: string;
   noFallback?: boolean;
   onAttribution?: (info: RelayAttribution) => void;
 }
+
+/** Providers served by the local harness bridge (llm-relay `harness/`). They read
+ *  `thinking_budget` and `reasoning_effort` from the request body, because the relay
+ *  forwards a chat body verbatim but consumes X-Thinking-Budget itself. The widget
+ *  learns the same set from the relay (`__HARNESS_PROVIDERS__`); keep this in sync. */
+const HARNESS_PROVIDERS = new Set(["claude-code", "codex"]);
 
 /**
  * Build the AI SDK fetch adapter for llm-relay.
@@ -67,6 +78,7 @@ export interface RelayFetchOptions {
  * SDK/default value can never silently replace the widget's visible choice.
  */
 export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
+  const harness = HARNESS_PROVIDERS.has(opts.provider);
   return async (url: RequestInfo | URL, init?: RequestInit) => {
     let options = init;
 
@@ -74,8 +86,13 @@ export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
       try {
         const parsed = JSON.parse(options.body);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          (parsed as Record<string, unknown>).provider = opts.provider;
-          options = { ...options, body: JSON.stringify(parsed) };
+          const body = parsed as Record<string, unknown>;
+          body.provider = opts.provider;
+          if (harness) {
+            if (opts.thinkingBudget) body.thinking_budget = opts.thinkingBudget;
+            if (opts.effort) body.reasoning_effort = opts.effort;
+          }
+          options = { ...options, body: JSON.stringify(body) };
         }
       } catch {
         // Non-JSON requests are forwarded unchanged; exact headers still apply.
@@ -90,7 +107,7 @@ export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
     if (opts.apiKey && opts.userKeyTier === "free") {
       extraHeaders["X-User-Key-Tier"] = "free";
     }
-    if (opts.thinkingBudget) extraHeaders["X-Thinking-Budget"] = String(opts.thinkingBudget);
+    if (opts.thinkingBudget && !harness) extraHeaders["X-Thinking-Budget"] = String(opts.thinkingBudget);
     if (opts.customUrl) extraHeaders["X-Custom-Url"] = opts.customUrl;
     if (opts.noFallback) extraHeaders["X-No-Fallback"] = "true";
     const headers = new Headers(options?.headers);
