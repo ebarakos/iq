@@ -6,18 +6,13 @@ Items are generated from a fresh random seed after the test starts. Every item c
 machine-readable **rule** or constraint witness, and pure code re-derives its answer. Humans
 and vision models receive the same answer-free visual contract.
 
-**There is deliberately no single IQ score.** Humans get a plain score; agents get
-pass-rate-by-difficulty-tier per model. The product headline is the **divergence** — items
-that are human-easy but agent-hard, and vice versa. The first 300-attempt model run scored
-87.7% overall, including 100% on matrices and 74.7% on odd-one-out; it is directional data
-from one model, not a benchmark norm.
+Humans get a score and a breakdown by reasoning family. Agent runs report performance by
+difficulty tier and model, making it possible to compare where people and models find the
+same generated questions easy or hard.
 
-> **Status: generated reasoning-test prototype.** Development builds lead with an explicitly
-> labelled 12-question preview across the new visual families; the compact five-question path
-> remains available without the retired hidden-arithmetic equation. Answers stay encrypted
-> until server-side submission. This is not yet a standardized human IQ score: the new notation
-> and difficulty still need a human pilot and a stable model panel. Design:
-> [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
+The public product offers a 5-question sample and a 30-question test drawn from the same
+generated visual-family pool. Answers stay encrypted until server-side submission. Design:
+[docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ### Hard quiz generation latency (deterministic probe)
 
@@ -53,6 +48,30 @@ OPENROUTER_API_KEY=sk-or-...   # required for the default openrouter provider
 No model call is made when a human starts or submits a test. Relay access is used only when
 an agent takes the visual test or during offline model experiments.
 
+### Vercel: one-time setup, then push
+
+Run this once from a clone with an `origin` remote:
+
+```bash
+npm run vercel:setup
+```
+
+The command uses the official Vercel CLI through `npx`, links or creates the project, creates
+separate sensitive `QUIZ_TOKEN_SECRET` values for production and preview when they are missing,
+connects `origin` to Vercel, and assigns `iq.ebarakos.com` to the production project. Secret values
+go directly from memory to Vercel: they are never printed or written to disk. Existing values are
+kept, so rerunning setup does not invalidate an active test. The domain is never moved with
+`--force`; if another project owns it, setup stops instead of breaking that site. The first run
+may ask you to sign in to Vercel; after it completes, normal pushes trigger preview deployments
+and pushes to the production branch trigger production deployments.
+
+The setup command prints Vercel's domain inspection after assignment. If DNS lives elsewhere,
+add the exact A or CNAME record reported there. The current Cloudflare setup requires an A record
+named `iq` pointing to `76.76.21.21`, with Cloudflare's proxy disabled.
+Vercel provisions HTTPS after DNS verification.
+
+Use `npm run vercel:setup -- --dry-run` to inspect the intended work without contacting Vercel.
+
 ---
 
 ## Architecture
@@ -74,8 +93,8 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
 - `src/items/generate.ts` — seeded, versioned compact quiz generator; `procedural-v1`
   and `procedural-v2` remain replayable, while `procedural-v3` removes the opaque
   operator equation from the current compact test.
-- `src/items/expanded-quiz.ts` — strict promotion-gated 12-question assembler plus
-  an explicitly labelled development preview of the code-valid scene families.
+- `src/items/expanded-quiz.ts` — seeded 5- and 30-question assembler over the live scene
+  families and difficulty bands.
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
   renderer shared by generated and reference items.
 - `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
@@ -114,6 +133,7 @@ npm run agent:smoke  # relay multimodal smoke test (vision models)
 npm run agent:run    # solver harness (--all --channel image --repeat N ...)
 npm run report       # calibration report (--write to tag the bank)
 npm run render:item  # PNG fixtures of bank items (data/fixtures/)
+npm run vercel:setup # one-time Vercel secrets + Git deployment bootstrap
 ```
 
 See [CLAUDE.md](CLAUDE.md) for full project context, [BRAINSTORM.md](BRAINSTORM.md) for

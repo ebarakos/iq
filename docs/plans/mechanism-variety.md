@@ -97,8 +97,8 @@ pairs or guarded by a visible condition. The composer:
    omitted, one step inverted.
 
 Ships as a new family (`composed-transform-v1`) in the composition band —
-code-valid behind the experimental label like everything else, withdrawable by
-the same env list, and the most likely place for agent-hard items to appear.
+code-valid like everything else, withdrawable by the same env list, and the most
+likely place for agent-hard items to appear.
 
 ## What this does not change
 

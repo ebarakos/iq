@@ -6,7 +6,7 @@ import { StemView, VisualGraphic, describeVisual } from "@/items/render";
 import { countUnansweredAnswers, needsBlankSubmissionConfirmation } from "@/lib/quiz-progress";
 import { apiFetch, formatApiError } from "@/lib/relay-client";
 
-type Source = "procedural" | "experimental" | "fallback";
+type Source = "generated" | "fallback";
 
 /** The two public test lengths. Both are built from the expanded family pool. */
 type TestProfile = "short-5" | "long-30";
@@ -335,7 +335,7 @@ export default function Page() {
           lowTimeAt={lowTimeThreshold((meta?.secondsPerQuestion ?? 60) * puzzles.length)}
           // One concise banner on Q1 only — repeating it on every question reads
           // as a new warning each time (ui-qa finding).
-          notice={current === 0 && (meta?.source === "fallback" || meta?.source === "experimental")
+          notice={current === 0 && meta?.source === "fallback"
             ? meta?.notice
             : undefined}
           onChoose={choose}
@@ -371,11 +371,7 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
       <p className="mt-3 text-gray-600">
         You get one minute per question as a single countdown for the whole test, so you can
         spend longer on a hard question and make it back on an easy one. At the end you get a
-        raw score and a breakdown by reasoning family. It is not an IQ number.
-      </p>
-      <p className="mt-3 text-sm text-amber-700">
-        Experimental: every answer passes the code checks, but the notation and difficulty are
-        still being tested with people.
+        score and a breakdown by reasoning family.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
@@ -717,7 +713,7 @@ function Result({
   const version = meta?.generatorVersion ? ` · ${meta.generatorVersion}` : "";
   const attribution = meta?.source === "fallback"
     ? `${length} · from the verified reference set`
-    : `${length} · fresh generated questions${version}`;
+    : `${length} · freshly generated questions${version}`;
 
   return (
     <section>

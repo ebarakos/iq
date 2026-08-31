@@ -21,9 +21,6 @@ const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 const hits = new Map<string, number[]>();
 
-const EXPERIMENTAL_NOTICE =
-  "Experimental: every answer passes the code checks, but the notation and difficulty are still being tested with people.";
-
 /**
  * Check the withdrawal list once, at server start.
  *
@@ -86,9 +83,8 @@ export async function POST(req: NextRequest) {
       ...delivery,
       profile,
       secondsPerQuestion: SECONDS_PER_QUESTION,
-      source: "experimental",
+      source: "generated",
       generatorVersion: EXPANDED_GENERATOR_VERSION,
-      notice: EXPERIMENTAL_NOTICE,
     });
   } catch (error) {
     if (error instanceof QuizTokenError && error.code === "configuration") {

@@ -80,9 +80,9 @@ connect and the hosted OpenRouter line in `.env.example` is the fallback.
 - BYO keys (optional): per-provider keys (`CEREBRAS_API_KEY`, `OPENROUTER_API_KEY`,
   `GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are forwarded as
   `X-User-Api-Key` to bypass the relay's shared quota. `.env` only — never commit.
-- On localhost the relay also offers `claude-code` / `codex` (the developer's own CLI
-  sign-ins); their effort/thinking picks come from the widget through `X-Relay-Effort` /
-  `X-Thinking-Budget` and become body fields on the relay hop.
+- Local harness providers `claude-code` and `codex` route through the relay to the Claude Code / Codex CLIs signed in on this machine. They appear only when llm-relay is running on localhost (`npm run dev` there) — never in production — and every call spends the same subscription plan limits as using the CLIs interactively. Their
+  effort/thinking picks come from the widget through `X-Relay-Effort` / `X-Thinking-Budget`
+  and become body fields on the relay hop.
 
 ## Where things live
 

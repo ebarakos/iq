@@ -22,10 +22,10 @@ describe("POST /api/generate", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.source).toBe("experimental");
+    expect(body.source).toBe("generated");
     expect(body.profile).toBe("long-30");
     expect(body.generatorVersion).toBe(EXPANDED_GENERATOR_VERSION);
-    expect(body.notice).toMatch(/still being tested/);
+    expect(body).not.toHaveProperty("notice");
     expect(body.puzzles).toHaveLength(30);
     expect(body.quizToken).toMatch(/^v1\./);
     for (const puzzle of body.puzzles) {
@@ -60,12 +60,12 @@ describe("POST /api/generate", () => {
 
     expect(response.status).toBe(200);
     expect(body.profile).toBe("short-5");
-    expect(body.source).toBe("experimental");
+    expect(body.source).toBe("generated");
     expect(body.puzzles).toHaveLength(5);
     expect(new Set(body.puzzles.map((puzzle: { familyId?: string }) => puzzle.familyId)).size).toBe(5);
   });
 
-  it("labels both lengths as experimental", async () => {
+  it("serves both lengths without an experimental notice", async () => {
     vi.stubEnv("QUIZ_TOKEN_SECRET", "test-only-secret-that-is-at-least-32-characters-long");
     vi.stubEnv("NODE_ENV", "production");
     vi.resetModules();
@@ -74,8 +74,10 @@ describe("POST /api/generate", () => {
     const short = await (await POST(generateRequest({ profile: "short-5" }, "notice-short"))).json();
     const long = await (await POST(generateRequest({ profile: "long-30" }, "notice-long"))).json();
 
-    expect(short.notice).toMatch(/still being tested/);
-    expect(long.notice).toMatch(/still being tested/);
+    expect(short.source).toBe("generated");
+    expect(long.source).toBe("generated");
+    expect(short).not.toHaveProperty("notice");
+    expect(long).not.toHaveProperty("notice");
   });
 
   it.each([

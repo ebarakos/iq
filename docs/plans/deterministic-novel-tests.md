@@ -126,17 +126,19 @@ The 2026-08-16 decisions in full:
 - **Results are a raw score and a reasoning-family breakdown, and nothing else.**
   No IQ number, no percentile, no normalized scale. `BRAINSTORM.md` Q8 records
   why an IQ figure is not available to us.
-- **Code-valid families ship publicly behind a visible experimental label.**
-  This reverses the earlier rule that a family had to pass the human pilot
+- **Code-valid families ship publicly.** This reverses the earlier rule that a
+  family had to pass the human pilot
   before it could appear in a public test. The pilot becomes a **retention
   gate**: a family is public until pilot evidence removes it, instead of private
   until pilot evidence admits it. Withdrawal happens through an environment
-  variable holding the excluded family ids, read at request time.
+  variable holding the excluded family ids, read at request time. On 2026-08-31
+  the owner removed the visible experimental label; the retention gate itself
+  did not change.
 
 The reason for the reversal is that the pilot needs real takers and the only way
 to reach real takers is to ship. The risk it accepts is that a confusing family
-is briefly public; the experimental label and the withdrawal list are what pay
-for that risk.
+is briefly public; the withdrawal list and continuing retention pilot are what
+contain that risk.
 
 ### Presentation contract
 
@@ -440,12 +442,11 @@ the notation or that another human interpretation is unreasonable.
 
 Families move through four states: **prototype → code-valid → pilot → enabled**.
 Since the 2026-08-16 retention decision, `code-valid` is enough to be served
-publicly behind the experimental label, and the gate below decides whether a
-family/band pair is kept and loses the label or is withdrawn. The states and
-thresholds are unchanged; only what a failing gate means has changed — it now
-removes a family that is already public instead of holding back one that is not.
-Judging is per band, because a clear introductory form does not establish that a
-denser or composed form is readable.
+publicly, and the gate below decides whether a family/band pair is kept or
+withdrawn. The states and thresholds are unchanged; only what a failing gate
+means has changed — it now removes a family that is already public instead of
+holding back one that is not. Judging is per band, because a clear introductory
+form does not establish that a denser or composed form is readable.
 
 For an initial pilot, prepare at least three representative items from every
 band in which the family seeks eligibility. Each item is attempted by at least

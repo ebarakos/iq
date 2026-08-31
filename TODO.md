@@ -4,7 +4,7 @@ Work this backlog top to bottom. Designs, branch targets, and evidence gates: [e
 
 ## After v11 — human verification
 
-- [ ] Run the desktop and mobile multi-participant retention pilot for every enabled family/band/bucket; passing items stay experimental until the documented sample thresholds are met.
+- [ ] Run the desktop and mobile multi-participant retention pilot for every enabled family/band/bucket, and withdraw any family/band pair that misses the documented sample thresholds.
 - [ ] Take one full 30-question test end to end and record whether the pooled timer, question ordering, skip-and-revisit, and review screen hold up (`src/app/page.tsx`).
 
 ## 2026-08-27 — the owner's correction: novelty over depth

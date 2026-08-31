@@ -19,7 +19,8 @@
     "families:verify": "node --import tsx scripts/scene-family-verify.ts",
     "experiment:llm-rules": "node --env-file=.env.local --import tsx scripts/llm-rule-experiment.ts",
     "report": "tsx scripts/report.ts",
-    "pilot:report": "tsx scripts/pilot-report.ts"
+    "pilot:report": "tsx scripts/pilot-report.ts",
+    "vercel:setup": "node --import tsx scripts/vercel-setup.ts"
   },
   "engines": {
     "node": ">=20"
