@@ -362,16 +362,14 @@ export default function Page() {
 function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-      <h2 className="text-xl font-semibold">Take a fresh visual reasoning test</h2>
+      <h2 className="text-xl font-semibold">Test instructions</h2>
       <p className="mt-3 text-gray-600">
-        Each test starts from a fresh random seed. The test moves from simple relations into
-        composition, spatial constraints, and rule transfer. There is no reading and no general
-        knowledge — only what you can see.
+        Choose one answer for each visual puzzle. You can move between questions and change
+        answers before submitting.
       </p>
       <p className="mt-3 text-gray-600">
-        You get one minute per question as a single countdown for the whole test, so you can
-        spend longer on a hard question and make it back on an easy one. At the end you get a
-        score and a breakdown by reasoning family.
+        The timer gives one minute per question in a single countdown. Unanswered questions
+        count as incorrect.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
@@ -393,10 +391,6 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
           Try the 5-question sample · 5 min
         </button>
       </div>
-      <p className="mt-3 text-xs text-gray-500">
-        The short sample draws from the same question families in the same rising order — it is a
-        taste of the long test, not an easier one.
-      </p>
     </section>
   );
 }
@@ -437,8 +431,6 @@ function puzzleTypeLabel(puzzle: PublicPuzzle<Visual>): string {
     "spatial-transform-v2": "spatial transformation",
     "transformation-machine-v3": "transformation machine",
     "rule-switching-v2": "rule switching",
-    "fold-punch-v2": "fold and punch",
-    "inverse-fold-punch-v2": "inverse fold and punch",
     "second-order-sequence-v2": "second-order sequence",
     "inverse-analogy-v2": "inverse analogy",
   };
@@ -626,7 +618,7 @@ function Solver({
           // buttons and reads as missing. The line states the task form only —
           // never the hidden relationship.
           <p className="mb-6 rounded-xl bg-gray-50 p-4 text-center text-gray-700">
-            All options but one follow the same hidden rule — pick the one that breaks it.
+            All options but one follow the same hidden rule. Pick the one that breaks it.
           </p>
         )}
 
@@ -637,7 +629,7 @@ function Solver({
               <button
                 key={i}
                 onClick={() => onChoose(i)}
-                aria-label={`Option ${LETTERS[i]} — ${describeVisual(opt)}`}
+                aria-label={`Option ${LETTERS[i]}: ${describeVisual(opt)}`}
                 aria-pressed={isSel}
                 className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
                   isSel
@@ -820,7 +812,7 @@ function ReviewItem({
           return (
             <div
               key={i}
-              aria-label={`Option ${LETTERS[i]} — ${describeVisual(opt)}${status ? ` (${status})` : ""}`}
+              aria-label={`Option ${LETTERS[i]}: ${describeVisual(opt)}${status ? ` (${status})` : ""}`}
               className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 ${
                 isCorrect ? "border-green-400 bg-green-50" : isChosen ? "border-red-400 bg-red-50" : "border-gray-200"
               }`}

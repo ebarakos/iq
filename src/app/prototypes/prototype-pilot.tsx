@@ -241,7 +241,7 @@ export function PrototypePilot({
       <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
         <h1 className="text-2xl font-bold">Prototype pilot complete</h1>
         <p className="mt-3 text-gray-600">
-          This is one moderated participant session for {packetId}. It stores no answers, explanation text, or session label — only counts per item. Paste the JSON below into a file and run <code className="rounded bg-gray-100 px-1">npm run pilot:report -- &lt;file&gt;</code>.
+          This is one moderated participant session for {packetId}. It stores no answers, explanation text, or session label, only counts per item. Paste the JSON below into a file and run <code className="rounded bg-gray-100 px-1">npm run pilot:report -- &lt;file&gt;</code>.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <button type="button" onClick={downloadAggregateJson} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white">Download JSON</button>
@@ -409,13 +409,13 @@ export function PrototypePilot({
               type="button"
               disabled={grade !== null || grading || itemState !== "ready"}
               onClick={() => setSelected(optionIndex)}
-              aria-label={`Option ${LETTERS[optionIndex]} — ${describeVisual(option)}${
+              aria-label={`Option ${LETTERS[optionIndex]}: ${describeVisual(option)}${
                 grade === null
                   ? ""
                   : grade.answerIndex === optionIndex
-                    ? " — correct answer"
+                    ? ": correct answer"
                     : selected === optionIndex
-                      ? " — your incorrect choice"
+                      ? ": your incorrect choice"
                       : ""
               }`}
               className={`rounded-xl border-2 p-3 ${

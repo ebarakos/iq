@@ -169,8 +169,16 @@ import {
  * had been withdrawn on evidence recorded in git and in data/pilot/README.md, so
  * the code carried nothing the history does not. The served battery is unchanged
  * at the same 19 keys as `v14`.
+ *
+ * `v16` withdraws both fold-and-punch families because their corner mirroring
+ * is too easy to earn repeated slots in the battery. Constraint-spatial now
+ * consists only of relational matrix and visual set algebra. The deep composed
+ * transform no longer adds a separate order-demonstration row and then asks
+ * for all three gates; it demonstrates A, B and C once, then asks for two of
+ * those gates in a recombined order. Results from v15 and v16 are different
+ * populations and must not be pooled.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v15" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v16" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -193,20 +201,7 @@ export const BAND_SCHEDULE: Readonly<
 export const MINIMUM_ELIGIBLE_FAMILIES: Readonly<
   Record<ExpandedProfile, Readonly<Record<ExpandedProfileBand, number>>>
 > = {
-  // constraint-spatial dropped from five families to three on 2026-08-23, when
-  // constraint-mosaic and minimal-repair were withdrawn for showing no worked
-  // evidence, and came back to four on 2026-08-24 when containment-analogy
-  // moved down from composition. Withdrawing containment-analogy-v2 on
-  // 2026-08-26 put it back at three. Three stays the floor: ten questions over
-  // three families means each is seen three or four times in a long test.
-  //
-  // These are the long-test floors of the "dual proof fails" row of the table
-  // in docs/plans/escalate-the-quiz.md, Phase 5: 4 composition, 3
-  // constraint-spatial, 3 induction-transfer. That branch is the live one —
-  // the dual-constraint necessity proof failed on 2026-08-25, so no
-  // `dual-constraint-matrix-v1` is ever added and constraint-spatial keeps a
-  // pool of four rather than the five the passing branch would have had.
-  "long-30": { warmup: 2, composition: 4, "constraint-spatial": 3, "induction-transfer": 3 },
+  "long-30": { warmup: 2, composition: 4, "constraint-spatial": 2, "induction-transfer": 3 },
   "short-5": { warmup: 1, composition: 1, "constraint-spatial": 2, "induction-transfer": 1 },
 };
 
@@ -214,24 +209,17 @@ export const MINIMUM_ELIGIBLE_FAMILIES: Readonly<
  * How many different families one test must contain.
  *
  * A profile that cannot reach its floor fails loudly rather than serving a
- * repetitive test. Each number is one below what the band draws add up to, so
- * there is room for exactly one family to appear in two bands:
+ * repetitive test. The long profile has room for one family to appear in two
+ * bands; the short profile does not:
  *
- * - long-30 draws 2 + 4 + 3 + 3 = 12 family slots, floor 11;
+ * - long-30 draws 2 + 4 + 2 + 3 = 11 family slots, floor 10;
  * - short-5 draws 1 + 1 + 2 + 1 = 5, floor 5, which leaves it no room at all.
  *
- * The long floor was 12 until the owner's decision of 2026-08-25. At 12 no
- * family could ever appear in two bands of a 30-question test, and that made
- * `composed-transform-d5` — the four-gate machine, the deepest question the
- * battery has — unreachable in the main test: the format cap puts
- * `composed-transform-v2` in every long composition draw, so the cross-band
- * rule always kept it out of induction-transfer. The owner chose to spend one
- * distinct family to get the deepest item back into the long test. The short
- * test keeps zero slack on purpose: it has five questions and needs five
- * different mechanisms, so its cross-band rule never yields.
+ * The short test keeps zero slack on purpose: it has five questions and needs
+ * five different mechanisms, so its cross-band rule never yields.
  */
 export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>> = {
-  "long-30": 11,
+  "long-30": 10,
   "short-5": 5,
 };
 
@@ -240,27 +228,16 @@ export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>
  * are split and ordered. Warmup keeps its complete pool so every test still
  * begins with the full set of introductory mechanisms.
  *
- * These are the draw sizes of the "dual proof fails" row of the table in
- * docs/plans/escalate-the-quiz.md, Phase 5, against eligible pools of 6
- * composition, 4 constraint-spatial and 4 induction-transfer families. A draw
- * one smaller than its pool is what lets the cross-band rule leave a family
- * alone when an earlier band already used it.
- *
- * Constraint-spatial lost that slack on 2026-08-26, when `containment-analogy-v2`
- * was withdrawn and its pool fell to three. The number stays at three rather
- * than dropping to two: the draw size is the shape of the band — ten questions
- * over three families, each seen three or four times — and cutting it to two
- * would make the band repeat two mechanisms five times each to buy back a
- * variety the pool no longer has. The band draws its whole pool until a family
- * is added to it. `MINIMUM_ELIGIBLE_FAMILIES` still fails the request loudly if
- * the pool falls below three.
+ * Constraint-spatial draws both of its remaining families after fold-and-punch
+ * was withdrawn in v16. Composition and induction-transfer keep their existing
+ * subsampling sizes.
  */
 export const FAMILY_SUBSAMPLE_SIZES: Readonly<
   Record<ExpandedProfileBand, number | undefined>
 > = {
   warmup: undefined,
   composition: 4,
-  "constraint-spatial": 3,
+  "constraint-spatial": 2,
   "induction-transfer": 3,
 };
 
@@ -270,9 +247,9 @@ export const FAMILY_SUBSAMPLE_SIZES: Readonly<
  *
  * Difficulty is meant to come from rule depth, but a test that asks the same
  * VISUAL QUESTION over and over stops measuring reasoning and starts measuring
- * familiarity with one presentation. Six of the fourteen servable families
- * happen to render as analogies, so an unconstrained draw regularly gave a
- * band three of them. Capping the draw is the plan's format-aware subsampling
+ * familiarity with one presentation. Several servable families render as
+ * analogies, so an unconstrained draw can overuse that layout. Capping the draw
+ * is the plan's format-aware subsampling
  * (docs/plans/escalate-the-quiz.md, Phase 5: "Composition and constraint draws
  * contain at most one analogy-layout family").
  *
@@ -301,9 +278,9 @@ const layoutProbeCache = new Map<string, string | null>();
  * Deliberately not a hand-maintained list of family names. Whether an item
  * reads as an analogy is a property of the stem the generator builds — three
  * panels shown as `A : B :: C : ?` — and several families that present that
- * way are not called "analogy" anything (`spatial-transform-v2`,
- * `fold-punch-v2`, `inverse-fold-punch-v2`), while `compositional-analogy-v2`
- * is named for its reasoning rather than its shape. Probing the generator
+ * way are not called "analogy" anything (`spatial-transform-v2`), while
+ * `compositional-analogy-v2` is named for its reasoning rather than its shape.
+ * Probing the generator
  * means a family added tomorrow is classified by what it draws, with no list
  * to remember to update.
  *
@@ -790,8 +767,19 @@ export function planExpandedSchedule(
       servedBuckets,
       crossBandSlack,
     );
-    const byFamilyId = new Map(drawn.map((family) => [family.familyId, family]));
-    const counts = evenSplit(count, drawn, seededRng(seed, `expanded-split:${profile}:${band}`));
+    // When a short band draws more candidates than it asks questions, allocate
+    // those few questions to unserved families whenever there are enough. The
+    // family draw still controls format and eligibility; this tie-break keeps a
+    // five-question sample from repeating composed-transform across two bands
+    // after induction-transfer shrank to three families in v16.
+    const unservedDrawn = drawn.filter((family) => !servedBuckets.has(family.familyId));
+    const allocationPool = count <= unservedDrawn.length ? unservedDrawn : drawn;
+    const byFamilyId = new Map(allocationPool.map((family) => [family.familyId, family]));
+    const counts = evenSplit(
+      count,
+      allocationPool,
+      seededRng(seed, `expanded-split:${profile}:${band}`),
+    );
     const arranged = arrangeBand(
       counts,
       byFamilyId,

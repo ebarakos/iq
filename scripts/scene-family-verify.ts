@@ -53,8 +53,6 @@ const CONVERTED_FAMILY_IDS = new Set<string>([
   "inverse-analogy-v2",
   "relational-matrix-v2",
   "visual-set-algebra-v2",
-  "fold-punch-v2",
-  "inverse-fold-punch-v2",
   "spatial-transform-v2",
   "transformation-machine-v3",
   "rule-switching-v2",
@@ -188,9 +186,8 @@ for (const entry of enabledKeys) {
 }
 
 const families = SCENE_FAMILY_IDS.map((familyId) => {
-  // Diversity is a property of the FAMILY's rule grammar, so a family that
-  // splits its grammar across buckets — fold-punch d5 serves only the
-  // two-crease half — is judged on the union, not on its narrowest bucket.
+  // Diversity is a property of the family's full rule grammar, so it is judged
+  // across every declared bucket rather than on only its narrowest bucket.
   const fingerprintsInProbe = new Set<string>();
   // Every declared bucket is swept, not just the one a band happens to enter
   // at: a bucket nothing can generate must fail the build, not a later test.

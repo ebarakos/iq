@@ -18,7 +18,7 @@
   ],
   "keysNotCarried": {
     "composed-transform-v2:composition:composed-transform-d4": "No v10 baseline. At 72ffdb3 the family is composed-transform-v1, and v11 both renamed it and deepened its grammar with the two token turns, so its d4 population is not the same population. For the record, v10's composed-transform-v1 measured p50 (2, 2) and p90 (5, 21).",
-    "every other key the current registry serves": "compositional-analogy-d4, parallel-evolution-d3, parallel-evolution-d4, fold-punch-d5, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10, and neither did the two d6 buckets added on 2026-08-26, composed-transform-d6 and transformation-machine-d6. The verifier reports their percentiles with comparable: false and invents no baseline for them."
+    "every other key the current registry serves": "compositional-analogy-d4, parallel-evolution-d3, parallel-evolution-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10, and neither did the two d6 buckets added on 2026-08-26, composed-transform-d6 and transformation-machine-d6. The verifier reports their percentiles with comparable: false and invents no baseline for them."
   },
   "withdrawnKeysNote": "Keys that once had a v10 baseline and are no longer served, kept with the numbers they were recorded with. A withdrawal is a normal event and must leave a record: deleting the row would make the gate green by forgetting, and the aggregate no-regression comparison runs over the keys still in \"keys\" either way. scripts/scene-family-verify.ts fails if a key appears in both objects, or if a key listed here turns up in a run.",
   "withdrawnKeys": {
@@ -37,6 +37,34 @@
       "note": "Same family, same bucket, same v10 generator path; only the band label moved from composition to constraint-spatial during this batch.",
       "withdrawnOn": "2026-08-26",
       "withdrawnReason": "containment-analogy-v2 was withdrawn from every band on 2026-08-26 on the human pilot's notation evidence (src/items/family-promotion.ts, data/pilot/README.md), so no run of scripts/scene-family-verify.ts measures this key any more. The numbers are kept exactly as they were recorded rather than deleted: the record of what the key measured is evidence, and a baseline file that quietly loses rows cannot be audited. The verifier skips it in the no-regression comparison and fails if the key is ever served again without this row moving back into \"keys\"."
+    },
+    "fold-punch-v2:constraint-spatial:fold-punch-d4": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 10
+      },
+      "p90": {
+        "positions": 3,
+        "atoms": 15
+      },
+      "withdrawnOn": "2026-08-31",
+      "withdrawnReason": "The fold-and-punch family was removed because its corner mirroring was too easy to earn a place in the battery."
+    },
+    "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 2,
+        "atoms": 12
+      },
+      "p90": {
+        "positions": 2,
+        "atoms": 14
+      },
+      "withdrawnOn": "2026-08-31",
+      "withdrawnReason": "The inverse fold-and-punch family was removed with its forward counterpart because the mechanism was too easy to earn a place in the battery."
     }
   },
   "keys": {
@@ -64,18 +92,6 @@
         "atoms": 20
       }
     },
-    "fold-punch-v2:constraint-spatial:fold-punch-d4": {
-      "seeds": 200,
-      "servedDistances": 1000,
-      "p50": {
-        "positions": 2,
-        "atoms": 10
-      },
-      "p90": {
-        "positions": 3,
-        "atoms": 15
-      }
-    },
     "inverse-analogy-v2:composition:inverse-analogy-d4": {
       "seeds": 200,
       "servedDistances": 1000,
@@ -86,18 +102,6 @@
       "p90": {
         "positions": 4,
         "atoms": 20
-      }
-    },
-    "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5": {
-      "seeds": 200,
-      "servedDistances": 1000,
-      "p50": {
-        "positions": 2,
-        "atoms": 12
-      },
-      "p90": {
-        "positions": 2,
-        "atoms": 14
       }
     },
     "relational-matrix-v2:constraint-spatial:relational-matrix-d4": {

@@ -10,11 +10,11 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   follow it.
 - `src/items/rules.ts` — rule DSL, semantic validator, bounded operator grammar,
   and full-grammar uniqueness oracle.
-- `src/items/scene-families.ts` — the 15 visual families and their acceptance
+- `src/items/scene-families.ts` — the 13 visual families and their acceptance
   contract; `src/items/family-promotion.ts` — which family may appear in which
   band, and the `WITHDRAWN_FAMILY_IDS` list that pulls one back out.
-- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v15`): band
-  schedules of 5/10/10/5 and 1/1/2/1, seeded 4/4/3 non-warmup family draws, an
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v16`): band
+  schedules of 5/10/10/5 and 1/1/2/1, seeded 4/2/3 non-warmup family draws, an
   even split over each draw, and an easiest-first order without adjacent repeats.
 - `src/items/generate.ts` — the older seeded generator. `procedural-v1`, `v2`,
   and `v3` are kept only so golden-seed replay tests keep passing.

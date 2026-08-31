@@ -23,7 +23,6 @@ import {
 } from "./family";
 import {
   applySceneBinary,
-  applySceneComposedProgram,
   applySceneCompositionPrimitive,
   applySceneUnary,
   enumerateSceneOrderedFiveStepCompositions,
@@ -53,8 +52,6 @@ export const SCENE_FAMILY_IDS = [
   "spatial-transform-v2",
   "transformation-machine-v3",
   "rule-switching-v2",
-  "fold-punch-v2",
-  "inverse-fold-punch-v2",
   "second-order-sequence-v2",
   "inverse-analogy-v2",
   "parallel-evolution-v1",
@@ -83,10 +80,8 @@ export interface SceneFamilyBucket {
    *
    * This replaces the old `programDepth(band)` guess, which called every
    * composition item two steps and everything above it three, whatever the
-   * family actually did. It is a floor, not an average: where a bucket's
-   * grammar mixes program lengths — `fold-punch-d4` draws one- and two-crease
-   * programs — the guaranteed number is declared, so a deeper bucket is a real,
-   * checkable increase rather than a relabelling.
+   * family actually did. It is a floor, not an average, so a deeper bucket is
+   * a real, checkable increase rather than a relabelling.
    */
   programDepth: number;
 }
@@ -120,15 +115,12 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "compositional-analogy-d3", difficulty: 3, programDepth: 2 },
     { bucket: "compositional-analogy-d4", difficulty: 4, programDepth: 3 },
   ],
-  // Containment change, then a move of the finished container.
-  // d4 shows three ordered gates, d5 four, and d6 five, each worked separately
-  // in its own row and then applied left to right; the depth counts those
-  // displayed gates — nothing else. Since 2026-08-25 every gate is provably
-  // load-bearing: a program whose answer survives deleting any one gate is not
-  // servable at any depth, so a five-gate item really costs five reading steps.
+  // d4 applies all three demonstrated gates. d5 demonstrates the same three
+  // gates but asks for two of them in a new order, so the solver must select
+  // and compose the relevant rules instead of merely replaying a long chain.
   "composed-transform-v2": [
     { bucket: "composed-transform-d4", difficulty: 4, programDepth: 3 },
-    { bucket: "composed-transform-d5", difficulty: 5, programDepth: 3 },
+    { bucket: "composed-transform-d5", difficulty: 5, programDepth: 2 },
     { bucket: "composed-transform-d6", difficulty: 6, programDepth: 5 },
   ],
   // A row rule and a column rule, both needed for the missing corner.
@@ -158,26 +150,6 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   ],
   // Two gates are demonstrated, but the query selects exactly one to apply.
   "rule-switching-v2": [{ bucket: "rule-switching-d5", difficulty: 5, programDepth: 1 }],
-  // d4 draws the whole crease grammar, so only one unfold is guaranteed. d5
-  // draws two-crease programs only: two unfolds, every time.
-  "fold-punch-v2": [
-    { bucket: "fold-punch-d4", difficulty: 4, programDepth: 1 },
-    { bucket: "fold-punch-d5", difficulty: 5, programDepth: 2 },
-  ],
-  // Fold programs run backwards, so the depth counts the folds a solver has to
-  // close to recover the missing input. d5 draws the whole mixed crease
-  // grammar, so only one closed fold is guaranteed; d6 draws two-crease
-  // programs only, so it is always two.
-  //
-  // Two is the deepest a crease program can go here, not a choice: a board is
-  // at most 3x3 and `SceneSchema` allows at most two guides, and a second fold
-  // on the same axis is a mirror about the same centre line, which either adds
-  // no punch or leaves punches on both sides of the crease. So the plan's
-  // "three creases" cannot be drawn at all — see the crease-ceiling test in
-  // scene-families.test.ts, which proves the schema refuses a third guide.
-  "inverse-fold-punch-v2": [
-    { bucket: "inverse-fold-punch-d5", difficulty: 5, programDepth: 1 },
-  ],
   // A step rule plus the rule governing how that step grows.
   "second-order-sequence-v2": [{ bucket: "second-order-sequence-d4", difficulty: 4, programDepth: 2 }],
   // Two changes, run in reverse to recover the missing input.
@@ -2861,47 +2833,26 @@ function ruleSwitching(rng: Rng): SceneFamilyCandidate {
   return asCandidate(family, puzzle);
 }
 
-/**
- * How many gates a composed-transform item shows. Three is the `-d4` bucket,
- * four the `-d5` bucket, five the `-d6` bucket; the number is also the
- * program's honest depth.
- */
+/** How many worked gates a composed-transform item shows. */
 export type ComposedGateCount = SceneComposedProgramLength;
 
 const COMPOSED_TRANSFORM_D4_BUCKET = "composed-transform-d4";
 const COMPOSED_TRANSFORM_D5_BUCKET = "composed-transform-d5";
 const COMPOSED_TRANSFORM_D6_BUCKET = "composed-transform-d6";
 
-/**
- * The displayed gate count each named bucket draws at.
- *
- * `composed-transform-d5` used to draw FOUR gates. On 2026-08-27 the owner
- * ruled that no item may ever display more than three — a fourth gate is more
- * procedure, not more reasoning — so d5 is now three gates too, and earns its
- * extra difficulty by running them BACKWARDS instead. See
- * `COMPOSED_TRANSFORM_REVERSED_BUCKETS`.
- */
+/** The displayed gate count each named bucket draws at. */
 const COMPOSED_TRANSFORM_BUCKET_GATES: Readonly<Record<string, ComposedGateCount>> = {
   [COMPOSED_TRANSFORM_D4_BUCKET]: 3,
   [COMPOSED_TRANSFORM_D5_BUCKET]: 3,
   [COMPOSED_TRANSFORM_D6_BUCKET]: 5,
 };
 
-/**
- * Buckets whose query gates are applied right to left.
- *
- * Reversal is only a fair question if the item SHOWS which direction it uses,
- * and per-gate worked rows cannot: a row demonstrating one gate alone says
- * nothing about order. So a reversed item carries one extra worked row — a
- * two-gate strip and the board it produces — and the solver reads the direction
- * off that before applying the query's three gates the same way. The two gates
- * in that row are always chosen so the two possible orders disagree; otherwise
- * the row would be evidence of nothing.
- *
- * This is the shape the owner asked for on 2026-08-27: "try to reverse the
- * gates, not only same sequence", under a hard cap of three gates.
- */
-const COMPOSED_TRANSFORM_REVERSED_BUCKETS: ReadonlySet<string> = new Set([COMPOSED_TRANSFORM_D5_BUCKET]);
+/** The two-gate query orders used by d5, all recombined from the worked A/B/C rows. */
+const COMPOSED_TRANSFORM_RECOMBINED_ORDERS: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [2, 1],
+  [2, 0],
+];
 
 /**
  * Every ordered program a solver could posit at each displayed depth — the
@@ -2952,27 +2903,23 @@ function composedGateIndexes(gateCount: number): number[] {
   return Array.from({ length: gateCount }, (_, index) => index);
 }
 
-/** Every ordering of `gateCount` gates, lexicographic, including the displayed one. */
-function composedGateOrders(gateCount: number): number[][] {
-  if (gateCount === 0) return [[]];
-  const orders: number[][] = [];
-  for (const head of composedGateIndexes(gateCount)) {
-    for (const rest of composedGateOrders(gateCount - 1)) {
-      orders.push([head, ...rest.map((index) => (index >= head ? index + 1 : index))]);
-    }
-  }
-  return orders;
+/** Every ordered selection of `length` distinct gates. */
+function composedGateRuns(gateCount: number, length: number): number[][] {
+  const build = (available: readonly number[], remaining: number): number[][] => {
+    if (remaining === 0) return [[]];
+    return available.flatMap((head) =>
+      build(available.filter((index) => index !== head), remaining - 1)
+        .map((tail) => [head, ...tail]));
+  };
+  return build(composedGateIndexes(gateCount), length);
 }
 
-/** The orderings that are not the demonstrated left-to-right one. */
+/** Every query-gate run except the one the strip shows. */
 function composedWrongGateOrders(gateCount: number, runOrder?: readonly number[]): number[][] {
-  // "Wrong" is relative to the order the item RUNS, not to the order it
-  // displays. Those were the same thing until reversed buckets arrived on
-  // 2026-08-27; passing the run order keeps the correct board out of the near
-  // miss pool and puts the other direction into it, which is where a solver who
-  // misread the direction would land.
-  const correct = (runOrder ?? composedGateIndexes(gateCount)).join(",");
-  return composedGateOrders(gateCount).filter((order) => order.join(",") !== correct);
+  const correctOrder = runOrder ?? composedGateIndexes(gateCount);
+  const correct = correctOrder.join(",");
+  return composedGateRuns(gateCount, correctOrder.length)
+    .filter((order) => order.join(",") !== correct);
 }
 
 /**
@@ -2985,9 +2932,10 @@ function composedGateOmissions(
 ): { kept: number[]; skipped: number[] }[] {
   const all = runOrder ?? composedGateIndexes(gateCount);
   const omissions: { kept: number[]; skipped: number[] }[] = [];
-  for (let mask = 1; mask < (1 << gateCount) - 1; mask++) {
-    const kept = all.filter((index) => ((mask >> index) & 1) === 1);
-    omissions.push({ kept, skipped: all.filter((index) => !kept.includes(index)) });
+  for (let mask = 1; mask < (1 << all.length) - 1; mask++) {
+    const kept = all.filter((_, position) => ((mask >> position) & 1) === 1);
+    const skipped = all.filter((_, position) => ((mask >> position) & 1) === 0);
+    omissions.push({ kept, skipped });
   }
   return omissions;
 }
@@ -3013,10 +2961,11 @@ function composedRunErrors(
   runOrder?: readonly number[],
 ): Array<{ output: Scene | null; reason: string }> {
   const gateCount = steps.length;
+  const queryGateCount = runOrder?.length ?? gateCount;
   return [
     ...composedWrongGateOrders(gateCount, runOrder).map((order) => ({
       output: runComposedGates(query, steps, order, apply),
-      reason: `applies the ${COMPOSED_GATE_COUNT_WORDS[gateCount as ComposedGateCount]} demonstrated gates in a wrong order`,
+      reason: `applies the ${queryGateCount} query gates in a different order`,
     })),
     ...composedGateOmissions(gateCount, runOrder).map(({ kept, skipped }) => ({
       output: runComposedGates(query, steps, kept, apply),
@@ -3041,7 +2990,7 @@ function composedReadingErrors(
 ): Array<{ output: Scene | null; reason: string }> {
   const executions: Array<{ output: Scene | null; reason: string }> = [];
   const order = runOrder ?? composedGateIndexes(steps.length);
-  for (const index of composedGateIndexes(steps.length)) {
+  for (const index of order) {
     for (const replacement of sceneComposedPrimitives()) {
       if (compositionPrimitiveKey(replacement) === compositionPrimitiveKey(steps[index])) continue;
       const misread = steps.map((step, position) => (position === index ? replacement : step));
@@ -3323,60 +3272,79 @@ export function declaredGateCounts(): Readonly<Record<string, number>> {
   };
 }
 
-function composedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
-  const gateCount = COMPOSED_TRANSFORM_BUCKET_GATES[bucket.bucket] ?? 3;
-  return composedTransformForProgram(
-    pick(rng, partitionComposedTransformPrograms(gateCount).publicPrograms),
-    rng,
-    { bucketId: bucket.bucket, reversed: COMPOSED_TRANSFORM_REVERSED_BUCKETS.has(bucket.bucket) },
-  );
+interface ComposedProgramOrder {
+  program: SceneComposedProgram;
+  queryOrder: readonly number[];
 }
 
-/**
- * The worked row that reveals which direction a reversed item runs its gates.
- *
- * It shows two of the displayed gates as a strip and the board they produce
- * when applied right to left, the same way the query will be. The pair is only
- * usable if the two possible orders give DIFFERENT boards — a commuting pair
- * would leave the direction exactly as unknowable as the single-gate rows do.
- * The first usable pair in displayed order is taken, so the choice is
- * deterministic and replays with the seed.
- */
-function composedOrderRow(
-  steps: readonly SceneCompositionPrimitive[],
-  displayed: readonly number[],
-  shapes: readonly SceneToken["shape"][],
-): { input: Scene; output: Scene; gates: number[] } | null {
-  for (let first = 0; first < displayed.length; first++) {
-    for (let second = first + 1; second < displayed.length; second++) {
-      const pair = [displayed[first], displayed[second]];
-      // A board distinct from both the per-gate worked inputs and the query,
-      // so the row adds evidence rather than repeating a board already shown.
-      const input = composedTransformQuery([...shapes].reverse());
-      const rightToLeft = runComposedGates(input, steps, [...pair].reverse(), applySceneCompositionPrimitive);
-      const leftToRight = runComposedGates(input, steps, pair, applySceneCompositionPrimitive);
-      if (!rightToLeft || !leftToRight) continue;
-      if (sceneSignature(rightToLeft) === sceneSignature(leftToRight)) continue;
-      return { input, output: rightToLeft, gates: pair };
-    }
+/** Whether a two-gate recombination has a unique answer and a full near-miss set. */
+function composedRecombinedOrderIsServable(
+  program: SceneComposedProgram,
+  queryOrder: readonly number[],
+): boolean {
+  const steps = sceneComposedProgramSteps(program);
+  const query = composedTransformQuery(CANONICAL_COMPOSED_SHAPES);
+  const answer = runComposedGates(query, steps, queryOrder, applySceneCompositionPrimitive);
+  const reversed = runComposedGates(
+    query, steps, [...queryOrder].reverse(), applySceneCompositionPrimitive);
+  if (!answer || !reversed || sceneSignature(answer) === sceneSignature(reversed)) return false;
+  const answerKey = sceneSignature(answer);
+  for (const gate of queryOrder) {
+    const ablated = runComposedGates(
+      query, steps, queryOrder.filter((index) => index !== gate), applySceneCompositionPrimitive);
+    if (ablated && sceneSignature(ablated) === answerKey) return false;
   }
-  return null;
+  const wrongBoards = distinctOutputs(
+    composedWrongExecutions(query, steps, applySceneCompositionPrimitive, queryOrder)
+      .map((execution) => execution.output),
+  ).filter((candidate) => sceneSignature(candidate) !== answerKey);
+  return wrongBoards.length >= DISTRACTORS_PER_ITEM;
+}
+
+function composedProgramOrders(
+  programs: readonly SceneComposedProgram[],
+  bucketId: string,
+): ComposedProgramOrder[] {
+  if (bucketId !== COMPOSED_TRANSFORM_D5_BUCKET) {
+    return programs.map((program) => ({
+      program,
+      queryOrder: composedGateIndexes(sceneComposedProgramSteps(program).length),
+    }));
+  }
+  return programs.flatMap((program) =>
+    COMPOSED_TRANSFORM_RECOMBINED_ORDERS
+      .filter((queryOrder) => composedRecombinedOrderIsServable(program, queryOrder))
+      .map((queryOrder) => ({ program, queryOrder })));
+}
+
+function composedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
+  const gateCount = COMPOSED_TRANSFORM_BUCKET_GATES[bucket.bucket] ?? 3;
+  const choices = composedProgramOrders(
+    partitionComposedTransformPrograms(gateCount).publicPrograms,
+    bucket.bucket,
+  );
+  const choice = pick(rng, choices);
+  return composedTransformForProgram(choice.program, rng, {
+    bucketId: bucket.bucket,
+    queryOrder: choice.queryOrder,
+  });
 }
 
 function composedTransformForProgram(
   program: SceneComposedProgram,
   rng: Rng,
-  options: { bucketId?: string; reversed?: boolean } = {},
+  options: { bucketId?: string; queryOrder?: readonly number[] } = {},
 ): SceneFamilyCandidate {
   const steps = sceneComposedProgramSteps(program);
   const gateCount = steps.length as ComposedGateCount;
   const displayed = composedGateIndexes(gateCount);
   const gateIds = displayed.map((index) => COMPOSED_GATE_IDS[index]);
-  const reversed = options.reversed ?? false;
-  // The order the query gates actually run in. Displayed order is always left
-  // to right; a reversed bucket applies them right to left, and the extra
-  // worked row below is what tells the solver which of the two it is.
-  const runOrder = reversed ? [...displayed].reverse() : displayed;
+  const queryOrder = options.queryOrder ?? displayed;
+  if (new Set(queryOrder).size !== queryOrder.length ||
+    queryOrder.some((index) => index < 0 || index >= gateCount)) {
+    throw new Error("composed transform query gates must be distinct worked gates");
+  }
+  const queryGateIds = queryOrder.map((index) => gateIds[index]);
   const bucket = requireSceneFamilyBucket(
     "composed-transform-v2",
     options.bucketId ?? (gateCount === 5
@@ -3391,59 +3359,55 @@ function composedTransformForProgram(
     return { input, output };
   });
   const query = composedTransformQuery(shapes);
-  const answer = runComposedGates(query, steps, runOrder, applySceneCompositionPrimitive);
+  const answer = runComposedGates(query, steps, queryOrder, applySceneCompositionPrimitive);
   const otherDirection = runComposedGates(
-    query, steps, [...runOrder].reverse(), applySceneCompositionPrimitive);
+    query, steps, [...queryOrder].reverse(), applySceneCompositionPrimitive);
   if (!answer || !otherDirection || sceneSignature(otherDirection) === sceneSignature(answer)) {
-    throw new Error(`composed transform needs a servable ${gateCount}-step program`);
-  }
-  // The order row: two of the displayed gates and the board they produce when
-  // run in this item's direction. Its pair is chosen so the two orders
-  // disagree — a pair that commutes would prove nothing about direction.
-  const orderRow = reversed ? composedOrderRow(steps, displayed, shapes) : null;
-  if (reversed && !orderRow) {
-    throw new Error("a reversed composed transform needs a gate pair whose two orders disagree");
+    throw new Error(`composed transform needs a servable ${queryOrder.length}-gate query`);
   }
   const nearMissPool = distinctOutputs(
-    composedWrongExecutions(query, steps, applySceneCompositionPrimitive, runOrder)
+    composedWrongExecutions(query, steps, applySceneCompositionPrimitive, queryOrder)
       .map((execution) => execution.output))
     .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  // Keep the other-direction board: it is the near miss that proves order
-  // matters, and in a reversed item it is exactly what a solver who ignored the
-  // order row and ran the strip left to right would choose.
+  // Keep the other-direction board because it is the near miss that proves
+  // order matters.
   const composedDistractors = selectDistractors(nearMissPool, rng, "composed transform", { answer, required: [otherDirection] });
   const gateWord = COMPOSED_GATE_COUNT_WORDS[gateCount];
+  const queryGateWord = queryOrder.length === 2 ? "two" : gateWord;
   const cueIds = [
     ...gateIds.map((gateId) => `worked-gate-${gateId}`),
-    "left-to-right-order",
+    "query-gate-order",
+    ...(queryOrder.length < gateCount ? ["query-gate-selection"] : []),
     ...(steps.some((step) => step.kind === "setFillAt") ? ["targeted-fill-slot"] : []),
     ...(steps.some((step) => step.kind === "turn") ? ["token-orientation"] : []),
   ];
+  const fullQuery = queryOrder.length === gateCount;
+  const instruction = fullQuery
+    ? `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`
+    : `Infer each worked gate, then apply the ${queryGateWord} query gates in the order shown.`;
+  const explanation = fullQuery
+    ? `The ${gateWord} worked rows expose the primitives separately. ${steps
+      .map((step, index) => `Gate ${COMPOSED_GATE_LETTERS[index]} ${compositionPrimitiveDescription(step)}`)
+      .join("; ")}. The query strip shows ${composedGateList(displayed)} in that order, so the ${gateWord} effects must be applied left to right to obtain the highlighted board. Every displayed gate is needed: dropping any one of them changes the result. The distractors run the gates in another order, skip one, or replace a step with another bounded primitive that fails its worked row.`
+    : `The ${gateWord} worked rows expose the primitives separately. ${steps
+      .map((step, index) => `Gate ${COMPOSED_GATE_LETTERS[index]} ${compositionPrimitiveDescription(step)}`)
+      .join("; ")}. The query strip shows ${composedGateList(queryOrder)} in that order, so those ${queryGateWord} effects are applied from left to right to obtain the highlighted board. ${composedGateList(displayed.filter((index) => !queryOrder.includes(index)))} is demonstrated but is not selected by the query. Every query gate is needed. The distractors change the selection or order, skip a query gate, or replace a step with another bounded primitive that fails its worked row.`;
   const puzzle = makePuzzle(
     "prototype-composed-transform",
     "matrix",
     "machineTable",
-    reversed
-      ? `Infer each worked gate, then work out from the two-gate row which way a strip runs before applying the ${gateWord} query gates.`
-      : `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`,
+    instruction,
     bucket.difficulty,
     [
       ...worked.flatMap((row, index) => [row.input, gateVisual(gateIds[index]), row.output]),
-      ...(orderRow
-        ? [orderRow.input, gateVisual(...orderRow.gates.map((index) => gateIds[index])), orderRow.output]
-        : []),
       query,
-      gateVisual(...gateIds),
+      gateVisual(...queryGateIds),
       { blank: true },
     ],
     answer,
     composedDistractors,
     rng,
-    `The ${gateWord} worked rows expose the primitives separately. ${steps
-      .map((step, index) => `Gate ${COMPOSED_GATE_LETTERS[index]} ${compositionPrimitiveDescription(step)}`)
-      .join("; ")}. ${orderRow
-      ? `The extra worked row shows ${composedGateList(orderRow.gates)} together, and its board is what those two produce applied RIGHT TO LEFT — left to right would give a different board, which is how the direction is known rather than guessed. The query strip shows ${composedGateList(displayed)}, so its effects run right to left too, to obtain the highlighted board.`
-      : `The query strip shows ${composedGateList(displayed)} in that order, so the ${gateWord} effects must be applied left to right to obtain the highlighted board.`} Every displayed gate is needed: dropping any one of them changes the result. The distractors run the gates in another order, skip one, or replace a step with another bounded primitive that fails its worked row.`,
+    explanation,
   );
   const family = definition(
     "composed-transform-v2",
@@ -3451,8 +3415,7 @@ function composedTransformForProgram(
     sceneComposedProgramKey(program),
     (candidate) => {
       const empty = { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      const orderRowPanels = orderRow ? 3 : 0;
-      if (candidate.stem.length !== gateCount * 3 + orderRowPanels + 3) return empty;
+      if (candidate.stem.length !== gateCount * 3 + 3) return empty;
       const panels = candidate.stem.map(scenePanel);
       const workedRows: { input: Scene; output: Scene; gateKey: string }[] = [];
       for (const index of displayed) {
@@ -3463,38 +3426,23 @@ function composedTransformForProgram(
         if (!input || !output || !gateKey) return empty;
         workedRows.push({ input, output, gateKey });
       }
-      // The order row, read back off the board rather than trusted: its strip
-      // names two of the displayed gates, and its output is what those two make
-      // in one of the two possible orders. Which one is the direction evidence.
-      let orderEvidence: { input: Scene; output: Scene; gates: number[] } | null = null;
-      if (orderRow) {
-        const input = panels[gateCount * 3];
-        const strip = panels[gateCount * 3 + 1];
-        const output = panels[gateCount * 3 + 2];
-        if (!input || !strip || !output) return empty;
-        const named = [...strip.objects]
-          .sort((left, right) => left.column - right.column)
-          .map((placement) => workedRows.findIndex((row) => row.gateKey === JSON.stringify(placement.object)));
-        if (named.length !== 2 || named.some((index) => index < 0)) return empty;
-        orderEvidence = { input, output, gates: named };
-      }
-      const queryInput = panels[gateCount * 3 + orderRowPanels];
-      const queryGates = panels[gateCount * 3 + orderRowPanels + 1];
+      const queryInput = panels[gateCount * 3];
+      const queryGates = panels[gateCount * 3 + 1];
       if (!queryInput || !queryGates) return empty;
 
-      // The query strip must show exactly the worked gates, once each, left to
-      // right: three glyphs across the middle row of an ordinary board, or four
-      // to five across the single row of the wide gate strip.
-      const wideStrip = gateCount >= GATE_STRIP_COLUMNS;
       const orderedQueryGates = [...queryGates.objects].sort((left, right) => left.column - right.column);
+      const visibleQueryOrder = orderedQueryGates.map((placement) =>
+        workedRows.findIndex((row) => row.gateKey === JSON.stringify(placement.object)));
+      const queryGateCount = visibleQueryOrder.length;
+      const wideStrip = queryGateCount >= GATE_STRIP_COLUMNS;
       const stripRow = wideStrip ? 0 : 1;
       const stripValid = queryGates.tiles.length === 0 &&
         queryGates.rows === (wideStrip ? GATE_STRIP_ROWS : 3) &&
-        queryGates.columns === (wideStrip ? gateCount : 3) &&
-        orderedQueryGates.length === gateCount &&
+        queryGates.columns === (wideStrip ? queryGateCount : 3) &&
+        queryGateCount === queryOrder.length &&
         orderedQueryGates.every((placement, index) => placement.row === stripRow && placement.column === index) &&
-        orderedQueryGates.every((placement, index) =>
-          JSON.stringify(placement.object) === workedRows[index].gateKey);
+        visibleQueryOrder.every((index) => index >= 0) &&
+        new Set(visibleQueryOrder).size === visibleQueryOrder.length;
       if (!stripValid) return empty;
 
       // Every program in the grammar whose i-th gate reproduces the i-th worked
@@ -3514,30 +3462,15 @@ function composedTransformForProgram(
       };
       build(0, []);
 
-      // A survivor predicts the query only through a direction the shown
-      // evidence actually pins. Without an order row the convention is left to
-      // right, as the instruction says. With one, the survivor must reproduce
-      // that row in exactly one of the two orders, and the query then runs the
-      // same way; a survivor whose pair commutes there proves no direction and
-      // predicts nothing.
       const predictFor = (candidateProgram: SceneComposedProgram): Scene | null => {
         const candidateSteps = sceneComposedProgramSteps(candidateProgram);
-        if (!orderEvidence) return applySceneComposedProgram(queryInput, candidateProgram);
-        const forwardPair = orderEvidence.gates;
-        const backwardPair = [...forwardPair].reverse();
-        const asShown = runComposedGates(orderEvidence.input, candidateSteps, forwardPair, applySceneCompositionPrimitive);
-        const asReversed = runComposedGates(orderEvidence.input, candidateSteps, backwardPair, applySceneCompositionPrimitive);
-        const target = sceneSignature(orderEvidence.output);
-        const fitsShown = asShown !== null && sceneSignature(asShown) === target;
-        const fitsReversed = asReversed !== null && sceneSignature(asReversed) === target;
-        if (fitsShown === fitsReversed) return null;
-        const order = fitsReversed ? [...displayed].reverse() : displayed;
-        return runComposedGates(queryInput, candidateSteps, order, applySceneCompositionPrimitive);
+        return runComposedGates(
+          queryInput, candidateSteps, visibleQueryOrder, applySceneCompositionPrimitive);
       };
       const predictions = distinctOutputs(survivors.map(predictFor));
       const wrongExecutions = survivors.flatMap((survivor) =>
         composedWrongExecutions(
-          queryInput, sceneComposedProgramSteps(survivor), applySceneCompositionPrimitive, runOrder));
+          queryInput, sceneComposedProgramSteps(survivor), applySceneCompositionPrimitive, visibleQueryOrder));
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
@@ -3545,288 +3478,6 @@ function composedTransformForProgram(
         distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
           wrongExecutions.find((execution) => execution.output &&
             sceneSignature(execution.output) === sceneSignature(option))?.reason ?? null),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-type CreaseGuide = NonNullable<Scene["guides"]>[number];
-
-interface FoldProgram {
-  guides: readonly [CreaseGuide] | readonly [CreaseGuide, CreaseGuide];
-}
-
-const VERTICAL_FOLD_GUIDES: readonly CreaseGuide[] = [
-  { kind: "crease", axis: "vertical", direction: "rightToLeft" },
-  { kind: "crease", axis: "vertical", direction: "leftToRight" },
-] as const;
-const HORIZONTAL_FOLD_GUIDES: readonly CreaseGuide[] = [
-  { kind: "crease", axis: "horizontal", direction: "bottomToTop" },
-  { kind: "crease", axis: "horizontal", direction: "topToBottom" },
-] as const;
-const FOLD_PROGRAM_GRAMMAR: readonly FoldProgram[] = [
-  ...VERTICAL_FOLD_GUIDES.map((guide): FoldProgram => ({ guides: [guide] })),
-  ...HORIZONTAL_FOLD_GUIDES.map((guide): FoldProgram => ({ guides: [guide] })),
-  ...VERTICAL_FOLD_GUIDES.flatMap((vertical) =>
-    HORIZONTAL_FOLD_GUIDES.map((horizontal): FoldProgram => ({ guides: [vertical, horizontal] }))),
-];
-
-/**
- * The two-crease half of the grammar — one vertical fold and one horizontal
- * fold, so opening the paper turns one punch into four.
- *
- * `fold-punch-d4` draws the whole grammar, which means half its draws are a
- * single fold and a solver can sometimes stop after one unfold.
- * `fold-punch-d5` draws only from here, so two unfolds are guaranteed. The
- * uniqueness oracle still searches the FULL grammar: the bucket narrows what is
- * generated, never what a solver is allowed to consider.
- */
-const TWO_CREASE_FOLD_PROGRAMS: readonly FoldProgram[] =
-  FOLD_PROGRAM_GRAMMAR.filter((program) => program.guides.length === 2);
-
-/** The bucket id whose draws are restricted to two-crease programs. */
-const FOLD_PUNCH_TWO_CREASE_BUCKET = "fold-punch-d5";
-
-function guideKey(guide: CreaseGuide): string {
-  return `${guide.axis}:${guide.direction}`;
-}
-
-function foldedPosition(program: FoldProgram, variant: 0 | 1): { row: number; column: number } {
-  const vertical = program.guides.find((guide) => guide.axis === "vertical");
-  const horizontal = program.guides.find((guide) => guide.axis === "horizontal");
-  return {
-    row: horizontal?.direction === "bottomToTop" ? 0
-      : horizontal?.direction === "topToBottom" ? 2
-        : variant === 0 ? 0 : 2,
-    column: vertical?.direction === "rightToLeft" ? 0
-      : vertical?.direction === "leftToRight" ? 2
-        : variant === 0 ? 0 : 2,
-  };
-}
-
-function foldedPaper(shape: SceneToken["shape"], program: FoldProgram, variant: 0 | 1): Scene {
-  const position = foldedPosition(program, variant);
-  return {
-    kind: "scene",
-    rows: 3,
-    columns: 3,
-    objects: [{ ...position, object: token(shape, "solid") }],
-    tiles: [],
-    guides: [...program.guides],
-  };
-}
-
-function unfoldAcross(input: Scene, axis: "horizontal" | "vertical"): Scene | null {
-  const guide = (input.guides ?? []).find((candidate) => candidate.kind === "crease" && candidate.axis === axis);
-  if (!guide) return null;
-  const onFoldedStack = input.objects.every((placement) =>
-    guide.direction === "rightToLeft" ? placement.column <= Math.floor((input.columns - 1) / 2) :
-    guide.direction === "leftToRight" ? placement.column >= Math.ceil((input.columns - 1) / 2) :
-    guide.direction === "bottomToTop" ? placement.row <= Math.floor((input.rows - 1) / 2) :
-    placement.row >= Math.ceil((input.rows - 1) / 2));
-  if (!onFoldedStack) return null;
-  const objects = input.objects.flatMap((placement) => [
-    placement,
-    axis === "vertical"
-      ? { ...placement, column: input.columns - 1 - placement.column }
-      : { ...placement, row: input.rows - 1 - placement.row },
-  ]);
-  const unique = new Map(objects.map((placement) => [`${placement.row}:${placement.column}:${JSON.stringify(placement.object)}`, placement]));
-  const remainingGuides = (input.guides ?? []).filter((candidate) => candidate !== guide);
-  const result: Scene = { ...input, objects: [...unique.values()], tiles: [], guides: remainingGuides };
-  return result.objects.length > input.objects.length ? result : null;
-}
-
-function sceneUsesFoldProgram(input: Scene, program: FoldProgram): boolean {
-  const shown = (input.guides ?? []).map(guideKey);
-  const expected = program.guides.map(guideKey);
-  return shown.length === expected.length && shown.every((key, index) => key === expected[index]);
-}
-
-function unfoldWithProgram(input: Scene, program: FoldProgram): Scene | null {
-  if (!sceneUsesFoldProgram(input, program)) return null;
-  let output: Scene | null = input;
-  for (const guide of program.guides) output = output && unfoldAcross(output, guide.axis);
-  return output;
-}
-
-function compatibleFoldPrograms(input: Scene): readonly [FoldProgram, FoldProgram, FoldProgram] | null {
-  const placement = input.objects[0];
-  if (!placement || input.objects.length !== 1) return null;
-  const vertical = VERTICAL_FOLD_GUIDES.find((guide) =>
-    guide.direction === (placement.column === 0 ? "rightToLeft" : placement.column === 2 ? "leftToRight" : ""));
-  const horizontal = HORIZONTAL_FOLD_GUIDES.find((guide) =>
-    guide.direction === (placement.row === 0 ? "bottomToTop" : placement.row === 2 ? "topToBottom" : ""));
-  return vertical && horizontal
-    ? [{ guides: [vertical] }, { guides: [horizontal] }, { guides: [vertical, horizontal] }]
-    : null;
-}
-
-/** Move every punch across the program's creases instead of keeping both copies. */
-function mirroredWithoutOriginal(input: Scene, program: FoldProgram): Scene | null {
-  let objects = input.objects;
-  for (const guide of program.guides) {
-    objects = objects.map((placement) => guide.axis === "vertical"
-      ? { ...placement, column: input.columns - 1 - placement.column }
-      : { ...placement, row: input.rows - 1 - placement.row });
-  }
-  const moved: Scene = { ...input, objects, tiles: [], guides: [] };
-  return sceneSignature(moved) === sceneSignature({ ...input, guides: [] }) ? null : moved;
-}
-
-function foldNearMissOutputs(input: Scene, answer: Scene): Array<{ output: Scene; reason: string }> {
-  const withoutCrease: Scene = { ...input, guides: [] };
-  const compatible = compatibleFoldPrograms(input) ?? [];
-  return [
-    { output: withoutCrease, reason: "leaves every fold closed" },
-    ...compatible.flatMap((program) => {
-      const folded: Scene = { ...input, guides: [...program.guides] };
-      const output = unfoldWithProgram(folded, program);
-      return output ? [{ output, reason: `uses the ${program.guides.map(guideKey).join(" then ")} fold program` }] : [];
-    }),
-    // Opening a fold keeps the punch and adds its mirror. Moving the punch to
-    // the mirror instead is the other way to get the count wrong.
-    ...compatible.flatMap((program) => {
-      const output = mirroredWithoutOriginal(input, program);
-      return output
-        ? [{ output, reason: `moves the punch across the ${program.guides.map(guideKey).join(" then ")} crease instead of keeping both` }]
-        : [];
-    }),
-  ].filter((entry, index, entries) =>
-    sceneSignature(entry.output) !== sceneSignature(answer) &&
-    entries.findIndex((candidate) => sceneSignature(candidate.output) === sceneSignature(entry.output)) === index);
-}
-
-function foldPunch(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
-  const grammar = bucket.bucket === FOLD_PUNCH_TWO_CREASE_BUCKET
-    ? TWO_CREASE_FOLD_PROGRAMS
-    : FOLD_PROGRAM_GRAMMAR;
-  const program = pick(rng, grammar);
-  const [firstShape, secondShape] = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const first = foldedPaper(firstShape, program, 0);
-  const unfolded = unfoldWithProgram(first, program)!;
-  const query = foldedPaper(secondShape, program, 1);
-  const answer = unfoldWithProgram(query, program)!;
-  const nearMisses = selectDistractors(
-    foldNearMissOutputs(query, answer).map((entry) => entry.output),
-    rng,
-    "fold punch",
-    { answer },
-  );
-  const puzzle = makePuzzle(
-    "prototype-fold-punch",
-    "analogy",
-    "analogy",
-    "The centre line is a fold. Apply the same unfolding to the new punch.",
-    bucket.difficulty,
-    [first, unfolded, query],
-    answer,
-    nearMisses,
-    rng,
-    `The worked pair establishes the visible crease program: ${program.guides.map(guideKey).join(", then ")}. Opening each fold preserves every existing punch and adds its mirror across that crease, so one crease makes two punches and two creases make four. Applying the same complete program to the query gives the highlighted board. The distractors leave a fold closed, omit one crease, unfold across the wrong axis, or move the punch to its mirror instead of keeping both.`,
-  );
-  const family = definition(
-    "fold-punch-v2",
-    ["visible-creases", "fold-directions", "worked-unfold"],
-    JSON.stringify(program),
-    (candidate) => {
-      const [workedInput, workedOutput, queryInput] = candidate.stem.map(scenePanel);
-      if (!workedInput || !workedOutput || !queryInput) {
-        return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      }
-      const survivors = FOLD_PROGRAM_GRAMMAR.filter((candidateProgram) => {
-        const predicted = unfoldWithProgram(workedInput, candidateProgram);
-        return predicted !== null && sceneSignature(predicted) === sceneSignature(workedOutput);
-      });
-      const predictions = distinctOutputs(survivors.map((candidateProgram) =>
-        unfoldWithProgram(queryInput, candidateProgram)));
-      const wrongRules = predictions[0] ? foldNearMissOutputs(queryInput, predictions[0]) : [];
-      return {
-        derivedAnswer: predictions.length === 1 ? predictions[0] : null,
-        solutionCount: predictions.length,
-        usedCueIds: ["visible-creases", "fold-directions", "worked-unfold"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
-          wrongRules.find((rule) => rule.output && sceneSignature(rule.output) === sceneSignature(option) &&
-            (!predictions[0] || sceneSignature(option) !== sceneSignature(predictions[0])))?.reason ?? null),
-      };
-    },
-  );
-  return asCandidate(family, puzzle);
-}
-
-function inverseFoldPunch(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
-  // This family has no d6 bucket, and the reason is a ceiling rather than a
-  // gap: `SceneSchema` allows a board at most two guides, so a three-crease
-  // program cannot be drawn at all (proved in scene-families.test.ts). A
-  // two-crease-only bucket was built and withdrawn on 2026-08-26 because d5
-  // already draws those same programs, so it raised no ceiling — it only
-  // dropped the easy half of an existing bucket. The d6 tail is carried by
-  // `composed-transform-d6` and `transformation-machine-d6` instead.
-  const program = pick(rng, FOLD_PROGRAM_GRAMMAR);
-  const [firstShape, secondShape] = shuffled(rng, ["circle", "square", "triangle", "diamond", "star"] as const);
-  const firstFolded = foldedPaper(firstShape, program, 0);
-  const firstUnfolded = unfoldWithProgram(firstFolded, program)!;
-  const answer = foldedPaper(secondShape, program, 1);
-  const queryUnfolded = unfoldWithProgram(answer, program)!;
-  const distractors = FOLD_PROGRAM_GRAMMAR
-    .filter((candidateProgram) => JSON.stringify(candidateProgram) !== JSON.stringify(program))
-    .map((candidateProgram, index) => foldedPaper(secondShape, candidateProgram, index % 2 as 0 | 1))
-    .filter((candidate, index, candidates) =>
-      sceneSignature(candidate) !== sceneSignature(answer) &&
-      candidates.findIndex((other) => sceneSignature(other) === sceneSignature(candidate)) === index);
-  const selectedDistractors = selectDistractors(distractors, rng, "inverse fold punch", { answer });
-  const puzzle = makePuzzle(
-    "prototype-inverse-fold-punch",
-    "analogy",
-    "analogy",
-    "Use the fold arrow and worked pair. Which folded punch produces the third board?",
-    bucket.difficulty,
-    [firstUnfolded, firstFolded, queryUnfolded],
-    answer,
-    selectedDistractors,
-    rng,
-    `Work backward from the open query board using the worked crease program: ${program.guides.map(guideKey).join(", then ")}. Mirrored punches overlap when each indicated side folds across its centre line, leaving the single punch shown by the highlighted folded board. Its punch position, crease axes, and arrows all match the worked pair. The other options use a different bounded fold program, so they either unfold to another pattern or contradict the demonstrated directions.`,
-  );
-  const family = definition(
-    "inverse-fold-punch-v2",
-    ["worked-inverse-fold", "fold-direction", "mirrored-punches"],
-    `inverse:${JSON.stringify(program)}`,
-    (candidate) => {
-      const [workedOutput, workedFolded, queryOutput] = candidate.stem.map(scenePanel);
-      if (!workedOutput || !workedFolded || !queryOutput) {
-        return { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
-      }
-      const survivors = FOLD_PROGRAM_GRAMMAR.filter((candidateProgram) => {
-        const prediction = unfoldWithProgram(workedFolded, candidateProgram);
-        return prediction !== null && sceneSignature(prediction) === sceneSignature(workedOutput);
-      });
-      const evaluated = candidate.options.map((option) => {
-        const matchingPrograms = survivors.filter((candidateProgram) => {
-          const output = unfoldWithProgram(option, candidateProgram);
-          return output !== null && sceneSignature(output) === sceneSignature(queryOutput);
-        });
-        return {
-          option,
-          matchingPrograms,
-          witness: matchingPrograms.length === 0
-            ? "its punch position, crease axes, or arrows do not reproduce the shown unfolding under the worked program"
-            : "matches more than one surviving fold program",
-        };
-      });
-      const selections = survivors.map((candidateProgram) => evaluated.flatMap((entry, optionIndex) =>
-        entry.matchingPrograms.includes(candidateProgram) ? [optionIndex] : []));
-      const everyProgramSelectsOne = selections.length > 0 && selections.every((matches) => matches.length === 1);
-      const predictedIndexes = new Set(selections.flat());
-      const unique = everyProgramSelectsOne && predictedIndexes.size === 1;
-      return {
-        derivedAnswer: unique ? candidate.options[[...predictedIndexes][0]] : null,
-        solutionCount: unique ? 1 : predictedIndexes.size,
-        usedCueIds: ["worked-inverse-fold", "fold-direction", "mirrored-punches"],
-        distractorWitnesses: candidate.options.flatMap((_, optionIndex) =>
-          optionIndex === candidate.answerIndex || evaluated[optionIndex].matchingPrograms.length > 0
-            ? []
-            : [{ optionIndex, witness: evaluated[optionIndex].witness }]),
       };
     },
   );
@@ -4446,8 +4097,6 @@ export function generateSceneFamilyCandidate(
     case "spatial-transform-v2": return spatialTransform(rng);
     case "transformation-machine-v3": return transformationMachine(rng, bucket);
     case "rule-switching-v2": return ruleSwitching(rng);
-    case "fold-punch-v2": return foldPunch(rng, bucket);
-    case "inverse-fold-punch-v2": return inverseFoldPunch(rng, bucket);
     case "second-order-sequence-v2": return secondOrderSequence(rng);
     case "inverse-analogy-v2": return inverseAnalogy(rng);
     case "parallel-evolution-v1": return parallelEvolution(rng, bucket);
@@ -4476,12 +4125,14 @@ export function generateHeldOutComposedTransformCandidate(
   if (heldOutPrograms.length === 0) {
     throw new Error(`no held-out composed-transform programs at ${gateCount} gates`);
   }
-  // The held-out item has to be the same KIND of item as the public bucket it
-  // stands in for, direction included: a reserved program rendered left to
-  // right would not measure the bucket a taker actually meets.
-  return composedTransformForProgram(pick(rng, heldOutPrograms), rng, {
+  const choices = composedProgramOrders(heldOutPrograms, bucketId);
+  if (choices.length === 0) {
+    throw new Error(`no held-out composed-transform programs support ${bucketId}`);
+  }
+  const choice = pick(rng, choices);
+  return composedTransformForProgram(choice.program, rng, {
     bucketId,
-    reversed: COMPOSED_TRANSFORM_REVERSED_BUCKETS.has(bucketId),
+    queryOrder: choice.queryOrder,
   });
 }
 

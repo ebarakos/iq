@@ -4,14 +4,13 @@
 > administers them to **both humans and AI agents**, using a difficulty ladder to
 > separate "human-hard" from "agent-hard" items.
 
-**Status: GENERATED REASONING-TEST PROTOTYPE.** The app serves two test lengths, 5 and 30
-questions, both drawn from the same pool of eligible visual reasoning families and the same
-four difficulty bands. Every test is generated from a fresh seed, validated in pure code,
-served without answers, and scored server-side against a whole-test deadline of 60 seconds
-per question. Every question offers six answer options, so a blind guess is worth 1 in 6.
-Families ship behind a visible experimental label. The human and agent evidence so far is
-enough to withdraw families, not to calibrate difficulty, so this is not a standardized IQ
-score. See [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
+The app serves two test lengths, 5 and 30 questions, both drawn from the same pool of eligible
+visual reasoning families and the same four difficulty bands. Every test is generated from a
+fresh seed, validated in pure code, served without answers, and scored server-side against a
+whole-test deadline of 60 seconds per question. Every question offers six answer options, so a
+blind guess is worth 1 in 6. Family/band pairs can be withdrawn through configuration when the
+retention pilot finds that they miss its documented thresholds. See
+[docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
 ## Commands
 

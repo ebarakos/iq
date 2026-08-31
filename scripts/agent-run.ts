@@ -65,6 +65,7 @@ import {
   readWithdrawnFamilyIds,
 } from "../src/items/family-promotion";
 import {
+  declaredGateCounts,
   generateHeldOutComposedTransformCandidate,
   partitionComposedTransformPrograms,
   sceneFamilyBucketsFor,
@@ -252,7 +253,7 @@ const HELD_OUT_RETRY_BUDGET = 24;
 
 export interface HeldOutBucket {
   bucket: SceneFamilyBucket;
-  /** Displayed gates. For this family the declared program depth IS the gate count. */
+  /** Number of worked gates displayed, which may exceed the selected query depth. */
   gateCount: ComposedGateCount;
   /** The band the public twin of this bucket sits in, so the two stay comparable. */
   band: ReasoningBand;
@@ -265,12 +266,12 @@ export interface HeldOutBucket {
  *
  * Read from the family's own bucket declaration and the promotion registry, so
  * a bucket added or renamed there is picked up here without editing this file.
- * Nothing about the count is written down: today it is the two the plan names,
- * and the even split follows whatever the declaration holds.
+ * The even split follows whatever the live declarations hold.
  */
 export function heldOutBuckets(): HeldOutBucket[] {
   const registry = CURRENT_FAMILY_PROMOTION_REGISTRY.find((entry) => entry.familyId === HELD_OUT_FAMILY_ID);
   if (!registry) throw new Error(`${HELD_OUT_FAMILY_ID} is not in the promotion registry`);
+  const gateCounts = declaredGateCounts();
   return sceneFamilyBucketsFor(HELD_OUT_FAMILY_ID).flatMap((bucket) => {
     // A bucket earns a held-out twin only if the reserved shape has programs at
     // its depth. At five gates it provably has none: the reserved shape is two
@@ -279,12 +280,13 @@ export function heldOutBuckets(): HeldOutBucket[] {
     // single-gate ablation rejects every one of them. Skipping such a bucket
     // keeps the pinned two-bucket probe and its --items 40 even split valid;
     // throwing here would take the whole held-out source down with it.
-    if (bucket.programDepth !== 3 && bucket.programDepth !== 4) return [];
+    const gateCount = gateCounts[bucket.bucket];
+    if (gateCount !== 3 && gateCount !== 4) return [];
     const band = registry.bands.find((entry) => entry.validatedDifficultyBuckets.includes(bucket.bucket));
     if (!band) throw new Error(`${bucket.bucket} is not enabled in any band, so it has no held-out twin`);
     return {
       bucket,
-      gateCount: bucket.programDepth as ComposedGateCount,
+      gateCount: gateCount as ComposedGateCount,
       band: band.band,
       featureBucket: `held-out-${bucket.bucket}`,
     };

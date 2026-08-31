@@ -72,8 +72,8 @@ describe("loadBank", () => {
       });
       // The top-up draws on both public lengths and records which one each item
       // came from, so a key no length reaches is caught rather than silently
-      // left thin. As of the v12 battery a long test reaches all 19 keys on its
-      // own and a short one reaches 15 — a 5-question test asks each band for
+      // left thin. In v16 a long test reaches all 16 keys on its own and a
+      // short one reaches 13. A 5-question test asks each band for
       // one or two questions, so it only ever gets a family's entry-point
       // bucket.
       expect(EXPANDED_PROFILES).toContain(item.provenance.profile);
@@ -82,7 +82,7 @@ describe("loadBank", () => {
     }
   });
 
-  it("holds exactly four items for every family, band, and bucket the registry can schedule", () => {
+  it("holds exactly five items for every family, band, and bucket the registry can schedule", () => {
     const coverage = expandedBankCoverage(
       loadBank(),
       CURRENT_FAMILY_PROMOTION_REGISTRY,
@@ -91,12 +91,9 @@ describe("loadBank", () => {
     expect(coverage.short).toEqual([]);
     expect(coverage.strays).toEqual([]);
     expect([...coverage.countsByKey.values()].every((have) => have === BANK_ITEMS_PER_KEY)).toBe(true);
-    // The v12 battery: 19 enabled keys x 4 items. It was 20 until 2026-08-26,
-    // when `containment-analogy-v2` was withdrawn (-1) and the two d6 buckets
-    // were added (+2) — and 19 again from 2026-08-27, when both d6 buckets were
-    // withdrawn (-2) under the owner's three-gate rule.
-    // See docs/plans/raise-the-ceiling-v12.md.
-    expect(coverage.countsByKey.size).toBe(19);
+    // The v16 battery has 16 enabled keys, each stocked for the five times a
+    // constraint family can appear in one long test.
+    expect(coverage.countsByKey.size).toBe(16);
     expect(loadBank()).toHaveLength(coverage.countsByKey.size * BANK_ITEMS_PER_KEY);
   });
 });

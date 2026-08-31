@@ -183,40 +183,9 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("composition", ["compositional-analogy-d3", "compositional-analogy-d4"])],
   },
   {
-    // Extended from two to three ordered steps on 2026-08-24 (raise-the-ceiling
-    // plan, Lever 2); the version suffix moved with the item semantics.
-    //
-    // The first family registered in two BANDS (escalate-the-quiz, Phase 3):
-    // three ordered gates in composition, four in induction-transfer. The
-    // four-gate form is a different item shape, not a harder draw of the same
-    // one — fifteen panels instead of twelve, and a query strip of four glyphs
-    // — so it belongs to the band that already carries the machine formats
-    // rather than to a second slot inside composition. A test that draws this
-    // family in both bands still gets two different questions; the cross-band
-    // rule in expanded-quiz.ts keeps that from happening when another family
-    // is free.
-    //
-    // The five-gate `composed-transform-d6` bucket was added on 2026-08-26 and
-    // withdrawn on 2026-08-27, one day later, on the owner's instruction:
-    // **never more than three gates**. Their reason is the one the pilot data
-    // agrees with — a fourth or fifth gate adds procedure, not reasoning. The
-    // owner knew the mechanism instantly and answered the five-gate item in
-    // under five seconds, wrong, because applying it once more was boring
-    // rather than hard.
-    //
-    // KNOWN VIOLATION, left in deliberately and awaiting the owner's call:
-    // `composed-transform-d5` displays FOUR gates (this family's `programDepth`
-    // IS its gate count), so it breaks the same three-gate rule. Withdrawing it
-    // was tried on 2026-08-27 and reverted the same hour, because it costs more
-    // than it fixes: induction-transfer drops to three families against a draw
-    // of three, so the last band loses all subsampling variety, and the mean
-    // analogy-layout questions in a long test rises to exactly its 10.0 cap
-    // (10.017 measured over the acceptance test's 10,000 seeds). A test that is
-    // MORE format-repetitive is the opposite of what the owner asked for. The
-    // fix that costs nothing is the reversed-order three-gate bucket they also
-    // asked for — it keeps the family in this band without a fourth gate. See
-    // TODO.md. The five-gate generator and the ablation proofs stay in the code
-    // for that rework.
+    // d4 asks for all three worked gates in order. d5 keeps the same three
+    // worked examples but selects two of them in a new order, so its extra
+    // difficulty comes from recombination rather than a longer procedure.
     familyId: "composed-transform-v2",
     primaryReasoningFamily: "ordered-composition",
     bands: [
@@ -258,26 +227,6 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     familyId: "rule-switching-v2",
     primaryReasoningFamily: "operator-induction",
     bands: [codeValidBand("induction-transfer", ["rule-switching-d5"])],
-  },
-  {
-    // Two buckets in one band since 2026-08-25 (escalate-the-quiz, Phase 3).
-    // d4 draws the whole crease grammar, so half its items need a single
-    // unfold; d5 draws two-crease programs only, so every d5 item needs two.
-    // A band's first fold-punch question is d4 and every later one is d5, which
-    // is what makes repetition inside a band a ramp instead of a plateau.
-    familyId: "fold-punch-v2",
-    primaryReasoningFamily: "spatial-transformation",
-    bands: [codeValidBand("constraint-spatial", ["fold-punch-d4", "fold-punch-d5"])],
-  },
-  {
-    // Two buckets in one band since 2026-08-26 (raise-the-ceiling-v12). d5
-    // draws the whole crease grammar, so half its draws close a single fold;
-    // d6 draws two-crease programs only, so every d6 item closes two folds in
-    // turn. Both live in induction-transfer because every d6 bucket does: the
-    // long test is ordered easiest-first and that band is last.
-    familyId: "inverse-fold-punch-v2",
-    primaryReasoningFamily: "spatial-transformation",
-    bands: [codeValidBand("induction-transfer", ["inverse-fold-punch-d5"])],
   },
   {
     familyId: "second-order-sequence-v2",

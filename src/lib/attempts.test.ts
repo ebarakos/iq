@@ -123,8 +123,8 @@ describe("held-out source of the agent harness", () => {
     // token-local steps, and at five gates that shape has no servable member at
     // all (it forces both fills plus a turn, and a turn never repaints the slot
     // the first fill painted, so single-gate ablation rejects every one). A
-    // bucket reserving nothing is skipped rather than fatal, which is what keeps
-    // the pinned two-bucket probe and its even --items 40 split valid.
+    // bucket reserving nothing is skipped rather than fatal, which keeps the
+    // pinned two-bucket probe and its even --items 40 split valid.
     const declared = sceneFamilyBucketsFor("composed-transform-v2").map((bucket) => bucket.bucket);
     const covered = buckets.map((entry) => entry.bucket.bucket);
     expect(covered).toEqual(declared.filter((bucket) => covered.includes(bucket)));
@@ -134,9 +134,12 @@ describe("held-out source of the agent harness", () => {
       expect(heldOutPrograms.length, entry.bucket.bucket).toBeGreaterThan(0);
     }
     for (const entry of buckets) {
-      // The declared program depth IS the number of displayed gates.
-      expect(entry.gateCount).toBe(entry.bucket.programDepth);
-      expect([3, 4]).toContain(entry.gateCount);
+      expect(entry.gateCount).toBe(3);
+      if (entry.bucket.bucket === "composed-transform-d5") {
+        expect(entry.bucket.programDepth).toBe(2);
+      } else {
+        expect(entry.bucket.programDepth).toBe(entry.gateCount);
+      }
       // A feature bucket of its own, so a rollup can never merge a reserved
       // program with its public twin.
       expect(entry.featureBucket).toBe(`held-out-${entry.bucket.bucket}`);
@@ -208,12 +211,10 @@ describe("held-out source of the agent harness", () => {
   });
 
   it("enforces its own reserved-primitive and program-complexity coverage", () => {
-    // Six items a bucket, not four. Until 2026-08-27 the two held-out buckets
-    // ran at three and four gates, so four items gave 12 and 16 gate slots
-    // against a reserved pool of 8 primitives. `composed-transform-d5` is now
-    // three gates run backwards rather than four run forwards, so both buckets
-    // are three gates and four items is 12 slots either side — enough on
-    // average, not enough to guarantee. That is a property of the sample, not a
+    // Six items a bucket, not four. Both buckets display three worked gates,
+    // while d5 selects two of them for its query. Four items are enough on
+    // average, not enough to guarantee full primitive coverage. That is a
+    // property of the sample, not a
     // fault in the harness: the very next test checks a thin run is REPORTED
     // rather than passed.
     const PER_BUCKET = 6;

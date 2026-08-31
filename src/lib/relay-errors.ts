@@ -59,7 +59,7 @@ export function parseRateLimitError(err: unknown): RateLimitInfo {
   return {
     source: "provider",
     limitType: null,
-    message: typeof body?.message === "string" ? body.message : "Rate-limited — wait a bit or try another provider",
+    message: typeof body?.message === "string" ? body.message : "Rate-limited. Wait a bit or try another provider",
     retryAfter: findRetryAfter(err),
   };
 }

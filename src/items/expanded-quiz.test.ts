@@ -70,15 +70,10 @@ describe("eligible family pool", () => {
       .not.toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the nineteen family/band/bucket keys the v12 battery serves", () => {
-    // Was 20 keys over pools of 2/6/4/4 under the "dual proof fails" row of the
-    // table in docs/plans/escalate-the-quiz.md, Phase 5. Two things moved it on
-    // 2026-08-26 (docs/plans/raise-the-ceiling-v12.md): `containment-analogy-v2`
-    // was withdrawn on the pilot's notation evidence, taking constraint-spatial
-    // from four families to three and the battery to 19 keys, and the two d6
-    // buckets — `composed-transform-d6` and `transformation-machine-d6` — were
-    // added to induction-transfer, bringing it to 21, and both were withdrawn
-    // again on 2026-08-27 under the owner's three-gate rule, bringing it to 19.
+  it("holds exactly the sixteen family/band/bucket keys the v16 battery serves", () => {
+    // v16 removes the two fold-and-punch families: two constraint keys and one
+    // induction key. The number is derived from the registry here, so changing
+    // the live population requires changing this assertion deliberately.
     // The number is derived from the registry here, so adding or withdrawing a
     // family without revisiting the plan fails this test rather than quietly
     // moving the population the pilot packet and emergency bank are sized to.
@@ -86,18 +81,18 @@ describe("eligible family pool", () => {
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => `${family.familyId}:${band}:${bucket.bucket}`)));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(19);
+    expect(keys).toHaveLength(16);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
-      .toEqual([2, 6, 3, 4]);
+      .toEqual([2, 6, 2, 3]);
     // No key is d6 any more. The two that were are withdrawn, so the ladder
     // tops out at d5 until a mechanism earns a sixth rung some way other than
     // by adding gates — the lever the owner ruled out on 2026-08-27.
     expect(keys.filter((key) => key.endsWith("-d6"))).toEqual([]);
     // The same row's draw sizes and long-test floors.
     expect(EXPANDED_PROFILE_BANDS.map((band) => FAMILY_SUBSAMPLE_SIZES[band]))
-      .toEqual([undefined, 4, 3, 3]);
+      .toEqual([undefined, 4, 2, 3]);
     expect(EXPANDED_PROFILE_BANDS.map((band) => MINIMUM_ELIGIBLE_FAMILIES["long-30"][band]))
-      .toEqual([2, 4, 3, 3]);
+      .toEqual([2, 4, 2, 3]);
   });
 
   it("still reads difficulty 6 out of a bucket name, though no bucket declares one", () => {
@@ -190,7 +185,12 @@ describe("assembleExpandedQuiz", () => {
           previousFloor = floor;
           const dips = difficulties.filter((value, index) =>
             index > 0 && value < difficulties[index - 1]).length;
-          expect(dips).toBeLessThanOrEqual(2);
+          const drawn = Math.min(
+            FAMILY_SUBSAMPLE_SIZES[band] ?? eligibleFamiliesForBand(REGISTRY, band).length,
+            eligibleFamiliesForBand(REGISTRY, band).length,
+          );
+          const maximumDips = Math.max(2, Math.ceil(BAND_SCHEDULE[profile][band] / drawn) - 1);
+          expect(dips).toBeLessThanOrEqual(maximumDips);
         }
       }
     }
@@ -299,11 +299,10 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("gives a family's later questions in a band its deeper bucket", () => {
-    // Four families now hold two validated buckets in one band: a band serves
+    // Three families now hold two validated buckets in one band: a band serves
     // the shallower one first and the deeper one every time after, so
     // repetition inside a band is a ramp, not a plateau.
     const ramps = [
-      { familyId: "fold-punch-v2", band: "constraint-spatial", buckets: ["fold-punch-d4", "fold-punch-d5"] },
       {
         familyId: "parallel-evolution-v1",
         band: "composition",
@@ -339,8 +338,8 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("lets composed-transform hold both bands of a long test but never of a short one", () => {
-    // The family is registered in composition (three gates) and in
-    // induction-transfer (four). A short test has five questions and needs five
+    // The family is registered in composition and induction-transfer. A short
+    // test has five questions and needs five
     // different mechanisms, so drawing it into both bands would make the test
     // unbuildable — its cross-band rule never yields.
     for (let seed = 0; seed < 60; seed++) {
@@ -353,16 +352,8 @@ describe("assembleExpandedQuiz", () => {
     }
 
     // A long test does yield, by the owner's decision of 2026-08-25. The format
-    // cap puts composed-transform-v2 in every long composition draw, so an
-    // unconditional cross-band rule made its four-gate bucket — then the
-    // deepest question the battery had — unreachable in the main test. A long
-    // test draws twelve family slots against a floor of eleven, so it can
-    // afford to spend one distinct family on serving that bucket.
-    //
-    // Induction-transfer briefly held two composed buckets (four gates and
-    // five) between 2026-08-26 and 2026-08-27. The five-gate one is withdrawn,
-    // so both profiles now reach the same two keys and the long test's extra
-    // reach is no longer about this family.
+    // cap puts composed-transform-v2 in every long composition draw, and the
+    // three-family induction pool now always includes its recombined d5 form.
     const shortBands = [
       "composition:composed-transform-d4",
       "induction-transfer:composed-transform-d5",
@@ -370,7 +361,7 @@ describe("assembleExpandedQuiz", () => {
     const longBands = shortBands;
     for (const profile of EXPANDED_PROFILES) {
       const seen = new Set<string>();
-      let withFourGates = 0;
+      let withRecombinedQuery = 0;
       for (let seed = 0; seed < 200; seed++) {
         const schedule = planExpandedSchedule(`composed-depth-${seed}`, profile, REGISTRY);
         for (const slot of schedule) {
@@ -378,16 +369,12 @@ describe("assembleExpandedQuiz", () => {
           seen.add(`${slot.band}:${slot.difficultyBucket}`);
         }
         if (schedule.some((slot) => slot.difficultyBucket === "composed-transform-d5")) {
-          withFourGates++;
+          withRecombinedQuery++;
         }
       }
       expect([...seen].sort(), profile).toEqual(profile === "long-30" ? longBands : shortBands);
-      // Measured over 10,000 seeds: 75.21% of long tests and 18.92% of short
-      // ones. Induction-transfer draws three of its four families uniformly and
-      // gives every one of them a question in a long test, so the long share is
-      // the 3/4 that mechanism predicts.
-      const share = withFourGates / 200;
-      if (profile === "long-30") expect(share).toBeGreaterThan(0.6);
+      const share = withRecombinedQuery / 200;
+      if (profile === "long-30") expect(share).toBe(1);
       else expect(share).toBeGreaterThan(0.05);
     }
   });
@@ -399,10 +386,14 @@ describe("assembleExpandedQuiz", () => {
         const difficulties = schedule
           .filter((slot) => slot.band === band)
           .map((slot) => slot.difficulty);
-        // The repeat rule may pull at most two harder questions forward; every
-        // other step of the band is non-decreasing on the SLOT's difficulty.
+        // With two families, the no-adjacent-repeat rule forces alternation and
+        // can pull up to four harder set-algebra questions ahead of a d4 matrix
+        // question. Larger pools keep the older two-dip ceiling.
         const dips = difficulties.filter((value, index) => index > 0 && value < difficulties[index - 1]);
-        expect(dips.length, `${band} seed ${seed}`).toBeLessThanOrEqual(2);
+        const eligible = eligibleFamiliesForBand(REGISTRY, band).length;
+        const drawn = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? eligible, eligible);
+        const maximumDips = Math.max(2, Math.ceil(BAND_SCHEDULE["long-30"][band] / drawn) - 1);
+        expect(dips.length, `${band} seed ${seed}`).toBeLessThanOrEqual(maximumDips);
       }
     }
   });
@@ -422,15 +413,9 @@ describe("assembleExpandedQuiz", () => {
     // has applied three ordered gates since the -v2 rewrite.
     const composed = requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d4");
     expect(composed.programDepth).toBe(3);
-    // The induction-transfer bucket is the deepest thing the battery serves and
-    // reports its own step count rather than the band's guess. It reports THREE
-    // since 2026-08-27: it used to display four gates, and the owner capped
-    // every item at three, so it now runs the same three backwards instead.
-    // Depth is the gate count, so the depth fell even though the difficulty did
-    // not — which is the whole point of the rebuild.
-    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d5").programDepth).toBe(3);
-    expect(requireSceneFamilyBucket("fold-punch-v2", "fold-punch-d4").programDepth).toBe(1);
-    expect(requireSceneFamilyBucket("fold-punch-v2", "fold-punch-d5").programDepth).toBe(2);
+    // The induction bucket demonstrates three rules but applies the two rules
+    // selected by its query strip.
+    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d5").programDepth).toBe(2);
     expect(requireSceneFamilyBucket("compositional-analogy-v2", "compositional-analogy-d3").programDepth).toBe(2);
     expect(requireSceneFamilyBucket("compositional-analogy-v2", "compositional-analogy-d4").programDepth).toBe(3);
     expect(requireSceneFamilyBucket("visual-set-algebra-v2", "visual-set-algebra-d4").programDepth).toBe(2);
@@ -464,7 +449,7 @@ describe("format-aware family subsampling", () => {
 
   it("reads the analogy-layout families off generated stems rather than off their names", () => {
     // Locked, not hardcoded policy: this is what the generator currently draws.
-    // Three of the six are not called "analogy" anything, and one family that
+    // One of the four is not called "analogy" anything, and one family that
     // is — compositional-analogy-v2 — is named for its reasoning, so a name
     // list would have classified four of these six wrongly. A family added
     // tomorrow lands in or out of this list by what its stem looks like, and
@@ -473,9 +458,7 @@ describe("format-aware family subsampling", () => {
     expect(eligibleFamilyIds.filter(isAnalogyLayoutFamily)).toEqual([
       "attribute-pairing-v1",
       "compositional-analogy-v2",
-      "fold-punch-v2",
       "inverse-analogy-v2",
-      "inverse-fold-punch-v2",
       "spatial-transform-v2",
     ]);
 
@@ -535,43 +518,29 @@ describe("format-aware family subsampling", () => {
     expect(new Set(composition.map((draw) =>
       draw.map((family) => family.familyId).sort().join("+"))).size).toBe(3);
 
-    // Constraint-spatial drew three from four until `containment-analogy-v2`
-    // was withdrawn on 2026-08-26. Its pool is now exactly its draw size, so
-    // there is one possible draw and the band has no subsampling variety left:
-    // every long test asks relational-matrix, visual-set-algebra and fold-punch.
-    // The format cap is satisfied by the pool itself — fold-punch-v2 is the one
-    // analogy-layout family in it.
+    // Constraint-spatial now consists only of the two exceptional families the
+    // owner retained, and the band draws both.
     expect(draws("constraint-spatial")).toHaveLength(1);
     expect(draws("constraint-spatial")[0].map((family) => family.familyId).sort())
-      .toEqual(["fold-punch-v2", "relational-matrix-v2", "visual-set-algebra-v2"]);
+      .toEqual(["relational-matrix-v2", "visual-set-algebra-v2"]);
 
-    // Induction-transfer draws three from four with no analogy pressure, so all
-    // four subsets qualify. Composition having used composed-transform-v2 does
-    // not change that in a long test: induction-transfer is the only band that
-    // serves the family's four-gate bucket, so the cross-band rule yields and
-    // spends the profile's one unit of slack.
+    // Induction-transfer has exactly three families and draws all three. The
+    // cross-band preference cannot exclude composed-transform because doing so
+    // would make the band too thin.
     const usedComposed = { "composed-transform-v2": ["composed-transform-d4"] };
-    expect(draws("induction-transfer")).toHaveLength(4);
-    expect(draws("induction-transfer", usedComposed, 1)).toHaveLength(4);
-    // With no slack — a short test — the avoidance stays in force and leaves
-    // exactly one draw.
+    expect(draws("induction-transfer")).toHaveLength(1);
+    expect(draws("induction-transfer", usedComposed, 1)).toHaveLength(1);
     expect(draws("induction-transfer", usedComposed, 0)).toHaveLength(1);
     expect(draws("induction-transfer", usedComposed, 0)[0]
       .map((family) => family.familyId).sort())
-      .toEqual(["inverse-fold-punch-v2", "rule-switching-v2", "transformation-machine-v3"]);
-    // The yield is about a bucket this band alone can serve. Once every bucket
-    // the family holds here has been served, there is no different question
-    // left to come back for and the forgiveness stops, slack or not — the draw
-    // avoiding it is the only one offered. Until 2026-08-27 this band held two
-    // composed buckets, so serving d4 and d5 still left d6 to come back for;
-    // with d6 withdrawn, d4 plus d5 is the whole family and the yield ends.
+      .toEqual(["composed-transform-v2", "rule-switching-v2", "transformation-machine-v3"]);
     const composedFullyServed = {
       "composed-transform-v2": ["composed-transform-d4", "composed-transform-d5"],
     };
     expect(draws("induction-transfer", composedFullyServed, 1)).toHaveLength(1);
     expect(draws("induction-transfer", composedFullyServed, 1)[0]
       .map((family) => family.familyId).sort())
-      .toEqual(["inverse-fold-punch-v2", "rule-switching-v2", "transformation-machine-v3"]);
+      .toEqual(["composed-transform-v2", "rule-switching-v2", "transformation-machine-v3"]);
 
     for (const band of EXPANDED_PROFILE_BANDS) {
       const eligible = eligibleFamiliesForBand(REGISTRY, band);
@@ -600,38 +569,9 @@ describe("format-aware family subsampling", () => {
     const deepestDifficultyInBattery = Math.max(...EXPANDED_PROFILE_BANDS.flatMap((band) =>
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => bucket.difficulty))));
-    // docs/plans/escalate-the-quiz.md, Phase 5, "dual proof fails" row: the
-    // mean number of analogy-layout questions in a 30-question test must be at
-    // or under 10.0. That row expected 115/12 = 9.5833 and measured 9.5837.
-    //
-    // The v12 battery expects 28/3 = 9.3333, and MEASURED 9.3383 over these
-    // 10,000 seeds. Two changes of 2026-08-26 moved it, and they cancel except
-    // in the last band:
-    //
-    // - `containment-analogy-v2` was withdrawn, so constraint-spatial draws its
-    //   whole three-family pool. It still contributes exactly one analogy
-    //   family (fold-punch-v2) instead of one of two, so its 10/3 is unchanged.
-    // - a band's leftover questions go first to the families that reach a new
-    //   bucket with them. That rule is currently inert: withdrawing the two d6
-    //   buckets on 2026-08-27 left every induction-transfer family holding one
-    //   bucket, so no family can reach a new one with a leftover and the
-    //   allocation falls through to the seeded shuffle it always used.
-    //
-    // The closed form is 115/12 exactly — the same value the battery had
-    // before the d6 tier existed, which is the arithmetic confirming the tier
-    // is fully out. Per band the expectation is
-    // (questions / families drawn) x (analogy families drawn):
-    // warmup 5/2 x 1 = 5/2, composition 10/4 x 1 = 5/2, constraint-spatial
-    // 10/3 x 1 = 10/3, induction-transfer 5/4. That last 5/4 is the average
-    // over the four equally likely draws of three from its pool of four: the
-    // draw without inverse-fold-punch-v2 contributes 0, and each of the three
-    // draws holding it contributes 1 + 2/3 = 5/3, its base question plus its
-    // even share of the two leftovers spread across three drawn families.
-    // (0 + 3 x 5/3) / 4 = 5/4.
-    // The draws are equally likely because the cross-band rule yields to
-    // composed-transform-v2 there rather than making its four-gate bucket
-    // unreachable — the owner's decision of 2026-08-25, paid for by the long
-    // test's floor of eleven distinct families.
+    // Fold-and-punch removal leaves no analogy layouts in the two hardest
+    // bands. Warmup contributes 5/2 and composition contributes another 5/2,
+    // so the long-test expectation is exactly five analogy questions.
     //
     // The assertion is two-sided around the closed form, not a bare "<= 10.0",
     // so it catches the mean drifting DOWN as well as up: a change that quietly
@@ -639,7 +579,7 @@ describe("format-aware family subsampling", () => {
     // asserted above, which is what holds the number under the cap in the first
     // place, is checked on every one of these seeds with no tolerance at all.
     const ANALOGY_ITEMS_PER_LONG_TEST_CAP = 10.0;
-    const ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED = 115 / 12;
+    const ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED = 5;
     const MEAN_TOLERANCE = 0.05;
 
     let analogyItems = 0;
@@ -709,13 +649,9 @@ describe("format-aware family subsampling", () => {
         expect(last.difficulty, `seed ${seed} final item`).toBe(deepestDifficultyInBattery);
         finalItemFamilies.set(last.familyId, (finalItemFamilies.get(last.familyId) ?? 0) + 1);
 
-        // The two hardest bands must keep at least six questions at d5 or
-        // deeper. Measured minimum over these seeds: 9, and never more than 10.
-        // Induction-transfer contributes all five of its questions whichever
-        // three families it draws — every bucket in that band is d5 — and
-        // constraint-spatial adds at least four more, two each from
-        // visual-set-algebra-v2 and fold-punch-v2 once their d4 entry point is
-        // spent.
+        // The two hardest bands keep nine questions at d5: all five induction
+        // questions plus four later visual-set-algebra occurrences after its
+        // d4 entry question.
         const deepest = schedule.filter((slot) =>
           (slot.band === "constraint-spatial" || slot.band === "induction-transfer") &&
           slot.difficulty >= 5);
@@ -762,7 +698,8 @@ describe("format-aware family subsampling", () => {
         const deepest = Math.max(...eligible.map((family) => family.bandBuckets.length));
         // Any draw can only be made of eligible families, so the deepest bucket
         // count in the pool bounds what any draw of it can ask for.
-        if (base > 0 && base < deepest) biting.push(`${profile} ${band}`);
+        const hasLeftover = BAND_SCHEDULE[profile][band] % drawn > 0;
+        if (hasLeftover && base > 0 && base < deepest) biting.push(`${profile} ${band}`);
       }
     }
     expect(biting).toEqual([]);

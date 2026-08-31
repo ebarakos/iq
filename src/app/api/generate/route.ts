@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   const ip = (req.headers.get("x-forwarded-for")?.split(",")[0] ?? "").trim() || "unknown";
   if (!allow(ip)) {
     return NextResponse.json(
-      { message: "Too many requests — please wait a minute before starting another test." },
+      { message: "Too many requests. Please wait a minute before starting another test." },
       { status: 429 },
     );
   }

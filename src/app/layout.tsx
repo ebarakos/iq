@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "aiq — visual reasoning test",
+  title: "aiq | visual reasoning test",
   description: "Fresh visual reasoning tests for humans and AI agents.",
 };
 

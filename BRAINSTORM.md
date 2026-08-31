@@ -99,12 +99,6 @@ fixed while changing only how many worked examples reveal it; compare the
 human and agent learning curves. The number of demonstrations needed to infer a
 fresh rule may expose a larger and more useful gap than final accuracy alone.
 
-**Hold out compositions before holding out whole families.** Reserve some
-combinations of public primitives for private evaluation while exposing each
-primitive separately. This is a lower-cost bridge to the plan's held-out-family
-level and tests whether a solver can recombine known operations instead of
-recognizing a practiced family procedure.
-
 **Gate personal interpretations on parallel-form reliability.** Ask a pilot
 subset to take two fresh, equivalent forms far enough apart to limit immediate
 practice effects. If overall or family-level results swing widely, describe a

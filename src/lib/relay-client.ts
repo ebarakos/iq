@@ -371,7 +371,7 @@ export async function apiFetch<T = unknown>(
       const prov = selection?.provider ?? relay.getState?.()?.provider;
       const cap = prov ? prov.charAt(0).toUpperCase() + prov.slice(1) : null;
       const msg = cap && prov && !info.message?.toLowerCase().includes(prov)
-        ? `${cap} is rate-limited — wait a bit or try another provider`
+        ? `${cap} is rate-limited. Wait a bit or try another provider`
         : info.message;
       relay.notify(msg);
     }
@@ -424,8 +424,8 @@ export async function apiFetch<T = unknown>(
     const curCap = curProv.charAt(0).toUpperCase() + curProv.slice(1);
     const fbCap = automaticTarget.provider.charAt(0).toUpperCase() + automaticTarget.provider.slice(1);
     const message = healed
-      ? `Selected model was unavailable — auto-switched to ${automaticTarget.model ?? "the provider default"}`
-      : `${curCap} rate limit — auto-switched to ${fbCap}`;
+      ? `Selected model was unavailable. Auto-switched to ${automaticTarget.model ?? "the provider default"}`
+      : `${curCap} rate limit. Auto-switched to ${fbCap}`;
     if (!automaticTarget.model) {
       relay?.notify?.("The relay switched models but did not report the exact model. The response was blocked.");
       throw new Error("Relay automatic-switch metadata is incomplete.");

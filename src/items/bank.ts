@@ -253,14 +253,11 @@ export function sampleQuiz(
 /**
  * How many banked items every enabled family/band/bucket key holds.
  *
- * Four, because that is the most times one key can come up in a single test:
- * constraint-spatial splits ten questions over three families, so a family
- * with one validated bucket there is asked for four times. The emergency bank
- * has to answer every one of them from the exact bucket the schedule asked
- * for — a fifth item would be spare, a third would push a slot onto the
- * fallback ladder below. See docs/plans/escalate-the-quiz.md, Phase 5.
+ * Five, because constraint-spatial now splits ten questions over its two
+ * retained families. The emergency bank has to answer every slot from the
+ * exact bucket the schedule asks for.
  */
-export const BANK_ITEMS_PER_KEY = 4;
+export const BANK_ITEMS_PER_KEY = 5;
 
 /**
  * What a bank item is stocked against: one family, in one band, at one bucket.
@@ -384,17 +381,17 @@ export function sampleExpandedBankQuiz(
     // family from whichever band the bank does hold it in.
     //
     // Only the first rung should ever run. A bank built by
-    // `npm run bank:topup -- --source expanded --replace --per-bucket 4` holds
-    // four items for every key the registry can schedule, and no key comes up
-    // more than four times in one test, so the exact bucket is always in stock
+    // `npm run bank:topup -- --source expanded --replace --per-bucket 5` holds
+    // five items for every key the registry can schedule, and no key comes up
+    // more than five times in one test, so the exact bucket is always in stock
     // — `expandedBankCoverage` above proves that from the built file rather
     // than leaving it to a lucky sampling run.
     //
     // The lower rungs stay as a guard for the one case that is not a bug: a
     // registry that has moved ahead of the committed bank. That has happened
-    // repeatedly — a deeper `fold-punch` bucket, then a second BAND for
-    // `composed-transform` — and an emergency fallback that refuses to serve a
-    // test is worse than one that serves the same family a step shallower.
+    // repeatedly as the family registry evolved, and an emergency fallback
+    // that refuses to serve a test is worse than one that serves the same
+    // family a step shallower.
     // `npm run bank:verify` reports the gap rather than leaving a taker to
     // find it.
     const candidates = exactKey.length > 0

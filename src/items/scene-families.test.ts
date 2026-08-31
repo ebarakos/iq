@@ -4,7 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { seededRng } from "../lib/rng";
 import {
   OPTIONS_PER_ITEM,
-  SceneSchema,
   VisualPuzzleSchema,
   sceneSignature,
   type Scene,
@@ -293,60 +292,6 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("keeps fold-punch d4 unchanged and restricts d5 to two-crease programs", () => {
-    //
-    // REISSUED 2026-08-27. Every value below moved that day, deliberately and
-    // across all families at once: distractor selection now has to make the
-    // wrong options AGREE with the answer on each aspect a solver can infer
-    // alone (footprint, shapes, fills, rotations, count), because the owner
-    // reported that one inference was often enough to pick the answer without
-    // reading the other rules. Different distractors mean different items. This
-    // is the "deliberate decision to reissue" these goldens exist to force.
-    // d4 is the bucket the battery already served. These replay keys were taken
-    // from the generator as it stood before buckets were named inputs, so a
-    // change to the d4 path — a different grammar, a different difficulty, one
-    // extra random draw — breaks this test rather than silently reshuffling a
-    // released population.
-    const D4_GOLDEN_REPLAY_KEYS = [
-      "14ce412bc3eaaa125a9b879b",
-      "8448e3e0c1f9c6d00f61ed04",
-      "6e4fc1952553db97fed58d5f",
-      "c1de0864393324dd2d06c801",
-      "8821e24ff6c68e84cc65b009",
-      "5fad5b2eac1ad5da6e32ce01",
-      "dab3dcb186dc209a41a03a5e",
-      "e896b522c5bb98366914f6e3",
-    ];
-    expect(D4_GOLDEN_REPLAY_KEYS.map((_, seed) => {
-      const candidate = generateSceneFamilyCandidate(
-        "fold-punch-v2",
-        seededRng("fold-punch-d4-golden", `${seed}`),
-        "fold-punch-d4",
-      );
-      return candidate.definition.replayKey!(candidate.puzzle);
-    })).toEqual(D4_GOLDEN_REPLAY_KEYS);
-
-    // The folded paper the item shows carries the crease program itself, so
-    // counting its guides is counting the unfolds the solver must perform.
-    const creaseCounts = (bucket: string) => {
-      const counts = new Set<number>();
-      for (let seed = 0; seed < 200; seed++) {
-        const { puzzle } = generateSceneFamilyCandidate(
-          "fold-punch-v2",
-          seededRng(`fold-creases:${bucket}`, `${seed}`),
-          bucket,
-        );
-        const folded = puzzle.stem[0];
-        if ("blank" in folded) throw new Error("fold punch needs a visible folded board");
-        counts.add((folded.guides ?? []).length);
-        expect(puzzle.difficulty, bucket).toBe(requireSceneFamilyBucket("fold-punch-v2", bucket).difficulty);
-      }
-      return counts;
-    };
-    expect(creaseCounts("fold-punch-d4")).toEqual(new Set([1, 2]));
-    expect(creaseCounts("fold-punch-d5")).toEqual(new Set([2]));
-  });
-
   it("keeps compositional-analogy d3 and visual-set-algebra d4 replaying byte for byte", () => {
     //
     // REISSUED 2026-08-27. Every value below moved that day, deliberately and
@@ -428,10 +373,9 @@ describe("scene family prototypes", () => {
     // that aspect never narrows six options to one.
     //
     // It is asserted only for families whose program really has several
-    // independent parts. `fold-punch`, `inverse-fold-punch` and
-    // `second-order-sequence` are excluded on purpose and not as a concession:
-    // every option they offer is the same token or paper at a different place,
-    // so a wrong option sharing the answer's footprint would BE the answer. A
+    // independent parts. `second-order-sequence` is excluded on purpose and
+    // not as a concession: every option is the same token at a different place,
+    // so a wrong option sharing the answer's footprint would be the answer. A
     // family whose whole rule lands in one aspect is correct, not broken. The
     // way to tell the two apart is whether the option set varies in more than
     // one aspect at all — these three do not.
@@ -685,7 +629,7 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("keeps the shallower composed buckets byte-identical, deeper bucket or not", () => {
+  it("keeps unchanged composed buckets byte-identical and pins the recombined bucket", () => {
     //
     // REISSUED 2026-08-27. Every value below moved that day, deliberately and
     // across all families at once: distractor selection now has to make the
@@ -707,20 +651,15 @@ describe("scene family prototypes", () => {
     // is exactly the job of this test. It must not move without a deliberate
     // decision to reissue the bucket.
     //
-    // `composed-transform-d5` was REISSUED on 2026-08-27 and its digest is
-    // re-taken. It used to be four gates run left to right; the owner capped
-    // items at three gates that day, so it is now three gates run RIGHT TO
-    // LEFT, with an extra worked row showing a two-gate strip so the direction
-    // is inferred from evidence instead of stated. A different bucket, so a
-    // different digest — and d4 sitting unchanged beside it is the proof the
-    // rebuild stayed inside its own bucket.
+    // `composed-transform-d5` is deliberately reissued in v16. It now shows
+    // three separate worked gates and asks for two of them in a new order.
     //
     // `composed-transform-d6` is withdrawn and no band may draw it, but the
     // five-gate generator stays in the code for a possible rework, so its
     // digest stays here to keep that path honest.
     const digests: Record<string, string> = {
       "composed-transform-d4": "475b4304f53bf0852fcf9df847e15257b0aedd29682bce2164dd0c37be36c5ad",
-      "composed-transform-d5": "5f7cfa85c7f649603cdca56cc7014f15135aa509ad696c4d4bfab23ba72e1354",
+      "composed-transform-d5": "e4b9f8bc4e4e0f0a122144258a7ec2007181043bbf0938a9fabb5815c7206e3c",
       "composed-transform-d6": "2f1c9e404730185dde8dc123f3b36a0adb2b14fc8f9293fe3043c03f7b1c3f5c",
     };
     for (const [bucket, digest] of Object.entries(digests)) {
@@ -788,7 +727,7 @@ describe("scene family prototypes", () => {
         .digest("hex").slice(0, 16);
     const buckets = [
       { bucket: "composed-transform-d4", gateCount: 3, stemPanels: 12 },
-      { bucket: "composed-transform-d5", gateCount: 4, stemPanels: 15 },
+      { bucket: "composed-transform-d5", gateCount: 3, stemPanels: 12 },
       { bucket: "composed-transform-d6", gateCount: 5, stemPanels: 18 },
     ] as const;
 
@@ -821,6 +760,7 @@ describe("scene family prototypes", () => {
         const reserved = generateHeldOutComposedTransformCandidate(
           seededRng("held-out-leakage", `eval:${bucket}:${seed}`),
           gateCount,
+          bucket,
         );
         expect(reserved.puzzle.stem, `${bucket} seed ${seed}`).toHaveLength(stemPanels);
         expect(heldOutFingerprints.has(reserved.definition.programFingerprint!(reserved.puzzle))).toBe(true);
@@ -829,20 +769,16 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("shows every gate of a served composed item doing visible work", () => {
+  it("shows every selected gate of a composed item doing visible work", () => {
     // The end-to-end reading of the ablation rule: take the item a taker is
     // actually served, recover each gate from its own worked row, and check
     // that dropping any one of them changes the answer.
     const pool = sceneComposedPrimitives();
     const demonstrated = new Set<string>();
-    // `orderRow` is the extra worked row a reversed bucket carries: a two-gate
-    // strip and the board it makes, which is how the solver learns the item
-    // runs right to left. It sits between the per-gate rows and the query, so
-    // it shifts where the query is and it must not be read as a gate row.
-    for (const { bucket, gateCount, reversed } of [
-      { bucket: "composed-transform-d4", gateCount: 3, reversed: false },
-      { bucket: "composed-transform-d5", gateCount: 3, reversed: true },
-      { bucket: "composed-transform-d6", gateCount: 5, reversed: false },
+    for (const { bucket, gateCount, queryGateCount } of [
+      { bucket: "composed-transform-d4", gateCount: 3, queryGateCount: 3 },
+      { bucket: "composed-transform-d5", gateCount: 3, queryGateCount: 2 },
+      { bucket: "composed-transform-d6", gateCount: 5, queryGateCount: 5 },
     ] as const) {
       for (let seed = 0; seed < 60; seed++) {
         const { puzzle } = generateSceneFamilyCandidate(
@@ -862,14 +798,21 @@ describe("scene family prototypes", () => {
           demonstrated.add(JSON.stringify(matches[0]));
           return matches[0];
         });
-        const query = panels[gateCount * 3 + (reversed ? 3 : 0)]!;
+        const workedGlyphs = Array.from({ length: gateCount }, (_, row) =>
+          JSON.stringify(panels[row * 3 + 1]!.objects[0].object));
+        const query = panels[gateCount * 3]!;
+        const strip = panels[gateCount * 3 + 1]!;
+        const selectedIndexes = [...strip.objects]
+          .sort((left, right) => left.column - right.column)
+          .map((placement) => workedGlyphs.indexOf(JSON.stringify(placement.object)));
+        expect(selectedIndexes, `${bucket} seed ${seed}`).toHaveLength(queryGateCount);
+        expect(selectedIndexes.every((index) => index >= 0)).toBe(true);
         const answer = puzzle.options[puzzle.answerIndex];
-        // The order the item runs, not the order it displays.
-        const running = reversed ? [...steps].reverse() : steps;
+        const running = selectedIndexes.map((index) => steps[index]);
         let full: Scene | null = query;
         for (const step of running) full = full && applySceneCompositionPrimitive(full, step);
         expect(sceneSignature(full!), `${bucket} seed ${seed}`).toBe(sceneSignature(answer));
-        for (let gate = 0; gate < gateCount; gate++) {
+        for (let gate = 0; gate < running.length; gate++) {
           let ablated: Scene | null = query;
           for (const [index, step] of running.entries()) {
             if (index === gate) continue;
@@ -879,14 +822,12 @@ describe("scene family prototypes", () => {
           expect(sceneSignature(ablated), `${bucket} seed ${seed} gate ${gate}`)
             .not.toBe(sceneSignature(answer));
         }
-        if (reversed) {
-          // Running the strip the way it is displayed must give a DIFFERENT
-          // board, otherwise the direction the order row teaches changes
-          // nothing and the item asks the solver to notice something that does
-          // not matter.
-          let forward: Scene | null = query;
-          for (const step of steps) forward = forward && applySceneCompositionPrimitive(forward, step);
-          expect(sceneSignature(forward!), `${bucket} seed ${seed} forward`)
+        if (queryGateCount === 2) {
+          let reversed: Scene | null = query;
+          for (const step of [...running].reverse()) {
+            reversed = reversed && applySceneCompositionPrimitive(reversed, step);
+          }
+          expect(sceneSignature(reversed!), `${bucket} seed ${seed} reversed`)
             .not.toBe(sceneSignature(answer));
         }
       }
@@ -929,21 +870,15 @@ describe("scene family prototypes", () => {
     expect(tokenTurns).toBeGreaterThan(0);
   });
 
-  it("lays out the reversed bucket as three worked gates, an order row, then the query", () => {
-    // `composed-transform-d5` was a four-gate item until 2026-08-27, when the
-    // owner capped every item at three gates. It earns its extra difficulty by
-    // running the same three gates RIGHT TO LEFT instead — and a reversal is
-    // only fair if the item shows which way it runs, which a row demonstrating
-    // one gate alone cannot. Hence the order row: two of the gates as a strip,
-    // and the board they make in this item's direction.
+  it("lays out d5 as three worked gates followed by two recombined query gates", () => {
     for (let seed = 0; seed < 40; seed++) {
       const { puzzle } = generateSceneFamilyCandidate(
         "composed-transform-v2",
         seededRng("gate-strip", `${seed}`),
         "composed-transform-d5",
       );
-      // 15 panels: three worked (input, gate, output) rows, the order row, the query row.
-      expect(puzzle.stem).toHaveLength(15);
+      // 12 panels: three worked (input, gate, output) rows and the query row.
+      expect(puzzle.stem).toHaveLength(12);
       const panel = (index: number) => {
         const value = puzzle.stem[index];
         if ("blank" in value) throw new Error(`panel ${index} must be visible`);
@@ -952,22 +887,15 @@ describe("scene family prototypes", () => {
       const workedGates = [0, 1, 2].map((row) => JSON.stringify(panel(row * 3 + 1).objects[0].object));
       expect(new Set(workedGates).size).toBe(3);
 
-      // The order row names two of the three worked gates, in displayed order.
-      const orderStrip = panel(10);
-      const orderGlyphs = [...orderStrip.objects]
+      const queryStrip = panel(10);
+      const queryGlyphs = [...queryStrip.objects]
         .sort((left, right) => left.column - right.column)
         .map((placement) => JSON.stringify(placement.object));
-      expect(orderGlyphs).toHaveLength(2);
-      expect(orderGlyphs.every((glyph) => workedGates.includes(glyph))).toBe(true);
-      expect(workedGates.indexOf(orderGlyphs[0])).toBeLessThan(workedGates.indexOf(orderGlyphs[1]));
-
-      // The query strip shows all three, once each, in worked order. Three
-      // glyphs fit an ordinary board, so no wide strip is needed any more.
-      const strip = panel(13);
-      expect({ rows: strip.rows, columns: strip.columns }).toEqual({ rows: 3, columns: 3 });
-      expect([...strip.objects]
-        .sort((left, right) => left.column - right.column)
-        .map((placement) => JSON.stringify(placement.object))).toEqual(workedGates);
+      expect(queryGlyphs).toHaveLength(2);
+      expect(queryGlyphs.every((glyph) => workedGates.includes(glyph))).toBe(true);
+      expect(new Set(queryGlyphs).size).toBe(2);
+      expect(workedGates.indexOf(queryGlyphs[0])).toBeGreaterThan(workedGates.indexOf(queryGlyphs[1]));
+      expect({ rows: queryStrip.rows, columns: queryStrip.columns }).toEqual({ rows: 3, columns: 3 });
       // No option is ever wider than a board: a strip is a control, not an answer.
       expect(puzzle.options.every((option) => option.columns <= 3)).toBe(true);
     }
@@ -1192,7 +1120,7 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("keeps transformation-machine d5 and inverse-fold-punch d5 replaying byte for byte", () => {
+  it("keeps transformation-machine d5 replaying byte for byte", () => {
     //
     // REISSUED 2026-08-27. Every value below moved that day, deliberately and
     // across all families at once: distractor selection now has to make the
@@ -1201,12 +1129,7 @@ describe("scene family prototypes", () => {
     // reported that one inference was often enough to pick the answer without
     // reading the other rules. Different distractors mean different items. This
     // is the "deliberate decision to reissue" these goldens exist to force.
-    // Both families grew a d6 bucket on 2026-08-26, which meant touching the
-    // shared machine program type, the run helpers, and the fold grammar's
-    // bucket switch. The two released d5 populations had to come through
-    // untouched rather than be assumed untouched.
-    //
-    // The digests below were computed from the generator as it stood BEFORE
+    // The digest below was computed from the generator as it stood BEFORE
     // that change, over the first 50 seeds of the same stream a 400-seed per
     // bucket before/after sweep used; the sweep compared 800 whole puzzles and
     // found none differing. A deliberate one-character perturbation of each d5
@@ -1216,10 +1139,6 @@ describe("scene family prototypes", () => {
       "transformation-machine-d5": {
         familyId: "transformation-machine-v3",
         digest: "3bd0edd26acbe7e3bac64a9dc2c5a67d55953e10347e6fd0f1a54dd44ac4b493",
-      },
-      "inverse-fold-punch-d5": {
-        familyId: "inverse-fold-punch-v2",
-        digest: "37cda86217242fe1c1814dddf0aa9440d0260b65fa2cd1986de9819996094b9f",
       },
     };
     for (const [bucket, { familyId, digest }] of Object.entries(digests)) {
@@ -1231,49 +1150,6 @@ describe("scene family prototypes", () => {
         ).puzzle));
       expect(createHash("sha256").update(rendered.join("\n")).digest("hex"), bucket).toBe(digest);
     }
-  });
-
-  it("has no fold program deeper than two creases, which is why the family has no d6", () => {
-    // The plan asked for a three-crease program run backwards. A board cannot
-    // show one: `SceneSchema` allows at most two guides, so a third crease is
-    // not a harder item but an invalid one. This is the proof, not a claim.
-    const punch = {
-      row: 0,
-      column: 0,
-      object: { kind: "token", shape: "circle", fill: "solid", size: "l", rotation: 0 },
-    };
-    const creases = [
-      { kind: "crease", axis: "vertical", direction: "rightToLeft" },
-      { kind: "crease", axis: "horizontal", direction: "bottomToTop" },
-      { kind: "crease", axis: "vertical", direction: "leftToRight" },
-    ];
-    const board = (guides: unknown[]) =>
-      SceneSchema.safeParse({ kind: "scene", rows: 3, columns: 3, objects: [punch], tiles: [], guides });
-    expect(board(creases.slice(0, 2)).success).toBe(true);
-    expect(board(creases).success).toBe(false);
-    expect(board(creases).error!.issues.some((issue) => /have <=2 items/.test(issue.message))).toBe(true);
-
-    // So the deepest fold program is two creases — and d5 already draws them.
-    // A two-crease-only d6 was built on 2026-08-26 and withdrawn the same day:
-    // it produced nothing d5 could not, so it raised no ceiling. This pins the
-    // reason, by showing d5's draw already spans both crease counts.
-    const creaseCounts = (bucket: string) => {
-      const counts = new Set<number>();
-      for (let seed = 0; seed < 200; seed++) {
-        const { puzzle } = generateSceneFamilyCandidate(
-          "inverse-fold-punch-v2",
-          seededRng(`inverse-fold-creases:${bucket}`, `${seed}`),
-          bucket,
-        );
-        const answer = puzzle.options[puzzle.answerIndex];
-        counts.add((answer.guides ?? []).length);
-        expect(puzzle.difficulty, bucket).toBe(requireSceneFamilyBucket("inverse-fold-punch-v2", bucket).difficulty);
-      }
-      return counts;
-    };
-    expect(creaseCounts("inverse-fold-punch-d5")).toEqual(new Set([1, 2]));
-    expect(SCENE_FAMILY_BUCKETS["inverse-fold-punch-v2"].map((entry) => entry.bucket))
-      .toEqual(["inverse-fold-punch-d5"]);
   });
 
   it("holds the combining machine to zero single-inference d4 items and a stated d5 residual", () => {

@@ -1,10 +1,10 @@
 {
  "schemaVersion": "prototype-pilot-packets-v3",
- "itemCount": 19,
+ "itemCount": 16,
  "packets": [
   {
    "packetId": "pilot-v3-a",
-   "contentFingerprint": "4fbb351aefb7f111",
+   "contentFingerprint": "3fcaa50b714f6c43",
    "items": [
     {
      "itemId": "relational-sequence-v2:warmup:relational-sequence-d2:r1",
@@ -99,30 +99,6 @@
      "familyId": "rule-switching-v2",
      "band": "induction-transfer",
      "difficultyBucket": "rule-switching-d5",
-     "difficulty": 5,
-     "bandTimeBudgetSeconds": 55
-    },
-    {
-     "itemId": "fold-punch-v2:constraint-spatial:fold-punch-d4:r1",
-     "familyId": "fold-punch-v2",
-     "band": "constraint-spatial",
-     "difficultyBucket": "fold-punch-d4",
-     "difficulty": 4,
-     "bandTimeBudgetSeconds": 50
-    },
-    {
-     "itemId": "fold-punch-v2:constraint-spatial:fold-punch-d5:r1",
-     "familyId": "fold-punch-v2",
-     "band": "constraint-spatial",
-     "difficultyBucket": "fold-punch-d5",
-     "difficulty": 5,
-     "bandTimeBudgetSeconds": 50
-    },
-    {
-     "itemId": "inverse-fold-punch-v2:induction-transfer:inverse-fold-punch-d5:r1",
-     "familyId": "inverse-fold-punch-v2",
-     "band": "induction-transfer",
-     "difficultyBucket": "inverse-fold-punch-d5",
      "difficulty": 5,
      "bandTimeBudgetSeconds": 55
     },

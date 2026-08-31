@@ -379,7 +379,7 @@ export function VisualGraphic({ visual, className }: { visual: Drawable; classNa
 /** A blank panel — the cell to be solved. */
 export function BlankGraphic({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="blank — the cell to solve">
+    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="blank: the cell to solve">
       <text x="50" y="50" textAnchor="middle" dominantBaseline="central" fontSize="48" fill="#9ca3af">
         ?
       </text>
