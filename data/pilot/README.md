@@ -30,11 +30,14 @@ no explanation. It is generated from the code by
 matches, so it can never drift from what the app would build.
 
 It exists because a packet is derived from the live promotion registry, which
-means the packet a person answered stops existing the moment a family is
-withdrawn. `npm run pilot:report -- <aggregate.json>` checks a result against
-this file rather than against the live registry, so an aggregate stays checkable
-afterwards. A mismatched packet id, fingerprint, item set, or schema version is
-a hard error naming exactly what disagreed.
+means the packet a person answered stops existing the moment its content
+changes. `npm run pilot:report -- <aggregate.json>` checks a result against the
+currently saved manifest rather than rebuilding the live registry. The manifest
+is replaced when a new generator population ships, so older aggregates remain
+historical evidence but are no longer replayable unless their matching manifest
+was preserved separately. A mismatched packet id, fingerprint, item set, or
+schema version is a hard error naming exactly what disagreed. Both v3 aggregates
+below predate the current v17 manifest and now fail that fingerprint check.
 
 Aggregate exports from the pilot screen are schema
 `prototype-pilot-aggregate-v2`: one row of counts per item, five-second solve
@@ -105,8 +108,8 @@ band (15 seconds) — the 2026-08-24 band move survives its first human contact.
 ## 2026-08-26 — pilot-v3-a (the v11 escalation pilot)
 
 One participant, one sitting, 20 items — one per enabled family/band/bucket key.
-Aggregate: `2026-08-26-pilot-v3-a.json`. Verify it with
-`npm run pilot:report -- data/pilot/2026-08-26-pilot-v3-a.json`.
+Aggregate: `2026-08-26-pilot-v3-a.json`. It matched the manifest current at the
+time; the present v17 manifest intentionally rejects it as a different item set.
 
 **Result: 15 of 20 correct, with four clean misses** among the 15 d4/d5 items —
 `visual-set-algebra-d5`, `composed-transform-d4`, `compositional-analogy-d4` and

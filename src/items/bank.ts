@@ -209,11 +209,13 @@ export function sampleQuiz(
     const requiredType = requiredTypes.length > 0 ? requiredTypes.shift() : null;
     let pool: BankItem[] = [];
     // Keep widening for a required type even when the untyped pool is already
-    // non-empty: a type that only exists far from the target difficulty (the
-    // demonstrated outliers live at d2) must still be reachable in hard mode.
+    // non-empty, but never below the profile floor. An easy item may share a
+    // type with hard items without becoming eligible for a hard quiz.
     for (let spread = 0; spread <= 4; spread++) {
       const candidates = items.filter((i) =>
-        !used.has(i.fingerprint) && Math.abs(i.puzzle.difficulty - target) <= spread);
+        !used.has(i.fingerprint) &&
+        i.puzzle.difficulty >= profileFloor &&
+        Math.abs(i.puzzle.difficulty - target) <= spread);
       if (requiredType) {
         const typed = candidates.filter((i) => i.puzzle.type === requiredType);
         if (typed.length > 0) {

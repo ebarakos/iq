@@ -183,9 +183,8 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("composition", ["compositional-analogy-d3", "compositional-analogy-d4"])],
   },
   {
-    // d4 asks for all three worked gates in order. d5 keeps the same three
-    // worked examples but selects two of them in a new order, so its extra
-    // difficulty comes from recombination rather than a longer procedure.
+    // d4 demonstrates and applies two gates. d5 demonstrates and applies all
+    // three, with the query order varied so its extra depth is meaningful.
     familyId: "composed-transform-v2",
     primaryReasoningFamily: "ordered-composition",
     bands: [
@@ -207,9 +206,10 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("constraint-spatial", ["visual-set-algebra-d4", "visual-set-algebra-d5"])],
   },
   {
+    // A single demonstrated spatial operation is an easy opening mechanism.
     familyId: "spatial-transform-v2",
     primaryReasoningFamily: "spatial-transformation",
-    bands: [codeValidBand("composition", ["spatial-transform-d3"])],
+    bands: [codeValidBand("warmup", ["spatial-transform-d2"])],
   },
   {
     // Two buckets in one band since 2026-08-26 (raise-the-ceiling-v12). d5
@@ -224,9 +224,11 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("induction-transfer", ["transformation-machine-d5"])],
   },
   {
+    // One selected operation is an opening-level mechanism, even though reading
+    // which of two worked gates the query names still requires attention.
     familyId: "rule-switching-v2",
     primaryReasoningFamily: "operator-induction",
-    bands: [codeValidBand("induction-transfer", ["rule-switching-d5"])],
+    bands: [codeValidBand("warmup", ["rule-switching-d2"])],
   },
   {
     familyId: "second-order-sequence-v2",

@@ -133,29 +133,34 @@ export interface SceneOrderedFiveStepComposition {
   fifth: SceneCompositionPrimitive;
 }
 
-/** Any composed program a machine table displays: three, four, or five gates. */
+/** Any composed program a machine table displays: two through five gates. */
 export type SceneComposedProgram =
+  | SceneOrderedComposition
   | SceneOrderedThreeStepComposition
   | SceneOrderedFourStepComposition
   | SceneOrderedFiveStepComposition;
 
 /** How many gates a composed program displays. Also its honest program depth. */
-export type SceneComposedProgramLength = 3 | 4 | 5;
+export type SceneComposedProgramLength = 2 | 3 | 4 | 5;
 
 /** The gates of a composed program, in the order the query strip shows them. */
 export function sceneComposedProgramSteps(program: SceneComposedProgram): SceneCompositionPrimitive[] {
   if ("fifth" in program) {
     return [program.first, program.second, program.third, program.fourth, program.fifth];
   }
-  return "fourth" in program
-    ? [program.first, program.second, program.third, program.fourth]
-    : [program.first, program.second, program.third];
+  if ("fourth" in program) {
+    return [program.first, program.second, program.third, program.fourth];
+  }
+  return "third" in program
+    ? [program.first, program.second, program.third]
+    : [program.first, program.second];
 }
 
-/** Rebuild a composed program from its ordered gates. Three, four, or five. */
+/** Rebuild a composed program from its ordered gates. Two through five. */
 export function sceneComposedProgramFromSteps(
   steps: readonly SceneCompositionPrimitive[],
 ): SceneComposedProgram {
+  if (steps.length === 2) return { first: steps[0], second: steps[1] };
   if (steps.length === 3) return { first: steps[0], second: steps[1], third: steps[2] };
   if (steps.length === 4) {
     return { first: steps[0], second: steps[1], third: steps[2], fourth: steps[3] };
@@ -165,7 +170,7 @@ export function sceneComposedProgramFromSteps(
       first: steps[0], second: steps[1], third: steps[2], fourth: steps[3], fifth: steps[4],
     };
   }
-  throw new Error(`a composed program shows three, four, or five gates, not ${steps.length}`);
+  throw new Error(`a composed program shows two, three, four, or five gates, not ${steps.length}`);
 }
 
 export interface ScenePosition {
@@ -473,7 +478,14 @@ export function sceneComposedPrimitives(): SceneCompositionPrimitive[] {
 /**
  * Is this ordered list of gates a program the composed grammar contains?
  *
- * Three rules, each removing programs whose displayed gates cannot all matter:
+ * The two-gate grammar is deliberately narrower: one board move and one fill
+ * change, in either order. Those are the 16 pairs for which reversing the two
+ * worked transformations visibly changes the canonical query. Pairs of two
+ * board moves collapse into one spatial operation, while turns commute with
+ * both board moves and fills on this board.
+ *
+ * Longer programs follow three rules, each removing programs whose displayed
+ * gates cannot all matter:
  *
  *  - the gates are distinct, so no two worked rows demonstrate the same thing;
  *  - they are not all board moves — rotations and reflections compose to one
@@ -491,9 +503,13 @@ export function sceneComposedPrimitives(): SceneCompositionPrimitive[] {
  * "deeper" also means "looser".
  */
 export function isSceneComposedProgram(steps: readonly SceneCompositionPrimitive[]): boolean {
-  if (steps.length !== 3 && steps.length !== 4 && steps.length !== 5) return false;
+  if (steps.length !== 2 && steps.length !== 3 && steps.length !== 4 && steps.length !== 5) return false;
   const keys = steps.map((primitive) => JSON.stringify(primitive));
   if (new Set(keys).size !== keys.length) return false;
+  if (steps.length === 2) {
+    return steps.filter((primitive) => primitive.kind === "spatial").length === 1 &&
+      steps.filter((primitive) => primitive.kind === "setFillAt").length === 1;
+  }
   if (steps.every((primitive) => primitive.kind === "spatial")) return false;
   return steps.filter((primitive) => primitive.kind === "turn").length <= 1;
 }

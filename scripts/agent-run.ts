@@ -253,7 +253,7 @@ const HELD_OUT_RETRY_BUDGET = 24;
 
 export interface HeldOutBucket {
   bucket: SceneFamilyBucket;
-  /** Number of worked gates displayed, which may exceed the selected query depth. */
+  /** Number of worked gates displayed and applied by the query. */
   gateCount: ComposedGateCount;
   /** The band the public twin of this bucket sits in, so the two stay comparable. */
   band: ReasoningBand;
@@ -277,9 +277,10 @@ export function heldOutBuckets(): HeldOutBucket[] {
     // its depth. At five gates it provably has none: the reserved shape is two
     // board moves then token-local steps, which at that length forces both fills
     // plus a turn — and a turn never repaints the slot the first fill painted, so
-    // single-gate ablation rejects every one of them. Skipping such a bucket
-    // keeps the pinned two-bucket probe and its --items 40 even split valid;
-    // throwing here would take the whole held-out source down with it.
+    // single-gate ablation rejects every one of them. The two-gate intermediate
+    // bucket also cannot begin with two board moves. Skipping depths with no
+    // reserved population keeps the held-out source honest; throwing here would
+    // take the whole source down with it.
     const gateCount = gateCounts[bucket.bucket];
     if (gateCount !== 3 && gateCount !== 4) return [];
     const band = registry.bands.find((entry) => entry.validatedDifficultyBuckets.includes(bucket.bucket));
@@ -458,16 +459,18 @@ export function heldOutBucketPool(
 }
 
 /**
- * A whole held-out run: the requested count split evenly across every final
- * composed bucket.
+ * A whole held-out run: the requested count split evenly across every composed
+ * bucket that has a reserved population.
  *
- * An uneven count is refused rather than rounded. Two buckets of unequal size
- * cannot be compared with each other, and quietly returning 21 and 19 items
- * would make that invisible in the artifact.
+ * The validation remains generic if another held-out bucket is added. There is
+ * currently one, so every positive whole item count divides cleanly.
  */
 export function heldOutSourcePool(seed: string, count: number): Puzzle<Visual>[] {
   const buckets = heldOutBuckets();
-  if (!Number.isInteger(count) || count <= 0 || count % buckets.length !== 0) {
+  if (!Number.isInteger(count) || count <= 0) {
+    throw new Error(`--source held-out needs a positive whole item count; got ${count}`);
+  }
+  if (count % buckets.length !== 0) {
     throw new Error(
       `--source held-out needs an item count that divides evenly across its ${buckets.length} ` +
         `composed buckets (${buckets.map((entry) => entry.bucket.bucket).join(", ")}); got ${count}`,
@@ -482,7 +485,7 @@ export interface HeldOutCoverageReport {
   missingPrimitives: { bucket: string; primitives: string[] }[];
   /** Program-complexity classes the buckets declare but the run does not contain. */
   missingComplexities: string[];
-  /** Items per bucket, so an uneven split is visible even when coverage passes. */
+  /** Items per bucket, so the allocation remains visible in the artifact. */
   itemsPerBucket: { bucket: string; items: number }[];
 }
 

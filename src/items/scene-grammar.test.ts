@@ -309,12 +309,15 @@ describe("five-gate composed programs", () => {
     const program = sceneComposedProgramFromSteps(steps);
     expect(sceneComposedProgramSteps(program)).toEqual(steps);
     expect(Object.keys(program)).toEqual(["first", "second", "third", "fourth", "fifth"]);
-    // Three and four still round-trip, and six is not a program length.
+    // Two through four still round-trip, and six is not a program length.
+    expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 2)))).toHaveLength(2);
     expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 3)))).toHaveLength(3);
     expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 4)))).toHaveLength(4);
-    expect(() => sceneComposedProgramFromSteps([...steps, pool[7]])).toThrow(/three, four, or five gates/);
+    expect(() => sceneComposedProgramFromSteps([...steps, pool[7]])).toThrow(/two, three, four, or five gates/);
     expect(isSceneComposedProgram([...steps, pool[7]])).toBe(false);
-    expect(isSceneComposedProgram(steps.slice(0, 2))).toBe(false);
+    const pair = enumerateSceneOrderedCompositions()[0];
+    expect(isSceneComposedProgram([pair.first, pair.second])).toBe(true);
+    expect(isSceneComposedProgram([pool[0], pool[1]])).toBe(false);
   });
 
   it("keeps the three- and four-gate grammars exactly as they were", () => {

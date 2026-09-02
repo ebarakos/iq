@@ -123,23 +123,19 @@ describe("held-out source of the agent harness", () => {
     // token-local steps, and at five gates that shape has no servable member at
     // all (it forces both fills plus a turn, and a turn never repaints the slot
     // the first fill painted, so single-gate ablation rejects every one). A
-    // bucket reserving nothing is skipped rather than fatal, which keeps the
-    // pinned two-bucket probe and its even --items 40 split valid.
+    // bucket reserving nothing is skipped rather than fatal. The intermediate
+    // pair reserves nothing; the hard three-gate bucket is the held-out arm.
     const declared = sceneFamilyBucketsFor("composed-transform-v2").map((bucket) => bucket.bucket);
     const covered = buckets.map((entry) => entry.bucket.bucket);
     expect(covered).toEqual(declared.filter((bucket) => covered.includes(bucket)));
-    expect(covered.length).toBeGreaterThan(1);
+    expect(covered).toEqual(["composed-transform-d5"]);
     for (const entry of buckets) {
       const { heldOutPrograms } = partitionComposedTransformPrograms(entry.gateCount);
       expect(heldOutPrograms.length, entry.bucket.bucket).toBeGreaterThan(0);
     }
     for (const entry of buckets) {
       expect(entry.gateCount).toBe(3);
-      if (entry.bucket.bucket === "composed-transform-d5") {
-        expect(entry.bucket.programDepth).toBe(2);
-      } else {
-        expect(entry.bucket.programDepth).toBe(entry.gateCount);
-      }
+      expect(entry.bucket.programDepth).toBe(entry.gateCount);
       // A feature bucket of its own, so a rollup can never merge a reserved
       // program with its public twin.
       expect(entry.featureBucket).toBe(`held-out-${entry.bucket.bucket}`);
@@ -147,16 +143,17 @@ describe("held-out source of the agent harness", () => {
     }
   });
 
-  it("splits the requested count evenly and refuses a count that cannot split", () => {
+  it("serves the requested held-out count and refuses zero", () => {
     const items = heldOutSourcePool("held-out-source-seed", buckets.length * 4);
     expect(items).toHaveLength(buckets.length * 4);
     for (const entry of buckets) {
       expect(items.filter((item) => item.generation?.featureBucket === entry.featureBucket)).toHaveLength(4);
     }
-    // Unequal buckets cannot be compared with each other, so an uneven request
-    // is refused rather than quietly rounded.
-    expect(() => heldOutSourcePool("held-out-source-seed", buckets.length * 4 + 1)).toThrow(/divides evenly/);
-    expect(() => heldOutSourcePool("held-out-source-seed", 0)).toThrow(/divides evenly/);
+    // One current bucket means an odd count is a complete allocation, not an
+    // uneven split that the harness should reject.
+    expect(heldOutSourcePool("held-out-source-seed", 5)).toHaveLength(5);
+    expect(() => heldOutSourcePool("held-out-source-seed", 0)).toThrow(/positive whole/);
+    expect(() => heldOutSourcePool("held-out-source-seed", 1.5)).toThrow(/positive whole/);
   });
 
   it("serves only reserved combinations the public pool can never produce", () => {
@@ -211,9 +208,8 @@ describe("held-out source of the agent harness", () => {
   });
 
   it("enforces its own reserved-primitive and program-complexity coverage", () => {
-    // Six items a bucket, not four. Both buckets display three worked gates,
-    // while d5 selects two of them for its query. Four items are enough on
-    // average, not enough to guarantee full primitive coverage. That is a
+    // Six items cover the hard bucket's reserved vocabulary. Four are enough
+    // on average, not enough to guarantee full primitive coverage. That is a
     // property of the sample, not a
     // fault in the harness: the very next test checks a thin run is REPORTED
     // rather than passed.
@@ -231,16 +227,15 @@ describe("held-out source of the agent harness", () => {
 
   it("reports what a thin run is missing instead of passing it", () => {
     const items = heldOutSourcePool("held-out-source-seed", buckets.length * 4);
-    // Keep one item from the first bucket only: the other bucket disappears
-    // entirely and the vocabulary is nowhere near covered.
+    // Keep one item only: the complexity is represented but the reserved
+    // vocabulary is nowhere near covered.
     const thin = items.slice(0, 1);
     const coverage = heldOutCoverage(thin);
     expect(heldOutCoverageComplete(coverage)).toBe(false);
     const message = formatMissingHeldOutCoverage(coverage);
     expect(message).toContain("missing required coverage");
     expect(message).toContain(buckets[0].bucket.bucket);
-    expect(message).toContain("program-complexity classes absent");
-    expect(message).toContain(`complexity-${buckets[1].bucket.difficulty}-depth-${buckets[1].bucket.programDepth}`);
+    expect(message).toContain("never shows");
   });
 
   it("builds the plan's pinned 40-item probe with complete coverage", () => {
@@ -251,7 +246,7 @@ describe("held-out source of the agent harness", () => {
     const items = heldOutSourcePool("probe-escalation-held-out", 40);
     expect(items).toHaveLength(40);
     const coverage = heldOutCoverage(items);
-    expect(coverage.itemsPerBucket.map((row) => row.items)).toEqual(buckets.map(() => 20));
+    expect(coverage.itemsPerBucket.map((row) => row.items)).toEqual([40]);
     expect(heldOutCoverageComplete(coverage)).toBe(true);
   });
 

@@ -25,6 +25,7 @@ import {
   applySceneBinary,
   applySceneCompositionPrimitive,
   applySceneUnary,
+  enumerateSceneOrderedCompositions,
   enumerateSceneOrderedFiveStepCompositions,
   enumerateSceneOrderedFourStepCompositions,
   enumerateSceneOrderedThreeStepCompositions,
@@ -115,12 +116,12 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "compositional-analogy-d3", difficulty: 3, programDepth: 2 },
     { bucket: "compositional-analogy-d4", difficulty: 4, programDepth: 3 },
   ],
-  // d4 applies all three demonstrated gates. d5 demonstrates the same three
-  // gates but asks for two of them in a new order, so the solver must select
-  // and compose the relevant rules instead of merely replaying a long chain.
+  // d4 demonstrates and applies two gates. d5 demonstrates and applies three,
+  // sometimes in a different order from the worked rows. No worked example is
+  // irrelevant to the requested result.
   "composed-transform-v2": [
-    { bucket: "composed-transform-d4", difficulty: 4, programDepth: 3 },
-    { bucket: "composed-transform-d5", difficulty: 5, programDepth: 2 },
+    { bucket: "composed-transform-d4", difficulty: 4, programDepth: 2 },
+    { bucket: "composed-transform-d5", difficulty: 5, programDepth: 3 },
     { bucket: "composed-transform-d6", difficulty: 6, programDepth: 5 },
   ],
   // A row rule and a column rule, both needed for the missing corner.
@@ -137,8 +138,8 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "visual-set-algebra-d4", difficulty: 4, programDepth: 2 },
     { bucket: "visual-set-algebra-d5", difficulty: 5, programDepth: 3 },
   ],
-  // One spatial transformation of the whole arrangement.
-  "spatial-transform-v2": [{ bucket: "spatial-transform-d3", difficulty: 3, programDepth: 1 }],
+  // One spatial transformation of the whole arrangement belongs in warmup.
+  "spatial-transform-v2": [{ bucket: "spatial-transform-d2", difficulty: 2, programDepth: 1 }],
   // Worked gates applied in the order the query path shows them: d5 shows
   // three, d6 four. The depth counts those displayed gates — nothing else.
   // Every gate is provably load-bearing: a program whose answer survives
@@ -148,8 +149,9 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "transformation-machine-d5", difficulty: 5, programDepth: 3 },
     { bucket: "transformation-machine-d6", difficulty: 6, programDepth: 4 },
   ],
-  // Two gates are demonstrated, but the query selects exactly one to apply.
-  "rule-switching-v2": [{ bucket: "rule-switching-d5", difficulty: 5, programDepth: 1 }],
+  // Two gates are demonstrated, but the query selects exactly one to apply. A
+  // one-operation result belongs in the easy opening pool, never the hard tail.
+  "rule-switching-v2": [{ bucket: "rule-switching-d2", difficulty: 2, programDepth: 1 }],
   // A step rule plus the rule governing how that step grows.
   "second-order-sequence-v2": [{ bucket: "second-order-sequence-d4", difficulty: 4, programDepth: 2 }],
   // Two changes, run in reverse to recover the missing input.
@@ -2164,7 +2166,7 @@ function spatialTransform(rng: Rng): SceneFamilyCandidate {
     "analogy",
     "analogy",
     "Apply the same transformation.",
-    3,
+    2,
     [first, transformed, query],
     answer,
     selectedDistractors,
@@ -2343,7 +2345,7 @@ const TRANSFORMATION_MACHINE_BUCKET_GATES: Readonly<Record<string, MachineGateCo
 /** Three gates is the `-d5` bucket, four the `-d6` bucket. */
 type MachineGateCount = 3 | 4;
 
-/** Gate labels, in the order the query strip shows them. */
+/** Gate labels, in the order the worked rows show them. */
 const MACHINE_GATE_COUNT_WORDS: Readonly<Record<MachineGateCount, string>> = { 3: "three", 4: "four" };
 
 function machineGrammarFor(gateCount: MachineGateCount): readonly MachineProgram[] {
@@ -2741,7 +2743,7 @@ function ruleSwitching(rng: Rng): SceneFamilyCandidate {
     "matrix",
     "machineTable",
     "Each gate has a demonstrated rule. Apply only the gate shown in the query path.",
-    5,
+    2,
     [
       inputA, gateVisual("a"), outputA,
       inputB, gateVisual("b"), outputB,
@@ -2842,16 +2844,22 @@ const COMPOSED_TRANSFORM_D6_BUCKET = "composed-transform-d6";
 
 /** The displayed gate count each named bucket draws at. */
 const COMPOSED_TRANSFORM_BUCKET_GATES: Readonly<Record<string, ComposedGateCount>> = {
-  [COMPOSED_TRANSFORM_D4_BUCKET]: 3,
+  [COMPOSED_TRANSFORM_D4_BUCKET]: 2,
   [COMPOSED_TRANSFORM_D5_BUCKET]: 3,
   [COMPOSED_TRANSFORM_D6_BUCKET]: 5,
 };
 
-/** The two-gate query orders used by d5, all recombined from the worked A/B/C rows. */
-const COMPOSED_TRANSFORM_RECOMBINED_ORDERS: readonly (readonly [number, number])[] = [
-  [1, 0],
-  [2, 1],
-  [2, 0],
+/** d4 applies its two worked transformations in their demonstrated order. */
+const COMPOSED_TRANSFORM_PAIR_ORDER = [0, 1] as const;
+
+/** d5 always applies all three worked transformations, with varied order. */
+const COMPOSED_TRANSFORM_HARD_ORDERS: readonly (readonly [number, number, number])[] = [
+  [0, 1, 2],
+  [0, 2, 1],
+  [1, 0, 2],
+  [1, 2, 0],
+  [2, 0, 1],
+  [2, 1, 0],
 ];
 
 /**
@@ -2868,11 +2876,13 @@ const composedTransformGrammars = new Map<ComposedGateCount, readonly SceneCompo
 function composedTransformGrammarFor(gateCount: ComposedGateCount): readonly SceneComposedProgram[] {
   const cached = composedTransformGrammars.get(gateCount);
   if (cached) return cached;
-  const grammar: readonly SceneComposedProgram[] = gateCount === 3
-    ? enumerateSceneOrderedThreeStepCompositions()
-    : gateCount === 4
-      ? enumerateSceneOrderedFourStepCompositions()
-      : enumerateSceneOrderedFiveStepCompositions();
+  const grammar: readonly SceneComposedProgram[] = gateCount === 2
+    ? enumerateSceneOrderedCompositions()
+    : gateCount === 3
+      ? enumerateSceneOrderedThreeStepCompositions()
+      : gateCount === 4
+        ? enumerateSceneOrderedFourStepCompositions()
+        : enumerateSceneOrderedFiveStepCompositions();
   composedTransformGrammars.set(gateCount, grammar);
   return grammar;
 }
@@ -2880,6 +2890,7 @@ function composedTransformGrammarFor(gateCount: ComposedGateCount): readonly Sce
 /** Gate labels, in the order the query strip shows them. */
 const COMPOSED_GATE_LETTERS = ["A", "B", "C", "D", "E"] as const;
 const COMPOSED_GATE_COUNT_WORDS: Readonly<Record<ComposedGateCount, string>> = {
+  2: "two",
   3: "three",
   4: "four",
   5: "five",
@@ -3220,7 +3231,9 @@ export function partitionComposedTransformPrograms(
   if (cached) return cached;
   const apply = memoizedComposedStepper();
   const servable = composedTransformGrammarFor(gateCount)
-    .filter((program) => composedProgramIsServable(program, apply));
+    .filter((program) => gateCount === 2
+      ? composedRecombinedOrderIsServable(program, COMPOSED_TRANSFORM_PAIR_ORDER)
+      : composedProgramIsServable(program, apply));
   const partition: ComposedTransformPartition = {
     publicPrograms: servable.filter((program) => !composedProgramIsHeldOut(program)),
     heldOutPrograms: servable.filter(composedProgramIsHeldOut),
@@ -3277,7 +3290,13 @@ interface ComposedProgramOrder {
   queryOrder: readonly number[];
 }
 
-/** Whether a two-gate recombination has a unique answer and a full near-miss set. */
+/** Program/order eligibility depends only on the cached program population. */
+const composedProgramOrderCache = new WeakMap<
+  readonly SceneComposedProgram[],
+  Map<string, ComposedProgramOrder[]>
+>();
+
+/** Whether an ordered query has a unique answer and a full near-miss set. */
 function composedRecombinedOrderIsServable(
   program: SceneComposedProgram,
   queryOrder: readonly number[],
@@ -3305,16 +3324,22 @@ function composedProgramOrders(
   programs: readonly SceneComposedProgram[],
   bucketId: string,
 ): ComposedProgramOrder[] {
-  if (bucketId !== COMPOSED_TRANSFORM_D5_BUCKET) {
-    return programs.map((program) => ({
+  const byBucket = composedProgramOrderCache.get(programs) ?? new Map<string, ComposedProgramOrder[]>();
+  const cached = byBucket.get(bucketId);
+  if (cached) return cached;
+  const choices = bucketId !== COMPOSED_TRANSFORM_D5_BUCKET
+    ? programs.map((program) => ({
       program,
       queryOrder: composedGateIndexes(sceneComposedProgramSteps(program).length),
-    }));
-  }
-  return programs.flatMap((program) =>
-    COMPOSED_TRANSFORM_RECOMBINED_ORDERS
-      .filter((queryOrder) => composedRecombinedOrderIsServable(program, queryOrder))
-      .map((queryOrder) => ({ program, queryOrder })));
+    }))
+    : programs
+      .filter((program) => sceneComposedProgramSteps(program).length === 3)
+      .flatMap((program) => COMPOSED_TRANSFORM_HARD_ORDERS
+        .filter((queryOrder) => composedRecombinedOrderIsServable(program, queryOrder))
+        .map((queryOrder) => ({ program, queryOrder })));
+  byBucket.set(bucketId, choices);
+  composedProgramOrderCache.set(programs, byBucket);
+  return choices;
 }
 
 function composedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
@@ -3333,23 +3358,21 @@ function composedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCand
 function composedTransformForProgram(
   program: SceneComposedProgram,
   rng: Rng,
-  options: { bucketId?: string; queryOrder?: readonly number[] } = {},
+  options: { bucketId: string; queryOrder?: readonly number[] },
 ): SceneFamilyCandidate {
   const steps = sceneComposedProgramSteps(program);
   const gateCount = steps.length as ComposedGateCount;
   const displayed = composedGateIndexes(gateCount);
   const gateIds = displayed.map((index) => COMPOSED_GATE_IDS[index]);
   const queryOrder = options.queryOrder ?? displayed;
-  if (new Set(queryOrder).size !== queryOrder.length ||
+  if (queryOrder.length !== gateCount || new Set(queryOrder).size !== queryOrder.length ||
     queryOrder.some((index) => index < 0 || index >= gateCount)) {
-    throw new Error("composed transform query gates must be distinct worked gates");
+    throw new Error("composed transform query must use every worked gate exactly once");
   }
   const queryGateIds = queryOrder.map((index) => gateIds[index]);
   const bucket = requireSceneFamilyBucket(
     "composed-transform-v2",
-    options.bucketId ?? (gateCount === 5
-      ? COMPOSED_TRANSFORM_D6_BUCKET
-      : COMPOSED_TRANSFORM_D4_BUCKET),
+    options.bucketId,
   );
   const shapes = shuffled(rng, CANONICAL_COMPOSED_SHAPES);
   const worked = steps.map((step, index) => {
@@ -3373,25 +3396,21 @@ function composedTransformForProgram(
   // order matters.
   const composedDistractors = selectDistractors(nearMissPool, rng, "composed transform", { answer, required: [otherDirection] });
   const gateWord = COMPOSED_GATE_COUNT_WORDS[gateCount];
-  const queryGateWord = queryOrder.length === 2 ? "two" : gateWord;
   const cueIds = [
     ...gateIds.map((gateId) => `worked-gate-${gateId}`),
     "query-gate-order",
-    ...(queryOrder.length < gateCount ? ["query-gate-selection"] : []),
     ...(steps.some((step) => step.kind === "setFillAt") ? ["targeted-fill-slot"] : []),
     ...(steps.some((step) => step.kind === "turn") ? ["token-orientation"] : []),
   ];
-  const fullQuery = queryOrder.length === gateCount;
-  const instruction = fullQuery
-    ? `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`
-    : `Infer each worked gate, then apply the ${queryGateWord} query gates in the order shown.`;
-  const explanation = fullQuery
+  const instruction = `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`;
+  const queryInWorkedOrder = queryOrder.every((gate, index) => gate === displayed[index]);
+  const explanation = queryInWorkedOrder
     ? `The ${gateWord} worked rows expose the primitives separately. ${steps
       .map((step, index) => `Gate ${COMPOSED_GATE_LETTERS[index]} ${compositionPrimitiveDescription(step)}`)
       .join("; ")}. The query strip shows ${composedGateList(displayed)} in that order, so the ${gateWord} effects must be applied left to right to obtain the highlighted board. Every displayed gate is needed: dropping any one of them changes the result. The distractors run the gates in another order, skip one, or replace a step with another bounded primitive that fails its worked row.`
     : `The ${gateWord} worked rows expose the primitives separately. ${steps
       .map((step, index) => `Gate ${COMPOSED_GATE_LETTERS[index]} ${compositionPrimitiveDescription(step)}`)
-      .join("; ")}. The query strip shows ${composedGateList(queryOrder)} in that order, so those ${queryGateWord} effects are applied from left to right to obtain the highlighted board. ${composedGateList(displayed.filter((index) => !queryOrder.includes(index)))} is demonstrated but is not selected by the query. Every query gate is needed. The distractors change the selection or order, skip a query gate, or replace a step with another bounded primitive that fails its worked row.`;
+      .join("; ")}. The query strip shows ${composedGateList(queryOrder)} in that order, so every demonstrated effect must be applied left to right to obtain the highlighted board. Dropping a displayed gate changes the result. The distractors run the gates in another order, skip one, or replace a step with another bounded primitive that fails its worked row.`;
   const puzzle = makePuzzle(
     "prototype-composed-transform",
     "matrix",
@@ -4119,7 +4138,7 @@ export function validateSceneFamilyCandidate(
 export function generateHeldOutComposedTransformCandidate(
   rng: Rng,
   gateCount: ComposedGateCount = 3,
-  bucketId: string = COMPOSED_TRANSFORM_D4_BUCKET,
+  bucketId: string = COMPOSED_TRANSFORM_D5_BUCKET,
 ): SceneFamilyCandidate {
   const { heldOutPrograms } = partitionComposedTransformPrograms(gateCount);
   if (heldOutPrograms.length === 0) {

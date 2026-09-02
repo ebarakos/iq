@@ -4,7 +4,7 @@
  "packets": [
   {
    "packetId": "pilot-v3-a",
-   "contentFingerprint": "3fcaa50b714f6c43",
+   "contentFingerprint": "b505b4b604c6a991",
    "items": [
     {
      "itemId": "relational-sequence-v2:warmup:relational-sequence-d2:r1",
@@ -79,12 +79,12 @@
      "bandTimeBudgetSeconds": 50
     },
     {
-     "itemId": "spatial-transform-v2:composition:spatial-transform-d3:r1",
+     "itemId": "spatial-transform-v2:warmup:spatial-transform-d2:r1",
      "familyId": "spatial-transform-v2",
-     "band": "composition",
-     "difficultyBucket": "spatial-transform-d3",
-     "difficulty": 3,
-     "bandTimeBudgetSeconds": 40
+     "band": "warmup",
+     "difficultyBucket": "spatial-transform-d2",
+     "difficulty": 2,
+     "bandTimeBudgetSeconds": 25
     },
     {
      "itemId": "transformation-machine-v3:induction-transfer:transformation-machine-d5:r1",
@@ -95,12 +95,12 @@
      "bandTimeBudgetSeconds": 55
     },
     {
-     "itemId": "rule-switching-v2:induction-transfer:rule-switching-d5:r1",
+     "itemId": "rule-switching-v2:warmup:rule-switching-d2:r1",
      "familyId": "rule-switching-v2",
-     "band": "induction-transfer",
-     "difficultyBucket": "rule-switching-d5",
-     "difficulty": 5,
-     "bandTimeBudgetSeconds": 55
+     "band": "warmup",
+     "difficultyBucket": "rule-switching-d2",
+     "difficulty": 2,
+     "bandTimeBudgetSeconds": 25
     },
     {
      "itemId": "second-order-sequence-v2:composition:second-order-sequence-d4:r1",

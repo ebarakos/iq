@@ -138,10 +138,10 @@ import {
  *   wrong option can carry the answer's shapes in other cells; and a fourth
  *   witnessed mistake, combining the right rule with the wrong two boards of the
  *   grid, which is the commonest real error on a 3x3.
- * - **`spatial-transform-d3`** (64%) pairs every board move with an extra token
+ * - **`spatial-transform-d2`** (64%) pairs every board move with an extra token
  *   turn, so the option list holds the board the solver gets by moving correctly
  *   and turning the tokens as well — the exact mix-up the family tests.
- * - **`rule-switching-d5`** (48%) adds the correct board carried one operation
+ * - **`rule-switching-d2`** (48%) adds the correct board carried one operation
  *   further, which keeps the answer's cells and changes only the fill.
  * - **`visual-set-algebra-d4`** (45%) redraws its inputs until the pool can
  *   cover every aspect, the way its `-d5` sibling already did for free through
@@ -177,8 +177,14 @@ import {
  * for all three gates; it demonstrates A, B and C once, then asks for two of
  * those gates in a recombined order. Results from v15 and v16 are different
  * populations and must not be pooled.
+ *
+ * `v17` makes the transformation ladder literal. The intermediate composed
+ * bucket demonstrates and applies two gates; the hard bucket demonstrates and
+ * applies three, with varied order. The one-step rule-switching family moves
+ * from the hard tail into warmup. Every composed worked row is now required by
+ * its query, so v16 and v17 results must not be pooled.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v16" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v17" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -201,7 +207,7 @@ export const BAND_SCHEDULE: Readonly<
 export const MINIMUM_ELIGIBLE_FAMILIES: Readonly<
   Record<ExpandedProfile, Readonly<Record<ExpandedProfileBand, number>>>
 > = {
-  "long-30": { warmup: 2, composition: 4, "constraint-spatial": 2, "induction-transfer": 3 },
+  "long-30": { warmup: 2, composition: 4, "constraint-spatial": 2, "induction-transfer": 2 },
   "short-5": { warmup: 1, composition: 1, "constraint-spatial": 2, "induction-transfer": 1 },
 };
 
@@ -209,10 +215,10 @@ export const MINIMUM_ELIGIBLE_FAMILIES: Readonly<
  * How many different families one test must contain.
  *
  * A profile that cannot reach its floor fails loudly rather than serving a
- * repetitive test. The long profile has room for one family to appear in two
- * bands; the short profile does not:
+ * repetitive test. The long profile has room for two family slots to repeat
+ * across bands; the short profile has none:
  *
- * - long-30 draws 2 + 4 + 2 + 3 = 11 family slots, floor 10;
+ * - long-30 draws 4 + 4 + 2 + 2 = 12 family slots, floor 10;
  * - short-5 draws 1 + 1 + 2 + 1 = 5, floor 5, which leaves it no room at all.
  *
  * The short test keeps zero slack on purpose: it has five questions and needs
@@ -229,8 +235,8 @@ export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>
  * begins with the full set of introductory mechanisms.
  *
  * Constraint-spatial draws both of its remaining families after fold-and-punch
- * was withdrawn in v16. Composition and induction-transfer keep their existing
- * subsampling sizes.
+ * was withdrawn in v16. Induction-transfer draws both of its hard, three-step
+ * transformation families after the one-step switch moved to warmup in v17.
  */
 export const FAMILY_SUBSAMPLE_SIZES: Readonly<
   Record<ExpandedProfileBand, number | undefined>
@@ -238,7 +244,7 @@ export const FAMILY_SUBSAMPLE_SIZES: Readonly<
   warmup: undefined,
   composition: 4,
   "constraint-spatial": 2,
-  "induction-transfer": 3,
+  "induction-transfer": 2,
 };
 
 /**
@@ -771,7 +777,7 @@ export function planExpandedSchedule(
     // those few questions to unserved families whenever there are enough. The
     // family draw still controls format and eligibility; this tie-break keeps a
     // five-question sample from repeating composed-transform across two bands
-    // after induction-transfer shrank to three families in v16.
+    // after induction-transfer shrank to two families in v17.
     const unservedDrawn = drawn.filter((family) => !servedBuckets.has(family.familyId));
     const allocationPool = count <= unservedDrawn.length ? unservedDrawn : drawn;
     const byFamilyId = new Map(allocationPool.map((family) => [family.familyId, family]));

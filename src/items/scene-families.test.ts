@@ -224,15 +224,15 @@ describe("scene family prototypes", () => {
   });
 
   it("makes every machine, switching, and composition fingerprint change the query answer", () => {
-    // composed-transform-v2's three-step space (56 public programs) is larger
-    // than 200 seeds can sweep, and distinct programs may legitimately land on
+    // composed-transform-v2's intermediate two-step space has 16 programs, and
+    // distinct programs may legitimately land on
     // the same query answer — the worked rows, not the answer alone, identify
     // the program. So for it the gate is breadth (minimumPrograms) plus
     // fingerprint-to-answer consistency, not answer injectivity.
     const families = [
       { familyId: "transformation-machine-v3", queryIndex: 9, expectedPrograms: 8, injectiveEffects: true },
       { familyId: "rule-switching-v2", queryIndex: 6, expectedPrograms: 8, injectiveEffects: true },
-      { familyId: "composed-transform-v2", queryIndex: 9, minimumPrograms: 40, injectiveEffects: false },
+      { familyId: "composed-transform-v2", queryIndex: 6, expectedPrograms: 16, injectiveEffects: false },
     ] as const;
     for (const family of families) {
       const { familyId, queryIndex } = family;
@@ -262,11 +262,7 @@ describe("scene family prototypes", () => {
         expect(effectByFingerprint.get(fingerprint!) ?? effect).toBe(effect);
         effectByFingerprint.set(fingerprint!, effect);
       }
-      if ("expectedPrograms" in family) {
-        expect(effectByFingerprint.size, familyId).toBe(family.expectedPrograms);
-      } else {
-        expect(effectByFingerprint.size, familyId).toBeGreaterThanOrEqual(family.minimumPrograms);
-      }
+      expect(effectByFingerprint.size, familyId).toBe(family.expectedPrograms);
       if (family.injectiveEffects) {
         expect(new Set(effectByFingerprint.values()).size, familyId).toBe(effectByFingerprint.size);
       }
@@ -382,7 +378,7 @@ describe("scene family prototypes", () => {
     //
     // The list below grew on 2026-08-27 by the four buckets that DID vary in
     // several aspects and still let one of them decide: `relational-matrix-d4`
-    // (88% of items), `spatial-transform-d3` (64%), `rule-switching-d5` (48%)
+    // (88% of items), `spatial-transform-d2` (64%), `rule-switching-d2` (48%)
     // and `visual-set-algebra-d4` (45%). Each was fixed at the source of its
     // near misses rather than by loosening anything here.
     const ms = (values: string[]) => [...values].sort().join("|");
@@ -405,8 +401,8 @@ describe("scene family prototypes", () => {
       { familyId: "parallel-evolution-v1", bucket: "parallel-evolution-d3" },
       { familyId: "parallel-evolution-v1", bucket: "parallel-evolution-d4" },
       { familyId: "relational-matrix-v2", bucket: "relational-matrix-d4" },
-      { familyId: "spatial-transform-v2", bucket: "spatial-transform-d3" },
-      { familyId: "rule-switching-v2", bucket: "rule-switching-d5" },
+      { familyId: "spatial-transform-v2", bucket: "spatial-transform-d2" },
+      { familyId: "rule-switching-v2", bucket: "rule-switching-d2" },
     ];
     for (const { familyId, bucket } of MULTI_RULE) {
       for (let seed = 0; seed < 40; seed++) {
@@ -427,7 +423,7 @@ describe("scene family prototypes", () => {
     // The owner's standing rule of 2026-08-27: a fourth gate is more procedure,
     // not more reasoning. It cost two buckets that day (`composed-transform-d6`
     // at five gates, `transformation-machine-d6` at four) and reshaped a third
-    // (`composed-transform-d5`, from four gates forward to three run backwards).
+    // (`composed-transform-d5`, from four gates forward to three in varied order).
     // Both withdrawn generators still exist in the code for a possible rework,
     // so the rule is checked where it can actually be broken: any bucket a band
     // is allowed to draw.
@@ -500,7 +496,7 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("locks the composed-transform grammar and its servable population at all three depths", () => {
+  it("locks the composed-transform grammar and its servable population at all four depths", () => {
     // The pool is eight primitives: four board moves (two rotations, two
     // reflections), two fill changes, and the two token turns added on
     // 2026-08-25. A program is an ordered list of DISTINCT primitives that is
@@ -509,6 +505,7 @@ describe("scene family prototypes", () => {
     // it — see isSceneComposedProgram). The five-gate grammar added on
     // 2026-08-26 carries exactly the same three rules.
     //
+    // Two gates: the 16 ordered pairs containing one board move and one fill.
     // Three gates: 8x7x6 = 336 ordered triples, less 4x3x2 = 24 all-spatial,
     // less the 6 x 3! = 36 that hold both turns, leaves 276.
     // Four gates: 8x7x6x5 = 1680, less 4! = 24 all-spatial, less 15 x 4! = 360
@@ -516,6 +513,7 @@ describe("scene family prototypes", () => {
     // Five gates: 8x7x6x5x4 = 6720. No all-spatial term at all — there are only
     // four board moves, so five distinct primitives can never all be spatial —
     // less the C(6,3) x 5! = 20 x 120 = 2400 that hold both turns, leaves 4320.
+    expect(composedTransformGrammar(2)).toHaveLength(16);
     expect(composedTransformGrammar(3)).toHaveLength(276);
     expect(composedTransformGrammar(4)).toHaveLength(1296);
     expect(composedTransformGrammar(5)).toHaveLength(4320);
@@ -529,14 +527,17 @@ describe("scene family prototypes", () => {
     //   696 have a gate whose deletion leaves the answer unchanged,
     //     0 run out of distinct wrong runs,
     //  1848 servable. 752 + 1024 + 696 + 0 + 1848 = 4320.
+    expect(servableComposedTransformPrograms(2)).toHaveLength(16);
     expect(servableComposedTransformPrograms(3)).toHaveLength(192);
     expect(servableComposedTransformPrograms(4)).toHaveLength(552);
     expect(servableComposedTransformPrograms(5)).toHaveLength(1848);
-    for (const gateCount of [3, 4, 5] as const) {
+    for (const gateCount of [2, 3, 4, 5] as const) {
       const { publicPrograms, heldOutPrograms } = partitionComposedTransformPrograms(gateCount);
       expect(publicPrograms.length + heldOutPrograms.length, `${gateCount} gates`)
         .toBe(servableComposedTransformPrograms(gateCount).length);
     }
+    expect(partitionComposedTransformPrograms(2).publicPrograms).toHaveLength(16);
+    expect(partitionComposedTransformPrograms(2).heldOutPrograms).toHaveLength(0);
     expect(partitionComposedTransformPrograms(3).publicPrograms).toHaveLength(168);
     expect(partitionComposedTransformPrograms(3).heldOutPrograms).toHaveLength(24);
     expect(partitionComposedTransformPrograms(4).publicPrograms).toHaveLength(520);
@@ -559,11 +560,11 @@ describe("scene family prototypes", () => {
   });
 
   it("proves every servable composed program needs every gate it displays", () => {
-    // Exhaustive over all three final grammars, on the board the family itself
+    // Exhaustive over all four grammars, on the board the family itself
     // decides servability against. Removing any one gate has to change the
     // answer, or the item shows a step a solver could skip.
     const query = canonicalComposedTransformQuery();
-    for (const gateCount of [3, 4, 5] as const) {
+    for (const gateCount of [2, 3, 4, 5] as const) {
       for (const program of servableComposedTransformPrograms(gateCount)) {
         const steps = sceneComposedProgramSteps(program);
         const answer = applySceneComposedProgram(query, program);
@@ -582,12 +583,16 @@ describe("scene family prototypes", () => {
 
   it("partitions every composed grammar into disjoint, exhaustive public and held-out halves", () => {
     const primitiveKeys = sceneComposedPrimitives().map((primitive) => JSON.stringify(primitive));
-    for (const gateCount of [3, 4, 5] as const) {
+    for (const gateCount of [2, 3, 4, 5] as const) {
       const { publicPrograms, heldOutPrograms } = partitionComposedTransformPrograms(gateCount);
       expect(publicPrograms.length, `${gateCount} gates`).toBeGreaterThan(0);
-      // Three and four gates reserve a real population. Five reserves none, and
-      // the test below this one proves why rather than accepting the zero.
-      if (gateCount < 5) expect(heldOutPrograms.length, `${gateCount} gates`).toBeGreaterThan(0);
+      // Three and four gates reserve a real population. Two cannot begin with
+      // two board moves, and five reserves none for the reason proved below.
+      if (gateCount === 3 || gateCount === 4) {
+        expect(heldOutPrograms.length, `${gateCount} gates`).toBeGreaterThan(0);
+      } else {
+        expect(heldOutPrograms, `${gateCount} gates`).toEqual([]);
+      }
 
       // Exhaustive and disjoint: together they are exactly the servable set.
       const publicKeys = new Set(publicPrograms.map(sceneComposedProgramKey));
@@ -620,16 +625,21 @@ describe("scene family prototypes", () => {
       // Every primitive stays practised on both sides: what is withheld is the
       // shape of the composition, never a step a solver has never seen. An
       // empty side has nothing to practise, so only non-empty sides are checked.
+      const expectedPrimitiveKeys = gateCount === 2
+        ? sceneComposedPrimitives()
+          .filter((primitive) => primitive.kind !== "turn")
+          .map((primitive) => JSON.stringify(primitive))
+        : primitiveKeys;
       for (const side of [publicPrograms, heldOutPrograms]) {
         if (side.length === 0) continue;
         const used = new Set(side.flatMap((program) =>
           sceneComposedProgramSteps(program).map((step) => JSON.stringify(step))));
-        expect([...primitiveKeys].filter((key) => !used.has(key)), `${gateCount} gates`).toEqual([]);
+        expect(expectedPrimitiveKeys.filter((key) => !used.has(key)), `${gateCount} gates`).toEqual([]);
       }
     }
   });
 
-  it("keeps unchanged composed buckets byte-identical and pins the recombined bucket", () => {
+  it("pins the v17 composed ladder and keeps the withdrawn d6 path byte-identical", () => {
     //
     // REISSUED 2026-08-27. Every value below moved that day, deliberately and
     // across all families at once: distractor selection now has to make the
@@ -644,22 +654,16 @@ describe("scene family prototypes", () => {
     // schema, so the two buckets that were already served had to be proved
     // unchanged rather than assumed unchanged.
     //
-    // `composed-transform-d4` still carries the digest computed from the
-    // generator as it stood BEFORE that change, over the first 50 seeds of the
-    // same stream a 400-seed per bucket before/after sweep used. It has now
-    // survived two later reworks — the d6 withdrawal and the d5 rebuild — which
-    // is exactly the job of this test. It must not move without a deliberate
-    // decision to reissue the bucket.
-    //
-    // `composed-transform-d5` is deliberately reissued in v16. It now shows
-    // three separate worked gates and asks for two of them in a new order.
+    // `composed-transform-d4` and d5 are deliberately reissued in v17. The
+    // intermediate bucket now shows and applies two gates; the hard bucket
+    // shows and applies three, with both worked and recombined orders sampled.
     //
     // `composed-transform-d6` is withdrawn and no band may draw it, but the
     // five-gate generator stays in the code for a possible rework, so its
     // digest stays here to keep that path honest.
     const digests: Record<string, string> = {
-      "composed-transform-d4": "475b4304f53bf0852fcf9df847e15257b0aedd29682bce2164dd0c37be36c5ad",
-      "composed-transform-d5": "e4b9f8bc4e4e0f0a122144258a7ec2007181043bbf0938a9fabb5815c7206e3c",
+      "composed-transform-d4": "f0b074c9eb4859a4216a1a76bb0a4828f07e459437ee5a4d7c744a4048c5d883",
+      "composed-transform-d5": "1889831dd1f341d43469d7a0d73a5e837d0ce8fe46a3ab752c376ac14fc42a76",
       "composed-transform-d6": "2f1c9e404730185dde8dc123f3b36a0adb2b14fc8f9293fe3043c03f7b1c3f5c",
     };
     for (const [bucket, digest] of Object.entries(digests)) {
@@ -726,7 +730,7 @@ describe("scene family prototypes", () => {
       createHash("sha256").update(`composed-transform-v2:${sceneComposedProgramKey(program)}`)
         .digest("hex").slice(0, 16);
     const buckets = [
-      { bucket: "composed-transform-d4", gateCount: 3, stemPanels: 12 },
+      { bucket: "composed-transform-d4", gateCount: 2, stemPanels: 9 },
       { bucket: "composed-transform-d5", gateCount: 3, stemPanels: 12 },
       { bucket: "composed-transform-d6", gateCount: 5, stemPanels: 18 },
     ] as const;
@@ -750,7 +754,7 @@ describe("scene family prototypes", () => {
       // combinations, and passes the same correctness contract as anything
       // public. Five gates reserve nothing, so there is nothing to draw and the
       // generator says so instead of quietly serving a public program.
-      if (gateCount === 5) {
+      if (heldOutPrograms.length === 0) {
         expect(heldOutPrograms).toHaveLength(0);
         expect(() => generateHeldOutComposedTransformCandidate(seededRng("held-out-leakage", "eval:d6"), gateCount))
           .toThrow();
@@ -776,8 +780,8 @@ describe("scene family prototypes", () => {
     const pool = sceneComposedPrimitives();
     const demonstrated = new Set<string>();
     for (const { bucket, gateCount, queryGateCount } of [
-      { bucket: "composed-transform-d4", gateCount: 3, queryGateCount: 3 },
-      { bucket: "composed-transform-d5", gateCount: 3, queryGateCount: 2 },
+      { bucket: "composed-transform-d4", gateCount: 2, queryGateCount: 2 },
+      { bucket: "composed-transform-d5", gateCount: 3, queryGateCount: 3 },
       { bucket: "composed-transform-d6", gateCount: 5, queryGateCount: 5 },
     ] as const) {
       for (let seed = 0; seed < 60; seed++) {
@@ -807,6 +811,8 @@ describe("scene family prototypes", () => {
           .map((placement) => workedGlyphs.indexOf(JSON.stringify(placement.object)));
         expect(selectedIndexes, `${bucket} seed ${seed}`).toHaveLength(queryGateCount);
         expect(selectedIndexes.every((index) => index >= 0)).toBe(true);
+        expect([...selectedIndexes].sort((left, right) => left - right), `${bucket} seed ${seed}`)
+          .toEqual(Array.from({ length: gateCount }, (_, index) => index));
         const answer = puzzle.options[puzzle.answerIndex];
         const running = selectedIndexes.map((index) => steps[index]);
         let full: Scene | null = query;
@@ -849,7 +855,7 @@ describe("scene family prototypes", () => {
       const { puzzle } = generateSceneFamilyCandidate(
         "spatial-transform-v2",
         seededRng("spatial-turn-contrast", `${seed}`),
-        "spatial-transform-d3",
+        "spatial-transform-d2",
       );
       const [first, transformed, query] = puzzle.stem.map((panel) => "blank" in panel ? null : panel);
       if (!first || !transformed || !query) throw new Error("a spatial item shows three boards");
@@ -870,7 +876,9 @@ describe("scene family prototypes", () => {
     expect(tokenTurns).toBeGreaterThan(0);
   });
 
-  it("lays out d5 as three worked gates followed by two recombined query gates", () => {
+  it("lays out d5 as three worked gates and uses all three in varied query orders", () => {
+    let inWorkedOrder = 0;
+    let recombined = 0;
     for (let seed = 0; seed < 40; seed++) {
       const { puzzle } = generateSceneFamilyCandidate(
         "composed-transform-v2",
@@ -891,14 +899,18 @@ describe("scene family prototypes", () => {
       const queryGlyphs = [...queryStrip.objects]
         .sort((left, right) => left.column - right.column)
         .map((placement) => JSON.stringify(placement.object));
-      expect(queryGlyphs).toHaveLength(2);
+      expect(queryGlyphs).toHaveLength(3);
       expect(queryGlyphs.every((glyph) => workedGates.includes(glyph))).toBe(true);
-      expect(new Set(queryGlyphs).size).toBe(2);
-      expect(workedGates.indexOf(queryGlyphs[0])).toBeGreaterThan(workedGates.indexOf(queryGlyphs[1]));
+      expect(new Set(queryGlyphs).size).toBe(3);
+      expect(new Set(queryGlyphs)).toEqual(new Set(workedGates));
+      if (queryGlyphs.every((glyph, index) => glyph === workedGates[index])) inWorkedOrder++;
+      else recombined++;
       expect({ rows: queryStrip.rows, columns: queryStrip.columns }).toEqual({ rows: 3, columns: 3 });
       // No option is ever wider than a board: a strip is a control, not an answer.
       expect(puzzle.options.every((option) => option.columns <= 3)).toBe(true);
     }
+    expect(inWorkedOrder).toBeGreaterThan(0);
+    expect(recombined).toBeGreaterThan(0);
   });
 
   it("locks the transformation-machine grammar and its servable population at both depths", () => {
@@ -1021,10 +1033,8 @@ describe("scene family prototypes", () => {
   it("fits the four-gate machine table in the agent canvas and the 375px browser strip", () => {
     // Difficulty comes from program depth, never from a smaller mark. The
     // fourth gate turns the twelve-panel table into a fifteen-panel one and the
-    // three-glyph gate board into the wide 1x4 strip that
-    // `composed-transform-d5` already ships, and nothing else about the item
-    // changes: the boards stay 3x3, the answer keeps three tokens, and the
-    // glyph keeps the 44px cell the four-gate strip has always given it.
+    // three-glyph gate board into a wide 1x4 strip. Nothing else about the item
+    // changes: the boards stay 3x3 and the answer keeps three tokens.
     for (let seed = 0; seed < 20; seed++) {
       const { puzzle } = generateSceneFamilyCandidate(
         "transformation-machine-v3",
@@ -1088,9 +1098,8 @@ describe("scene family prototypes", () => {
     expect(gateStripWidth(4)).toBeLessThanOrEqual(NARROW_VIEWPORT_STEM_WIDTH);
 
     // The fourth glyph is bought out of the strip's own width, not out of the
-    // mark: a four-glyph strip gives each glyph a 44px cell instead of 56px,
-    // which is the presentation `composed-transform-d5` has shipped since
-    // 2026-08-25 and not a new shrink for this bucket. The shape drawn inside
+    // mark: a four-glyph strip gives each glyph a 44px cell instead of 56px.
+    // The shape drawn inside
     // that cell still clears this project's 24px legibility floor.
     const stripPanel = puzzle.stem[13];
     if ("blank" in stripPanel) throw new Error("the query gate strip must be visible");

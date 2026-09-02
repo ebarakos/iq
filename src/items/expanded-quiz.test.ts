@@ -47,8 +47,8 @@ describe("eligible family pool", () => {
     const byBand = EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band));
     // Derived from the registry, not hardcoded: a withdrawal is a normal event
     // and must not need this number edited. Since 2026-08-25 a family may hold
-    // more than one band — composed-transform-v2 serves three ordered gates in
-    // composition and four in induction-transfer — so the count to match is the
+    // more than one band: composed-transform-v2 serves two gates in composition
+    // and three in induction-transfer. So the count to match is the
     // number of registered (family, band) ENTRIES, and what each band offers
     // must be exactly the families that registered for it.
     const entries = REGISTRY.flatMap((family) => family.bands
@@ -65,14 +65,14 @@ describe("eligible family pool", () => {
     expect(byBand.flat().every((family) => family.difficulty >= 2 && family.difficulty <= 5)).toBe(true);
 
     const composition = eligibleFamiliesForBand(REGISTRY, "composition").map((f) => f.familyId);
-    expect(composition).toContain("spatial-transform-v2");
+    expect(composition).not.toContain("spatial-transform-v2");
     expect(eligibleFamiliesForBand(REGISTRY, "warmup").map((f) => f.familyId))
-      .not.toContain("spatial-transform-v2");
+      .toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the sixteen family/band/bucket keys the v16 battery serves", () => {
-    // v16 removes the two fold-and-punch families: two constraint keys and one
-    // induction key. The number is derived from the registry here, so changing
+  it("holds exactly the sixteen family/band/bucket keys the v17 battery serves", () => {
+    // v17 keeps the same key count while moving the one-step switching family
+    // from the hard tail to warmup. The number is derived from the registry, so changing
     // the live population requires changing this assertion deliberately.
     // The number is derived from the registry here, so adding or withdrawing a
     // family without revisiting the plan fails this test rather than quietly
@@ -83,16 +83,16 @@ describe("eligible family pool", () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(keys).toHaveLength(16);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
-      .toEqual([2, 6, 2, 3]);
+      .toEqual([4, 5, 2, 2]);
     // No key is d6 any more. The two that were are withdrawn, so the ladder
     // tops out at d5 until a mechanism earns a sixth rung some way other than
     // by adding gates — the lever the owner ruled out on 2026-08-27.
     expect(keys.filter((key) => key.endsWith("-d6"))).toEqual([]);
     // The same row's draw sizes and long-test floors.
     expect(EXPANDED_PROFILE_BANDS.map((band) => FAMILY_SUBSAMPLE_SIZES[band]))
-      .toEqual([undefined, 4, 2, 3]);
+      .toEqual([undefined, 4, 2, 2]);
     expect(EXPANDED_PROFILE_BANDS.map((band) => MINIMUM_ELIGIBLE_FAMILIES["long-30"][band]))
-      .toEqual([2, 4, 2, 3]);
+      .toEqual([2, 4, 2, 2]);
   });
 
   it("still reads difficulty 6 out of a bucket name, though no bucket declares one", () => {
@@ -114,10 +114,28 @@ describe("eligible family pool", () => {
     expect(buckets).toEqual([{ bucket: "composed-transform-d5", difficulty: 5 }]);
   });
 
+  it("keeps one-step mechanisms easy and reserves the hard transformation band for three steps", () => {
+    const served = EXPANDED_PROFILE_BANDS.flatMap((band) =>
+      eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
+        family.bandBuckets.map((bucket) => ({
+          band,
+          familyId: family.familyId,
+          bucket: requireSceneFamilyBucket(family.familyId as SceneFamilyId, bucket.bucket),
+        }))));
+    const oneStep = served.filter((entry) => entry.bucket.programDepth === 1);
+    expect(oneStep.length).toBeGreaterThan(0);
+    expect(oneStep.every((entry) => entry.band === "warmup" && entry.bucket.difficulty === 2)).toBe(true);
+
+    const hardTransforms = served.filter((entry) => entry.band === "induction-transfer");
+    expect(hardTransforms.map((entry) => entry.familyId).sort())
+      .toEqual(["composed-transform-v2", "transformation-machine-v3"]);
+    expect(hardTransforms.every((entry) => entry.bucket.programDepth === 3)).toBe(true);
+  });
+
   it("drops withdrawn families", () => {
     const withdrawn = new Set(["attribute-pairing-v1"]);
     expect(eligibleFamiliesForBand(REGISTRY, "warmup", withdrawn).map((f) => f.familyId))
-      .toEqual(["relational-sequence-v2"]);
+      .toEqual(["relational-sequence-v2", "rule-switching-v2", "spatial-transform-v2"]);
   });
 });
 
@@ -267,7 +285,11 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("refuses a long test when withdrawals leave a band too thin", () => {
-    const withdrawn = new Set(["attribute-pairing-v1"]);
+    const withdrawn = new Set([
+      "attribute-pairing-v1",
+      "rule-switching-v2",
+      "spatial-transform-v2",
+    ]);
     expect(() => assembleExpandedQuiz("thin-warmup", "long-30", REGISTRY, withdrawn))
       .toThrow(/at least 2 eligible warmup families but has 1/);
   });
@@ -276,6 +298,8 @@ describe("assembleExpandedQuiz", () => {
     const withdrawn = new Set([
       "relational-sequence-v2",
       "attribute-pairing-v1",
+      "rule-switching-v2",
+      "spatial-transform-v2",
     ]);
     expect(() => assembleExpandedQuiz("no-warmup", "short-5", REGISTRY, withdrawn))
       .toThrow(/at least 1 eligible warmup families but has 0/);
@@ -285,12 +309,17 @@ describe("assembleExpandedQuiz", () => {
     expect(() => assertProfilesRemainBuildable(REGISTRY, new Set())).not.toThrow();
     expect(() => assertProfilesRemainBuildable(
       REGISTRY,
-      new Set(["attribute-pairing-v1"]),
+      new Set(["attribute-pairing-v1", "rule-switching-v2", "spatial-transform-v2"]),
     ))
       .toThrow(/long-30 needs 2 warmup families but only 1 remain/);
     expect(() => assertProfilesRemainBuildable(
       REGISTRY,
-      new Set(["relational-sequence-v2", "attribute-pairing-v1"]),
+      new Set([
+        "relational-sequence-v2",
+        "attribute-pairing-v1",
+        "rule-switching-v2",
+        "spatial-transform-v2",
+      ]),
     )).toThrow(/short-5 needs 1 warmup families but only 0 remain/);
   });
 
@@ -353,7 +382,7 @@ describe("assembleExpandedQuiz", () => {
 
     // A long test does yield, by the owner's decision of 2026-08-25. The format
     // cap puts composed-transform-v2 in every long composition draw, and the
-    // three-family induction pool now always includes its recombined d5 form.
+    // two-family hard pool always includes its three-step d5 form.
     const shortBands = [
       "composition:composed-transform-d4",
       "induction-transfer:composed-transform-d5",
@@ -410,12 +439,12 @@ describe("assembleExpandedQuiz", () => {
     }
     // The regression this replaces: composed-transform-v2 sits in the
     // composition band, which used to stamp every item there with depth 2. It
-    // has applied three ordered gates since the -v2 rewrite.
+    // now applies exactly the two gates appropriate to this intermediate rung.
     const composed = requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d4");
-    expect(composed.programDepth).toBe(3);
-    // The induction bucket demonstrates three rules but applies the two rules
-    // selected by its query strip.
-    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d5").programDepth).toBe(2);
+    expect(composed.programDepth).toBe(2);
+    // The hard bucket demonstrates and applies all three rules, sometimes in a
+    // different query order from the worked rows.
+    expect(requireSceneFamilyBucket("composed-transform-v2", "composed-transform-d5").programDepth).toBe(3);
     expect(requireSceneFamilyBucket("compositional-analogy-v2", "compositional-analogy-d3").programDepth).toBe(2);
     expect(requireSceneFamilyBucket("compositional-analogy-v2", "compositional-analogy-d4").programDepth).toBe(3);
     expect(requireSceneFamilyBucket("visual-set-algebra-v2", "visual-set-algebra-d4").programDepth).toBe(2);
@@ -493,7 +522,7 @@ describe("format-aware family subsampling", () => {
   it("offers only the draws that satisfy the cross-band and format rules", () => {
     // `served` is what earlier bands have already asked each family for, and
     // `slack` is how many families the profile can still afford to repeat —
-    // one for a long test, none for a short one.
+    // two for a long test, none for a short one.
     const draws = (
       band: (typeof EXPANDED_PROFILE_BANDS)[number],
       served: Record<string, string[]> = {},
@@ -508,15 +537,15 @@ describe("format-aware family subsampling", () => {
 
     // Warmup is not subsampled: its whole pool is the only draw.
     expect(draws("warmup")).toHaveLength(1);
-    expect(draws("warmup")[0]).toHaveLength(2);
+    expect(draws("warmup")[0]).toHaveLength(4);
 
-    // Composition draws four from six, of which three are analogy-layout, so
-    // the cap leaves exactly one choice: all three non-analogy families plus
-    // one of the three analogy families.
+    // Composition draws four from five, of which two are analogy-layout, so
+    // the cap leaves exactly two choices: all three non-analogy families plus
+    // one of the two analogy families.
     const composition = draws("composition");
-    expect(composition).toHaveLength(3);
+    expect(composition).toHaveLength(2);
     expect(new Set(composition.map((draw) =>
-      draw.map((family) => family.familyId).sort().join("+"))).size).toBe(3);
+      draw.map((family) => family.familyId).sort().join("+"))).size).toBe(2);
 
     // Constraint-spatial now consists only of the two exceptional families the
     // owner retained, and the band draws both.
@@ -524,23 +553,22 @@ describe("format-aware family subsampling", () => {
     expect(draws("constraint-spatial")[0].map((family) => family.familyId).sort())
       .toEqual(["relational-matrix-v2", "visual-set-algebra-v2"]);
 
-    // Induction-transfer has exactly three families and draws all three. The
-    // cross-band preference cannot exclude composed-transform because doing so
-    // would make the band too thin.
+    // Induction-transfer now has exactly the two three-step transformation
+    // families and draws both. The one-step switch belongs to warmup.
     const usedComposed = { "composed-transform-v2": ["composed-transform-d4"] };
     expect(draws("induction-transfer")).toHaveLength(1);
     expect(draws("induction-transfer", usedComposed, 1)).toHaveLength(1);
     expect(draws("induction-transfer", usedComposed, 0)).toHaveLength(1);
     expect(draws("induction-transfer", usedComposed, 0)[0]
       .map((family) => family.familyId).sort())
-      .toEqual(["composed-transform-v2", "rule-switching-v2", "transformation-machine-v3"]);
+      .toEqual(["composed-transform-v2", "transformation-machine-v3"]);
     const composedFullyServed = {
       "composed-transform-v2": ["composed-transform-d4", "composed-transform-d5"],
     };
     expect(draws("induction-transfer", composedFullyServed, 1)).toHaveLength(1);
     expect(draws("induction-transfer", composedFullyServed, 1)[0]
       .map((family) => family.familyId).sort())
-      .toEqual(["composed-transform-v2", "rule-switching-v2", "transformation-machine-v3"]);
+      .toEqual(["composed-transform-v2", "transformation-machine-v3"]);
 
     for (const band of EXPANDED_PROFILE_BANDS) {
       const eligible = eligibleFamiliesForBand(REGISTRY, band);
@@ -570,8 +598,8 @@ describe("format-aware family subsampling", () => {
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => bucket.difficulty))));
     // Fold-and-punch removal leaves no analogy layouts in the two hardest
-    // bands. Warmup contributes 5/2 and composition contributes another 5/2,
-    // so the long-test expectation is exactly five analogy questions.
+    // bands. Two of four warmup families and one of four drawn composition
+    // families are analogy-shaped, so each band contributes 5/2.
     //
     // The assertion is two-sided around the closed form, not a bare "<= 10.0",
     // so it catches the mean drifting DOWN as well as up: a change that quietly
@@ -612,9 +640,9 @@ describe("format-aware family subsampling", () => {
 
         // A family may hold two bands only as far as the profile's slack allows
         // — the gap between the family slots its band draws add up to and the
-        // distinct families it must still contain. That is one for a long test
+        // distinct families it must still contain. That is two for a long test
         // and none for a short one, so a short test never repeats a mechanism
-        // across bands and a long test does it at most once.
+        // across bands and a long test permits at most two cross-band repeats.
         const bandsPerFamily = new Map<string, Set<string>>();
         const bucketsPerFamily = new Map<string, Set<string>>();
         for (const slot of schedule) {
@@ -668,11 +696,15 @@ describe("format-aware family subsampling", () => {
     // question is always the same family stops measuring reasoning at the top
     // of the ladder and starts measuring familiarity with one machine, so the
     // finals have to spread over the induction-transfer pool. While the d6
-    // tier existed this was pinned to exactly two families at roughly 50/50;
-    // with the tier withdrawn every family the band can draw may finish a test,
-    // so the requirement is stated as spread rather than as a fixed pair.
+    // tier existed this was pinned to exactly two families at roughly 50/50.
+    // The current hard pool also contains two, and every family in that live
+    // pool must be able to finish a test rather than a fixed name pair being
+    // baked into this distribution check.
+    const eligibleFinalFamilies = eligibleFamiliesForBand(REGISTRY, "induction-transfer");
     expect(finalItemFamilies.size, "distinct families that can finish a long test")
-      .toBeGreaterThanOrEqual(3);
+      .toBe(eligibleFinalFamilies.length);
+    expect(new Set(finalItemFamilies.keys()))
+      .toEqual(new Set(eligibleFinalFamilies.map((family) => family.familyId)));
     for (const [familyId, count] of finalItemFamilies) {
       expect(count / SCHEDULES, `${familyId} share of final items`).toBeLessThan(0.75);
     }
