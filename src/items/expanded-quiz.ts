@@ -183,8 +183,13 @@ import {
  * applies three, with varied order. The one-step rule-switching family moves
  * from the hard tail into warmup. Every composed worked row is now required by
  * its query, so v16 and v17 results must not be pooled.
+ *
+ * `v18` promotes `combining-machine-v1` into constraint-spatial — the first
+ * family whose gates combine two boards — growing the served pool from 16 keys
+ * to 18. A new family is a new population, so v17 and v18 results must not be
+ * pooled.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v17" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v18" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -234,9 +239,11 @@ export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>
  * are split and ordered. Warmup keeps its complete pool so every test still
  * begins with the full set of introductory mechanisms.
  *
- * Constraint-spatial draws both of its remaining families after fold-and-punch
- * was withdrawn in v16. Induction-transfer draws both of its hard, three-step
- * transformation families after the one-step switch moved to warmup in v17.
+ * Constraint-spatial draws two of its three families since combining-machine
+ * was promoted in v18, so one long test never carries all three heavy
+ * constraint mechanisms at once. Induction-transfer draws both of its hard,
+ * three-step transformation families after the one-step switch moved to warmup
+ * in v17.
  */
 export const FAMILY_SUBSAMPLE_SIZES: Readonly<
   Record<ExpandedProfileBand, number | undefined>

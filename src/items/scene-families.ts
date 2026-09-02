@@ -1750,9 +1750,16 @@ const COMBINING_MACHINE_GATE_ORDERS_TRIED = 140;
  * Gate orders searched for full aspect coverage before settling for a sound
  * draw. Deliberately large: it takes a wide search to find a three-gate chain
  * whose answer some OTHER chain can sit beside, and the payoff is real — d5 items
- * decided by a single aspect fall from 47% at 40 orders to 8% at 120. The cost is
- * roughly 700ms an item, which is fine while this family is a prototype the
- * assembler never calls, and the first thing to revisit if it is ever promoted.
+ * decided by a single aspect fall from 47% at 40 orders to 8% at 120.
+ *
+ * Revisited at promotion (v18, 2026-09-02) and kept. Measured then: d5 items
+ * cost ~626ms mean / ~1.2s p90 to build, which puts a long test that draws this
+ * family at ~3.7s mean (~150ms without it). That is a one-time wait when a
+ * person starts a test, well inside the serverless budget, and the search is
+ * exactly what buys the single-aspect bar — shrinking it trades quality for
+ * speed, and a wall-clock cutoff would break seed reproducibility. A smarter
+ * search that pre-filters orders is a deliberate generator reissue if the wait
+ * ever matters more.
  */
 const COMBINING_MACHINE_COVERAGE_ORDERS = 120;
 

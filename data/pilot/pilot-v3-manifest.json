@@ -1,11 +1,27 @@
 {
  "schemaVersion": "prototype-pilot-packets-v3",
- "itemCount": 16,
+ "itemCount": 18,
  "packets": [
   {
    "packetId": "pilot-v3-a",
-   "contentFingerprint": "b505b4b604c6a991",
+   "contentFingerprint": "e922c681ca71bee5",
    "items": [
+    {
+     "itemId": "combining-machine-v1:constraint-spatial:combining-machine-d4:r1",
+     "familyId": "combining-machine-v1",
+     "band": "constraint-spatial",
+     "difficultyBucket": "combining-machine-d4",
+     "difficulty": 4,
+     "bandTimeBudgetSeconds": 50
+    },
+    {
+     "itemId": "combining-machine-v1:constraint-spatial:combining-machine-d5:r1",
+     "familyId": "combining-machine-v1",
+     "band": "constraint-spatial",
+     "difficultyBucket": "combining-machine-d5",
+     "difficulty": 5,
+     "bandTimeBudgetSeconds": 50
+    },
     {
      "itemId": "relational-sequence-v2:warmup:relational-sequence-d2:r1",
      "familyId": "relational-sequence-v2",

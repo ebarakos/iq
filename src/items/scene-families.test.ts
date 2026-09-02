@@ -442,7 +442,10 @@ describe("scene family prototypes", () => {
     expect(drawable.has("transformation-machine-d6")).toBe(false);
     // Guard the guard: a typo in the table names would make the filter vacuous.
     expect(Object.keys(declared).filter((bucket) => drawable.has(bucket)).sort())
-      .toEqual(["composed-transform-d4", "composed-transform-d5", "transformation-machine-d5"]);
+      .toEqual([
+        "combining-machine-d4", "combining-machine-d5",
+        "composed-transform-d4", "composed-transform-d5", "transformation-machine-d5",
+      ]);
   });
 
   it("builds set-algebra rows that separate all eight combining rules", () => {

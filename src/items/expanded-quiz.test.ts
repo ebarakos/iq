@@ -70,10 +70,8 @@ describe("eligible family pool", () => {
       .toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the sixteen family/band/bucket keys the v17 battery serves", () => {
-    // v17 keeps the same key count while moving the one-step switching family
-    // from the hard tail to warmup. The number is derived from the registry, so changing
-    // the live population requires changing this assertion deliberately.
+  it("holds exactly the eighteen family/band/bucket keys the v18 battery serves", () => {
+    // v18 adds the two combining-machine buckets to constraint-spatial.
     // The number is derived from the registry here, so adding or withdrawing a
     // family without revisiting the plan fails this test rather than quietly
     // moving the population the pilot packet and emergency bank are sized to.
@@ -81,9 +79,9 @@ describe("eligible family pool", () => {
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => `${family.familyId}:${band}:${bucket.bucket}`)));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(16);
+    expect(keys).toHaveLength(18);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
-      .toEqual([4, 5, 2, 2]);
+      .toEqual([4, 5, 3, 2]);
     // No key is d6 any more. The two that were are withdrawn, so the ladder
     // tops out at d5 until a mechanism earns a sixth rung some way other than
     // by adding gates — the lever the owner ruled out on 2026-08-27.
@@ -547,11 +545,18 @@ describe("format-aware family subsampling", () => {
     expect(new Set(composition.map((draw) =>
       draw.map((family) => family.familyId).sort().join("+"))).size).toBe(2);
 
-    // Constraint-spatial now consists only of the two exceptional families the
-    // owner retained, and the band draws both.
-    expect(draws("constraint-spatial")).toHaveLength(1);
-    expect(draws("constraint-spatial")[0].map((family) => family.familyId).sort())
-      .toEqual(["relational-matrix-v2", "visual-set-algebra-v2"]);
+    // Constraint-spatial draws two of its three families since combining-machine
+    // was promoted in v18. None of the three is analogy-shaped, so every pair is
+    // a legal draw.
+    const constraint = draws("constraint-spatial");
+    expect(constraint).toHaveLength(3);
+    expect(new Set(constraint.map((draw) =>
+      draw.map((family) => family.familyId).sort().join("+"))).size).toBe(3);
+    for (const draw of constraint) {
+      expect(draw.map((family) => family.familyId).every((familyId) =>
+        ["combining-machine-v1", "relational-matrix-v2", "visual-set-algebra-v2"].includes(familyId)))
+        .toBe(true);
+    }
 
     // Induction-transfer now has exactly the two three-step transformation
     // families and draws both. The one-step switch belongs to warmup.

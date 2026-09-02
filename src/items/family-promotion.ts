@@ -150,18 +150,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [candidateBand("composition")],
   },
   {
-    // New on 2026-08-27, and deliberately a PROTOTYPE rather than code-valid:
-    // code-valid is served immediately, and no person has looked at this family
-    // yet. It now meets the single-inference bar the rest of the battery was
-    // held to the same day — 0 of 40 d4 items decided by one aspect, 4 of 40 at
-    // d5, pinned by a test — so what is left before promotion is a human
-    // reading one, not more generator work. Note that nothing currently SHOWS a
-    // prototype family to a person: the pilot packet is built from enabled keys
-    // and skips this state (`enabledPrototypePilotKeys`), so promoting it needs
-    // a surface first. TODO.md carries that.
+    // Built 2026-08-27, promoted to code-valid on the owner's 2026-09-02
+    // instruction after the battery-wide human check came back clean. It meets
+    // the single-inference bar the rest of the battery was held to — 0 of 40 d4
+    // items decided by one aspect, 4 of 40 at d5, pinned by a test. The first
+    // family whose gates combine TWO boards; d4 shows two gates, d5 three.
     familyId: "combining-machine-v1",
     primaryReasoningFamily: "operator-induction",
-    bands: [candidateBand("constraint-spatial")],
+    bands: [codeValidBand("constraint-spatial", ["combining-machine-d4", "combining-machine-d5"])],
   },
   {
     familyId: "relational-sequence-v2",

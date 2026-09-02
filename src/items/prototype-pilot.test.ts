@@ -538,7 +538,10 @@ describe("pilot report validation", () => {
 describe("pilot report gates", () => {
   it("flags the documented withdrawal reasons per item and withdraws nothing", () => {
     const [first, second, third, fourth] = packet.items.map((item) => item.itemId);
-    const slow = deepestItems[0];
+    // A d5 item that is not one of the four above, so its budget override never
+    // collides with (and silently replaces) one of theirs in the overrides map.
+    const slow = deepestItems.find((item) =>
+      ![first, second, third, fourth].includes(item.itemId))!;
     const report = analysePrototypePilotAggregate(manifest, aggregateFor({
       [first]: { notationMisunderstandingReports: 1 },
       [second]: { intendedRelationshipDescriptions: 0 },

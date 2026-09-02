@@ -18,7 +18,7 @@
   ],
   "keysNotCarried": {
     "composed-transform-v2:composition:composed-transform-d4": "No v10 baseline. At 72ffdb3 the family is composed-transform-v1. The current d4 population was reissued in v17 as a two-step spatial-and-fill composition, so it is not the same population. For the record, v10's composed-transform-v1 measured p50 (2, 2) and p90 (5, 21).",
-    "every other key the current registry serves": "compositional-analogy-d4, parallel-evolution-d3, parallel-evolution-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10, and neither did the two d6 buckets added on 2026-08-26, composed-transform-d6 and transformation-machine-d6. The verifier reports their percentiles with comparable: false and invents no baseline for them."
+    "every other key the current registry serves": "compositional-analogy-d4, parallel-evolution-d3, parallel-evolution-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10, and neither did the two d6 buckets added on 2026-08-26, composed-transform-d6 and transformation-machine-d6, nor the two combining-machine buckets promoted in v18. The verifier reports their percentiles with comparable: false and invents no baseline for them."
   },
   "withdrawnKeysNote": "Keys that once had a v10 baseline and are no longer served, kept with the numbers they were recorded with. A withdrawal is a normal event and must leave a record: deleting the row would make the gate green by forgetting, and the aggregate no-regression comparison runs over the keys still in \"keys\" either way. scripts/scene-family-verify.ts fails if a key appears in both objects, or if a key listed here turns up in a run.",
   "withdrawnKeys": {

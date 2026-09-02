@@ -72,10 +72,9 @@ describe("loadBank", () => {
       });
       // The top-up draws on both public lengths and records which one each item
       // came from, so a key no length reaches is caught rather than silently
-      // left thin. In v17 a long test reaches all 16 keys on its own and a
-      // short one reaches 13. A 5-question test asks each band for
-      // one or two questions, so it only ever gets a family's entry-point
-      // bucket.
+      // left thin. In v18 a long test reaches all 18 keys on its own. A
+      // 5-question test asks each band for one or two questions, so it only
+      // ever gets a family's entry-point bucket.
       expect(EXPANDED_PROFILES).toContain(item.provenance.profile);
       expect(typeof item.provenance.seed).toBe("string");
       expect(item.puzzle.generation?.generatorVersion).toBe(EXPANDED_GENERATOR_VERSION);
@@ -91,9 +90,9 @@ describe("loadBank", () => {
     expect(coverage.short).toEqual([]);
     expect(coverage.strays).toEqual([]);
     expect([...coverage.countsByKey.values()].every((have) => have === BANK_ITEMS_PER_KEY)).toBe(true);
-    // The v17 battery has 16 enabled keys, each stocked for the five times a
+    // The v18 battery has 18 enabled keys, each stocked for the five times a
     // constraint family can appear in one long test.
-    expect(coverage.countsByKey.size).toBe(16);
+    expect(coverage.countsByKey.size).toBe(18);
     expect(loadBank()).toHaveLength(coverage.countsByKey.size * BANK_ITEMS_PER_KEY);
   });
 });
