@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CURRENT_GENERATOR_VERSION, generateQuiz } from "@/items/generate";
 import { assembleExpandedQuiz } from "@/items/expanded-quiz";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
 import {
@@ -17,7 +16,7 @@ import {
 const SECRET = "test-only-quiz-token-secret-with-at-least-32-characters";
 
 function quiz() {
-  return generateQuiz("quiz-token-test-seed", CURRENT_GENERATOR_VERSION, "standard");
+  return assembleExpandedQuiz("quiz-token-test-seed", "short-5", CURRENT_FAMILY_PROMOTION_REGISTRY);
 }
 
 function payloadWith(itemCount: number) {
@@ -25,6 +24,7 @@ function payloadWith(itemCount: number) {
     version: 1 as const,
     issuedAt: 1_000,
     expiresAt: 2_000,
+    answerDeadline: 1_500,
     items: new Array(itemCount).fill(null).map((_, index) => ({
       id: `item-${index}`,
       answerIndex: 0,
@@ -74,20 +74,12 @@ describe("quiz token delivery", () => {
       .toEqual({ late: true, secondsLate: GRACE_WINDOW_SECONDS + 1 });
   });
 
-  it("never marks a token issued before deadlines existed", () => {
-    const delivery = createQuizDelivery(quiz(), { secret: SECRET, nowSeconds: 1_000 });
-    const payload = openQuizToken(delivery.quizToken, SECRET, 1_001);
-    const withoutDeadline = { ...payload, answerDeadline: undefined };
-
-    expect(submissionTiming(withoutDeadline, 999_999)).toEqual({ late: false, secondsLate: 0 });
-  });
-
-  it("accepts the two current lengths and the retired 12-question one, and nothing else", () => {
-    expect([...ACCEPTED_ITEM_COUNTS]).toEqual([5, 12, 30]);
+  it("accepts the two current lengths, and nothing else", () => {
+    expect([...ACCEPTED_ITEM_COUNTS]).toEqual([5, 30]);
     for (const count of ACCEPTED_ITEM_COUNTS) {
       expect(QuizTokenPayloadSchema.safeParse(payloadWith(count)).success).toBe(true);
     }
-    for (const count of [0, 4, 6, 13, 29, 31]) {
+    for (const count of [0, 4, 6, 12, 13, 29, 31]) {
       expect(QuizTokenPayloadSchema.safeParse(payloadWith(count)).success).toBe(false);
     }
   });

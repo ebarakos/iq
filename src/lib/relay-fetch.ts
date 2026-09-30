@@ -1,4 +1,4 @@
-// @relay-template: relay-fetch@9
+// @relay-template: relay-fetch@10
 
 /**
  * Custom fetch for the OpenAI-compatible / Vercel AI SDK client that talks to llm-relay.
@@ -9,9 +9,9 @@
  *      request whose body model differs (409 widget_model_mismatch), so a stale SDK default
  *      can never silently replace the user's visible choice
  *   3. Adds the BYO key / free-tier / thinking / custom-URL / no-fallback headers — except
- *      for the local harness providers (Claude Code / Codex), which take thinking and
- *      reasoning effort as request BODY fields; the relay never forwards X-Thinking-Budget
- *      to a harness process
+ *      for the local harness providers (Claude Code / Codex), which take thinking,
+ *      reasoning effort and the optional conversation `sessionId` as request BODY fields;
+ *      the relay never forwards X-Thinking-Budget to a harness process
  *   4. Reports per-request attribution to `onAttribution` (provider that actually answered,
  *      and whether the relay fell back to another provider or healed a retired model id)
  *   5. Throws a typed error on a relay-originated 429 so rate limits are distinguishable
@@ -60,6 +60,13 @@ export interface RelayFetchOptions {
   thinkingBudget?: number;
   /** Reasoning effort level (e.g. "low" … "max"). Only the harness providers honour it. */
   effort?: string;
+  /** Conversation id (16–128 chars, use a UUID) for the harness providers: the bridge keeps
+   *  the CLI session alive across calls and only reads the newest user message on later
+   *  ones. One id per conversation — never shared between independent actors, or they read
+   *  each other's context. Still send the full `messages` history: an unknown id (bridge
+   *  restart, idle expiry, model switch) is rebuilt from it, and the response header
+   *  `X-Harness-Session` says `resumed` or `new`. Hosted providers never receive it. */
+  sessionId?: string;
   customUrl?: string;
   noFallback?: boolean;
   onAttribution?: (info: RelayAttribution) => void;
@@ -91,6 +98,7 @@ export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
           if (harness) {
             if (opts.thinkingBudget) body.thinking_budget = opts.thinkingBudget;
             if (opts.effort) body.reasoning_effort = opts.effort;
+            if (opts.sessionId) body.session_id = opts.sessionId;
           }
           options = { ...options, body: JSON.stringify(body) };
         }

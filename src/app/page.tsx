@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { PublicPuzzle, Visual } from "@/items/schema";
 import { StemView, VisualGraphic, describeVisual } from "@/items/render";
-import { countUnansweredAnswers, needsBlankSubmissionConfirmation } from "@/lib/quiz-progress";
-import { apiFetch, formatApiError } from "@/lib/relay-client";
+import {
+  countUnansweredAnswers,
+  needsBlankSubmissionConfirmation,
+  parseStoredSession,
+  type StoredSession,
+} from "@/lib/quiz-progress";
 
 type Source = "generated" | "fallback";
 
@@ -22,6 +26,9 @@ interface GenerateResponse {
   profile?: TestProfile;
   /** Server-issued end of the test, in epoch seconds. The browser only displays it. */
   answerDeadline?: number;
+  /** Server clock at issue time, in the same epoch-seconds unit as answerDeadline —
+   *  lets the browser correct for its own clock being wrong, not just slow. */
+  serverNow?: number;
   secondsPerQuestion?: number;
   source: Source;
   generatorVersion?: string;
@@ -52,8 +59,56 @@ interface SubmitResponse {
 
 type Phase = "intro" | "loading" | "submitting" | "result" | "active" | "error";
 const START_TIMEOUT_MS = 20000;
+/** Mirrors START_TIMEOUT_MS: scoring an already-finished test should not hang
+ *  indefinitely either, and a timed-out submission must not lose the test. */
+const SUBMIT_TIMEOUT_MS = 20000;
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
+
+/**
+ * Plain POST helper, replacing the llm-relay widget's `apiFetch`. This app
+ * never loads that widget (it has no model picker), so it only ever needs a
+ * fetch that reads the API routes' own `{ message }` error body.
+ */
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return (await res.json()) as T;
+}
+
+/** Read the `{ message }` body an API route sends on failure; fall back to a
+ *  plain sentence for anything else (a proxy's HTML error page, an empty body). */
+async function readErrorMessage(res: Response): Promise<string> {
+  try {
+    const data: unknown = await res.json();
+    if (data && typeof data === "object" && typeof (data as { message?: unknown }).message === "string") {
+      return (data as { message: string }).message;
+    }
+  } catch {
+    // Not JSON — fall through to the plain sentence.
+  }
+  return `Request failed (${res.status})`;
+}
+
+/** Fetch failures throw a message that names the browser engine, not the
+ *  problem — "Failed to fetch" in Chromium, "Load failed" in Safari, a
+ *  NetworkError string in Firefox — and none of it means anything to a test
+ *  taker. Recognise those and swap in a plain sentence instead. */
+function isRawNetworkErrorMessage(message: string): boolean {
+  return /^failed to fetch$/i.test(message) ||
+    /^load failed$/i.test(message) ||
+    /networkerror/i.test(message);
+}
+
+/** Build a user-friendly error string from a caught error. */
+function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
 
 /** Warn in the last tenth of the budget, and never later than the last 30 seconds. */
 function lowTimeThreshold(totalSeconds: number): number {
@@ -69,27 +124,15 @@ function formatClock(seconds: number): string {
 // hide the new start experience after a reload.
 const SESSION_KEY = "aiq-test-v5";
 
-/** Validate a raw parsed object before restoring session state. */
-function isValidSession(v: unknown): v is {
-  phase: "active" | "result";
-  puzzles: PublicPuzzle<Visual>[];
-  answers: (number | null)[];
-  current: number;
-  quizToken: string;
-  answerDeadline?: number;
-  review?: SubmitResponse;
-} {
-  if (!v || typeof v !== "object") return false;
-  const s = v as Record<string, unknown>;
-  if (s.phase !== "active" && s.phase !== "result") return false;
-  if (!Array.isArray(s.puzzles) || s.puzzles.length === 0) return false;
-  if (!Array.isArray(s.answers) || s.answers.length !== s.puzzles.length) return false;
-  if (typeof s.current !== "number" || s.current < 0 || s.current >= s.puzzles.length) return false;
-  if (typeof s.quizToken !== "string" || s.quizToken.length === 0) return false;
-  if (s.answerDeadline !== undefined && typeof s.answerDeadline !== "number") return false;
-  if (s.phase === "result" && (!s.review || typeof s.review !== "object")) return false;
-  return true;
-}
+type TestMeta = {
+  profile: TestProfile;
+  secondsPerQuestion: number;
+  source: Source;
+  generatorVersion?: string;
+  notice?: string;
+};
+
+type SavedSession = StoredSession<PublicPuzzle<Visual>, SubmitResponse, Partial<TestMeta>>;
 
 export default function Page() {
   const [phase, setPhase] = useState<Phase>("intro");
@@ -98,19 +141,25 @@ export default function Page() {
   const [quizToken, setQuizToken] = useState("");
   const [review, setReview] = useState<SubmitResponse | null>(null);
   const [current, setCurrent] = useState(0);
-  const [meta, setMeta] = useState<{
-    profile: TestProfile;
-    secondsPerQuestion: number;
-    source: Source;
-    generatorVersion?: string;
-    notice?: string;
-  } | null>(null);
+  const [meta, setMeta] = useState<TestMeta | null>(null);
   // The countdown is restored from the deadline the server issued, never from a
   // locally kept elapsed time, so a reload cannot hand anyone extra minutes.
   const [answerDeadline, setAnswerDeadline] = useState<number | null>(null);
+  // How far the server's clock sat ahead of (or behind) the browser's when the
+  // test was issued (serverNow - clientNow). Added to the browser's own clock
+  // at every tick, so the countdown runs on the server's clock rather than
+  // trusting a taker's device to have the right time.
+  const [clockOffset, setClockOffset] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const autoSubmitted = useRef(false);
   const [error, setError] = useState<string>("");
+  // Whether the error on screen came from a failed *submission* that left the
+  // test intact — as opposed to a failed start, or an expired/invalid token,
+  // both of which already reset back to a blank test.
+  const [canRetrySubmit, setCanRetrySubmit] = useState(false);
+  // Whether the last submission was the automatic one fired when time ran
+  // out, so the result screen can say so plainly.
+  const [wasAutomaticSubmit, setWasAutomaticSubmit] = useState(false);
   const startRequestId = useRef(0);
   const requestedProfile = useRef<TestProfile>("long-30");
 
@@ -130,7 +179,10 @@ export default function Page() {
     setCurrent(0);
     setMeta(null);
     setAnswerDeadline(null);
+    setClockOffset(0);
     setSecondsLeft(null);
+    setCanRetrySubmit(false);
+    setWasAutomaticSubmit(false);
     autoSubmitted.current = false;
   }
 
@@ -141,51 +193,56 @@ export default function Page() {
   // Restore in-progress session on mount (client-only; avoids hydration mismatch).
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as unknown;
-      if (!isValidSession(parsed)) return;
-      setPhase(parsed.phase);
-      setPuzzles(parsed.puzzles);
-      setAnswers(parsed.answers);
-      setQuizToken(parsed.quizToken);
-      if (typeof parsed.answerDeadline === "number") setAnswerDeadline(parsed.answerDeadline);
-      if (parsed.review) setReview(parsed.review);
-      setCurrent(parsed.current);
-      if ("meta" in (parsed as Record<string, unknown>) && parsed && typeof parsed === "object") {
-        const m = (parsed as Record<string, unknown>).meta;
-        if (m && typeof m === "object") {
-          const restored = m as {
-            profile?: TestProfile;
-            secondsPerQuestion?: number;
-            source: Source;
-            generatorVersion?: string;
-            notice?: string;
-          };
-          setMeta({
-            ...restored,
-            profile: restored.profile ?? "long-30",
-            secondsPerQuestion: restored.secondsPerQuestion ?? 60,
-          });
-          requestedProfile.current = restored.profile ?? "long-30";
-        }
+      const restored = parseStoredSession<PublicPuzzle<Visual>, SubmitResponse, Partial<TestMeta>>(
+        sessionStorage.getItem(SESSION_KEY),
+      );
+      if (!restored) return;
+      setPhase(restored.phase);
+      setPuzzles(restored.puzzles);
+      setAnswers(restored.answers);
+      setQuizToken(restored.quizToken);
+      setAnswerDeadline(restored.answerDeadline);
+      setClockOffset(restored.clockOffset);
+      setWasAutomaticSubmit(restored.wasAutomaticSubmit);
+      if (restored.review) setReview(restored.review);
+      setCurrent(restored.current);
+      if (restored.meta) {
+        const profile = restored.meta.profile ?? "long-30";
+        setMeta({
+          ...restored.meta,
+          source: restored.meta.source ?? "generated",
+          profile,
+          secondsPerQuestion: restored.meta.secondsPerQuestion ?? 60,
+        });
+        requestedProfile.current = profile;
       }
     } catch {
-      // Malformed storage — ignore.
+      // Storage unavailable (private browsing, blocked site data) — ignore.
     }
   }, []);
 
-  // Persist state whenever it changes while test is in progress.
+  // Persist state whenever it changes while a test is in progress — including
+  // while an error is on screen, so a reload after a failed submission hands
+  // the test back instead of losing it. The error screen itself is not worth
+  // restoring (its message may already be stale), so it is saved as "active":
+  // a reload during it resumes the test exactly as it stood before the failed
+  // submission, ready to submit again. A token failure already clears
+  // everything (puzzles is empty by the time this runs), so there is nothing
+  // useful to save then.
   useEffect(() => {
-    if (phase !== "active" && phase !== "result") return;
+    if (phase !== "active" && phase !== "result" && phase !== "error") return;
+    if (phase === "error" && puzzles.length === 0) return;
+    const storedPhase = phase === "error" ? "active" : phase;
+    const snapshot: SavedSession = {
+      phase: storedPhase, puzzles, answers, current, meta, quizToken, answerDeadline, clockOffset,
+      wasAutomaticSubmit, review,
+    };
     try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-        phase, puzzles, answers, current, meta, quizToken, answerDeadline, review,
-      }));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(snapshot));
     } catch {
       // Storage quota exceeded or private browsing restriction — ignore.
     }
-  }, [phase, puzzles, answers, current, meta, quizToken, answerDeadline, review]);
+  }, [phase, puzzles, answers, current, meta, quizToken, answerDeadline, clockOffset, wasAutomaticSubmit, review]);
 
   async function start(profile: TestProfile) {
     if (phase === "loading" || phase === "submitting") return;
@@ -207,7 +264,7 @@ export default function Page() {
 
     try {
       const data = await Promise.race([
-        apiFetch<GenerateResponse>("/api/generate", { profile }),
+        postJson<GenerateResponse>("/api/generate", { profile }),
         timeout,
       ]);
       if (startRequestId.current !== requestId) return;
@@ -217,10 +274,15 @@ export default function Page() {
       setQuizToken(data.quizToken);
       setAnswers(new Array(data.puzzles.length).fill(null));
       const secondsPerQuestion = data.secondsPerQuestion ?? 60;
-      setAnswerDeadline(
-        data.answerDeadline ??
-          Math.floor(Date.now() / 1000) + secondsPerQuestion * data.puzzles.length,
-      );
+      const deadline = data.answerDeadline ??
+        Math.floor(Date.now() / 1000) + secondsPerQuestion * data.puzzles.length;
+      setAnswerDeadline(deadline);
+      // The countdown runs on the server's clock: how far ahead (or behind)
+      // it sat when this response arrived, added back at every tick. A
+      // session saved before this field existed reads as 0 (the client's own
+      // clock), matching how it already behaved.
+      const clientNowAtReceipt = Math.floor(Date.now() / 1000);
+      setClockOffset(typeof data.serverNow === "number" ? data.serverNow - clientNowAtReceipt : 0);
       autoSubmitted.current = false;
       setMeta({
         profile: data.profile ?? profile,
@@ -233,7 +295,12 @@ export default function Page() {
       setPhase("active");
     } catch (err) {
       if (startRequestId.current !== requestId) return;
-      setError(formatApiError(err, "Something went wrong"));
+      const message = errorMessage(err, "Something went wrong");
+      setError(
+        isRawNetworkErrorMessage(message)
+          ? "Could not reach the server. Please check your connection and try again."
+          : message,
+      );
       setPhase("error");
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
@@ -247,11 +314,14 @@ export default function Page() {
       setSecondsLeft(null);
       return;
     }
-    const tick = () => setSecondsLeft(Math.max(0, answerDeadline - Math.floor(Date.now() / 1000)));
+    const tick = () => {
+      const estimatedServerNow = Date.now() / 1000 + clockOffset;
+      setSecondsLeft(Math.max(0, Math.floor(answerDeadline - estimatedServerNow)));
+    };
     tick();
     const handle = setInterval(tick, 1000);
     return () => clearInterval(handle);
-  }, [phase, answerDeadline]);
+  }, [phase, answerDeadline, clockOffset]);
 
   // Out of time: submit whatever is answered. Everything left blank scores wrong,
   // exactly as it would have on an early submission.
@@ -265,26 +335,63 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, secondsLeft]);
 
-  async function finish(automatic = false) {
-    const unanswered = countUnansweredAnswers(answers);
-    if (needsBlankSubmissionConfirmation(answers, automatic)) {
-      const questionLabel = unanswered === 1 ? "question" : "questions";
-      if (!window.confirm(`You have ${unanswered} unanswered ${questionLabel}. Submit anyway?`)) return;
+  /**
+   * Score the current test.
+   *
+   * `isRetry` is set only by the "Retry submission" button on the error
+   * screen: it resubmits the same answers and token without reopening the
+   * blank-answers confirm the taker already got past (or deliberately never
+   * triggered, on an automatic submission).
+   */
+  async function finish(automatic = false, isRetry = false) {
+    if (!isRetry) {
+      const unanswered = countUnansweredAnswers(answers);
+      if (needsBlankSubmissionConfirmation(answers, automatic)) {
+        const questionLabel = unanswered === 1 ? "question" : "questions";
+        if (!window.confirm(`You have ${unanswered} unanswered ${questionLabel}. Submit anyway?`)) return;
+      }
+      setWasAutomaticSubmit(automatic);
     }
     setPhase("submitting");
     setError("");
+    setCanRetrySubmit(false);
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error("Scoring is taking longer than expected. Your answers are kept — try again."));
+      }, SUBMIT_TIMEOUT_MS);
+    });
+
     try {
-      const result = await apiFetch<SubmitResponse>("/api/submit", { quizToken, answers });
+      const result = await Promise.race([
+        postJson<SubmitResponse>("/api/submit", { quizToken, answers }),
+        timeout,
+      ]);
       setReview(result);
       setPhase("result");
     } catch (err) {
-      const message = formatApiError(err, "Could not score this test");
-      if (isTokenFailureMessage(message)) {
+      const raw = errorMessage(err, "Could not score this test. Your answers are kept — try again.");
+      if (isTokenFailureMessage(raw)) {
+        // The token itself is dead — nothing left to retry. Same recovery as
+        // today: drop back to a blank test.
         clearStoredSession();
         resetLocalTestState();
+        setError(raw);
+      } else {
+        // Every other failure — a network error, a timeout, a 500 — leaves
+        // the test exactly as it was. The taker can retry the same
+        // submission or, from the same screen, choose to start over instead.
+        setCanRetrySubmit(true);
+        setError(
+          isRawNetworkErrorMessage(raw)
+            ? "Could not reach the server to score this test. Your answers are kept — try again."
+            : raw,
+        );
       }
-      setError(message);
       setPhase("error");
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
 
@@ -322,7 +429,15 @@ export default function Page() {
       {phase === "intro" && <Intro onStart={start} />}
       {phase === "loading" && <Loading label="Creating a fresh test…" />}
       {phase === "submitting" && <Loading label="Scoring your answers…" />}
-      {phase === "error" && <ErrorView message={error} onRetry={() => start(requestedProfile.current)} />}
+      {phase === "error" && (
+        <ErrorView
+          message={error}
+          canRetrySubmit={canRetrySubmit}
+          onRetrySubmit={() => finish(false, true)}
+          onRetryStart={() => start(requestedProfile.current)}
+          onStartNew={() => restart(true)}
+        />
+      )}
 
       {phase === "active" && puzzles[current] && (
         <Solver
@@ -352,6 +467,7 @@ export default function Page() {
           answers={answers}
           review={review}
           meta={meta}
+          automatic={wasAutomaticSubmit}
           onRestart={restart}
         />
       )}
@@ -404,40 +520,100 @@ function Loading({ label }: { label: string }) {
   );
 }
 
-function ErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const isTokenError = message.includes("quiz token");
+function ErrorView({
+  message,
+  canRetrySubmit,
+  onRetrySubmit,
+  onRetryStart,
+  onStartNew,
+}: {
+  message: string;
+  /** True only for a failed submission that left the test intact — a token
+   *  failure or a failed start has already reset back to a blank test. */
+  canRetrySubmit: boolean;
+  onRetrySubmit: () => void;
+  onRetryStart: () => void;
+  onStartNew: () => void;
+}) {
+  const isTokenError = message.includes("quiz token") || message.includes("quiz has expired");
   return (
     <section className="rounded-2xl border border-red-200 bg-red-50 p-8 shadow-sm">
       <h2 className="text-lg font-semibold text-red-800">Something went wrong</h2>
       <p className="mt-2 text-red-700">{message}</p>
-      <button
-        onClick={onRetry}
-        className="mt-5 rounded-lg bg-red-700 px-4 py-2 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
-      >
-        {isTokenError ? "Start a fresh test" : "Try again"}
-      </button>
+      {canRetrySubmit ? (
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            onClick={onRetrySubmit}
+            className="rounded-lg bg-red-700 px-4 py-2 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
+          >
+            Retry submission
+          </button>
+          <button
+            onClick={onStartNew}
+            className="rounded-lg border border-red-300 px-4 py-2 font-medium text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
+          >
+            Start a new test
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onRetryStart}
+          className="mt-5 rounded-lg bg-red-700 px-4 py-2 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
+        >
+          {isTokenError ? "Start a fresh test" : "Try again"}
+        </button>
+      )}
     </section>
   );
 }
 
-function puzzleTypeLabel(puzzle: PublicPuzzle<Visual>): string {
-  const familyLabels: Record<string, string> = {
-    "relational-sequence-v2": "relational sequence",
-    "attribute-pairing-v1": "attribute pairing",
-    "compositional-analogy-v2": "compositional analogy",
-    "composed-transform-v2": "composed transformation",
-    "relational-matrix-v2": "relational matrix",
-    "visual-set-algebra-v2": "visual set algebra",
-    "spatial-transform-v2": "spatial transformation",
-    "transformation-machine-v3": "transformation machine",
-    "rule-switching-v2": "rule switching",
-    "second-order-sequence-v2": "second-order sequence",
-    "inverse-analogy-v2": "inverse analogy",
-  };
-  if (puzzle.familyId && familyLabels[puzzle.familyId]) return familyLabels[puzzle.familyId];
-  return puzzle.type === "operatorInduction"
+const FAMILY_LABELS: Record<string, string> = {
+  "relational-sequence-v2": "relational sequence",
+  "attribute-pairing-v1": "attribute pairing",
+  "compositional-analogy-v2": "compositional analogy",
+  "composed-transform-v2": "composed transformation",
+  "relational-matrix-v2": "relational matrix",
+  "visual-set-algebra-v2": "visual set algebra",
+  "spatial-transform-v2": "spatial transformation",
+  "transformation-machine-v3": "transformation machine",
+  "second-order-sequence-v2": "second-order sequence",
+  "inverse-analogy-v2": "inverse analogy",
+};
+
+/**
+ * A readable name for a reasoning family. The explicit map above is checked
+ * first; anything not in it (a family added since, or the review screen's
+ * own gaps) falls back to turning the raw id into words — strip a trailing
+ * "-vN" version suffix, hyphens to spaces — so a raw id is never shown.
+ */
+function familyLabel(familyId: string): string {
+  if (FAMILY_LABELS[familyId]) return FAMILY_LABELS[familyId];
+  return familyId.replace(/-v\d+$/, "").replaceAll("-", " ");
+}
+
+const BAND_LABELS: Record<string, string> = {
+  warmup: "warm-up",
+  composition: "composition",
+  "constraint-spatial": "constraint & spatial",
+  "induction-transfer": "induction & transfer",
+};
+
+/** A readable name for a difficulty band, with the same words-from-id fallback. */
+function bandLabel(band: string): string {
+  return BAND_LABELS[band] ?? band.replaceAll("-", " ");
+}
+
+/**
+ * A readable label for a review-screen question header. The family id comes
+ * from the submit response's per-question results, never from the served
+ * puzzle — the public puzzle type carries no family/band before answers ride
+ * back from the server (see the "answer-free until scored" rule).
+ */
+function puzzleTypeLabel(type: PublicPuzzle<Visual>["type"], familyId?: string): string {
+  if (familyId) return familyLabel(familyId);
+  return type === "operatorInduction"
     ? "visual equation"
-    : puzzle.type === "oddOneOut" ? "odd one out" : puzzle.type;
+    : type === "oddOneOut" ? "odd one out" : type;
 }
 
 function NoticeBanner({ notice }: { notice?: string }) {
@@ -652,7 +828,7 @@ function Solver({
         </p>
       </div>
 
-      <div className="mt-6 flex items-center justify-between pr-14 sm:pr-0">
+      <div className="mt-6 flex items-center justify-between">
         <button
           onClick={onPrev}
           disabled={index === 0}
@@ -685,6 +861,7 @@ function Result({
   answers,
   review,
   meta,
+  automatic,
   onRestart,
 }: {
   puzzles: PublicPuzzle<Visual>[];
@@ -697,15 +874,19 @@ function Result({
     generatorVersion?: string;
     notice?: string;
   } | null;
+  /** True when this submission was the automatic one fired at time-up,
+   *  rather than the taker choosing to submit. */
+  automatic: boolean;
   onRestart: () => void;
 }) {
   const pct = Math.round((review.score / review.total) * 100);
+  const skipped = review.results.filter((result) => result.chosen === null).length;
+  const wrong = review.total - review.score - skipped;
 
   const length = meta ? PROFILE_LABELS[meta.profile] : `${puzzles.length}-question test`;
-  const version = meta?.generatorVersion ? ` · ${meta.generatorVersion}` : "";
   const attribution = meta?.source === "fallback"
     ? `${length} · from the verified reference set`
-    : `${length} · freshly generated questions${version}`;
+    : `${length} · freshly generated questions`;
 
   return (
     <section>
@@ -716,13 +897,26 @@ function Result({
           <span className="text-2xl font-normal text-gray-400"> / {puzzles.length}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
+        <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+          <span className="text-green-700">{review.score} correct</span>
+          <span className="text-red-700">{wrong} wrong</span>
+          <span className="text-gray-500">{skipped} skipped</span>
+        </div>
+        {automatic && (
+          <p className="mt-3 text-sm text-amber-700">
+            Time ran out; unanswered questions count as wrong.
+          </p>
+        )}
         {review.late && (
           <p className="mt-2 text-sm text-amber-700">
-            Submitted {formatClock(review.secondsLate ?? 0)} after time ran out. Your answers are
-            still scored; this result is left out of the family measurements.
+            Submitted {formatClock(review.secondsLate ?? 0)} after time ran out. Your answers were
+            still scored.
           </p>
         )}
         <div className="mt-3 text-xs text-gray-400">{attribution}</div>
+        {meta?.generatorVersion && (
+          <div className="mt-1 text-[11px] text-gray-400">Generator {meta.generatorVersion}</div>
+        )}
         <button
           onClick={onRestart}
           className="mt-6 rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
@@ -733,22 +927,8 @@ function Result({
 
       {review.breakdown && (review.breakdown.bands.length > 0 || review.breakdown.families.length > 0) && (
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          {[
-            ["By band", review.breakdown.bands],
-            ["By reasoning family", review.breakdown.families],
-          ].map(([title, rows]) => (
-            <div key={title as string} className="rounded-xl border border-gray-200 bg-white p-4 text-left">
-              <h3 className="text-sm font-semibold text-gray-800">{title as string}</h3>
-              <ul className="mt-2 space-y-1 text-sm text-gray-600">
-                {(rows as Array<{ key: string; correct: number; attempted: number }>).map((row) => (
-                  <li key={row.key} className="flex justify-between gap-3">
-                    <span>{row.key.replaceAll("-", " ")}</span>
-                    <span>{row.correct} / {row.attempted}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <BreakdownCard title="By band" rows={review.breakdown.bands} label={bandLabel} />
+          <BreakdownCard title="By reasoning family" rows={review.breakdown.families} label={familyLabel} />
         </div>
       )}
 
@@ -765,6 +945,30 @@ function Result({
         ))}
       </div>
     </section>
+  );
+}
+
+function BreakdownCard({
+  title,
+  rows,
+  label,
+}: {
+  title: string;
+  rows: Array<{ key: string; correct: number; attempted: number }>;
+  label: (key: string) => string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 text-left">
+      <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+      <ul className="mt-2 space-y-1 text-sm text-gray-600">
+        {rows.map((row) => (
+          <li key={row.key} className="flex justify-between gap-3">
+            <span>{label(row.key)}</span>
+            <span>{row.correct} / {row.attempted}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -789,7 +993,7 @@ function ReviewItem({
     <div className={`rounded-xl border bg-white p-5 shadow-sm ${correct ? "border-green-300" : "border-red-200"}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-500">
-          Q{index + 1} · {puzzleTypeLabel(puzzle)}
+          Q{index + 1} · {puzzleTypeLabel(puzzle.type, result.familyId)}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
@@ -809,6 +1013,14 @@ function ReviewItem({
           const isCorrect = i === result.answerIndex;
           const isChosen = i === chosen;
           const status = isCorrect ? "correct answer" : isChosen ? "your incorrect choice" : "";
+          // Colour and border alone do not carry the status: a screen reader
+          // ignores an aria-label on this role-less tile, and a colour-blind
+          // reader cannot use border colour either. State it as plain text —
+          // a tile can be both the correct answer and the taker's own pick.
+          const letterColor = isCorrect ? "text-green-700" : isChosen ? "text-red-700" : "text-gray-600";
+          const noteText = isCorrect && isChosen
+            ? "Correct answer · your choice"
+            : isCorrect ? "Correct answer" : isChosen ? "Your choice" : "";
           return (
             <div
               key={i}
@@ -817,10 +1029,15 @@ function ReviewItem({
                 isCorrect ? "border-green-400 bg-green-50" : isChosen ? "border-red-400 bg-red-50" : "border-gray-200"
               }`}
             >
-              <span className={`text-[10px] font-semibold ${isChosen ? "text-red-700" : "text-gray-600"}`}>
+              <span className={`text-xs font-semibold ${letterColor}`}>
                 {LETTERS[i]}
               </span>
               <VisualGraphic visual={opt} className="h-16 w-16" />
+              {noteText && (
+                <span className={`text-center text-xs font-medium leading-tight ${isCorrect ? "text-green-700" : "text-red-700"}`}>
+                  {noteText}
+                </span>
+              )}
             </div>
           );
         })}

@@ -470,6 +470,25 @@ export function gateStripWidth(glyphCount: number): number {
 }
 
 /**
+ * Analogy pair geometry, in CSS pixels at the narrowest viewport — priced the
+ * same way `gateStripWidth` prices a gate strip, from the Tailwind width
+ * classes the analogy markup actually uses (`w-20` panels, `w-6`/`w-8` fixed
+ * colon columns, `gap-1`). One pair ("A : B") fits `NARROW_VIEWPORT_STEM_WIDTH`
+ * comfortably; the full "A : B :: C : ?" line does not, which is exactly why
+ * the analogy strip wraps its two pairs onto separate lines instead of
+ * scrolling one of them out of view.
+ */
+export const ANALOGY_PANEL_WIDTH = 80; // w-20
+export const ANALOGY_COLON_WIDTH = 24; // w-6
+export const ANALOGY_DOUBLE_COLON_WIDTH = 32; // w-8
+export const ANALOGY_STRIP_GAP = 4; // gap-1
+
+/** Laid-out width of one analogy pair ("A : B", or the trailing "C : ?" half). */
+export function analogyPairWidth(): number {
+  return ANALOGY_PANEL_WIDTH * 2 + ANALOGY_COLON_WIDTH + ANALOGY_STRIP_GAP * 2;
+}
+
+/**
  * A machine gate: the dashed frame plus one full-size cell per gate glyph, read
  * left to right. A combined query gate used to be squeezed into a single cell,
  * which left each glyph about 7px wide on a phone; giving every glyph the cell a
@@ -668,13 +687,17 @@ export function StemView({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Vis
     const rows = Array.from({ length: puzzle.stem.length / 3 }, (_, index) =>
       puzzle.stem.slice(index * 3, index * 3 + 3),
     );
-    // The rows wrap: a query row carrying a multi-glyph gate is wider than a
-    // phone, and wrapping it puts the whole gate strip on a line of its own
-    // instead of shrinking it back into an unreadable single cell.
+    // Any row can be wider than a 375px phone, not only a query row carrying a
+    // multi-glyph gate — even one ordinary worked row (two panels, two arrows,
+    // one single-glyph gate) already exceeds the 261px budget on its own — so
+    // every row wraps rather than shrinking back into an unreadable line. Each
+    // row gets its own boxed background and the rows sit a clearly bigger gap
+    // apart than a wrapped row's own lines do, so a wrapped row still reads as
+    // one unit rather than blurring into its neighbour.
     return (
-      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3" aria-label="Worked transformation paths followed by one query path">
+      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-4" aria-label="Worked transformation paths followed by one query path">
         {rows.map(([input, gate, output], index) => (
-          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-1 sm:gap-2">
+          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-2 rounded-lg bg-gray-100/70 py-2 sm:gap-x-2">
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <div className="w-20 shrink-0">{input && <PanelBox panel={input} />}</div>
               <span className="text-xl text-gray-400" aria-hidden="true">→</span>
@@ -693,17 +716,18 @@ export function StemView({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Vis
   if (puzzle.layout === "combineTable") {
     // (left, gate, right, output) per row. The gate glyph sits BETWEEN the two
     // boards it combines, which is the whole difference from a machine table:
-    // there the gate transforms one board and stands before it.
+    // there the gate transforms one board and stands before it. Rows are
+    // boxed and gapped exactly as machineTable's — see the comment there.
     const rows = Array.from({ length: puzzle.stem.length / 4 }, (_, index) =>
       puzzle.stem.slice(index * 4, index * 4 + 4),
     );
     return (
       <div
-        className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3"
+        className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-4"
         aria-label="Worked combinations followed by one query combination"
       >
         {rows.map(([left, gate, right, output], index) => (
-          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-1 sm:gap-2">
+          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-2 rounded-lg bg-gray-100/70 py-2 sm:gap-x-2">
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <div className="w-20 shrink-0">{left && <PanelBox panel={left} />}</div>
             </div>
@@ -722,18 +746,31 @@ export function StemView({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Vis
   if (puzzle.layout === "analogy") {
     // [A, B, C] rendered as  A : B  ::  C : ?
     const [a, b, c] = puzzle.stem;
+    // Each pair ("A : B", ":: C : ?") is one non-wrapping flex item —
+    // `analogyPairWidth()` prices it against NARROW_VIEWPORT_STEM_WIDTH below.
+    // On a 375px phone the full line does not fit, so the two pairs wrap onto
+    // their own line at "::" instead of scrolling: scrolling the first pair
+    // out of view would defeat the comparison the puzzle asks for, and a pair
+    // itself never splits.
     return (
-      <ScrollStrip label="Analogy: the first pair, then the pair to complete">
-        <div className="w-20 shrink-0">{a && <PanelBox panel={a} />}</div>
-        <span className="text-2xl font-semibold text-gray-400">:</span>
-        <div className="w-20 shrink-0">{b && <PanelBox panel={b} />}</div>
-        <span className="px-1 text-2xl font-semibold text-gray-400">::</span>
-        <div className="w-20 shrink-0">{c && <PanelBox panel={c} />}</div>
-        <span className="text-2xl font-semibold text-gray-400">:</span>
-        <div className="w-20 shrink-0">
-          <PanelBox panel={{ blank: true }} />
+      <div
+        className="mx-auto flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-2 sm:flex-nowrap sm:gap-x-2"
+        aria-label="Analogy: the first pair, then the pair to complete"
+      >
+        <div className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2">
+          <div className="w-20 shrink-0">{a && <PanelBox panel={a} />}</div>
+          <span className="w-6 shrink-0 text-center text-2xl font-semibold text-gray-400">:</span>
+          <div className="w-20 shrink-0">{b && <PanelBox panel={b} />}</div>
         </div>
-      </ScrollStrip>
+        <div className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2">
+          <span className="w-8 shrink-0 text-center text-2xl font-semibold text-gray-400">::</span>
+          <div className="w-20 shrink-0">{c && <PanelBox panel={c} />}</div>
+          <span className="w-6 shrink-0 text-center text-2xl font-semibold text-gray-400">:</span>
+          <div className="w-20 shrink-0">
+            <PanelBox panel={{ blank: true }} />
+          </div>
+        </div>
+      </div>
     );
   }
 

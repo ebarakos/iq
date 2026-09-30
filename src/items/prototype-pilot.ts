@@ -547,8 +547,8 @@ export interface PrototypePilotGrade {
   /**
    * Which option was the answer. Part of the grade only, never of the served
    * item, so it reaches the browser exactly once and only after the answer has
-   * been locked. The explanations all say "the highlighted option"; this is
-   * what lets the page highlight one.
+   * been locked. The explanations refer to "the correct answer"; this is what
+   * lets the page mark which tile that is.
    */
   answerIndex: number;
   explanation: string;
@@ -618,9 +618,9 @@ export function gradePrototypePilotSittingAnswer(request: {
     correct: request.selectedOption === item.answerIndex,
     // Sent only in the grade response, never before it. The item is graded once
     // and the explanation already names the answer, so revealing which option
-    // it was leaks nothing further — and without it the explanation's phrase
-    // "the highlighted option" pointed at nothing on screen, which is exactly
-    // what the 2026-08-27 sitting reported.
+    // it was leaks nothing further — and without it the explanation's answer
+    // pointed at nothing on screen, which is exactly what the 2026-08-27
+    // sitting reported.
     answerIndex: item.answerIndex,
     explanation: item.explanation,
     late: elapsedSeconds > item.bandTimeBudgetSeconds,

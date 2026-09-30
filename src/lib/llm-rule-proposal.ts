@@ -1,6 +1,5 @@
 import { generateText } from "ai";
-import type { ModelOverrides } from "./relay-api-helpers";
-import { relayModel, relayTimeoutMs } from "./model";
+import { relayModel, relayTimeoutMs, type ModelOverrides } from "./model";
 import {
   materializeSceneRuleProposal,
   parseSceneRuleProposal,

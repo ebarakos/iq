@@ -9,7 +9,6 @@ import {
   fingerprintPuzzle,
   loadBank,
   sampleExpandedBankQuiz,
-  sampleQuiz,
 } from "./bank";
 import {
   BAND_SCHEDULE,
@@ -72,7 +71,7 @@ describe("loadBank", () => {
       });
       // The top-up draws on both public lengths and records which one each item
       // came from, so a key no length reaches is caught rather than silently
-      // left thin. In v18 a long test reaches all 18 keys on its own. A
+      // left thin. A long test reaches all 15 keys on its own. A
       // 5-question test asks each band for one or two questions, so it only
       // ever gets a family's entry-point bucket.
       expect(EXPANDED_PROFILES).toContain(item.provenance.profile);
@@ -90,9 +89,12 @@ describe("loadBank", () => {
     expect(coverage.short).toEqual([]);
     expect(coverage.strays).toEqual([]);
     expect([...coverage.countsByKey.values()].every((have) => have === BANK_ITEMS_PER_KEY)).toBe(true);
-    // The v18 battery has 18 enabled keys, each stocked for the five times a
-    // constraint family can appear in one long test.
-    expect(coverage.countsByKey.size).toBe(18);
+    // The battery has 15 enabled keys: parallel-evolution-v1's two were
+    // retired on 2026-09-28 and rule-switching-v2's one on 2026-09-29;
+    // combining-machine-v1's two left on 2026-09-29 and came back on
+    // 2026-09-30. Each is stocked for the five times a constraint family can
+    // appear in one long test.
+    expect(coverage.countsByKey.size).toBe(15);
     expect(loadBank()).toHaveLength(coverage.countsByKey.size * BANK_ITEMS_PER_KEY);
   });
 });
@@ -191,55 +193,6 @@ describe("sampleExpandedBankQuiz", () => {
         expect(expandedBankKeyOf(items[index].puzzle), `${seed} slot ${index + 1}`)
           .toBe(expandedBankKey(slot.familyId, slot.band, slot.difficultyBucket));
       });
-    }
-  });
-});
-
-describe("sampleQuiz", () => {
-  it("returns a valid, ramped, type-diverse quiz aligned with its bank items (100 runs)", () => {
-    for (let run = 0; run < 100; run++) {
-      const { puzzles, items } = sampleQuiz();
-      const parsed = PuzzleSetSchema.safeParse(puzzles);
-      expect(parsed.success, JSON.stringify(parsed.success ? "" : parsed.error.issues)).toBe(true);
-      expect(puzzles).toHaveLength(5);
-
-      for (let i = 1; i < puzzles.length; i++) {
-        expect(puzzles[i].difficulty).toBeGreaterThanOrEqual(puzzles[i - 1].difficulty);
-      }
-      expect(new Set(puzzles.map((p) => p.type)).size).toBeGreaterThanOrEqual(3);
-      expect(puzzles.some((p) => p.difficulty >= 4)).toBe(true);
-      // items[i] is the canonical bank record of puzzles[i]
-      expect(items.map((i) => i.puzzle.id)).toEqual(puzzles.map((p) => p.id));
-    }
-  });
-
-  it("throws when the bank is too small", () => {
-    expect(() => sampleQuiz(loadBank().slice(0, 3))).toThrow(/need at least/);
-  });
-
-  it("honours difficulty profiles (50 runs each)", () => {
-    for (let run = 0; run < 50; run++) {
-      const easy = sampleQuiz(loadBank(), 5, "easy");
-      expect(Math.max(...easy.puzzles.map((p) => p.difficulty))).toBeLessThanOrEqual(3);
-      expect(PuzzleSetSchema.safeParse(easy.puzzles).success).toBe(true);
-
-      const hard = sampleQuiz(loadBank(), 5, "hard");
-      expect(Math.min(...hard.puzzles.map((p) => p.difficulty))).toBeGreaterThanOrEqual(3);
-      expect(hard.puzzles.filter((p) => p.difficulty >= 4).length).toBeGreaterThanOrEqual(3);
-      expect(PuzzleSetSchema.safeParse(hard.puzzles).success).toBe(true);
-    }
-  });
-
-  it("covers every puzzle type available in the bank in a hard five-item sample", () => {
-    // Available means reachable at the hard profile's difficulty floor (3):
-    // the demonstrated outliers live at d2, so hard samples skip them rather
-    // than dilute the profile.
-    const availableTypes = new Set(loadBank()
-      .filter((item) => item.puzzle.difficulty >= 3)
-      .map((item) => item.puzzle.type));
-    for (let run = 0; run < 80; run++) {
-      const { items } = sampleQuiz(loadBank(), 5, "hard");
-      expect(new Set(items.map((item) => item.puzzle.type)).size).toBe(availableTypes.size);
     }
   });
 });

@@ -1,4 +1,4 @@
-// @relay-template: relay-errors@7
+// @relay-template: relay-errors@8
 /**
  * Typed rate-limit error handling for llm-relay consumers.
  *
@@ -179,10 +179,10 @@ function findResetField(err: unknown): string | null {
     if (retryAfter) return retryAfter;
     const reset = readHeader(headers, "x-ratelimit-reset");
     if (reset && /^\d+$/.test(reset.trim())) {
+      // Range first: a huge value makes an invalid Date, whose toISOString() throws.
       const ts = Number(reset.trim());
-      const iso = new Date(ts * 1000).toISOString();
       const seconds = (ts * 1000 - Date.now()) / 1000;
-      if (seconds >= 0 && seconds <= MAX_RETRY_AFTER_SECONDS) return iso;
+      if (seconds >= 0 && seconds <= MAX_RETRY_AFTER_SECONDS) return new Date(ts * 1000).toISOString();
     }
   }
 

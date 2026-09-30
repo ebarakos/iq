@@ -62,10 +62,7 @@ export const MAXIMUM_OPTIONS_PER_ITEM = 6;
  * test that nobody misses cannot tell two people apart at the top. Difficulty 6
  * is reserved for buckets whose program has one more step that provably changes
  * the answer — never for a smaller mark, a busier board, or a relabelled d5.
- *
- * Widening the range does NOT loosen the older compact-cell generators. They are
- * capped by their own tables, and `generate.test.ts` pins that `procedural-v1`,
- * `v2`, and `v3` still never emit above 5.
+ * No served bucket uses 6 since the d6 tail was withdrawn on 2026-08-27.
  */
 export const MAXIMUM_DIFFICULTY = 6;
 
@@ -499,6 +496,32 @@ const RuntimePuzzleSchema = z
         });
       }
     }
+    // Every gate a table shows must take part in the answer (owner's rule,
+    // 2026-09-29). A worked row demonstrating a gate the query never runs shows
+    // a transformation for nothing, and a query gate no worked row demonstrates
+    // cannot be read. So the glyphs in the worked rows' gate column and the
+    // glyphs in the query's gate panel must be the same set.
+    const tableRowLength = p.layout === "machineTable" ? 3 : p.layout === "combineTable" ? 4 : 0;
+    if (tableRowLength > 0 && p.stem.length > tableRowLength && p.stem.length % tableRowLength === 0) {
+      const glyphs = (panel: Panel<Visual>) => new Map(!isBlank(panel) && isScene(panel)
+        ? panel.objects.map(({ object }) => [JSON.stringify(object),
+          object.kind === "token" ? `${object.fill} ${object.shape}` : object.kind] as const)
+        : []);
+      const queryGate = glyphs(p.stem[p.stem.length - tableRowLength + 1]);
+      const workedGates = new Map(p.stem.slice(0, -tableRowLength)
+        .filter((_, index) => index % tableRowLength === 1)
+        .flatMap((panel) => [...glyphs(panel)]));
+      const unused = [...workedGates].filter(([key]) => !queryGate.has(key)).map(([, label]) => label);
+      const unshown = [...queryGate].filter(([key]) => !workedGates.has(key)).map(([, label]) => label);
+      if (unused.length > 0 || unshown.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stem"],
+          message: "every demonstrated gate must be run by the query, and every query gate demonstrated " +
+            `(never run: ${unused.join(", ") || "none"}; never demonstrated: ${unshown.join(", ") || "none"})`,
+        });
+      }
+    }
     for (const [index, option] of p.options.entries()) {
       if (isGateStrip(option)) {
         ctx.addIssue({
@@ -568,15 +591,17 @@ export const VisualPuzzleSchema = RuntimePuzzleSchema as z.ZodType<Puzzle<Visual
  * Keep this as an explicit schema rather than relying on TypeScript's `Omit`:
  * types disappear at runtime, while this schema also strips unknown private
  * fields if an internal puzzle is passed to it.
+ *
+ * Since 2026-09-28 it also leaves out `familyId`, `band` and `difficulty`.
+ * Each is a hint about the question before it is answered — which mechanism,
+ * how hard — and the page needs them only on the review screen, which reads
+ * them from the submit response instead.
  */
 const RuntimePublicPuzzleSchema = z.object({
   id: z.string().min(1),
   type: z.enum(PUZZLE_TYPES),
   instruction: z.string().min(3).max(140),
-  difficulty: z.number().int().min(1).max(MAXIMUM_DIFFICULTY),
   layout: z.enum(LAYOUTS),
-  familyId: z.string().min(1).optional(),
-  band: z.enum(REASONING_BANDS).optional(),
   operatorLegend: OperatorLegendSchema.optional(),
   stem: z.array(PanelSchema),
   options: z.array(VisualSchema).min(MINIMUM_OPTIONS_PER_ITEM).max(MAXIMUM_OPTIONS_PER_ITEM),
@@ -589,9 +614,32 @@ export type PublicPuzzle<V extends Visual = Cell> = Omit<RuntimePublicPuzzle, "s
 export const PublicPuzzleSchema = RuntimePublicPuzzleSchema as z.ZodType<PublicPuzzle>;
 export const VisualPublicPuzzleSchema = RuntimePublicPuzzleSchema as z.ZodType<PublicPuzzle<Visual>>;
 
+/**
+ * One scene written the same way however it was built: objects and tiles in
+ * reading order (row, then column).
+ *
+ * Near misses are built by several routes, and a few of them appended a moved
+ * token at the end of the list instead of in its place. The list order is
+ * invisible on screen but not in the payload: when exactly one option's list
+ * was out of order, that option was never the answer (0 of 28 such items in a
+ * 600-item sample, 2026-09-28). Serving every option in one canonical order
+ * leaves nothing to read off it.
+ */
+function canonicalSceneOrder<V extends Visual>(visual: V): V {
+  if (!isScene(visual)) return visual;
+  const byPosition = <T extends { row: number; column: number }>(left: T, right: T) =>
+    left.row - right.row || left.column - right.column;
+  return {
+    ...visual,
+    objects: [...visual.objects].sort(byPosition),
+    tiles: [...visual.tiles].sort(byPosition),
+  };
+}
+
 /** Strip the answer key and authoring metadata at the server boundary. */
 export function toPublicPuzzle<V extends Visual>(puzzle: Puzzle<V>): PublicPuzzle<V> {
-  return VisualPublicPuzzleSchema.parse(puzzle) as PublicPuzzle<V>;
+  const parsed = VisualPublicPuzzleSchema.parse(puzzle) as PublicPuzzle<V>;
+  return { ...parsed, options: parsed.options.map(canonicalSceneOrder) };
 }
 
 /** The two public lengths are 5 and 30; 12 is the retired profile, kept for replay. */
@@ -623,7 +671,7 @@ export const VisualPublicPuzzleSetSchema = RuntimePublicPuzzleSetSchema as z.Zod
 
 /** Strip private fields from a complete legacy or current quiz. */
 export function toPublicPuzzleSet<V extends Visual>(puzzles: PuzzleSet<V>): PublicPuzzleSet<V> {
-  return VisualPublicPuzzleSetSchema.parse(puzzles) as PublicPuzzleSet<V>;
+  return VisualPublicPuzzleSetSchema.parse(puzzles.map(toPublicPuzzle)) as PublicPuzzleSet<V>;
 }
 
 /** Type guard: is this panel a blank placeholder? */

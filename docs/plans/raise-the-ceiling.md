@@ -100,7 +100,7 @@ on the three-step version is pending the next agent probe.
 but reserve some *combinations* of them for a private evaluation set. This tests
 whether a solver recombines known operations or recognises a practised family
 procedure, and it is a much cheaper bridge to the held-out-family idea in the
-parent plan. Captured earlier in `BRAINSTORM.md` under high-value measurement
+parent plan. Captured earlier in `docs/brainstorm.md` under high-value measurement
 ideas; this is the promotion of that entry.
 
 Implemented 2026-08-24 exactly as scoped below: the split lives in

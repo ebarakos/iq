@@ -19,4 +19,4 @@ Nothing here is locked except **JS/TS + Vercel + llm-relay** (explicit user
 requirements). Framework and libraries are proposals open to revision.
 
 The relay section the table points at lives in `CLAUDE.md` (env vars, rules) and
-`docs/architecture.md` (integration files, widget).
+`docs/architecture.md` (integration files).

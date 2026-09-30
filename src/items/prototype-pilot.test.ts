@@ -40,6 +40,7 @@ import {
 } from "../../scripts/pilot-report";
 import { BAND_TIME_BUDGET_SECONDS, CURRENT_FAMILY_PROMOTION_REGISTRY } from "./family-promotion";
 import { requireSceneFamilyBucket, type SceneFamilyId } from "./scene-families";
+import { toPublicPuzzle } from "./schema";
 
 /** The enabled keys, derived the same way the registry documents them. */
 const registryKeys = CURRENT_FAMILY_PROMOTION_REGISTRY.flatMap((family) =>
@@ -47,6 +48,16 @@ const registryKeys = CURRENT_FAMILY_PROMOTION_REGISTRY.flatMap((family) =>
     .filter((band) => band.state !== "prototype")
     .flatMap((band) => band.validatedDifficultyBuckets.map((bucket) =>
       `${family.familyId}:${band.band}:${bucket}`)));
+
+/**
+ * The live questions and packets, built once for every test that only reads
+ * them. Building them regenerates every enabled key's item; the fingerprint
+ * test below still builds a second, independent copy to prove two builds agree.
+ */
+let memoisedQuestions: ReturnType<typeof buildPrototypePilotQuestions> | undefined;
+let memoisedPackets: ReturnType<typeof buildPrototypePilotPackets> | undefined;
+const pilotQuestions = () => (memoisedQuestions ??= buildPrototypePilotQuestions());
+const pilotPackets = () => (memoisedPackets ??= buildPrototypePilotPackets());
 
 describe("pilot v3 identity", () => {
   it("covers every enabled family, band, and bucket key exactly once", () => {
@@ -57,13 +68,13 @@ describe("pilot v3 identity", () => {
       .toEqual([...registryKeys].sort());
     expect(keys.length).toBeGreaterThan(0);
 
-    const questions = buildPrototypePilotQuestions();
+    const questions = pilotQuestions();
     expect(questions).toHaveLength(keys.length * PILOT_ITEMS_PER_KEY);
     expect(new Set(questions.map((question) => question.itemId)).size).toBe(questions.length);
   });
 
   it("gives every item the full four-part identity and round-trips it", () => {
-    for (const question of buildPrototypePilotQuestions()) {
+    for (const question of pilotQuestions()) {
       expect(question.itemId)
         .toBe(`${question.familyId}:${question.band}:${question.difficultyBucket}:r1`);
       const parsed = parsePrototypePilotItemId(question.itemId);
@@ -96,19 +107,19 @@ describe("pilot v3 identity", () => {
 
   it("rebuilds the same item from the id alone", () => {
     const key = enabledPrototypePilotKeys()[0];
-    const question = buildPrototypePilotQuestions()
+    const question = pilotQuestions()
       .find((entry) => entry.itemId === prototypePilotItemId(key, 1))!;
     const parsed = parsePrototypePilotItemId(question.itemId);
-    const rebuilt = prototypePilotCandidate(parsed.key, parsed.representative);
-    expect(rebuilt.puzzle.stem).toEqual(question.puzzle.stem);
-    expect(rebuilt.puzzle.options).toEqual(question.puzzle.options);
+    const rebuilt = toPublicPuzzle(prototypePilotCandidate(parsed.key, parsed.representative).puzzle);
+    expect(rebuilt.stem).toEqual(question.puzzle.stem);
+    expect(rebuilt.options).toEqual(question.puzzle.options);
   });
 });
 
 describe("pilot v3 packets", () => {
   it("fits the whole battery into one capped sitting", () => {
-    const packets = buildPrototypePilotPackets();
-    const questions = buildPrototypePilotQuestions();
+    const packets = pilotPackets();
+    const questions = pilotQuestions();
     expect(PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET).toBe(24);
     expect(PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION).toBe("prototype-pilot-packets-v3");
     const expectedCount = Math.ceil(questions.length / PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET);
@@ -122,15 +133,23 @@ describe("pilot v3 packets", () => {
   });
 
   it("serves no answer or explanation to the participant", () => {
-    for (const question of buildPrototypePilotQuestions()) {
+    for (const question of pilotQuestions()) {
       expect(question.puzzle).not.toHaveProperty("answerIndex");
       expect(question.puzzle).not.toHaveProperty("explanation");
-      expect(question.puzzle.familyId).toBe(question.familyId);
+      // The puzzle is the same answer-free public contract a test serves, so it
+      // carries no family, band or difficulty. The pilot's own question record
+      // still names them beside it: the moderator's page shows the key being
+      // piloted, which is the point of a pilot sitting.
+      expect(question.puzzle).not.toHaveProperty("familyId");
+      expect(question.puzzle).not.toHaveProperty("band");
+      expect(question.puzzle).not.toHaveProperty("difficulty");
+      expect(question.familyId).toBeTruthy();
+      expect(question.band).toBeTruthy();
     }
   });
 
   it("uses the moderator session label to rotate a packet reproducibly", () => {
-    const packet = buildPrototypePilotPackets()[0];
+    const packet = pilotPackets()[0];
     const first = orderPrototypePilotPacket(packet, "participant-01");
     expect(orderPrototypePilotPacket(packet, "participant-01").map((item) => item.itemId))
       .toEqual(first.map((item) => item.itemId));
@@ -151,7 +170,7 @@ describe("pilot v3 packets", () => {
 
 describe("pilot v3 content fingerprint", () => {
   it("is stable across builds and pins the visible content", () => {
-    const first = buildPrototypePilotPackets();
+    const first = pilotPackets();
     const second = buildPrototypePilotPackets();
     expect(second.map((packet) => packet.contentFingerprint))
       .toEqual(first.map((packet) => packet.contentFingerprint));
@@ -198,7 +217,7 @@ describe("pilot v3 saved manifest", () => {
         ]);
       }
     }
-    expect(live.itemCount).toBe(buildPrototypePilotQuestions().length);
+    expect(live.itemCount).toBe(pilotQuestions().length);
   });
 });
 
@@ -206,7 +225,7 @@ describe("pilot v3 sittings: server timing, single-use grading, frozen content",
   const key = enabledPrototypePilotKeys()[0];
   const itemId = prototypePilotItemId(key, 1);
   const { puzzle } = prototypePilotCandidate(key, 1);
-  const sittingPacket = buildPrototypePilotPackets()
+  const sittingPacket = pilotPackets()
     .find((entry) => entry.items.some((entry_) => entry_.itemId === itemId))!;
   const START_MS = Date.UTC(2026, 7, 26, 9, 0, 0);
 

@@ -97,19 +97,6 @@ export interface EnabledFamilyBand {
   fallbackAvailable: boolean;
 }
 
-function candidateBand(
-  band: ExpandedProfileBand,
-  validatedDifficultyBuckets: readonly string[] = [],
-): FamilyBandPromotion {
-  return {
-    band,
-    state: "prototype",
-    validatedDifficultyBuckets,
-    perItemTimeBudgetSeconds: BAND_TIME_BUDGET_SECONDS[band],
-    fallbackAvailable: false,
-  };
-}
-
 function codeValidBand(
   band: ExpandedProfileBand,
   validatedDifficultyBuckets: readonly string[],
@@ -124,37 +111,22 @@ function codeValidBand(
 }
 
 /**
- * Current generators are candidates only. No human pilot results exist, so no
- * family/band pair is enabled for the expanded profile. The old visual operator
- * has no eligible band because its hidden numeric encoding is being replaced.
+ * Every family the expanded profile may serve, and the band and buckets each
+ * serves in. No human pilot results are recorded here, so no pair is enabled;
+ * code-valid is enough to be served (see `eligibleFamiliesForBand`). Four
+ * prototype rows with no scene generator behind them were deleted on
+ * 2026-09-28.
  */
 export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
   {
-    familyId: "sequence-transform-v1",
-    primaryReasoningFamily: "sequential-relation",
-    bands: [candidateBand("warmup")],
-  },
-  {
-    familyId: "odd-one-out-v1",
-    primaryReasoningFamily: "classification-relation",
-    bands: [candidateBand("warmup")],
-  },
-  {
-    familyId: "analogy-transform-v1",
-    primaryReasoningFamily: "analogical-transformation",
-    bands: [candidateBand("composition")],
-  },
-  {
-    familyId: "matrix-axis-transform-v1",
-    primaryReasoningFamily: "matrix-reasoning",
-    bands: [candidateBand("composition")],
-  },
-  {
-    // Built 2026-08-27, promoted to code-valid on the owner's 2026-09-02
-    // instruction after the battery-wide human check came back clean. It meets
-    // the single-inference bar the rest of the battery was held to — 0 of 40 d4
-    // items decided by one aspect, 4 of 40 at d5, pinned by a test. The first
-    // family whose gates combine TWO boards; d4 shows two gates, d5 three.
+    // Built 2026-08-27, promoted to code-valid on 2026-09-02; the first family
+    // whose gates combine TWO boards (d4 shows two gates, d5 three). Demoted to
+    // prototype on 2026-09-29: its query pair has four role cells and so only
+    // 22 legible boards besides the answer, and under the agreement rule no
+    // option list kept the answer out of the aspect-majority top group (a
+    // four-way tie at best). Served again since 2026-09-30, unchanged: once
+    // agreement became a balanced strategy the same pool passes the
+    // options-only gate at about 22% (docs/plans/blind-answer-leak.md).
     familyId: "combining-machine-v1",
     primaryReasoningFamily: "operator-induction",
     bands: [codeValidBand("constraint-spatial", ["combining-machine-d4", "combining-machine-d5"])],
@@ -208,23 +180,12 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("warmup", ["spatial-transform-d2"])],
   },
   {
-    // Two buckets in one band since 2026-08-26 (raise-the-ceiling-v12). d5
-    // demonstrates three gates and applies them along the query path; d6
-    // demonstrates a fourth, a swap of two named slots, and applies that too.
-    // `transformation-machine-d6` was withdrawn on 2026-08-27 under the same
-    // three-gate rule that withdrew `composed-transform-d6`. The four-gate
-    // generator and its ablation proof stay in the code for a later rework;
-    // no band may draw the bucket.
+    // d5 demonstrates three gates and applies them along the query path. The
+    // four-gate d6 bucket was withdrawn on 2026-08-27 under the owner's
+    // three-gate rule and its generator deleted on 2026-09-28.
     familyId: "transformation-machine-v3",
     primaryReasoningFamily: "operator-induction",
     bands: [codeValidBand("induction-transfer", ["transformation-machine-d5"])],
-  },
-  {
-    // One selected operation is an opening-level mechanism, even though reading
-    // which of two worked gates the query names still requires attention.
-    familyId: "rule-switching-v2",
-    primaryReasoningFamily: "operator-induction",
-    bands: [codeValidBand("warmup", ["rule-switching-d2"])],
   },
   {
     familyId: "second-order-sequence-v2",
@@ -236,19 +197,15 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     primaryReasoningFamily: "analogical-transformation",
     bands: [codeValidBand("composition", ["inverse-analogy-d4"])],
   },
-  {
-    // Added 2026-08-25 (escalate-the-quiz, Phase 4). Three tokens on one board,
-    // each following its own perimeter-step and fill-cycle rule, all three
-    // strands fully visible in all five shown boards. d3 gives every token a
-    // rule that changes exactly one aspect; d4 draws the whole grammar and
-    // always includes at least one token that changes both, so a band's second
-    // question from this family really is deeper than its first. It is the
-    // sixth composition family, which is what the plan's dual-proof-fails
-    // branch needs to keep that band's pool at six.
-    familyId: "parallel-evolution-v1",
-    primaryReasoningFamily: "sequential-relation",
-    bands: [codeValidBand("composition", ["parallel-evolution-d3", "parallel-evolution-d4"])],
-  },
+  // `parallel-evolution-v1` was retired in code on 2026-09-28 (owner's
+  // decision): every wrong option was one token away from the answer, so a
+  // cell-by-cell vote over the options rebuilt the answer in every item. See
+  // docs/plans/blind-answer-leak.md.
+  //
+  // `rule-switching-v2` was retired in code on 2026-09-29 (owner's decision):
+  // it demonstrated two gates and its query used only one, so every item showed
+  // a transformation that played no part in the answer. The schema now rejects
+  // any machine or combine table whose worked gates and query gates differ.
 ];
 
 /**

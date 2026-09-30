@@ -26,81 +26,24 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 cd "$PROJECT_ROOT"
 
 # --------------------------------------------------------------------------
-# Cleanup tracking — only tear down what WE started
-# --------------------------------------------------------------------------
-_STARTED_SERVER=0
-_SERVER_PID=""
-
-cleanup() {
-  if [[ "$_STARTED_SERVER" == "1" && -n "$_SERVER_PID" ]]; then
-    kill "$_SERVER_PID" 2>/dev/null || true
-    wait "$_SERVER_PID" 2>/dev/null || true
-  fi
-}
-trap cleanup EXIT
-
-# --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
 suite_pass() { echo "QA: $1 pass"; }
 suite_fail() { echo "QA: $1 fail"; }
 suite_skip() { echo "QA: $1 skip"; }
 
-# Run a command with a timeout; return its exit code.
+# Run one npm script as a suite, with a timeout in seconds (QA_TIMEOUT overrides it).
 run_suite() {
-  local name="$1"; shift
-  local timeout_sec="${QA_TIMEOUT:-120}"
+  local name="$1" default_timeout="$2"
   local rc=0
-  timeout "$timeout_sec" bash -c "$*" || rc=$?
-  return $rc
-}
-
-# --------------------------------------------------------------------------
-# Suite: typecheck
-# --------------------------------------------------------------------------
-run_typecheck() {
-  echo "--- suite: typecheck ---"
-  local rc=0
-  run_suite typecheck "npm run typecheck --silent" 2>&1 || rc=$?
+  echo "--- suite: $name ---"
+  timeout "${QA_TIMEOUT:-$default_timeout}" npm run "$name" --silent 2>&1 || rc=$?
   if [[ $rc -eq 0 ]]; then
-    suite_pass typecheck
+    suite_pass "$name"
     return 0
-  else
-    suite_fail typecheck
-    return 1
   fi
-}
-
-# --------------------------------------------------------------------------
-# Suite: test (vitest unit tests — 114 tests, no LLM, mocked)
-# --------------------------------------------------------------------------
-run_test() {
-  echo "--- suite: test ---"
-  local rc=0
-  run_suite test "npm run test --silent" 2>&1 || rc=$?
-  if [[ $rc -eq 0 ]]; then
-    suite_pass test
-    return 0
-  else
-    suite_fail test
-    return 1
-  fi
-}
-
-# --------------------------------------------------------------------------
-# Suite: bank:verify (schema + rule + fingerprint integrity, no LLM)
-# --------------------------------------------------------------------------
-run_bank_verify() {
-  echo "--- suite: bank:verify ---"
-  local rc=0
-  run_suite "bank:verify" "npm run bank:verify --silent" 2>&1 || rc=$?
-  if [[ $rc -eq 0 ]]; then
-    suite_pass "bank:verify"
-    return 0
-  else
-    suite_fail "bank:verify"
-    return 1
-  fi
+  suite_fail "$name"
+  return 1
 }
 
 # --------------------------------------------------------------------------
@@ -126,10 +69,13 @@ echo ""
 
 FAIL=0
 
-# Run all suites; accumulate failures
-run_typecheck    || FAIL=1
-run_test         || FAIL=1
-run_bank_verify  || FAIL=1
+# The full local gate from CLAUDE.md, in the same order; accumulate failures.
+run_suite typecheck       300 || FAIL=1
+run_suite lint            300 || FAIL=1
+run_suite test            900 || FAIL=1
+run_suite families:verify 600 || FAIL=1
+run_suite bank:verify     300 || FAIL=1
+run_suite build           600 || FAIL=1
 run_agent_smoke_skip
 
 echo ""

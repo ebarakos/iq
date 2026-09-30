@@ -422,8 +422,8 @@ export function PrototypePilot({
                 // Before grading, the only mark is which option the participant
                 // picked. After grading the answer is marked green and a wrong
                 // pick red, the same way the real test's review screen does it —
-                // every explanation says "the highlighted option", so something
-                // on screen has to be highlighted.
+                // every explanation refers to "the correct answer", so the screen
+                // has to show which option that is.
                 grade !== null && grade.answerIndex === optionIndex
                   ? "border-green-500 bg-green-50"
                   : grade !== null && selected === optionIndex

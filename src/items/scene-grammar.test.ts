@@ -8,8 +8,6 @@ import {
   applySceneUnary,
   enumerateSceneConcepts,
   enumerateSceneOrderedCompositions,
-  enumerateSceneOrderedFiveStepCompositions,
-  enumerateSceneOrderedFourStepCompositions,
   enumerateSceneOrderedThreeStepCompositions,
   enumerateSceneUnaryOperations,
   isSceneComposedProgram,
@@ -283,19 +281,17 @@ describe("token turn", () => {
   });
 });
 
-describe("five-gate composed programs", () => {
-  it("carries the three- and four-gate rules over to five gates unchanged", () => {
-    const programs = enumerateSceneOrderedFiveStepCompositions();
-    // 8x7x6x5x4 = 6720 ordered quintuples of distinct primitives, less the
-    // C(6,3) x 5! = 2400 that hold both turns. There is no all-spatial term:
-    // only four board moves exist, so five distinct primitives cannot all be
-    // spatial.
-    expect(programs).toHaveLength(4320);
+describe("composed program lengths", () => {
+  it("holds every three-gate program to the grammar's three rules", () => {
+    const programs = enumerateSceneOrderedThreeStepCompositions();
+    // 8x7x6 = 336 ordered triples of distinct primitives, less 4x3x2 = 24 that
+    // are all board moves, less the 6 x 3! = 36 that hold both turns.
+    expect(programs).toHaveLength(276);
     for (const program of programs) {
       const steps = sceneComposedProgramSteps(program);
-      expect(steps).toHaveLength(5);
+      expect(steps).toHaveLength(3);
       // Distinct primitives.
-      expect(new Set(steps.map((step) => JSON.stringify(step))).size).toBe(5);
+      expect(new Set(steps.map((step) => JSON.stringify(step))).size).toBe(3);
       // Not all board moves, and at most one turn.
       expect(steps.some((step) => step.kind !== "spatial")).toBe(true);
       expect(steps.filter((step) => step.kind === "turn").length).toBeLessThanOrEqual(1);
@@ -303,25 +299,19 @@ describe("five-gate composed programs", () => {
     }
   });
 
-  it("round-trips a five-gate program through its ordered steps", () => {
+  it("round-trips two and three gates and refuses a fourth", () => {
+    // The owner's three-gate ceiling of 2026-08-27, held in the grammar itself
+    // since the four- and five-gate programs were deleted on 2026-09-28.
     const pool = sceneComposedPrimitives();
-    const steps = [pool[0], pool[1], pool[4], pool[5], pool[6]];
+    const steps = [pool[0], pool[4], pool[6]];
     const program = sceneComposedProgramFromSteps(steps);
     expect(sceneComposedProgramSteps(program)).toEqual(steps);
-    expect(Object.keys(program)).toEqual(["first", "second", "third", "fourth", "fifth"]);
-    // Two through four still round-trip, and six is not a program length.
+    expect(Object.keys(program)).toEqual(["first", "second", "third"]);
     expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 2)))).toHaveLength(2);
-    expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 3)))).toHaveLength(3);
-    expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 4)))).toHaveLength(4);
-    expect(() => sceneComposedProgramFromSteps([...steps, pool[7]])).toThrow(/two, three, four, or five gates/);
-    expect(isSceneComposedProgram([...steps, pool[7]])).toBe(false);
+    expect(() => sceneComposedProgramFromSteps([...steps, pool[5]])).toThrow(/two or three gates/);
+    expect(isSceneComposedProgram([...steps, pool[5]])).toBe(false);
     const pair = enumerateSceneOrderedCompositions()[0];
     expect(isSceneComposedProgram([pair.first, pair.second])).toBe(true);
     expect(isSceneComposedProgram([pool[0], pool[1]])).toBe(false);
-  });
-
-  it("keeps the three- and four-gate grammars exactly as they were", () => {
-    expect(enumerateSceneOrderedThreeStepCompositions()).toHaveLength(276);
-    expect(enumerateSceneOrderedFourStepCompositions()).toHaveLength(1296);
   });
 });

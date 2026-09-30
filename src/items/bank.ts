@@ -3,11 +3,9 @@ import { z } from "zod";
 import bankFile from "../../data/bank/items.json";
 import {
   PuzzleSchema,
-  PUZZLE_TYPES,
   isBlank,
   isScene,
   sceneSignature,
-  shuffleOptions,
   visualSignature,
   type Puzzle,
   type PuzzleSet,
@@ -123,133 +121,6 @@ export function loadBank(): BankItem[] {
 export interface SampledQuiz {
   puzzles: PuzzleSet;
   items: BankItem[];
-}
-
-/**
- * Per-item agent calibration summary, served alongside bank quizzes (Phase D).
- * The client imports only this TYPE (type-only import — bank.ts itself must
- * never reach the client bundle: node:crypto + the whole bank JSON).
- */
-export interface AgentStats {
-  solveRate: number;
-  attempts: number;
-  tag: string | null; // "agent-easy" | "agent-mid" | "agent-hard"
-}
-
-export function agentStatsFor(item: BankItem): AgentStats | null {
-  if (!item.calibration) return null;
-  return {
-    solveRate: item.calibration.solveRate,
-    attempts: item.calibration.attempts,
-    tag: item.tags.find((t) => t.startsWith("agent-")) ?? null,
-  };
-}
-
-const QUIZ_SIZE = 5;
-
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-/** Internal difficulty profile used by generation, calibration, and fallback sampling. */
-export type DifficultyLevel = "easy" | "standard" | "hard";
-
-/**
- * Target per-slot difficulty ramps (ascending). The bank is topped up evenly
- * across d1–d5, so exact matches normally exist; the sampler widens to the
- * nearest available difficulty when they don't.
- */
-export const DIFFICULTY_RAMPS: Record<DifficultyLevel, readonly number[]> = {
-  easy: [1, 1, 2, 2, 3],
-  standard: [2, 2, 3, 3, 5],
-  hard: [3, 4, 4, 5, 5],
-};
-
-export const EXPANDED_DIFFICULTY_RAMPS: Record<DifficultyLevel, readonly number[]> = {
-  easy: [1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4],
-  standard: [2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5],
-  hard: [3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
-};
-
-/**
- * Sample a quiz from the bank: one item per ramp slot at the nearest available
- * difficulty, preferring types not yet covered (and enforcing full family coverage
- * for hard mode when five families are available),
- * ascending difficulty order, serve-time option shuffle. Content-addressed ids
- * make uniqueness automatic.
- */
-export function sampleQuiz(
-  items: BankItem[] = loadBank(),
-  n = QUIZ_SIZE,
-  level: DifficultyLevel = "standard",
-): SampledQuiz {
-  if (items.length < n) {
-    throw new Error(`bank has ${items.length} items — need at least ${n} to sample a quiz`);
-  }
-  const rampSource = n === 12 ? EXPANDED_DIFFICULTY_RAMPS : DIFFICULTY_RAMPS;
-  const ramp = rampSource[level].slice(0, n);
-  while (ramp.length < n) ramp.push(ramp[ramp.length - 1] ?? 3);
-  const forceAllTypes = level === "hard" && n >= PUZZLE_TYPES.length;
-  // Hard mode forces one item per type, but only for types the profile can
-  // reach without dropping below its own floor: a type that exists only at d2
-  // (the demonstrated outliers) must not drag a hard sample down to warmup.
-  const profileFloor = Math.min(...ramp);
-  const coverableTypes = new Set(
-    items.filter((i) => i.puzzle.difficulty >= profileFloor).map((i) => i.puzzle.type));
-  const requiredTypes = forceAllTypes
-    ? PUZZLE_TYPES.filter((puzzleType) => coverableTypes.has(puzzleType))
-    : [];
-
-  const used = new Set<string>();
-  const typesCovered = new Set<PuzzleType>();
-  const typeCounts = new Map<PuzzleType, number>();
-  const chosen: BankItem[] = [];
-  for (const target of ramp) {
-    // Nearest available difficulty, widening the spread only when a bucket is exhausted.
-    const requiredType = requiredTypes.length > 0 ? requiredTypes.shift() : null;
-    let pool: BankItem[] = [];
-    // Keep widening for a required type even when the untyped pool is already
-    // non-empty, but never below the profile floor. An easy item may share a
-    // type with hard items without becoming eligible for a hard quiz.
-    for (let spread = 0; spread <= 4; spread++) {
-      const candidates = items.filter((i) =>
-        !used.has(i.fingerprint) &&
-        i.puzzle.difficulty >= profileFloor &&
-        Math.abs(i.puzzle.difficulty - target) <= spread);
-      if (requiredType) {
-        const typed = candidates.filter((i) => i.puzzle.type === requiredType);
-        if (typed.length > 0) {
-          pool = typed;
-          break;
-        }
-        pool = candidates;
-      } else if (candidates.length > 0) {
-        pool = candidates;
-        break;
-      }
-    }
-    if (pool.length === 0) {
-      throw new Error(`bank cannot satisfy the "${level}" difficulty profile`);
-    }
-    const uncovered = pool.filter((i) => !typesCovered.has(i.puzzle.type));
-    const diversityPool = uncovered.length > 0
-      ? uncovered
-      : pool.filter((item) => {
-          const least = Math.min(...new Set(pool.map((candidate) => typeCounts.get(candidate.puzzle.type) ?? 0)));
-          return (typeCounts.get(item.puzzle.type) ?? 0) === least;
-        });
-    const item = pickRandom(diversityPool);
-    used.add(item.fingerprint);
-    typesCovered.add(item.puzzle.type);
-    typeCounts.set(item.puzzle.type, (typeCounts.get(item.puzzle.type) ?? 0) + 1);
-    chosen.push(item);
-  }
-
-  chosen.sort((a, b) => a.puzzle.difficulty - b.puzzle.difficulty);
-  return {
-    puzzles: chosen.map((i) => shuffleOptions(i.puzzle)) as PuzzleSet,
-    items: chosen,
-  };
 }
 
 /**
@@ -383,7 +254,7 @@ export function sampleExpandedBankQuiz(
     // family from whichever band the bank does hold it in.
     //
     // Only the first rung should ever run. A bank built by
-    // `npm run bank:topup -- --source expanded --replace --per-bucket 5` holds
+    // `npm run bank:topup -- --replace --per-bucket 5` holds
     // five items for every key the registry can schedule, and no key comes up
     // more than five times in one test, so the exact bucket is always in stock
     // — `expandedBankCoverage` above proves that from the built file rather

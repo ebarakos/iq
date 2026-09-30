@@ -215,21 +215,43 @@ function paddedHamming(left: ReadonlyMap<string, string>, right: ReadonlyMap<str
  * read. The nearest misses should be the ones you have to read.
  */
 export function sceneEditDistance(a: Scene, b: Scene): SceneDistance {
+  return canonicalSceneDistance(canonicalizeForDistance(a), canonicalizeForDistance(b));
+}
+
+/**
+ * One scene read once for distance: its board size, canonical cells, and
+ * crease fields. `selectDistractors` measures every pair of dozens of boards,
+ * and building each board's canonical form once instead of once per pair is
+ * most of that cost. Opaque on purpose: only this module reads inside it.
+ */
+export interface DistanceCanonical {
+  readonly rows: number;
+  readonly columns: number;
+  readonly cells: ReadonlyMap<string, CanonicalCell>;
+  readonly guides: ReadonlyMap<string, string>;
+}
+
+export function canonicalizeForDistance(scene: Scene): DistanceCanonical {
+  return { rows: scene.rows, columns: scene.columns, cells: canonicalCells(scene), guides: guideFields(scene) };
+}
+
+/** `sceneEditDistance` over two scenes already read by `canonicalizeForDistance`. */
+export function canonicalSceneDistance(a: DistanceCanonical, b: DistanceCanonical): SceneDistance {
   if (a.rows !== b.rows || a.columns !== b.columns) return "incomparable";
 
-  const left = canonicalCells(a);
-  const right = canonicalCells(b);
   let positions = 0;
   let atoms = 0;
-  for (const key of new Set([...left.keys(), ...right.keys()])) {
-    const leftCell = left.get(key) ?? EMPTY_CELL;
-    const rightCell = right.get(key) ?? EMPTY_CELL;
+  const visit = (key: string) => {
+    const leftCell = a.cells.get(key) ?? EMPTY_CELL;
+    const rightCell = b.cells.get(key) ?? EMPTY_CELL;
     const changed = paddedHamming(leftCell.fields, rightCell.fields) +
       (leftCell.tag === rightCell.tag ? 0 : 1);
     if (changed > 0) positions += 1;
     atoms += changed;
-  }
-  return { positions, atoms: atoms + paddedHamming(guideFields(a), guideFields(b)) };
+  };
+  for (const key of a.cells.keys()) visit(key);
+  for (const key of b.cells.keys()) if (!a.cells.has(key)) visit(key);
+  return { positions, atoms: atoms + paddedHamming(a.guides, b.guides) };
 }
 
 /**

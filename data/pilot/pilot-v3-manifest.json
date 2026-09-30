@@ -1,10 +1,10 @@
 {
  "schemaVersion": "prototype-pilot-packets-v3",
- "itemCount": 18,
+ "itemCount": 15,
  "packets": [
   {
    "packetId": "pilot-v3-a",
-   "contentFingerprint": "e922c681ca71bee5",
+   "contentFingerprint": "8d2f4dafca7239ba",
    "items": [
     {
      "itemId": "combining-machine-v1:constraint-spatial:combining-machine-d4:r1",
@@ -111,14 +111,6 @@
      "bandTimeBudgetSeconds": 55
     },
     {
-     "itemId": "rule-switching-v2:warmup:rule-switching-d2:r1",
-     "familyId": "rule-switching-v2",
-     "band": "warmup",
-     "difficultyBucket": "rule-switching-d2",
-     "difficulty": 2,
-     "bandTimeBudgetSeconds": 25
-    },
-    {
      "itemId": "second-order-sequence-v2:composition:second-order-sequence-d4:r1",
      "familyId": "second-order-sequence-v2",
      "band": "composition",
@@ -131,22 +123,6 @@
      "familyId": "inverse-analogy-v2",
      "band": "composition",
      "difficultyBucket": "inverse-analogy-d4",
-     "difficulty": 4,
-     "bandTimeBudgetSeconds": 40
-    },
-    {
-     "itemId": "parallel-evolution-v1:composition:parallel-evolution-d3:r1",
-     "familyId": "parallel-evolution-v1",
-     "band": "composition",
-     "difficultyBucket": "parallel-evolution-d3",
-     "difficulty": 3,
-     "bandTimeBudgetSeconds": 40
-    },
-    {
-     "itemId": "parallel-evolution-v1:composition:parallel-evolution-d4:r1",
-     "familyId": "parallel-evolution-v1",
-     "band": "composition",
-     "difficultyBucket": "parallel-evolution-d4",
      "difficulty": 4,
      "bandTimeBudgetSeconds": 40
     }

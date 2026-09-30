@@ -274,15 +274,13 @@ export function heldOutBuckets(): HeldOutBucket[] {
   const gateCounts = declaredGateCounts();
   return sceneFamilyBucketsFor(HELD_OUT_FAMILY_ID).flatMap((bucket) => {
     // A bucket earns a held-out twin only if the reserved shape has programs at
-    // its depth. At five gates it provably has none: the reserved shape is two
-    // board moves then token-local steps, which at that length forces both fills
-    // plus a turn — and a turn never repaints the slot the first fill painted, so
-    // single-gate ablation rejects every one of them. The two-gate intermediate
-    // bucket also cannot begin with two board moves. Skipping depths with no
-    // reserved population keeps the held-out source honest; throwing here would
-    // take the whole source down with it.
+    // its depth. The reserved shape is two board moves then token-local steps,
+    // which only a three-gate program can take: the two-gate intermediate bucket
+    // cannot begin with two board moves. Skipping depths with no reserved
+    // population keeps the held-out source honest; throwing here would take the
+    // whole source down with it.
     const gateCount = gateCounts[bucket.bucket];
-    if (gateCount !== 3 && gateCount !== 4) return [];
+    if (gateCount !== 3) return [];
     const band = registry.bands.find((entry) => entry.validatedDifficultyBuckets.includes(bucket.bucket));
     if (!band) throw new Error(`${bucket.bucket} is not enabled in any band, so it has no held-out twin`);
     return {

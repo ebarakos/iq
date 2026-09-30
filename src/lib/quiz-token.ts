@@ -35,30 +35,25 @@ const TokenItemSchema = z.object({
   path: ["answerIndex"],
 });
 
-/** Lengths a token may hold: 5 and 30 are current, 12 is the retired profile. */
-export const ACCEPTED_ITEM_COUNTS = [5, 12, 30] as const;
+/** Lengths a token may hold: 5 and 30, the two current public test lengths. */
+export const ACCEPTED_ITEM_COUNTS = [5, 30] as const;
 
 export const QuizTokenPayloadSchema = z.object({
   version: z.literal(1),
   issuedAt: z.number().int().nonnegative(),
   /** When the answer key stops opening at all. Never the same thing as the deadline. */
   expiresAt: z.number().int().positive(),
-  /**
-   * When the test is over. Optional only so tokens issued before deadlines
-   * existed still open; those are scored without a late marker.
-   */
-  answerDeadline: z.number().int().positive().optional(),
-  // The two public lengths are 5 and 30. Twelve is the retired preview profile:
-  // tokens issued before the change must still open, replay, and score.
+  /** When the test is over. */
+  answerDeadline: z.number().int().positive(),
   items: z.array(TokenItemSchema).refine(
     (items) => (ACCEPTED_ITEM_COUNTS as readonly number[]).includes(items.length),
-    { message: "quiz token must contain 5, 12, or 30 items" },
+    { message: "quiz token must contain 5 or 30 items" },
   ),
 }).refine((payload) => payload.expiresAt > payload.issuedAt, {
   message: "expiresAt must be after issuedAt",
   path: ["expiresAt"],
-}).refine((payload) => payload.answerDeadline === undefined ||
-  (payload.answerDeadline > payload.issuedAt && payload.answerDeadline <= payload.expiresAt), {
+}).refine((payload) =>
+  payload.answerDeadline > payload.issuedAt && payload.answerDeadline <= payload.expiresAt, {
   message: "answerDeadline must fall between issuedAt and expiresAt",
   path: ["answerDeadline"],
 });
@@ -92,7 +87,6 @@ export function submissionTiming(
   payload: QuizTokenPayload,
   nowSeconds = Math.floor(Date.now() / 1000),
 ): SubmissionTiming {
-  if (payload.answerDeadline === undefined) return { late: false, secondsLate: 0 };
   const past = nowSeconds - payload.answerDeadline;
   if (past <= GRACE_WINDOW_SECONDS) return { late: false, secondsLate: 0 };
   return { late: true, secondsLate: past };

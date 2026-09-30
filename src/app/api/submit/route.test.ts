@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CURRENT_GENERATOR_VERSION, generateQuiz } from "@/items/generate";
+import { assembleExpandedQuiz } from "@/items/expanded-quiz";
+import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
 import { createQuizDelivery, GRACE_WINDOW_SECONDS } from "@/lib/quiz-token";
 import { POST } from "./route";
+
+function freshQuiz(seed: string) {
+  return assembleExpandedQuiz(seed, "short-5", CURRENT_FAMILY_PROMOTION_REGISTRY);
+}
 
 const SECRET = "test-only-submit-route-secret-with-at-least-32-characters";
 
@@ -18,7 +23,7 @@ describe("POST /api/submit", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("marks a submission late only after the grace window, and still scores it", async () => {
-    const quiz = generateQuiz("submit-route-late", CURRENT_GENERATOR_VERSION, "standard");
+    const quiz = freshQuiz("submit-route-late");
     const issuedAt = Math.floor(Date.now() / 1000);
     const { quizToken, answerDeadline } = createQuizDelivery(quiz, { secret: SECRET, nowSeconds: issuedAt });
     const answers = quiz.map((puzzle) => puzzle.answerIndex);
@@ -42,7 +47,7 @@ describe("POST /api/submit", () => {
   });
 
   it("scores on the server and returns review data without the hidden rules", async () => {
-    const quiz = generateQuiz("submit-route-test", CURRENT_GENERATOR_VERSION, "standard");
+    const quiz = freshQuiz("submit-route-test");
     const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
     const answers = quiz.map((puzzle, index) => index === 0 ? null : puzzle.answerIndex);
 
@@ -64,7 +69,7 @@ describe("POST /api/submit", () => {
   });
 
   it("rejects malformed, incomplete, and out-of-range submissions", async () => {
-    const quiz = generateQuiz("submit-route-validation", CURRENT_GENERATOR_VERSION, "easy");
+    const quiz = freshQuiz("submit-route-validation");
     const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
 
     expect((await POST(request({ answers: [] }))).status).toBe(400);
@@ -76,7 +81,7 @@ describe("POST /api/submit", () => {
   });
 
   it("reports separate family and band subtotals when the profile supplies them", async () => {
-    const quiz = generateQuiz("submit-route-breakdown", CURRENT_GENERATOR_VERSION, "standard")
+    const quiz = freshQuiz("submit-route-breakdown")
       .map((puzzle, index) => ({
         ...puzzle,
         familyId: index < 2 ? "family-a-v1" : "family-b-v1",
@@ -98,7 +103,7 @@ describe("POST /api/submit", () => {
   });
 
   it("rejects a tampered token", async () => {
-    const quiz = generateQuiz("submit-route-tamper", CURRENT_GENERATOR_VERSION, "hard");
+    const quiz = freshQuiz("submit-route-tamper");
     const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
     const replacement = quizToken.endsWith("A") ? "B" : "A";
     const tampered = `${quizToken.slice(0, -1)}${replacement}`;

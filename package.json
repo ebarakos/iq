@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "bank:topup": "node --env-file=.env.local --import tsx scripts/bank-topup.ts",
+    "bank:topup": "node --import tsx scripts/bank-topup.ts",
     "bank:verify": "node --import tsx scripts/bank-verify.ts",
     "agent:smoke": "node --env-file=.env.local --import tsx scripts/agent-smoke.ts",
     "agent:run": "node --env-file=.env.local --import tsx scripts/agent-run.ts",

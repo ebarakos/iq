@@ -18,7 +18,8 @@
   ],
   "keysNotCarried": {
     "composed-transform-v2:composition:composed-transform-d4": "No v10 baseline. At 72ffdb3 the family is composed-transform-v1. The current d4 population was reissued in v17 as a two-step spatial-and-fill composition, so it is not the same population. For the record, v10's composed-transform-v1 measured p50 (2, 2) and p90 (5, 21).",
-    "every other key the current registry serves": "compositional-analogy-d4, parallel-evolution-d3, parallel-evolution-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10, and neither did the two d6 buckets added on 2026-08-26, composed-transform-d6 and transformation-machine-d6, nor the two combining-machine buckets promoted in v18. The verifier reports their percentiles with comparable: false and invents no baseline for them."
+    "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d4": "Moved out of \"keys\" on 2026-09-29 (owner's decision). The v10 baseline predates the 2026-08-27 redesign of visual-set-algebra: at v10 its two input boards were a fixed diagonal of two tokens that could never disagree, while today's rows are three-token boards built from four roles including a clash, so it is not the same population. Since scene-families-v19 the family serves option lists that keep the answer from being picked without the question (docs/plans/blind-answer-leak.md), and where those balance rules and closeness conflict the balance rules win: even the closest balanced lists put p90 at (4, 12). For the record, v10 measured p50 (2, 10) and p90 (3, 15) over 200 seeds.",
+    "every other key the current registry serves": "compositional-analogy-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10. The verifier reports their percentiles with comparable: false and invents no baseline for them. (parallel-evolution-d3 and -d4, added after v10 and retired on 2026-09-28, never had a baseline either, so their retirement leaves no withdrawn row; nor did the two combining-machine buckets, promoted in v18, out of the band from 2026-09-29 to 2026-09-30 and served again since.)"
   },
   "withdrawnKeysNote": "Keys that once had a v10 baseline and are no longer served, kept with the numbers they were recorded with. A withdrawal is a normal event and must leave a record: deleting the row would make the gate green by forgetting, and the aggregate no-regression comparison runs over the keys still in \"keys\" either way. scripts/scene-family-verify.ts fails if a key appears in both objects, or if a key listed here turns up in a run.",
   "withdrawnKeys": {
@@ -65,6 +66,18 @@
       },
       "withdrawnOn": "2026-08-31",
       "withdrawnReason": "The inverse fold-and-punch family was removed with its forward counterpart because the mechanism was too easy to earn a place in the battery."
+    },
+    "rule-switching-v2:warmup:rule-switching-d2": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 20
+      },
+      "p90": {
+        "positions": 4,
+        "atoms": 20
+      }
     }
   },
   "keys": {
@@ -128,18 +141,6 @@
         "atoms": 10
       }
     },
-    "rule-switching-v2:warmup:rule-switching-d2": {
-      "seeds": 200,
-      "servedDistances": 1000,
-      "p50": {
-        "positions": 4,
-        "atoms": 20
-      },
-      "p90": {
-        "positions": 4,
-        "atoms": 20
-      }
-    },
     "second-order-sequence-v2:composition:second-order-sequence-d4": {
       "seeds": 200,
       "servedDistances": 1000,
@@ -174,18 +175,6 @@
       "p90": {
         "positions": 5,
         "atoms": 21
-      }
-    },
-    "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d4": {
-      "seeds": 200,
-      "servedDistances": 1000,
-      "p50": {
-        "positions": 2,
-        "atoms": 10
-      },
-      "p90": {
-        "positions": 3,
-        "atoms": 15
       }
     }
   }

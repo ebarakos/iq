@@ -70,6 +70,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { profile?: unknown };
   const profile = requestedProfile(body.profile);
   const seed = randomBytes(16).toString("hex");
+  // Read once per delivery, AFTER the questions exist, and threaded into
+  // createQuizDelivery's own clock read: the deadline the token seals and the
+  // serverNow the browser corrects its countdown against agree to the second,
+  // and time spent assembling never comes out of the taker's budget.
+  const nowSeconds = () => Math.floor(Date.now() / 1000);
 
   try {
     const puzzles = assembleExpandedQuiz(
@@ -78,13 +83,15 @@ export async function POST(req: NextRequest) {
       CURRENT_FAMILY_PROMOTION_REGISTRY,
       WITHDRAWN_FAMILY_IDS,
     );
-    const delivery = createQuizDelivery(puzzles);
+    const serverNow = nowSeconds();
+    const delivery = createQuizDelivery(puzzles, { nowSeconds: serverNow });
     return NextResponse.json({
       ...delivery,
       profile,
       secondsPerQuestion: SECONDS_PER_QUESTION,
       source: "generated",
       generatorVersion: EXPANDED_GENERATOR_VERSION,
+      serverNow,
     });
   } catch (error) {
     if (error instanceof QuizTokenError && error.code === "configuration") {
@@ -104,13 +111,15 @@ export async function POST(req: NextRequest) {
         CURRENT_FAMILY_PROMOTION_REGISTRY,
         WITHDRAWN_FAMILY_IDS,
       );
-      const delivery = createQuizDelivery(puzzles);
+      const serverNow = nowSeconds();
+      const delivery = createQuizDelivery(puzzles, { nowSeconds: serverNow });
       return NextResponse.json({
         ...delivery,
         profile,
         secondsPerQuestion: SECONDS_PER_QUESTION,
         source: "fallback",
         notice: "Fresh generation failed, so this test comes from the verified reference set.",
+        serverNow,
       });
     } catch (fallbackError) {
       console.error("generate: reference fallback failed —", fallbackError);

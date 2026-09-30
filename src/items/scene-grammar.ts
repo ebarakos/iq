@@ -114,63 +114,34 @@ export interface SceneOrderedThreeStepComposition {
   third: SceneCompositionPrimitive;
 }
 
-export interface SceneOrderedFourStepComposition {
-  first: SceneCompositionPrimitive;
-  second: SceneCompositionPrimitive;
-  third: SceneCompositionPrimitive;
-  fourth: SceneCompositionPrimitive;
-}
-
-/**
- * Five ordered gates — the deepest composed program the battery displays,
- * added for `composed-transform-d6` on 2026-08-26 (raise-the-ceiling-v12).
- */
-export interface SceneOrderedFiveStepComposition {
-  first: SceneCompositionPrimitive;
-  second: SceneCompositionPrimitive;
-  third: SceneCompositionPrimitive;
-  fourth: SceneCompositionPrimitive;
-  fifth: SceneCompositionPrimitive;
-}
-
-/** Any composed program a machine table displays: two through five gates. */
+/** Any composed program a machine table displays: two or three gates. */
 export type SceneComposedProgram =
   | SceneOrderedComposition
-  | SceneOrderedThreeStepComposition
-  | SceneOrderedFourStepComposition
-  | SceneOrderedFiveStepComposition;
+  | SceneOrderedThreeStepComposition;
 
-/** How many gates a composed program displays. Also its honest program depth. */
-export type SceneComposedProgramLength = 2 | 3 | 4 | 5;
+/**
+ * How many gates a composed program displays. Also its honest program depth.
+ *
+ * Never more than three: the owner's rule of 2026-08-27 is that a fourth gate
+ * adds procedure, not reasoning. The four- and five-gate programs behind the
+ * withdrawn d6 buckets were deleted on 2026-09-28.
+ */
+export type SceneComposedProgramLength = 2 | 3;
 
 /** The gates of a composed program, in the order the query strip shows them. */
 export function sceneComposedProgramSteps(program: SceneComposedProgram): SceneCompositionPrimitive[] {
-  if ("fifth" in program) {
-    return [program.first, program.second, program.third, program.fourth, program.fifth];
-  }
-  if ("fourth" in program) {
-    return [program.first, program.second, program.third, program.fourth];
-  }
   return "third" in program
     ? [program.first, program.second, program.third]
     : [program.first, program.second];
 }
 
-/** Rebuild a composed program from its ordered gates. Two through five. */
+/** Rebuild a composed program from its ordered gates. Two or three. */
 export function sceneComposedProgramFromSteps(
   steps: readonly SceneCompositionPrimitive[],
 ): SceneComposedProgram {
   if (steps.length === 2) return { first: steps[0], second: steps[1] };
   if (steps.length === 3) return { first: steps[0], second: steps[1], third: steps[2] };
-  if (steps.length === 4) {
-    return { first: steps[0], second: steps[1], third: steps[2], fourth: steps[3] };
-  }
-  if (steps.length === 5) {
-    return {
-      first: steps[0], second: steps[1], third: steps[2], fourth: steps[3], fifth: steps[4],
-    };
-  }
-  throw new Error(`a composed program shows two, three, four, or five gates, not ${steps.length}`);
+  throw new Error(`a composed program shows two or three gates, not ${steps.length}`);
 }
 
 export interface ScenePosition {
@@ -497,13 +468,11 @@ export function sceneComposedPrimitives(): SceneCompositionPrimitive[] {
  *    one turn removed the other one does change the answer.
  *
  * Everything else is left to a family's own servability and ablation filters.
- *
- * The rules are stated once and applied at every displayed depth: the five-gate
- * grammar added on 2026-08-26 carries them over unchanged, so nothing about
- * "deeper" also means "looser".
+ * Nothing longer than three gates is a program at all (see
+ * `SceneComposedProgramLength`).
  */
 export function isSceneComposedProgram(steps: readonly SceneCompositionPrimitive[]): boolean {
-  if (steps.length !== 2 && steps.length !== 3 && steps.length !== 4 && steps.length !== 5) return false;
+  if (steps.length !== 2 && steps.length !== 3) return false;
   const keys = steps.map((primitive) => JSON.stringify(primitive));
   if (new Set(keys).size !== keys.length) return false;
   if (steps.length === 2) {
@@ -546,23 +515,6 @@ export function enumerateSceneOrderedCompositions(): SceneOrderedComposition[] {
 export function enumerateSceneOrderedThreeStepCompositions(): SceneOrderedThreeStepComposition[] {
   return enumerateComposedPrograms(3)
     .map((steps) => ({ first: steps[0], second: steps[1], third: steps[2] }));
-}
-
-/** Every ordered quadruple of distinct primitives that is not four board moves. */
-export function enumerateSceneOrderedFourStepCompositions(): SceneOrderedFourStepComposition[] {
-  return enumerateComposedPrograms(4)
-    .map((steps) => ({ first: steps[0], second: steps[1], third: steps[2], fourth: steps[3] }));
-}
-
-/**
- * Every ordered quintuple the grammar contains: five distinct primitives, at
- * most one of them a turn. "Not all board moves" costs nothing here — there are
- * only four board moves, so five distinct primitives can never all be spatial.
- */
-export function enumerateSceneOrderedFiveStepCompositions(): SceneOrderedFiveStepComposition[] {
-  return enumerateComposedPrograms(5).map((steps) => ({
-    first: steps[0], second: steps[1], third: steps[2], fourth: steps[3], fifth: steps[4],
-  }));
 }
 
 export function applySceneOrderedThreeStepComposition(

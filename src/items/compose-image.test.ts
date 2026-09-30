@@ -2,6 +2,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
+  ANALOGY_DOUBLE_COLON_WIDTH,
+  ANALOGY_STRIP_GAP,
   CELL_CANVAS_PADDING,
   CELL_VIEWBOX,
   GATE_GLYPH_WIDTH,
@@ -17,11 +19,11 @@ import {
   SceneGraphic,
   CellGraphic,
   StemView,
+  analogyPairWidth,
   describeCell,
   gateGlyphs,
   gateStripWidth,
 } from "./render";
-import { generatePuzzle } from "./generate";
 import { loadBank } from "./bank";
 import {
   GATE_STRIP_COLUMNS,
@@ -40,9 +42,56 @@ import {
   SIZES,
   ROTATIONS,
 } from "./schema";
-import { mulberry32 } from "../lib/rng";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
+
+/** Cell literal builder shared by the two hand-authored fixtures below. */
+function fx(shape: Cell["shape"], count: Cell["count"], fill: Cell["fill"]): Cell {
+  return { shape, count, rotation: 0, fill, size: "m" };
+}
+
+/**
+ * The live scene-family assembler (scene-families-v19) never produces
+ * "oddOneOut" or "operatorInduction" puzzles, and the bank holds no items of
+ * either type — both were retired legacy-generator-only families. These two
+ * literal fixtures exist only so the tests below can still exercise the
+ * `row`/`operatorTable` renderer paths in render.tsx / compose-image.tsx,
+ * which are kept on purpose (see CLAUDE.md).
+ */
+const ODD_ONE_OUT_FIXTURE: Puzzle = {
+  id: "fixture-odd-one-out",
+  type: "oddOneOut",
+  instruction: "Which one does not belong?",
+  difficulty: 3,
+  layout: "row",
+  stem: [],
+  options: [fx("square", 1, "solid"), fx("square", 2, "solid"), fx("circle", 2, "solid"), fx("square", 3, "solid")],
+  answerIndex: 2,
+  explanation: "Three options are squares; one is a circle.",
+};
+
+const OPERATOR_INDUCTION_FIXTURE: Puzzle = {
+  id: "fixture-operator-induction",
+  type: "operatorInduction",
+  instruction: "Infer the visual operation. Which output completes the last row?",
+  difficulty: 4,
+  layout: "operatorTable",
+  operatorLegend: { shapeCycle: ["circle", "square", "triangle"] },
+  stem: [
+    fx("circle", 1, "solid"), fx("square", 2, "solid"), fx("triangle", 1, "solid"),
+    fx("square", 1, "outline"), fx("circle", 2, "outline"), fx("triangle", 2, "outline"),
+    fx("triangle", 1, "half"), fx("square", 3, "half"), fx("circle", 3, "half"),
+    fx("circle", 1, "outline"), fx("square", 1, "outline"), { blank: true },
+  ],
+  options: [fx("circle", 1, "solid"), fx("square", 1, "solid"), fx("triangle", 1, "solid"), fx("circle", 2, "outline")],
+  answerIndex: 0,
+  explanation: "Fixture only — the live app never generates this puzzle type.",
+};
+
+const LEGACY_TYPE_FIXTURES: Partial<Record<PuzzleType, Puzzle>> = {
+  oddOneOut: ODD_ONE_OUT_FIXTURE,
+  operatorInduction: OPERATOR_INDUCTION_FIXTURE,
+};
 
 function renderCell(cell: Cell): string {
   return renderToStaticMarkup(createElement(CellGraphic, { cell }));
@@ -91,7 +140,10 @@ const scenePuzzle: Puzzle<Visual> = {
 
 function firstOfType(type: PuzzleType): Puzzle {
   const bankHit = loadBank().find((item) => item.puzzle.type === type);
-  return bankHit?.puzzle ?? generatePuzzle(type, 4, mulberry32(42));
+  if (bankHit) return bankHit.puzzle;
+  const fixture = LEGACY_TYPE_FIXTURES[type];
+  if (!fixture) throw new Error(`no bank item or fixture for puzzle type ${type}`);
+  return fixture;
 }
 
 async function puzzleToSvg(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>) {
@@ -717,11 +769,19 @@ describe("machine gates and wide stem rows", () => {
     expect(browser).not.toContain("data-strip-edge");
   });
 
-  it("lets a clipped analogy strip scroll from its first panel", () => {
-    // An analogy's `A : B :: C : ?` panels are glued in pairs, so this strip
-    // must NOT wrap — a line break between a pair invents a grouping the puzzle
-    // does not have. It scrolls instead, and its content is centred with auto
-    // margins: `justify-center` would push the first panel out of reach.
+  it("wraps a clipped analogy strip at '::' instead of scrolling it", () => {
+    // An analogy's `A : B :: C : ?` panels are glued in pairs. A 375px phone
+    // cannot fit the whole line (`analogyPairWidth()` prices one pair against
+    // the same NARROW_VIEWPORT_STEM_WIDTH budget the gate strip uses above),
+    // so the two pairs wrap onto their own line at "::" instead of scrolling
+    // — scrolling the first pair out of view would defeat the comparison the
+    // puzzle asks for. Neither pair itself ever splits.
+    expect(analogyPairWidth()).toBe(192);
+    expect(analogyPairWidth()).toBeLessThanOrEqual(NARROW_VIEWPORT_STEM_WIDTH);
+    const secondGroupWidth = ANALOGY_DOUBLE_COLON_WIDTH + ANALOGY_STRIP_GAP + analogyPairWidth();
+    const unwrappedLineWidth = analogyPairWidth() + ANALOGY_STRIP_GAP + secondGroupWidth;
+    expect(unwrappedLineWidth).toBeGreaterThan(NARROW_VIEWPORT_STEM_WIDTH);
+
     const analogyPuzzle: Puzzle<Visual> = {
       ...longRowPuzzle,
       id: "long-analogy-renderer",
@@ -730,14 +790,15 @@ describe("machine gates and wide stem rows", () => {
       stem: [sceneAt(0, 0), sceneAt(0, 1), sceneAt(1, 0), { blank: true }],
     };
     const browser = renderToStaticMarkup(createElement(StemView, { puzzle: analogyPuzzle }));
-    expect(browser).toContain("overflow-x-auto");
-    // Asserted class by class: the order Tailwind classes appear in is not part
-    // of the contract, only that the strip is nowrap, sized to its content, and
-    // centred by auto margins rather than justify-center.
-    expect(browser).toContain("mx-auto");
-    expect(browser).toContain("w-max");
-    expect(browser).toContain("flex-nowrap");
-    expect(browser).not.toContain("sm:justify-center");
+    // The outer strip wraps below `sm:` and stops wrapping from `sm:` up; each
+    // pair is its own non-wrapping flex item, so a wrap can only ever land
+    // between the two pairs, never inside one.
+    expect(browser).toContain("flex-wrap");
+    expect(browser).toContain("sm:flex-nowrap");
+    // Exactly the two pair groups carry an unprefixed flex-nowrap; the outer
+    // container's own nowrap is prefixed (sm:flex-nowrap) and must not count.
+    expect((browser.match(/(?<!sm:)flex-nowrap/g) ?? []).length).toBe(2);
+    expect(browser).not.toContain("overflow-x-auto");
     expect(browser).not.toContain("data-strip-edge");
   });
 });

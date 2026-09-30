@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { assembleExpandedQuiz } from "@/items/expanded-quiz";
-import { CURRENT_FAMILY_PROMOTION_REGISTRY, readWithdrawnFamilyIds } from "@/items/family-promotion";
+import {
+  drawExpandedSlot,
+  EXPANDED_SLOT_RETRY_BUDGET,
+  planExpandedSchedule,
+  type EligibleFamily,
+} from "@/items/expanded-quiz";
+import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
+import type { Puzzle, Visual } from "@/items/schema";
 import {
   coverageComplete,
   formatMissingCoverage,
@@ -10,13 +16,39 @@ import {
   STANDARD_PROBE_MINIMUM,
 } from "./agent-probe";
 
+/**
+ * One real, accepted item for a scheduled slot's key, drawn through the
+ * assembler's own per-item path and shared by every slot with that key.
+ *
+ * Coverage counts items by family and by complexity stratum, both of which are
+ * properties of the key, so thirty long tests' worth of schedules plus one item
+ * per key selects exactly what thirty assembled tests would, without paying for
+ * nine hundred items.
+ */
+function itemsForSchedules(schedules: readonly EligibleFamily[][]): Puzzle<Visual>[] {
+  const byKey = new Map<string, Puzzle<Visual>>();
+  return schedules.flat().map((slot) => {
+    const key = `${slot.familyId}:${slot.band}:${slot.difficultyBucket}`;
+    let item = byKey.get(key);
+    for (let attempt = 0; !item && attempt < EXPANDED_SLOT_RETRY_BUDGET; attempt++) {
+      const draw = drawExpandedSlot(`coverage-test:${key}`, "long-30", 0, attempt, slot);
+      if (draw.accepted) item = draw.puzzle;
+    }
+    if (!item) throw new Error(`no accepted item for ${key}`);
+    byKey.set(key, item);
+    return item;
+  });
+}
+
 describe("standard generated probe coverage", () => {
   it("selects the fixed minimum for every eligible family and complexity bucket", () => {
-    const withdrawn = readWithdrawnFamilyIds();
+    // An empty withdrawal list, not the developer's WITHDRAWN_FAMILY_IDS: the
+    // test is about the probe's selection rule over the registry, and it must
+    // give the same verdict on every machine.
+    const withdrawn = new Set<string>();
     const requirements = standardProbeRequirements(CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn);
-    const pool = Array.from({ length: 30 }, (_, index) =>
-      assembleExpandedQuiz(`coverage-test:${index}`, "long-30", CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn),
-    ).flat();
+    const pool = itemsForSchedules(Array.from({ length: 30 }, (_, index) =>
+      planExpandedSchedule(`coverage-test:${index}`, "long-30", CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn)));
 
     const selected = selectCoverageItems(pool, requirements);
     const report = probeCoverage(selected, requirements);

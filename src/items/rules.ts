@@ -14,10 +14,9 @@ import type { Cell, OperatorLegend, Panel, Puzzle } from "./schema";
  * A rule describes how cell dimensions change across the stem, in a form pure
  * code can re-apply. `checkRule` re-derives the correct answer from the rule and
  * verifies the whole puzzle against it; this is the semantic validator that
- * closes the "model mis-marks the answer" reliability gap. The same DSL drives
- * the procedural generator (generate.ts), whose items are correct by
- * construction. The implemented foundation is recorded in
- * docs/plans/rules-bank-agent-calibration.md.
+ * closes the "model mis-marks the answer" reliability gap. The procedural
+ * generator that this DSL once drove was deleted on 2026-09-28 (see
+ * docs/plans/history.md); the schema keeps the rule shape for banked items.
  *
  * Not expressible in v1 (escape hatch — items simply omit `rule` and are
  * excluded from the calibrated bank): multiplicative count rules, shape-changing

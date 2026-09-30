@@ -45,8 +45,8 @@ describe("prototype start route", () => {
   });
 
   it("serves items that carry no answer, which is the whole protection", async () => {
-    // Since 2026-08-27 the GRADE names the answer, so the page can highlight
-    // it — every explanation says "the highlighted option". That makes this the
+    // Since 2026-08-27 the GRADE names the answer, so the page can mark it —
+    // every explanation refers to "the correct answer". That makes this the
     // only line of defence left: what a sitting hands the browser before an
     // answer is locked must be the answer-free public puzzle, with no key
     // anywhere in it, at any depth.

@@ -18,6 +18,7 @@ import {
   areScenesCategoricallyDistinct,
   SHAPES,
   VisualPuzzleSchema,
+  sceneSignature,
   shuffleOptions,
   toPublicPuzzle,
   visualSignature,
@@ -28,9 +29,6 @@ import {
   type SceneToken,
   type Visual,
 } from "./schema";
-import { generatePuzzle, generateQuiz } from "./generate";
-import { mulberry32 } from "../lib/rng";
-
 const c = (
   shape: Cell["shape"],
   count: Cell["count"],
@@ -357,29 +355,6 @@ describe("PuzzleSchema — difficulty range", () => {
       generation: { ...generation, features: { ...generation.features, difficulty: MAXIMUM_DIFFICULTY + 1 } },
     }).success).toBe(false);
   });
-
-  it("keeps the legacy compact-cell generators at difficulty 5 or below", () => {
-    // Widening the puzzle schema's range must not quietly loosen what the older
-    // paths produce. `procedural-v1`, `v2`, and `v3` have sha256 golden-seed
-    // tests in generate.test.ts that would notice a changed ITEM; this notices a
-    // changed RANGE, which is the thing the schema edit could have opened up.
-    // Their own difficulty ramps top out at 5 and nothing here may exceed it.
-    for (const version of ["procedural-v1", "procedural-v2", "procedural-v3"] as const) {
-      for (const profile of ["easy", "standard", "hard"] as const) {
-        for (let seed = 0; seed < 12; seed++) {
-          const quiz = generateQuiz(`legacy-difficulty-cap-${seed}`, version, profile);
-          for (const puzzle of quiz) {
-            expect(puzzle.difficulty, `${version} ${profile} seed ${seed}`).toBeLessThanOrEqual(5);
-            expect(puzzle.generation?.features.difficulty ?? 1, `${version} ${profile} seed ${seed}`)
-              .toBeLessThanOrEqual(5);
-          }
-        }
-      }
-    }
-    // And the per-item entry point refuses a difficulty above its own ramp,
-    // whatever the puzzle schema now allows.
-    expect(() => generatePuzzle("matrix", MAXIMUM_DIFFICULTY as 5, mulberry32(11))).toThrow();
-  });
 });
 
 describe("PuzzleSchema — options and answerIndex", () => {
@@ -553,24 +528,155 @@ describe("PuzzleSchema — scene-specific layouts", () => {
     }).success).toBe(false);
   });
 
-  it("keeps the reasoning family in the answer-free public contract", () => {
-    const publicPuzzle = toPublicPuzzle({ ...validSequence, familyId: "relational-sequence-v1" });
-    expect(publicPuzzle.familyId).toBe("relational-sequence-v1");
+  it("shows only the gates the query runs, and runs only gates it shows", () => {
+    // Owner's rule, 2026-09-29. rule-switching-v2 demonstrated two gates and
+    // its query ran one, so every item showed a transformation that played no
+    // part in the answer.
+    const gate = (...shapes: SceneToken["shape"][]): Scene => ({
+      kind: "scene",
+      rows: 3,
+      columns: 3,
+      objects: shapes.map((shape, column) => ({ row: 1, column, object: token(shape) })),
+      tiles: [],
+    });
+    const machine: Puzzle<Visual> = {
+      ...validMatrix,
+      id: "every-gate-used",
+      layout: "machineTable",
+      stem: [
+        scene(0), gate("triangle"), scene(1),
+        scene(0), gate("square"), scene(1),
+        scene(0), gate("square", "triangle"), { blank: true },
+      ],
+      options: sceneOptions,
+    };
+    expect(VisualPuzzleSchema.safeParse(machine).success).toBe(true);
+
+    const queryRuns = (query: Scene) => VisualPuzzleSchema.safeParse({
+      ...machine,
+      stem: machine.stem.map((panel, index) => index === 7 ? query : panel),
+    });
+    const unused = queryRuns(gate("triangle"));
+    expect(unused.success).toBe(false);
+    expect(unused.error?.issues.map((issue) => issue.message).join("\n"))
+      .toMatch(/never run: solid square; never demonstrated: none/);
+    const unshown = queryRuns(gate("square", "triangle", "diamond"));
+    expect(unshown.success).toBe(false);
+    expect(unshown.error?.issues.map((issue) => issue.message).join("\n"))
+      .toMatch(/never run: none; never demonstrated: solid diamond/);
+
+    // A combine table's gate sits between its two operands, and the same rule holds.
+    const combine: Puzzle<Visual> = {
+      ...machine,
+      id: "every-combine-gate-used",
+      layout: "combineTable",
+      stem: [
+        scene(0), gate("triangle"), scene(1), scene(0),
+        scene(0), gate("square"), scene(1), scene(0),
+        scene(0), gate("triangle", "square"), scene(1), { blank: true },
+      ],
+    };
+    expect(VisualPuzzleSchema.safeParse(combine).success).toBe(true);
+    expect(VisualPuzzleSchema.safeParse({
+      ...combine,
+      stem: combine.stem.map((panel, index) => index === 9 ? gate("square") : panel),
+    }).success).toBe(false);
+  });
+
+  it("serves no answer and no hint about the question before it is answered", () => {
+    // Family, band and difficulty left the pre-answer payload on 2026-09-28:
+    // each says something about the question (which mechanism, how hard) that
+    // the taker should work out, and the review screen reads them from the
+    // submit response instead.
+    const publicPuzzle = toPublicPuzzle({
+      ...validSequence,
+      familyId: "relational-sequence-v1",
+      band: "warmup",
+    });
+    expect(Object.keys(publicPuzzle).sort()).toEqual(["id", "instruction", "layout", "options", "stem", "type"]);
     expect(publicPuzzle).not.toHaveProperty("answerIndex");
     expect(publicPuzzle).not.toHaveProperty("explanation");
+    expect(publicPuzzle).not.toHaveProperty("familyId");
+    expect(publicPuzzle).not.toHaveProperty("band");
+    expect(publicPuzzle).not.toHaveProperty("difficulty");
+    expect(PublicPuzzleSchema.safeParse(publicPuzzle).success).toBe(true);
+  });
+
+  it("serves every scene option's objects in reading order, however it was built", () => {
+    // When exactly one option's object list was out of row/column order, that
+    // option was never the answer (0 of 28 cases in 600 items, 2026-09-28): the
+    // order was a leak nobody could see on screen. The public payload now lists
+    // every option's objects row by row, then column by column.
+    const at = (row: number, column: number, shape: SceneToken["shape"]) => ({
+      row, column, object: { kind: "token" as const, shape, rotation: 0, fill: "outline" as const, size: "l" as const },
+    });
+    const board = (objects: ReturnType<typeof at>[]): Scene =>
+      ({ kind: "scene", rows: 3, columns: 3, objects, tiles: [] });
+    const options = [
+      board([at(2, 2, "circle"), at(0, 1, "square")]),
+      board([at(0, 0, "circle"), at(1, 2, "square")]),
+      board([at(1, 0, "circle"), at(0, 2, "star"), at(0, 1, "square")]),
+      board([at(2, 0, "circle")]),
+    ];
+    const puzzle = {
+      id: "t-scene-order",
+      type: "analogy" as const,
+      instruction: "Complete the analogy.",
+      difficulty: 3,
+      layout: "analogy" as const,
+      stem: [options[1], options[3], options[2]],
+      options,
+      answerIndex: 0,
+      explanation: "fixture",
+    };
+    const served = toPublicPuzzle(puzzle as never) as unknown as { options: Scene[] };
+    for (const option of served.options) {
+      const cells = option.objects.map((placement) => placement.row * 3 + placement.column);
+      expect(cells).toEqual([...cells].sort((left, right) => left - right));
+    }
+    // Only the order moved: every option is the same board, in the same place.
+    expect(served.options.map(sceneSignature)).toEqual(options.map(sceneSignature));
   });
 });
 
+// The live scene-family assembler never produces an "operatorInduction"
+// puzzle and the bank holds none (both were legacy-generator-only), so this
+// fixture is a hand-authored literal — same style as validMatrix etc. above —
+// rather than a generated one. It only needs to be schema-valid; the schema
+// rules under test don't care how the triples were produced.
+const validOperatorInduction: Puzzle = {
+  id: "t-operator",
+  type: "operatorInduction",
+  instruction: "Infer the visual operation. Which output completes the last row?",
+  difficulty: 4,
+  layout: "operatorTable",
+  operatorLegend: { shapeCycle: ["circle", "square", "triangle"] },
+  stem: [
+    c("circle", 1, 0, "solid"), c("square", 2, 0, "solid"), c("triangle", 1, 0, "solid"),
+    c("square", 1, 0, "outline"), c("circle", 2, 0, "outline"), c("triangle", 2, 0, "outline"),
+    c("triangle", 1, 0, "half"), c("square", 3, 0, "half"), c("circle", 3, 0, "half"),
+    c("circle", 1, 0, "outline"), c("square", 1, 0, "outline"), BLANK,
+  ],
+  options: [
+    c("circle", 1, 0, "solid"),
+    c("square", 1, 0, "solid"),
+    c("triangle", 1, 0, "solid"),
+    c("circle", 2, 0, "outline"),
+  ],
+  answerIndex: 0,
+  explanation: "Fixture only — the live app never generates this puzzle type.",
+};
+
 describe("PuzzleSchema — operator induction", () => {
   it("accepts the generated triple contract and rejects missing public legend or a misplaced blank", () => {
-    const valid = generatePuzzle("operatorInduction", 4, mulberry32(7));
+    const valid = validOperatorInduction;
     expect(PuzzleSchema.safeParse(valid).success).toBe(true);
     expect(PuzzleSchema.safeParse({ ...valid, operatorLegend: undefined }).success).toBe(false);
     expect(PuzzleSchema.safeParse({ ...valid, stem: [{ blank: true }, ...valid.stem.slice(1)] }).success).toBe(false);
   });
 
   it("rejects a shape outside the displayed per-item order", () => {
-    const valid = generatePuzzle("operatorInduction", 4, mulberry32(8));
+    const valid = validOperatorInduction;
     const outside = SHAPES.find((shape) => !valid.operatorLegend!.shapeCycle.includes(shape));
     if (!outside) throw new Error("fixture needs a shape outside the operator cycle");
     const first = valid.stem[0];

@@ -17,6 +17,10 @@ import {
 } from "../src/items/scene-distance";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY, EXPANDED_PROFILE_BANDS } from "../src/items/family-promotion";
 import { eligibleFamiliesForBand } from "../src/items/expanded-quiz";
+import {
+  blindStrategyCredits,
+} from "../src/items/blind-options";
+import { toPublicPuzzle, type Scene } from "../src/items/schema";
 
 const PROGRAM_VARIETY_PROBE_SEEDS = 200;
 const MIN_DISTINCT_PROGRAM_FINGERPRINTS = 8;
@@ -55,11 +59,32 @@ const CONVERTED_FAMILY_IDS = new Set<string>([
   "visual-set-algebra-v2",
   "spatial-transform-v2",
   "transformation-machine-v3",
-  "rule-switching-v2",
   "composed-transform-v2",
-  "parallel-evolution-v1",
   "combining-machine-v1",
 ]);
+
+/**
+ * The options-only gate (docs/plans/blind-answer-leak.md): for every served
+ * bucket, this many items, read exactly as served — shuffled, and through
+ * `toPublicPuzzle` — by strategies that never see the question
+ * (`blindStrategyCredits`): the option at each rank, 1 to 6, of each of three
+ * solvers and of their composite, the option whose ranks sit nearest the
+ * middle, a guess among the options left once the extremes are ruled out, a
+ * pick among the options alone in their value of some aspect, and a guess
+ * among the rest once those are ruled out. A bucket fails when any strategy
+ * picks the answer more often than the limit. A blind guess is 1 in 6 (16.7%).
+ *
+ * v1 (2026-09-29) read only each solver's top pick, and selection passed it by
+ * keeping the answer off the top — which piled the answer into the middle
+ * ranks, where a middle-rank strategy found it up to 53% of the time. v2 reads
+ * every rank. The two lone-aspect strategies joined on 2026-09-30, when the
+ * agreement rule that fed one of them (42.9% on `relational-matrix-d4`) stopped
+ * being a hard rule. The seeds are fixed, so the gate cannot flake; 200 items
+ * put 30% about five standard errors above chance.
+ */
+const BLIND_GATE_ITEMS = 200;
+const BLIND_GATE_LIMIT = 0.30;
+const BLIND_GATE_SEED = "blind-gate-v2";
 
 const seedsArg = process.argv.find((argument) => argument.startsWith("--seeds="));
 const seeds = Number(seedsArg?.split("=")[1] ?? PROGRAM_VARIETY_PROBE_SEEDS);
@@ -371,6 +396,40 @@ const distanceKeys = enabledKeys.map((entry) => {
  * fails the aggregate outright. That case is already a per-key regression:
  * `"incomparable"` sorts behind every finite distance.
  */
+/**
+ * Options-only solvers, per served bucket. Run in full whatever `--seeds=`
+ * says: it is the one check here whose sample size is fixed by the gate itself.
+ */
+const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${entry.difficultyBucket}`, entry])).values()]
+  .map((entry) => {
+    const credit: Record<string, number> = {};
+    for (let item = 0; item < BLIND_GATE_ITEMS; item++) {
+      const { puzzle } = generateSceneFamilyCandidate(
+        entry.familyId as SceneFamilyId,
+        seededRng(BLIND_GATE_SEED, `${entry.difficultyBucket}:${item}`),
+        entry.difficultyBucket,
+      );
+      const served = toPublicPuzzle(puzzle).options as Scene[];
+      for (const [strategy, earned] of Object.entries(blindStrategyCredits(served, puzzle.answerIndex))) {
+        credit[strategy] = (credit[strategy] ?? 0) + earned;
+      }
+    }
+    const rates = Object.fromEntries(Object.entries(credit).map(([strategy, earned]) =>
+      [strategy, Number((earned / BLIND_GATE_ITEMS).toFixed(3))])) as Record<string, number>;
+    const [worstStrategy, worstRate] = Object.entries(rates).reduce((worst, next) => (next[1] > worst[1] ? next : worst));
+    const passed = worstRate <= BLIND_GATE_LIMIT;
+    if (!passed) failures++;
+    return {
+      familyId: entry.familyId,
+      difficultyBucket: entry.difficultyBucket,
+      items: BLIND_GATE_ITEMS,
+      worstStrategy,
+      worstRate,
+      rates,
+      passed,
+    };
+  });
+
 const comparableKeys = distanceKeys.filter((entry) => entry.comparable);
 const positionsOf = (distance: SceneDistance | null | undefined): number | null =>
   distance === null || distance === undefined || distance === "incomparable" ? null : distance.positions;
@@ -397,7 +456,7 @@ const aggregateImproved = comparableKeys.length > 0 &&
 if (distanceGateEnforced && !aggregateImproved) failures++;
 
 process.stdout.write(`${JSON.stringify({
-  version: "scene-family-verify-v5",
+  version: "scene-family-verify-v8",
   bucketParity: {
     enabledRegistryKeys: enabledKeys.length,
     declaredBuckets: declaredBucketOwners.size,
@@ -408,6 +467,14 @@ process.stdout.write(`${JSON.stringify({
     convertedFamilyIds: [...CONVERTED_FAMILY_IDS],
     probeSeeds: PROGRAM_VARIETY_PROBE_SEEDS,
     minimumDistinctProgramFingerprints: MIN_DISTINCT_PROGRAM_FINGERPRINTS,
+  },
+  blindOptions: {
+    seed: BLIND_GATE_SEED,
+    itemsPerBucket: BLIND_GATE_ITEMS,
+    limit: BLIND_GATE_LIMIT,
+    chance: 1 / 6,
+    buckets: blindKeys,
+    passed: blindKeys.every((entry) => entry.passed),
   },
   distractorDistance: {
     baselinePath: DISTANCE_BASELINE_PATH,
@@ -442,6 +509,17 @@ process.stderr.write(
   `summed p50 positions ${summedMedianPositions} vs baseline ${baselineSummedMedianPositions} ` +
     `over ${comparableKeys.length} comparable keys\n`,
 );
+const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`.padStart(6);
+process.stderr.write(
+  `\noptions-only strategies, ${BLIND_GATE_ITEMS} items per bucket (limit ${percent(BLIND_GATE_LIMIT)}, chance 17%)\n` +
+    `${"bucket".padEnd(28)} ${"worst strategy".padEnd(20)} rate  lone-aspect  exclude-lone\n`,
+);
+for (const entry of blindKeys) {
+  process.stderr.write(
+    `${entry.difficultyBucket.padEnd(28)} ${entry.worstStrategy.padEnd(20)}${percent(entry.worstRate)}     ` +
+      `${percent(entry.rates["lone-aspect"])}       ${percent(entry.rates["exclude-lone-aspect"])}${entry.passed ? "" : "  FAILS"}\n`,
+  );
+}
 
 if (failures > 0) {
   const diversityFailures = families.filter((family) => !family.programVariety.passed)
@@ -467,6 +545,14 @@ if (failures > 0) {
   if (extrapolationOffenders.length > 0) {
     parts.push(
       `extrapolation gate failed for ${extrapolationOffenders.join(", ")}: a row strand containing the blank must show at least ${MINIMUM_OBSERVED_TERMS_IN_ANSWERED_STRAND} terms, declared as the panels that lead to it`,
+    );
+  }
+  const blindOffenders = blindKeys.filter((entry) => !entry.passed).map((entry) =>
+    `${entry.difficultyBucket} (${entry.worstStrategy} ${percent(entry.worstRate).trim()})`);
+  if (blindOffenders.length > 0) {
+    parts.push(
+      `an options-only strategy picks the answer above ${percent(BLIND_GATE_LIMIT).trim()} of the time for ` +
+        `${blindOffenders.join("; ")}`,
     );
   }
   const distanceOffenders = distanceKeys.filter((entry) => entry.regressed).map((entry) =>

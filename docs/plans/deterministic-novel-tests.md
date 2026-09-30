@@ -124,7 +124,7 @@ The 2026-08-16 decisions in full:
 - **A hard deadline with a grace window and a late marker.** The countdown ends
   the test. "The answer deadline" below fixes the exact rule.
 - **Results are a raw score and a reasoning-family breakdown, and nothing else.**
-  No IQ number, no percentile, no normalized scale. `BRAINSTORM.md` Q8 records
+  No IQ number, no percentile, no normalized scale. [`docs/brainstorm.md`](../brainstorm.md) Q8 records
   why an IQ figure is not available to us.
 - **Code-valid families ship publicly.** This reverses the earlier rule that a
   family had to pass the human pilot
@@ -354,21 +354,19 @@ built from three families. A `short-5` test needs one eligible family per band.
 
 #### Measured cost
 
-Measured 2026-08-18 on the development machine, 100 fresh seeds per length:
+Measured 2026-09-29 on the development machine on `scene-families-v19` (the 2026-08-18
+figures of 18 ms per long test predate the gate machines and the balanced option lists):
 
-| Profile | Median | 95th percentile | Slowest | Failed assemblies |
-|---|---:|---:|---:|---:|
-| `short-5` | 3.6 ms | 8.7 ms | 27.0 ms | 0 of 100 |
-| `long-30` | 18.0 ms | 21.0 ms | 22.5 ms | 0 of 100 |
+| Profile | Seeds | Median | 95th percentile | Slowest | Failed assemblies |
+|---|---:|---:|---:|---:|---:|
+| `short-5` | 100 | 54 ms | 129 ms | 232 ms | 0 |
+| `long-30` | 50 | 321 ms | 434 ms | 502 ms | 0 |
 
-Candidate rejection at the family-acceptance stage is 0% across 100 draws from
-each of the 18 families, so the retry budget only ever absorbs the rare repeat
-of a visible puzzle. A 30-question test is therefore built in about 20
-milliseconds and fits inside the browser's 20-second start timeout with four
-orders of magnitude to spare. Generating questions progressively would add a
-loading state, a partial-test failure mode, and more token bookkeeping to solve
-a problem the measurement says does not exist, so the test is still assembled in
-one request.
+Most of a long test's time goes to choosing balanced option lists (see
+[blind-answer-leak.md](blind-answer-leak.md)). A 30-question test is still built well inside
+the browser's 20-second start timeout. Generating questions progressively would add a
+loading state, a partial-test failure mode, and more token bookkeeping to solve a problem
+the measurement says does not exist, so the test is still assembled in one request.
 
 #### When generation fails
 

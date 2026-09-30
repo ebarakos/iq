@@ -25,171 +25,11 @@ import {
  * Generation semantics for the two public test lengths.
  *
  * Bump this whenever the band schedule, the family pool rule, the ordering
- * rule, or any family's item semantics change. `scene-families-v2` was the
- * retired 12-question profile; `v3` carried the ill-posed `minimal-repair-v1`,
- * so attempt data recorded under it must not be pooled with `v4`. `v5` adds
- * seeded family-pool subsampling, so it is likewise a separate population.
- * `v6` serves `OPTIONS_PER_ITEM` options instead of four, which lowers the value
- * of a guess and changes every family's near misses — results from `v5` and `v6`
- * are not comparable and must never be pooled. `v7` withdraws the four families
- * the first human pilot ruled out, so its family pool is smaller than `v6`'s.
- * `v8` withdraws `interleaved-sequence-v2` (one observed transition is not
- * evidence a step repeats), shrinking the pool again — attempts recorded under
- * `v7` and `v8` are different populations and must never be pooled. `v9`
- * raises the ceiling: composed-transform grows to three ordered steps (as
- * `-v2`), the redesigned `interleaved-sequence-v3` and `relational-outlier-v3`
- * enter at their predecessors' positions, and `containment-analogy-v2` moves
- * down into constraint-spatial — a different pool and ladder than `v8`'s.
- * `v10` withdraws both redesigns after the 2026-08-24 full-battery pilot:
- * `relational-outlier-v3` failed it outright, and `interleaved-sequence-v3`
- * was answered correctly but with the notation misread, which the human gate
- * does not accept as proof of legibility.
- *
- * `v11` is the escalate-the-quiz batch, bumped once on 2026-08-25 after every
- * semantic change and registry entry was final, so no attempt or bank artifact
- * was ever recorded under a half-finished population. It changes what a
- * question is made of, in six ways. Difficulty buckets are now an INPUT to
- * generation rather than a label put on the output, so a bucket selects the
- * program the family draws; `fold-punch`, `visual-set-algebra`,
- * `compositional-analogy` and `composed-transform` each gained a deeper bucket
- * on top of their existing one, and a family asked for twice in a band now
- * gets its deeper bucket the second time. Wrong answers are no longer sampled
- * uniformly: required contrasts are kept, then the remaining slots are filled
- * from the closest candidates by scene edit distance, so every option is a
- * near miss. Composed transforms grew a four-gate form and admit token turns,
- * and every displayed gate is now proved load-bearing — a program whose answer
- * survives deleting any one gate is not servable — with the deep half of that
- * grammar held out of public tests entirely. `parallel-evolution-v1` joins the
- * composition band, three tokens on one board each following their own rule.
- * Band draws became format-aware: at most one analogy-layout family per draw,
- * chosen uniformly from the subsets that satisfy that and the cross-band rule
- * — which now yields for a family whose bucket only this band can serve, so a
- * long test can spend one of its distinct families on the four-gate machine
- * and its floor moved from twelve to eleven to pay for it.
- * And the family pools are the plan's fallback branch — six composition, four
- * constraint-spatial, four induction-transfer, twenty enabled family/band/bucket
- * keys — because the `dual-constraint-matrix-v1` necessity proof failed and
- * that family was never added. Every one of those changes moves what a score
- * means, so `v10` and `v11` results are different populations and must never be
- * pooled. See docs/plans/escalate-the-quiz.md.
- *
- * `v12` is the raise-the-ceiling batch of 2026-08-26, bumped once for four
- * changes that all move what a score means. The difficulty range gained a sixth
- * rung, and two buckets sit on it: `composed-transform-d6` shows five ordered
- * gates and `transformation-machine-d6` demonstrates four. Both live in
- * `induction-transfer` because the long test is ordered easiest-first and that
- * band is last, so a deeper bucket anywhere else would still be answered before
- * the end. A band's leftover questions now go first to the families whose next
- * occurrence reaches a bucket their base share never would, which is what turns
- * "a long test usually ends on the hardest thing the battery has" into "always".
- * And `containment-analogy-v2` is withdrawn on the pilot's notation evidence,
- * which drops `constraint-spatial` from four families to three — exactly its
- * draw size, so that band no longer subsamples. `v11` and `v12` results are
- * different populations and must never be pooled. See
- * docs/plans/raise-the-ceiling-v12.md.
- *
- * `v13` is the owner's correction of 2026-08-27, one day after v12, and it
- * moves the population twice:
- *
- * - **Both d6 buckets are withdrawn.** The rule is now **never more than three
- *   gates**: a fourth or fifth adds procedure, not reasoning. The owner knew
- *   the mechanism instantly and answered the five-gate item wrong in under five
- *   seconds because applying it once more was boring. The ladder tops out at d5
- *   again, and the leftover-question rule from v12 stays but redirects nothing
- *   until some family holds two buckets in one band again.
- * - **`visual-set-algebra-v2` is rebuilt.** Its inputs were a fixed diagonal of
- *   two tokens that could never disagree, which the owner called toys. Boards
- *   are now three tokens drawn into four roles — shared, clashing, left-only,
- *   right-only — and the combining vocabulary went from four operations to
- *   eight, because a clash finally makes "which side wins" and "does identity
- *   count" real questions. `relational-matrix-v2` moves with it: it draws from
- *   the same widened operation set.
- *
- * The battery is 19 enabled family/band/bucket keys over pools of two warmup,
- * six composition, three constraint-spatial and four induction-transfer
- * families.
- *
- * `v14`, later the same day, changes what the WRONG options are in every
- * family at once. The owner reported that "using only one first inference you
- * can select the right answer without looking at the other rules", and it
- * measured true of every item in four buckets: the answer was the only board
- * with its footprint, so working out where the tokens go finished the item
- * without ever reading a shape or a fill. Distractor selection now takes, for
- * each aspect a solver can infer on its own — footprint, shapes, fills,
- * rotations, token count — the closest wrong option that AGREES with the answer
- * on it, before filling the remaining slots by closeness as before. Knowing one
- * aspect therefore no longer narrows six options to one. `relational-matrix-v2`
- * needed its inputs widened for the same reason `visual-set-algebra-v2` did a
- * few hours earlier: its four corner atoms were fixed, so two input boards
- * could never disagree and no wrong option could share the answer's footprint.
- *
- * Every family's option lists moved, so `v13` and `v14` are different
- * populations. Measured over 120 seeds a bucket, items solvable from a single
- * aspect fell from 13 buckets to 8, and the five multi-rule families that
- * carried the ladder — composed-transform, transformation-machine,
- * compositional-analogy, visual-set-algebra d5 and inverse-analogy — went to
- * zero.
- *
- * `v15` finishes that job in the four buckets `v14` left leaking, each at the
- * source of its near misses rather than in the shared selection:
- *
- * - **`relational-matrix-d4`** (88% of items decided by one aspect) gets three
- *   tokens per corner instead of two, so a shape has three possible homes and a
- *   wrong option can carry the answer's shapes in other cells; and a fourth
- *   witnessed mistake, combining the right rule with the wrong two boards of the
- *   grid, which is the commonest real error on a 3x3.
- * - **`spatial-transform-d2`** (64%) pairs every board move with an extra token
- *   turn, so the option list holds the board the solver gets by moving correctly
- *   and turning the tokens as well — the exact mix-up the family tests.
- * - **`rule-switching-d2`** (48%) adds the correct board carried one operation
- *   further, which keeps the answer's cells and changes only the fill.
- * - **`visual-set-algebra-d4`** (45%) redraws its inputs until the pool can
- *   cover every aspect, the way its `-d5` sibling already did for free through
- *   its third turning step.
- *
- * Every servable bucket that can hide its answer now does. Four cannot and are
- * not defects: `fold-punch` d4/d5, `inverse-fold-punch-d5` and
- * `second-order-sequence-d4` offer one token or one punched sheet at different
- * places, so an option agreeing on the footprint would BE the answer.
- *
- * `v15` also adds `combining-machine-v1`, the first family whose gates take TWO
- * boards — the owner asked for the set-algebra idea inside the gate machines,
- * and a machine row of (input, gate, output) cannot show a second operand, so it
- * ships with a new row shape where the gate glyph sits between its operands. It
- * is registered as a PROTOTYPE, not code-valid, so the assembler does not serve
- * it: no human has seen it. Its aspect gap was closed the same day — d4 to 0%
- * and d5 to 8%, from 63% and 90% — by giving the pool the two boards that sit
- * beside the answer: the clash read the wrong way round, and the exclusive token
- * kept from the wrong board.
- *
- * `v15` also DELETES the ten families that were carried in the registry but
- * served in no test: operator-induction-v1, containment-analogy-v2, both
- * relational-outliers, constraint-mosaic-v2, topology-path-v1,
- * concept-induction-v2, both interleaved-sequences and minimal-repair-v3. Each
- * had been withdrawn on evidence recorded in git and in data/pilot/README.md, so
- * the code carried nothing the history does not. The served battery is unchanged
- * at the same 19 keys as `v14`.
- *
- * `v16` withdraws both fold-and-punch families because their corner mirroring
- * is too easy to earn repeated slots in the battery. Constraint-spatial now
- * consists only of relational matrix and visual set algebra. The deep composed
- * transform no longer adds a separate order-demonstration row and then asks
- * for all three gates; it demonstrates A, B and C once, then asks for two of
- * those gates in a recombined order. Results from v15 and v16 are different
- * populations and must not be pooled.
- *
- * `v17` makes the transformation ladder literal. The intermediate composed
- * bucket demonstrates and applies two gates; the hard bucket demonstrates and
- * applies three, with varied order. The one-step rule-switching family moves
- * from the hard tail into warmup. Every composed worked row is now required by
- * its query, so v16 and v17 results must not be pooled.
- *
- * `v18` promotes `combining-machine-v1` into constraint-spatial — the first
- * family whose gates combine two boards — growing the served pool from 16 keys
- * to 18. A new family is a new population, so v17 and v18 results must not be
- * pooled.
+ * rule, or any family's item semantics change: results recorded under two
+ * versions are different populations and must never be pooled. What each
+ * version changed is in docs/plans/history.md.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v18" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v19" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -239,11 +79,10 @@ export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>
  * are split and ordered. Warmup keeps its complete pool so every test still
  * begins with the full set of introductory mechanisms.
  *
- * Constraint-spatial draws two of its three families since combining-machine
- * was promoted in v18, so one long test never carries all three heavy
- * constraint mechanisms at once. Induction-transfer draws both of its hard,
- * three-step transformation families after the one-step switch moved to warmup
- * in v17.
+ * Constraint-spatial draws two of its three families (combining-machine was
+ * out of the band from 2026-09-29 to 2026-09-30, when the draw of two was the
+ * band's whole pool). Induction-transfer draws both of its hard, three-step
+ * transformation families after the one-step switch moved to warmup in v17.
  */
 export const FAMILY_SUBSAMPLE_SIZES: Readonly<
   Record<ExpandedProfileBand, number | undefined>
@@ -332,7 +171,7 @@ export function isAnalogyLayoutFamily(familyId: string): boolean {
 }
 
 /** Attempts per slot before assembly gives up. Each attempt has its own child seed. */
-const RETRY_BUDGET = 4;
+export const EXPANDED_SLOT_RETRY_BUDGET = 4;
 
 /**
  * Worked-example layouts must show at least two visible scenes, so the rule is
@@ -595,24 +434,35 @@ function arrangeBand(
  * defeats the answer-free public contract, which is the point of serving the
  * puzzle without `answerIndex`, `rule`, or `explanation` at all.
  *
- * The id is now a keyed hash of the seed and slot: still deterministic (the
- * same seed replays the same ids) and still unique within a test, but one-way.
- * The real seed stays inside the sealed server token.
+ * The id is now a one-way hash of the seed and slot: still deterministic (the
+ * same seed replays the same ids) and still unique within a test. The seed
+ * itself is never served, sealed into the token, or stored; it exists only
+ * during the request that assembles the test.
  */
-function runtimePuzzleId(seed: Seed, slotIndex: number, familyId: string): string {
+function runtimePuzzleId(seed: Seed, slotIndex: number): string {
   const digest = createHash("sha256")
     .update(`aiq.public-item-id.v1\u0000${String(seed)}\u0000${slotIndex}`)
     .digest("hex")
     .slice(0, 16);
-  return `expanded-${digest}-${slotIndex + 1}-${familyId}`;
+  // No family name: the id is served before scoring, and the family is one of
+  // the hints the public payload deliberately leaves out.
+  return `expanded-${digest}-${slotIndex + 1}`;
 }
 
-function visibleFingerprint(puzzle: Puzzle<Scene>): string {
+/**
+ * What makes two questions the same question: what the taker is ASKED — the
+ * item type, its layout, and the panels of its stem.
+ *
+ * The options are deliberately left out. Until 2026-09-28 they were hashed in,
+ * in served order, so the same stem offered with different near misses (or the
+ * same near misses in another order) counted as a new question, and about 3% of
+ * long tests asked one question twice.
+ */
+export function questionFingerprint(puzzle: { type: string; layout: string; stem: readonly unknown[] }): string {
   return createHash("sha256").update(JSON.stringify({
     type: puzzle.type,
     layout: puzzle.layout,
     stem: puzzle.stem,
-    options: puzzle.options,
   })).digest("hex");
 }
 
@@ -671,9 +521,10 @@ function combinations<T>(items: readonly T[], size: number): T[][] {
  *   distinct family the repeat costs.
  *
  * The slack is what keeps the two lengths apart without a special case for
- * either. A long test draws twelve family slots against a floor of eleven, so
- * it can spend one; a short test draws five against a floor of five, so it can
- * spend none and its cross-band rule never yields.
+ * either. A long test draws more family slots than its floor of distinct
+ * families (`MINIMUM_DISTINCT_FAMILIES`), so it can spend the difference; a
+ * short test draws five against a floor of five, so it can spend none and its
+ * cross-band rule never yields.
  */
 export function candidateFamilyDraws(
   families: readonly EligibleFamily[],
@@ -730,22 +581,51 @@ function drawnFamiliesForBand(
 /**
  * The most different families a profile's band draws could possibly produce.
  *
- * One band contributes the smaller of the families it draws and the questions
- * it asks: a short test's composition band draws four families for one
- * question, so it can only ever show one of them. The gap between this and
- * `MINIMUM_DISTINCT_FAMILIES` is how many families a test may repeat across
- * bands before it stops being buildable.
+ * Each band offers the smaller of the families it draws and the questions it
+ * asks — a short test's composition band draws four families for one question,
+ * so it can only ever show one of them — and each of those places can hold any
+ * family the band may draw. A family registered in two bands still counts once,
+ * which is why this is a matching rather than a sum: until 2026-09-28 it was the
+ * sum, `composed-transform-v2` counted in both of its bands, and a withdrawal
+ * that left a long test one family short passed the startup check.
+ *
+ * The gap between this and `MINIMUM_DISTINCT_FAMILIES` is how many families a
+ * test may repeat across bands before it stops being buildable. The format cap
+ * and the cross-band preference are ignored, so this is an upper bound:
+ * `assertProfilesRemainBuildable` is what proves a length really builds.
  */
 export function maximumDistinctFamilies(
   profile: ExpandedProfile,
   registry: FamilyPromotionRegistry,
   withdrawnFamilyIds: ReadonlySet<string> = new Set(),
 ): number {
-  return EXPANDED_PROFILE_BANDS.reduce((total, band) => {
-    const pool = eligibleFamiliesForBand(registry, band, withdrawnFamilyIds).length;
-    const drawn = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? pool, pool);
-    return total + Math.min(drawn, BAND_SCHEDULE[profile][band]);
-  }, 0);
+  const places: string[][] = [];
+  for (const band of EXPANDED_PROFILE_BANDS) {
+    const pool = eligibleFamiliesForBand(registry, band, withdrawnFamilyIds).map((family) => family.familyId);
+    const drawn = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? pool.length, pool.length);
+    const shown = Math.min(drawn, BAND_SCHEDULE[profile][band]);
+    for (let place = 0; place < shown; place++) places.push(pool);
+  }
+  // Largest matching of places to distinct families, by augmenting paths. The
+  // graph is a few dozen edges, so the simple algorithm is instant.
+  const placeOf = new Map<string, number>();
+  const assign = (place: number, visited: Set<string>): boolean => {
+    for (const familyId of places[place]) {
+      if (visited.has(familyId)) continue;
+      visited.add(familyId);
+      const holder = placeOf.get(familyId);
+      if (holder === undefined || assign(holder, visited)) {
+        placeOf.set(familyId, place);
+        return true;
+      }
+    }
+    return false;
+  };
+  let matched = 0;
+  for (let place = 0; place < places.length; place++) {
+    if (assign(place, new Set())) matched++;
+  }
+  return matched;
 }
 
 /** Choose every family for the whole test before any item is generated. */
@@ -760,9 +640,10 @@ export function planExpandedSchedule(
   // just ids, because a family registered in two bands asks a different
   // question in each and the cross-band rule needs to tell those apart.
   const servedBuckets = new Map<string, Set<string>>();
-  let crossBandSlack =
-    maximumDistinctFamilies(profile, registry, withdrawnFamilyIds) -
-    MINIMUM_DISTINCT_FAMILIES[profile];
+  let crossBandSlack = Math.max(
+    0,
+    maximumDistinctFamilies(profile, registry, withdrawnFamilyIds) - MINIMUM_DISTINCT_FAMILIES[profile],
+  );
   for (const band of EXPANDED_PROFILE_BANDS) {
     const count = BAND_SCHEDULE[profile][band];
     if (count === 0) continue;
@@ -827,33 +708,151 @@ export function planExpandedSchedule(
 }
 
 /**
- * Refuse to start when the withdrawal list has emptied out a band.
+ * Schedules planned per length before the server agrees to start.
+ *
+ * Planning is pure arithmetic over the registry — no item is generated — so 64
+ * plans of each length cost a few milliseconds. The seeds are fixed, so the
+ * check gives the same verdict on every start for one registry and withdrawal
+ * list.
+ */
+const BUILDABILITY_PROBE_SEEDS = 64;
+const BUILDABILITY_PROBE_NAMESPACE = "aiq.buildability-probe.v1";
+
+/**
+ * Refuse to start when the withdrawal list has left a test length unbuildable.
  *
  * Called once at server start. Pulling one confusing family is routine; pulling
- * enough of them that the long test can no longer be built is a different
- * event, and it must be visible immediately rather than discovered by the first
- * person who presses start.
+ * enough of them that a length can no longer be built is a different event, and
+ * it must be visible immediately rather than discovered by the first person who
+ * presses start.
+ *
+ * Two checks, in this order. The per-band minimums give the clearest message
+ * when a band has simply run dry. They are not enough on their own: on
+ * 2026-09-28 withdrawing `spatial-transform-v2` and `rule-switching-v2` left
+ * every band at or above its minimum, and every long test then failed with "needs
+ * at least 10 distinct families but has 9". So each length is also planned for
+ * real, over fixed seeds, exactly as a request would plan it.
  */
 export function assertProfilesRemainBuildable(
   registry: FamilyPromotionRegistry,
   withdrawnFamilyIds: ReadonlySet<string>,
 ): void {
   const shortfalls: string[] = [];
+  const thinBands = new Set<string>();
   for (const profile of EXPANDED_PROFILES) {
     for (const band of EXPANDED_PROFILE_BANDS) {
       const available = eligibleFamiliesForBand(registry, band, withdrawnFamilyIds).length;
       const minimum = MINIMUM_ELIGIBLE_FAMILIES[profile][band];
       if (available < minimum) {
         shortfalls.push(`${profile} needs ${minimum} ${band} families but only ${available} remain`);
+        thinBands.add(band);
       }
     }
   }
   if (shortfalls.length > 0) {
     throw new Error(
       `WITHDRAWN_FAMILY_IDS has left the test unbuildable: ${shortfalls.join("; ")}. ` +
-        "Put a family back, or add a new one for the short band.",
+        `Put a family back, or add a new one to the ${[...thinBands].join(" and ")} band.`,
     );
   }
+
+  const unbuildable: string[] = [];
+  for (const profile of EXPANDED_PROFILES) {
+    for (let index = 0; index < BUILDABILITY_PROBE_SEEDS; index++) {
+      try {
+        planExpandedSchedule(`${BUILDABILITY_PROBE_NAMESPACE}:${index}`, profile, registry, withdrawnFamilyIds);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        unbuildable.push(`the ${profile} test cannot be built (${reason})`);
+        break;
+      }
+    }
+  }
+  if (unbuildable.length > 0) {
+    throw new Error(
+      `WITHDRAWN_FAMILY_IDS has left the test unbuildable: ${unbuildable.join("; ")}. ` +
+        "Put a family back, or add a new one to a band it can serve.",
+    );
+  }
+}
+
+/** One attempt at filling one slot: the item the assembler would serve, or why not. */
+export type ExpandedSlotDraw =
+  | { accepted: true; puzzle: Puzzle<Scene> }
+  | { accepted: false; rejection: string };
+
+/**
+ * Draw one scheduled slot once, through every check the assembler applies to a
+ * single item.
+ *
+ * Exported so the per-bucket acceptance sweep in the tests measures the very
+ * path a real test takes. The one check left to the caller is that no two
+ * questions in a test are the same (`questionFingerprint`), because only the
+ * caller knows what else the test holds.
+ */
+export function drawExpandedSlot(
+  seed: Seed,
+  profile: ExpandedProfile,
+  slotIndex: number,
+  attempt: number,
+  selected: EligibleFamily,
+): ExpandedSlotDraw {
+  const familyId = selected.familyId as SceneFamilyId;
+  // Program depth is a property of the bucket, not of the band. Reading it
+  // here also proves the registry and the generator agree about this bucket
+  // before anything is drawn: a registry that enables a bucket the family does
+  // not declare fails the whole assembly rather than serving an item labelled
+  // with a depth nobody produced.
+  const declaredBucket = requireSceneFamilyBucket(familyId, selected.difficultyBucket);
+  // A family can refuse a draw outright — for instance when the rule it sampled
+  // cannot produce enough near misses to fill the option list. That is a
+  // rejected attempt like any other, not a failed test: the next attempt has
+  // its own child seed and usually succeeds.
+  let generated;
+  try {
+    generated = generateSceneFamilyCandidate(
+      familyId,
+      seededRng(seed, `expanded-scene-slot:${profile}:${slotIndex}:${attempt}:${familyId}`),
+      declaredBucket.bucket,
+    );
+  } catch (error) {
+    return { accepted: false, rejection: error instanceof Error ? error.message : String(error) };
+  }
+  const puzzle: Puzzle<Scene> = {
+    ...generated.puzzle,
+    id: runtimePuzzleId(seed, slotIndex),
+    band: selected.band,
+    generation: {
+      generatorVersion: EXPANDED_GENERATOR_VERSION,
+      familyId,
+      programFingerprint: generated.definition.programFingerprint!(generated.puzzle),
+      featureBucket: selected.difficultyBucket,
+      features: {
+        difficulty: generated.puzzle.difficulty,
+        ruleComplexity: generated.puzzle.difficulty,
+        programDepth: declaredBucket.programDepth,
+        activeDimensions: [],
+        usesWrap: false,
+        distractorStrategy: "near-miss",
+      },
+    },
+  };
+
+  const acceptance = validateSceneFamilyCandidate({ ...generated, puzzle });
+  if (!acceptance.accepted) {
+    return { accepted: false, rejection: acceptance.issues.map((issue) => issue.message).join("; ") };
+  }
+  if (puzzle.difficulty !== selected.difficulty) {
+    return {
+      accepted: false,
+      rejection: `difficulty ${puzzle.difficulty} does not match bucket ${selected.difficultyBucket}`,
+    };
+  }
+  const visiblePanels = puzzle.stem.filter((panel) => !("blank" in panel)).length;
+  if (visiblePanels < MINIMUM_VISIBLE_STEM_PANELS) {
+    return { accepted: false, rejection: `only ${visiblePanels} visible stem panels` };
+  }
+  return { accepted: true, puzzle };
 }
 
 /**
@@ -875,89 +874,36 @@ export function assembleExpandedQuiz(
   const puzzles: Puzzle<Scene>[] = [];
   // A program fingerprint names a family's rule structure, not one instance, so
   // it cannot be unique across a 30-question test that reuses families. What
-  // must be unique is the visible puzzle: no two questions may look the same.
-  const visibleFingerprints = new Set<string>();
+  // must be unique is the question: no two may ask the same thing.
+  const askedQuestions = new Set<string>();
 
   for (const [slotIndex, selected] of schedule.entries()) {
-    const familyId = selected.familyId as SceneFamilyId;
-    // Program depth is a property of the bucket, not of the band. Reading it
-    // here also proves the registry and the generator agree about this bucket
-    // before anything is drawn: a registry that enables a bucket the family
-    // does not declare fails the whole assembly rather than serving an item
-    // labelled with a depth nobody produced.
-    const declaredBucket = requireSceneFamilyBucket(familyId, selected.difficultyBucket);
     const rejections: string[] = [];
     let accepted: Puzzle<Scene> | undefined;
-    let acceptedVisible = "";
+    let acceptedQuestion = "";
 
-    for (let attempt = 0; attempt < RETRY_BUDGET && !accepted; attempt++) {
-      // A family can refuse a draw outright — for instance when the rule it
-      // sampled cannot produce enough near misses to fill the option list. That
-      // is a rejected attempt like any other, not a failed test: the next
-      // attempt has its own child seed and usually succeeds.
-      let generated;
-      try {
-        generated = generateSceneFamilyCandidate(
-          familyId,
-          seededRng(seed, `expanded-scene-slot:${profile}:${slotIndex}:${attempt}:${familyId}`),
-          declaredBucket.bucket,
-        );
-      } catch (error) {
-        rejections.push(error instanceof Error ? error.message : String(error));
+    for (let attempt = 0; attempt < EXPANDED_SLOT_RETRY_BUDGET && !accepted; attempt++) {
+      const draw = drawExpandedSlot(seed, profile, slotIndex, attempt, selected);
+      if (!draw.accepted) {
+        rejections.push(draw.rejection);
         continue;
       }
-      const puzzle: Puzzle<Scene> = {
-        ...generated.puzzle,
-        id: runtimePuzzleId(seed, slotIndex, familyId),
-        band: selected.band,
-        generation: {
-          generatorVersion: EXPANDED_GENERATOR_VERSION,
-          familyId,
-          programFingerprint: generated.definition.programFingerprint!(generated.puzzle),
-          featureBucket: selected.difficultyBucket,
-          features: {
-            difficulty: generated.puzzle.difficulty,
-            ruleComplexity: generated.puzzle.difficulty,
-            programDepth: declaredBucket.programDepth,
-            activeDimensions: [],
-            usesWrap: false,
-            distractorStrategy: "near-miss",
-          },
-        },
-      };
-
-      const acceptance = validateSceneFamilyCandidate({ ...generated, puzzle });
-      if (!acceptance.accepted) {
-        rejections.push(acceptance.issues.map((issue) => issue.message).join("; "));
+      const question = questionFingerprint(draw.puzzle);
+      if (askedQuestions.has(question)) {
+        rejections.push("repeats a question this test already asks");
         continue;
       }
-      if (puzzle.difficulty !== selected.difficulty) {
-        rejections.push(
-          `difficulty ${puzzle.difficulty} does not match bucket ${selected.difficultyBucket}`,
-        );
-        continue;
-      }
-      const visiblePanels = puzzle.stem.filter((panel) => !("blank" in panel)).length;
-      if (visiblePanels < MINIMUM_VISIBLE_STEM_PANELS) {
-        rejections.push(`only ${visiblePanels} visible stem panels`);
-        continue;
-      }
-      const visible = visibleFingerprint(puzzle);
-      if (visibleFingerprints.has(visible)) {
-        rejections.push("duplicate visible puzzle");
-        continue;
-      }
-      accepted = puzzle;
-      acceptedVisible = visible;
+      accepted = draw.puzzle;
+      acceptedQuestion = question;
     }
 
     if (!accepted) {
       throw new Error(
-        `${familyId} could not fill slot ${slotIndex + 1} of the ${profile} test after ` +
-          `${RETRY_BUDGET} attempts: ${rejections.join(" | ")}`,
+        `${selected.familyId} could not fill slot ${slotIndex + 1} of the ${profile} test after ` +
+          `${EXPANDED_SLOT_RETRY_BUDGET} attempts: ${rejections.join(" | ")}`,
       );
     }
-    visibleFingerprints.add(acceptedVisible);
+    askedQuestions.add(acceptedQuestion);
     puzzles.push(accepted);
   }
 

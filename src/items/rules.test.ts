@@ -6,13 +6,11 @@ import {
   checkRule,
   deriveAnswer,
   enumerateOperatorExpressions,
-  findDerivedNearMissWitness,
   operatorExpressionKey,
   RuleSchema,
   type DimTransform,
   type Rule,
 } from "./rules";
-import { isInstantlyDistinct, visualSignature } from "./domains";
 import { PuzzleSchema, type Cell, type Panel, type Puzzle } from "./schema";
 
 const c = (
@@ -397,65 +395,5 @@ describe("operator induction v1", () => {
     const analysis = analyzeOperatorStem(rows, { shapeCycle: [...cycle] });
     expect(analysis.ok).toBe(false);
     expect(analysis.issues.join(" ")).toMatch(/predict/);
-  });
-
-  it("produces witness-backed near misses for a generated unique item", async () => {
-    const { generatePuzzle } = await import("./generate");
-    const { mulberry32 } = await import("../lib/rng");
-    const puzzle = generatePuzzle("operatorInduction", 5, mulberry32(91));
-    const analysis = analyzeOperatorStem(puzzle.stem, puzzle.operatorLegend!);
-    expect(analysis.ok).toBe(true);
-    expect(analysis.answer).toEqual(puzzle.options[puzzle.answerIndex]);
-    expect(analysis.nearMisses.length).toBeGreaterThanOrEqual(3);
-    expect(analysis.nearMisses.every((miss) => miss.failedRows.length >= 1)).toBe(true);
-    const distractors = puzzle.options.filter((_, index) => index !== puzzle.answerIndex);
-    for (const distractor of distractors) {
-      const witness = analysis.nearMisses.find(
-        (nearMiss) => visualSignature(nearMiss.cell) === visualSignature(distractor),
-      );
-      expect(witness?.failedRows.length).toBeGreaterThanOrEqual(1);
-    }
-    for (let i = 0; i < puzzle.options.length; i++) {
-      for (let j = i + 1; j < puzzle.options.length; j++) {
-        expect(isInstantlyDistinct(puzzle.options[i], puzzle.options[j])).toBe(true);
-      }
-    }
-  });
-});
-
-describe("derived-family near misses", () => {
-  it("traces every generated distractor to a competing program that fails visible evidence", async () => {
-    const { generatePuzzle } = await import("./generate");
-    const { mulberry32 } = await import("../lib/rng");
-    const types = ["sequence", "analogy", "matrix"] as const;
-
-    for (const type of types) {
-      for (const difficulty of [3, 4, 5] as const) {
-        for (let seed = 1; seed <= 12; seed++) {
-          const generated = generatePuzzle(type, difficulty, mulberry32(seed * 101 + difficulty));
-          const rule = generated.rule;
-          if (!rule || rule.kind === "oddOneOut" || rule.kind === "operatorInduction") {
-            throw new Error(`${type} fixture is missing a derived-family rule`);
-          }
-          const answer = generated.options[generated.answerIndex];
-          const distractors = generated.options.filter((_, index) => index !== generated.answerIndex);
-
-          for (const distractor of distractors) {
-            expect(isInstantlyDistinct(answer, distractor)).toBe(true);
-            const witness = findDerivedNearMissWitness(rule, generated.stem, distractor);
-            expect(
-              witness,
-              `${type} d${difficulty} seed${seed}: distractor has no failed-program witness`,
-            ).not.toBeNull();
-            expect(witness?.failedEvidence.every(({ transitions }) => transitions.length > 0)).toBe(true);
-          }
-          for (let i = 0; i < generated.options.length; i++) {
-            for (let j = i + 1; j < generated.options.length; j++) {
-              expect(isInstantlyDistinct(generated.options[i], generated.options[j])).toBe(true);
-            }
-          }
-        }
-      }
-    }
   });
 });

@@ -23,7 +23,7 @@ npm run lint             # ESLint
 npm test                 # vitest run
 npm run families:verify  # scene-family acceptance contract
 npm run bank:verify      # bank integrity gate (run before committing bank changes)
-./qa/run.sh              # QA runner, all suites (from project root)
+./qa/run.sh              # the full local gate below, logged to qa/runs/ (from project root)
 ```
 
 Full local gate, before landing generator, family, or assembler changes:
@@ -32,8 +32,9 @@ Full local gate, before landing generator, family, or assembler changes:
 npm run typecheck && npm run lint && npm test && npm run families:verify && npm run bank:verify && npm run build
 ```
 
-The agent harness and offline experiments (`agent:smoke`, `agent:run`, `bank:topup`,
-`report`, `render:item`, `pilot:report`) need relay env; see `README.md` and `package.json`.
+Only the model-calling scripts (`agent:smoke`, `agent:run`, `experiment:llm-rules`) need relay
+env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` run offline. See
+`README.md` and `package.json`.
 
 ## Hard rules
 
@@ -80,17 +81,16 @@ connect and the hosted OpenRouter line in `.env.example` is the fallback.
   `GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are forwarded as
   `X-User-Api-Key` to bypass the relay's shared quota. `.env` only — never commit.
 - Local harness providers `claude-code` and `codex` route through the relay to the Claude Code / Codex CLIs signed in on this machine. They appear only when llm-relay is running on localhost (`npm run dev` there) — never in production — and every call spends the same subscription plan limits as using the CLIs interactively. Their
-  effort/thinking picks come from the widget through `X-Relay-Effort` / `X-Thinking-Budget`
-  and become body fields on the relay hop.
+  effort and thinking budget come from `agent:run`'s `--effort` (default `RELAY_EFFORT`) and
+  `--thinking-budget` flags and travel as body fields on the relay hop.
 
 ## Where things live
 
-- Single source of truth: design → `docs/plans/<slug>.md` (or BRAINSTORM.md while
-  still ideating), status → `TODO.md`, baton → `docs/handoff.md`.
-- `docs/architecture.md` — per-file module map plus the relay integration files and widget
-  wiring. Open it before changing item generation, rendering, scoring, or relay code.
+- Single source of truth: design → `docs/plans/<slug>.md`, ideas → `docs/brainstorm.md`,
+  status → `TODO.md`, baton → `docs/handoff.md`.
+- `docs/architecture.md` — per-file module map plus the relay integration files. Open it
+  before changing item generation, rendering, scoring, or relay code.
 - `docs/reference.md` — the tech-stack table. Open it when the stack itself is in question.
 - `docs/plans/history.md` — the dated status narrative, the original concept definition, and
   the pre-repo layout plan. Background only, never current fact.
-- Capture files: `docs/bugs.md` (bugs, proof required) and `docs/brainstorm.md` (ideas);
-  root `BRAINSTORM.md` also holds ideas.
+- Capture files: `docs/bugs.md` (bugs, proof required) and `docs/brainstorm.md` (ideas).

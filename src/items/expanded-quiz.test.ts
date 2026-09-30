@@ -11,8 +11,10 @@ import {
   BAND_SCHEDULE,
   bucketDifficulty,
   candidateFamilyDraws,
+  drawExpandedSlot,
   EXPANDED_GENERATOR_VERSION,
   EXPANDED_PROFILES,
+  EXPANDED_SLOT_RETRY_BUDGET,
   FAMILY_SUBSAMPLE_SIZES,
   eligibleFamiliesForBand,
   isAnalogyLayoutFamily,
@@ -22,11 +24,18 @@ import {
   MINIMUM_ELIGIBLE_FAMILIES,
   planExpandedSchedule,
   questionCount,
+  questionFingerprint,
   sceneFamilyLayout,
   type ExpandedProfile,
   evenSplit,
 } from "./expanded-quiz";
-import { OPTIONS_PER_ITEM, VisualPuzzleSetSchema, visualElementSignature } from "./schema";
+import {
+  OPTIONS_PER_ITEM,
+  VisualPuzzleSetSchema,
+  visualElementSignature,
+  type PuzzleSet,
+  type Visual,
+} from "./schema";
 import {
   generateSceneFamilyCandidate,
   requireSceneFamilyBucket,
@@ -40,6 +49,25 @@ const REGISTRY = CURRENT_FAMILY_PROMOTION_REGISTRY;
 function bandOrder(profile: ExpandedProfile): string[] {
   return EXPANDED_PROFILE_BANDS.flatMap((band) =>
     new Array(BAND_SCHEDULE[profile][band]).fill(band) as string[]);
+}
+
+/**
+ * One assembled test per length, shared by every test here that only reads it.
+ *
+ * Assembly is the expensive step, and most checks below are properties of any
+ * one test, so they read the same memoised test instead of each assembling
+ * their own. The seed is 32 hex characters on purpose: it is also the seed the
+ * id-leak check below looks for inside the served ids.
+ */
+const SHARED_SEED = "0123456789abcdef0123456789abcdef";
+const sharedQuizzes = new Map<ExpandedProfile, PuzzleSet<Visual>>();
+function sharedQuiz(profile: ExpandedProfile): PuzzleSet<Visual> {
+  let quiz = sharedQuizzes.get(profile);
+  if (!quiz) {
+    quiz = assembleExpandedQuiz(SHARED_SEED, profile, REGISTRY);
+    sharedQuizzes.set(profile, quiz);
+  }
+  return quiz;
 }
 
 describe("eligible family pool", () => {
@@ -70,18 +98,23 @@ describe("eligible family pool", () => {
       .toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the eighteen family/band/bucket keys the v18 battery serves", () => {
-    // v18 adds the two combining-machine buckets to constraint-spatial.
-    // The number is derived from the registry here, so adding or withdrawing a
-    // family without revisiting the plan fails this test rather than quietly
-    // moving the population the pilot packet and emergency bank are sized to.
+  it("holds exactly the fifteen family/band/bucket keys the battery serves", () => {
+    // v18 added the two combining-machine buckets to constraint-spatial, for
+    // eighteen keys; retiring `parallel-evolution-v1` on 2026-09-28 took its two
+    // composition buckets out again, and retiring `rule-switching-v2` on
+    // 2026-09-29 took its warmup bucket out, leaving warmup with three.
+    // `combining-machine-v1` was out of constraint-spatial from 2026-09-29 to
+    // 2026-09-30 (docs/plans/blind-answer-leak.md). The number is derived
+    // from the registry here, so adding or withdrawing a family without
+    // revisiting the plan fails this test rather than quietly moving the
+    // population the pilot packet and emergency bank are sized to.
     const keys = EXPANDED_PROFILE_BANDS.flatMap((band) =>
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => `${family.familyId}:${band}:${bucket.bucket}`)));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(18);
+    expect(keys).toHaveLength(15);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
-      .toEqual([4, 5, 3, 2]);
+      .toEqual([3, 4, 3, 2]);
     // No key is d6 any more. The two that were are withdrawn, so the ladder
     // tops out at d5 until a mechanism earns a sixth rung some way other than
     // by adding gates — the lever the owner ruled out on 2026-08-27.
@@ -133,7 +166,7 @@ describe("eligible family pool", () => {
   it("drops withdrawn families", () => {
     const withdrawn = new Set(["attribute-pairing-v1"]);
     expect(eligibleFamiliesForBand(REGISTRY, "warmup", withdrawn).map((f) => f.familyId))
-      .toEqual(["relational-sequence-v2", "rule-switching-v2", "spatial-transform-v2"]);
+      .toEqual(["relational-sequence-v2", "spatial-transform-v2"]);
   });
 });
 
@@ -146,8 +179,8 @@ describe("assembleExpandedQuiz", () => {
 
   for (const profile of EXPANDED_PROFILES) {
     it(`assembles a deterministic ${profile} test from code-valid families`, () => {
-      const first = assembleExpandedQuiz(`${profile}-scenes`, profile, REGISTRY);
-      const replay = assembleExpandedQuiz(`${profile}-scenes`, profile, REGISTRY);
+      const first = sharedQuiz(profile);
+      const replay = assembleExpandedQuiz(SHARED_SEED, profile, REGISTRY);
 
       expect(replay).toEqual(first);
       expect(VisualPuzzleSetSchema.safeParse(first).success).toBe(true);
@@ -159,14 +192,33 @@ describe("assembleExpandedQuiz", () => {
         puzzle.layout === "singleScene" ||
         puzzle.stem.length === 0 ||
         puzzle.stem.filter((panel) => !("blank" in panel)).length >= 2)).toBe(true);
+
+      // Every served question is exactly the slot its schedule planned: same
+      // family, band, bucket, and difficulty, in the same order. That is what
+      // lets the invariants below be checked on schedules alone — planning is
+      // cheap and assembly is not.
+      const schedule = planExpandedSchedule(SHARED_SEED, profile, REGISTRY);
+      expect(first.map((puzzle) => ({
+        familyId: puzzle.generation!.familyId,
+        band: puzzle.band,
+        bucket: puzzle.generation!.featureBucket,
+        difficulty: puzzle.difficulty,
+      }))).toEqual(schedule.map((slot) => ({
+        familyId: slot.familyId,
+        band: slot.band,
+        bucket: slot.difficultyBucket,
+        difficulty: slot.difficulty,
+      })));
     });
   }
 
   it("keeps coverage, spread, and ramp invariants across many schedules", () => {
+    // Checked on the planned schedule: the test above proves an assembled test
+    // serves exactly its schedule, slot for slot.
     for (const profile of EXPANDED_PROFILES) {
-      for (let seed = 0; seed < 12; seed++) {
-        const quiz = assembleExpandedQuiz(`schedule-${seed}`, profile, REGISTRY);
-        const familyIds = quiz.map((puzzle) => puzzle.generation!.familyId);
+      for (let seed = 0; seed < 40; seed++) {
+        const schedule = planExpandedSchedule(`schedule-${seed}`, profile, REGISTRY);
+        const familyIds = schedule.map((slot) => slot.familyId);
 
         expect(new Set(familyIds).size).toBeGreaterThanOrEqual(MINIMUM_DISTINCT_FAMILIES[profile]);
         for (let index = 1; index < familyIds.length; index++) {
@@ -175,15 +227,12 @@ describe("assembleExpandedQuiz", () => {
 
         // Even split: no family may take more than its share of a band.
         for (const band of EXPANDED_PROFILE_BANDS) {
-          const inBand = quiz.filter((puzzle) => puzzle.band === band);
+          const inBand = schedule.filter((slot) => slot.band === band);
           const eligible = eligibleFamiliesForBand(REGISTRY, band).length;
           const pool = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? eligible, eligible);
           const cap = Math.ceil(BAND_SCHEDULE[profile][band] / pool);
           const counts = new Map<string, number>();
-          for (const puzzle of inBand) {
-            const id = puzzle.generation!.familyId;
-            counts.set(id, (counts.get(id) ?? 0) + 1);
-          }
+          for (const slot of inBand) counts.set(slot.familyId, (counts.get(slot.familyId) ?? 0) + 1);
           expect(Math.max(...counts.values())).toBeLessThanOrEqual(cap);
         }
 
@@ -193,9 +242,9 @@ describe("assembleExpandedQuiz", () => {
         // buckets in one band is not the same on every occurrence.
         let previousFloor = 0;
         for (const band of EXPANDED_PROFILE_BANDS) {
-          const difficulties = quiz
-            .filter((puzzle) => puzzle.band === band)
-            .map((puzzle) => puzzle.difficulty);
+          const difficulties = schedule
+            .filter((slot) => slot.band === band)
+            .map((slot) => slot.difficulty);
           const floor = Math.min(...difficulties);
           expect(floor).toBeGreaterThanOrEqual(previousFloor);
           previousFloor = floor;
@@ -217,13 +266,11 @@ describe("assembleExpandedQuiz", () => {
       EXPANDED_PROFILE_BANDS.map((band) => [band, new Set<string>()]),
     );
 
-    // Both lengths, because since the format cap arrived they no longer reach
-    // the same families: every long-30 composition draw is forced to take all
-    // three of its non-analogy families, which leaves composed-transform-v2 out
-    // of every long-30 induction-transfer draw. A short-5 composition band
-    // hands its one question to a single family, so the cross-band rule often
-    // has nothing to avoid and induction-transfer can draw it. Neither profile
-    // alone covers the pool; together they do.
+    // Both lengths, because they do not reach the same families: every long-30
+    // composition draw takes its whole pool, composed-transform-v2 included,
+    // while a short-5 composition band hands its one question to a single
+    // family, so induction-transfer can draw composed-transform instead.
+    // Neither profile alone covers the pool; together they do.
     for (const profile of EXPANDED_PROFILES) {
       for (let seed = 0; seed < 24; seed++) {
         const schedule = planExpandedSchedule(`pool-${seed}`, profile, REGISTRY);
@@ -257,8 +304,7 @@ describe("assembleExpandedQuiz", () => {
 
   it("serves the configured number of options on every question", () => {
     for (const profile of EXPANDED_PROFILES) {
-      const quiz = assembleExpandedQuiz(`options-${profile}`, profile, REGISTRY);
-      for (const puzzle of quiz) {
+      for (const puzzle of sharedQuiz(profile)) {
         expect(puzzle.options.length, `${profile} ${puzzle.familyId}`).toBe(OPTIONS_PER_ITEM);
       }
     }
@@ -268,11 +314,29 @@ describe("assembleExpandedQuiz", () => {
     // The agent harness shuffles options and maps the model's pick back by this
     // identity, so two options that share one would silently mis-score a run.
     for (const profile of EXPANDED_PROFILES) {
-      const quiz = assembleExpandedQuiz(`identity-${profile}`, profile, REGISTRY);
-      for (const puzzle of quiz) {
+      for (const puzzle of sharedQuiz(profile)) {
         const identities = puzzle.options.map(visualElementSignature);
         expect(new Set(identities).size).toBe(identities.length);
       }
+    }
+  });
+
+  it("never asks the same question twice in one test, whatever its options", () => {
+    // Found 2026-09-28: the duplicate check hashed the stem TOGETHER with the
+    // options in served order, so one stem offered with different near misses
+    // passed as a new question — about 3% of long tests asked one twice. A
+    // question is what the taker is asked: its type, layout, and stem.
+    const puzzle = sharedQuiz("long-30")[0];
+    const base = questionFingerprint(puzzle);
+    const reordered = { ...puzzle, options: [...puzzle.options].reverse() };
+    const otherOptions = { ...puzzle, options: puzzle.options.slice(1) };
+    expect(questionFingerprint(reordered)).toBe(base);
+    expect(questionFingerprint(otherOptions)).toBe(base);
+    expect(questionFingerprint({ ...puzzle, stem: [...puzzle.stem].reverse() })).not.toBe(base);
+    expect(questionFingerprint({ ...puzzle, layout: puzzle.layout === "row" ? "analogy" : "row" })).not.toBe(base);
+    for (const profile of EXPANDED_PROFILES) {
+      const questions = sharedQuiz(profile).map(questionFingerprint);
+      expect(new Set(questions).size, profile).toBe(questions.length);
     }
   });
 
@@ -283,11 +347,7 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("refuses a long test when withdrawals leave a band too thin", () => {
-    const withdrawn = new Set([
-      "attribute-pairing-v1",
-      "rule-switching-v2",
-      "spatial-transform-v2",
-    ]);
+    const withdrawn = new Set(["attribute-pairing-v1", "spatial-transform-v2"]);
     expect(() => assembleExpandedQuiz("thin-warmup", "long-30", REGISTRY, withdrawn))
       .toThrow(/at least 2 eligible warmup families but has 1/);
   });
@@ -296,7 +356,6 @@ describe("assembleExpandedQuiz", () => {
     const withdrawn = new Set([
       "relational-sequence-v2",
       "attribute-pairing-v1",
-      "rule-switching-v2",
       "spatial-transform-v2",
     ]);
     expect(() => assembleExpandedQuiz("no-warmup", "short-5", REGISTRY, withdrawn))
@@ -307,7 +366,7 @@ describe("assembleExpandedQuiz", () => {
     expect(() => assertProfilesRemainBuildable(REGISTRY, new Set())).not.toThrow();
     expect(() => assertProfilesRemainBuildable(
       REGISTRY,
-      new Set(["attribute-pairing-v1", "rule-switching-v2", "spatial-transform-v2"]),
+      new Set(["attribute-pairing-v1", "spatial-transform-v2"]),
     ))
       .toThrow(/long-30 needs 2 warmup families but only 1 remain/);
     expect(() => assertProfilesRemainBuildable(
@@ -315,10 +374,62 @@ describe("assembleExpandedQuiz", () => {
       new Set([
         "relational-sequence-v2",
         "attribute-pairing-v1",
-        "rule-switching-v2",
         "spatial-transform-v2",
       ]),
     )).toThrow(/short-5 needs 1 warmup families but only 0 remain/);
+    // The advice names the band that is actually short, not a fixed one.
+    expect(() => assertProfilesRemainBuildable(
+      REGISTRY,
+      new Set(["attribute-pairing-v1", "spatial-transform-v2"]),
+    )).toThrow(/add a new one to the warmup band/);
+  });
+
+  it("refuses to start when every band is deep enough but a length still cannot be built", () => {
+    // Found 2026-09-28. Withdrawing these two leaves warmup at exactly its
+    // long-test minimum of two, so the per-band check passed — and then every
+    // long test failed with "needs at least 10 distinct families but has 9",
+    // because composed-transform-v2 fills a place in two bands and the old
+    // arithmetic counted it twice. The check now plans each length for real.
+    // Since rule-switching-v2 retired (2026-09-29), one withdrawal is enough.
+    const withdrawn = new Set(["spatial-transform-v2"]);
+    expect(eligibleFamiliesForBand(REGISTRY, "warmup", withdrawn))
+      .toHaveLength(MINIMUM_ELIGIBLE_FAMILIES["long-30"].warmup);
+    expect(() => planExpandedSchedule("any-seed", "long-30", REGISTRY, withdrawn))
+      .toThrow(/needs at least 10 distinct families but has 9/);
+    expect(() => assertProfilesRemainBuildable(REGISTRY, withdrawn))
+      .toThrow(/the long-30 test cannot be built \(the long-30 test needs at least 10 distinct families but has 9\)/);
+    // The short test is still buildable, and the error does not claim otherwise.
+    expect(() => assertProfilesRemainBuildable(REGISTRY, withdrawn)).not.toThrow(/short-5/);
+    // The arithmetic behind the cross-band slack counts that family once.
+    expect(maximumDistinctFamilies("long-30", REGISTRY, withdrawn)).toBe(9);
+  });
+
+  it("survives one withdrawal only from the band with a family to spare", () => {
+    // Since rule-switching-v2 retired (2026-09-29) a long test's ten distinct
+    // families are exactly what the registry can supply, so withdrawing a
+    // warmup, composition or induction-transfer family stops long tests from
+    // building. Constraint-spatial has three families and draws two (since
+    // combining-machine-v1 returned on 2026-09-30), so one of those can go.
+    expect(maximumDistinctFamilies("long-30", REGISTRY, new Set()))
+      .toBe(MINIMUM_DISTINCT_FAMILIES["long-30"]);
+    expect(() => assertProfilesRemainBuildable(REGISTRY, new Set(["attribute-pairing-v1"])))
+      .toThrow(/the long-30 test cannot be built/);
+    const withdrawn = new Set(["combining-machine-v1"]);
+    expect(() => assertProfilesRemainBuildable(REGISTRY, withdrawn)).not.toThrow();
+    for (const profile of EXPANDED_PROFILES) {
+      expect(planExpandedSchedule("safe-withdrawal", profile, REGISTRY, withdrawn))
+        .toHaveLength(questionCount(profile));
+    }
+  });
+
+  it("counts a family registered in two bands once when bounding distinct families", () => {
+    // composed-transform-v2 is registered in composition and induction-transfer.
+    // Composition draws its whole pool of four, composed-transform included, so
+    // induction-transfer can add only transformation-machine-v3: 3 + 4 + 2 + 1
+    // (warmup has held three families since rule-switching-v2 retired on
+    // 2026-09-29).
+    expect(maximumDistinctFamilies("long-30", REGISTRY)).toBe(10);
+    expect(maximumDistinctFamilies("short-5", REGISTRY)).toBe(5);
   });
 
   it("rejects an empty seed", () => {
@@ -326,15 +437,10 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("gives a family's later questions in a band its deeper bucket", () => {
-    // Three families now hold two validated buckets in one band: a band serves
-    // the shallower one first and the deeper one every time after, so
+    // Three served families hold two validated buckets in one band: a band
+    // serves the shallower one first and the deeper one every time after, so
     // repetition inside a band is a ramp, not a plateau.
     const ramps = [
-      {
-        familyId: "parallel-evolution-v1",
-        band: "composition",
-        buckets: ["parallel-evolution-d3", "parallel-evolution-d4"],
-      },
       {
         familyId: "compositional-analogy-v2",
         band: "composition",
@@ -344,6 +450,11 @@ describe("assembleExpandedQuiz", () => {
         familyId: "visual-set-algebra-v2",
         band: "constraint-spatial",
         buckets: ["visual-set-algebra-d4", "visual-set-algebra-d5"],
+      },
+      {
+        familyId: "combining-machine-v1",
+        band: "constraint-spatial",
+        buckets: ["combining-machine-d4", "combining-machine-d5"],
       },
     ] as const;
     for (const { familyId, band, buckets } of ramps) {
@@ -426,8 +537,7 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("reads program depth from the family bucket, not from the band", () => {
-    const quiz = assembleExpandedQuiz("program-depth", "long-30", REGISTRY);
-    for (const puzzle of quiz) {
+    for (const puzzle of sharedQuiz("long-30")) {
       const declared = requireSceneFamilyBucket(
         puzzle.generation!.familyId as SceneFamilyId,
         puzzle.generation!.featureBucket,
@@ -449,30 +559,80 @@ describe("assembleExpandedQuiz", () => {
     expect(requireSceneFamilyBucket("visual-set-algebra-v2", "visual-set-algebra-d5").programDepth).toBe(3);
   });
 
-  // Slow on purpose: 200 full 30-question assemblies take roughly fifteen
-  // seconds, well past vitest's five-second default, so the timeout is raised
-  // rather than the sample cut. Closeness-ranked distractor selection draws
-  // from the *nearest* candidates, which are the ones most likely to be
-  // illegible next to the answer, so a family can now refuse a draw where the
-  // old uniform sample would have accepted it. Each slot gets four attempts;
-  // running out throws, and that throw is the whole failure signal here.
-  it("fills every slot of 200 long tests without exhausting a retry budget", () => {
-    const exhausted: string[] = [];
-    for (let seed = 0; seed < 200; seed++) {
-      try {
-        expect(assembleExpandedQuiz(`retry-budget-${seed}`, "long-30", REGISTRY))
-          .toHaveLength(questionCount("long-30"));
-      } catch (error) {
-        exhausted.push(`seed ${seed}: ${error instanceof Error ? error.message : String(error)}`);
+  it("fills every slot within its retry budget: a per-bucket acceptance sweep", () => {
+    // Replaces "fills every slot of 200 long tests" (2026-09-28), which took
+    // seven to nine minutes and could only report a throw after the fact. This
+    // measures the thing that throw depended on, directly, for every key.
+    //
+    // A slot gets EXPANDED_SLOT_RETRY_BUDGET attempts, each on its own child
+    // seed, and fails only if every one is refused. An attempt is refused when
+    // the family throws, the item fails acceptance, its difficulty or visible
+    // panels are wrong (all inside `drawExpandedSlot`, the assembler's own
+    // path), or it repeats a question the test already asks. The repeat is
+    // priced here as the worst case: a draw matching any of the draws before it
+    // that one test could already hold of the same key — the band's most
+    // questions per family, less one.
+    //
+    // Per key, the refused share must stay at or under 10%. Four attempts then
+    // fail together at most 0.1^4 = 1 time in 10,000, so a 30-question test runs
+    // out of attempts in under 0.3% of assemblies — the bound the 200-test run
+    // was a sample of, now held per key where a regression shows up first.
+    const DRAWS = 40;
+    const MAXIMUM_REFUSED_SHARE = 0.1;
+    const report: string[] = [];
+    for (const band of EXPANDED_PROFILE_BANDS) {
+      const pool = eligibleFamiliesForBand(REGISTRY, band);
+      const drawnFamilies = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? pool.length, pool.length);
+      const mostPerFamily = Math.ceil(BAND_SCHEDULE["long-30"][band] / drawnFamilies);
+      for (const family of pool) {
+        for (const { bucket, difficulty } of family.bandBuckets) {
+          const slot = { ...family, difficultyBucket: bucket, difficulty };
+          const asked: string[] = [];
+          let refused = 0;
+          const reasons = new Set<string>();
+          for (let index = 0; index < DRAWS; index++) {
+            const draw = drawExpandedSlot(`acceptance-sweep:${bucket}:${index}`, "long-30", 0, 0, slot);
+            if (!draw.accepted) {
+              refused++;
+              reasons.add(draw.rejection);
+              continue;
+            }
+            const question = questionFingerprint(draw.puzzle);
+            if (asked.slice(-(mostPerFamily - 1)).includes(question)) {
+              refused++;
+              reasons.add("repeats a question");
+            }
+            asked.push(question);
+          }
+          if (refused / DRAWS > MAXIMUM_REFUSED_SHARE) {
+            report.push(`${band}:${bucket} refused ${refused}/${DRAWS} (${[...reasons].join(" | ")})`);
+          }
+        }
       }
     }
-    expect(exhausted).toEqual([]);
-  }, 120_000);
+    expect(EXPANDED_SLOT_RETRY_BUDGET).toBe(4);
+    expect(report).toEqual([]);
+  });
 });
 
 describe("format-aware family subsampling", () => {
   const eligibleFamilyIds = [...new Set(EXPANDED_PROFILE_BANDS.flatMap((band) =>
     eligibleFamiliesForBand(REGISTRY, band).map((family) => family.familyId)))].sort();
+
+  /**
+   * The most analogy-layout families one draw of this band may hold.
+   *
+   * The cap, unless the pool has too few other families to fill a draw without
+   * exceeding it — then the cap yields by exactly that shortfall and no more.
+   * Composition is that band since `parallel-evolution-v1` was retired: its
+   * whole pool of four is the draw, and two of the four are analogies.
+   */
+  const analogyCeiling = (band: (typeof EXPANDED_PROFILE_BANDS)[number]) => {
+    const eligible = eligibleFamiliesForBand(REGISTRY, band);
+    const size = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? eligible.length, eligible.length);
+    const others = eligible.filter((family) => !isAnalogyLayoutFamily(family.familyId)).length;
+    return Math.max(MAXIMUM_ANALOGY_LAYOUT_FAMILIES_PER_DRAW, size - others);
+  };
 
   it("reads the analogy-layout families off generated stems rather than off their names", () => {
     // Locked, not hardcoded policy: this is what the generator currently draws.
@@ -535,28 +695,25 @@ describe("format-aware family subsampling", () => {
 
     // Warmup is not subsampled: its whole pool is the only draw.
     expect(draws("warmup")).toHaveLength(1);
-    expect(draws("warmup")[0]).toHaveLength(4);
+    expect(draws("warmup")[0]).toHaveLength(3);
 
-    // Composition draws four from five, of which two are analogy-layout, so
-    // the cap leaves exactly two choices: all three non-analogy families plus
-    // one of the two analogy families.
+    // Composition draws four from four since `parallel-evolution-v1` was
+    // retired on 2026-09-28, so its one draw is the whole pool — and two of
+    // those four are analogy-layout. The cap is a preference and yields: the
+    // band carries two analogy families rather than a thinner draw.
     const composition = draws("composition");
-    expect(composition).toHaveLength(2);
-    expect(new Set(composition.map((draw) =>
-      draw.map((family) => family.familyId).sort().join("+"))).size).toBe(2);
+    expect(composition).toHaveLength(1);
+    expect(composition[0].filter((family) => isAnalogyLayoutFamily(family.familyId)).map((family) => family.familyId))
+      .toEqual(["compositional-analogy-v2", "inverse-analogy-v2"]);
 
-    // Constraint-spatial draws two of its three families since combining-machine
-    // was promoted in v18. None of the three is analogy-shaped, so every pair is
-    // a legal draw.
+    // Constraint-spatial draws two of its three families, none analogy-shaped,
+    // so every pair is a draw. (While combining-machine was out of the band,
+    // 2026-09-29 to 2026-09-30, the one draw was both remaining families.)
     const constraint = draws("constraint-spatial");
     expect(constraint).toHaveLength(3);
-    expect(new Set(constraint.map((draw) =>
-      draw.map((family) => family.familyId).sort().join("+"))).size).toBe(3);
-    for (const draw of constraint) {
-      expect(draw.map((family) => family.familyId).every((familyId) =>
-        ["combining-machine-v1", "relational-matrix-v2", "visual-set-algebra-v2"].includes(familyId)))
-        .toBe(true);
-    }
+    for (const draw of constraint) expect(draw).toHaveLength(2);
+    expect([...new Set(constraint.flat().map((family) => family.familyId))].sort())
+      .toEqual(["combining-machine-v1", "relational-matrix-v2", "visual-set-algebra-v2"]);
 
     // Induction-transfer now has exactly the two three-step transformation
     // families and draws both. The one-step switch belongs to warmup.
@@ -583,7 +740,7 @@ describe("format-aware family subsampling", () => {
         expect(new Set(draw.map((family) => family.familyId)).size, band).toBe(size);
         if (band !== "warmup") {
           expect(draw.filter((family) => isAnalogyLayoutFamily(family.familyId)).length, band)
-            .toBeLessThanOrEqual(MAXIMUM_ANALOGY_LAYOUT_FAMILIES_PER_DRAW);
+            .toBeLessThanOrEqual(analogyCeiling(band));
         }
       }
       // Enumerating every subset is only affordable while the pools are small,
@@ -603,16 +760,21 @@ describe("format-aware family subsampling", () => {
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => bucket.difficulty))));
     // Fold-and-punch removal leaves no analogy layouts in the two hardest
-    // bands. Two of four warmup families and one of four drawn composition
-    // families are analogy-shaped, so each band contributes 5/2.
+    // bands. Two of the three warmup families are analogy-shaped since
+    // `rule-switching-v2` retired on 2026-09-29, so warmup contributes
+    // 5 x 2/3 = 3.33 (it was 5 x 2/4 = 2.5 with four). Composition draws its
+    // whole pool of four since `parallel-evolution-v1` was retired on
+    // 2026-09-28, and two of those four are analogies, so it contributes
+    // 10 x 2/4 = 5 (it was 2.5 while a fifth, non-analogy family let the cap
+    // hold). 3.33 + 5 = 8.33.
     //
     // The assertion is two-sided around the closed form, not a bare "<= 10.0",
     // so it catches the mean drifting DOWN as well as up: a change that quietly
-    // stopped serving analogies would otherwise pass. The per-draw format cap
+    // stopped serving analogies would otherwise pass. The per-draw ceiling
     // asserted above, which is what holds the number under the cap in the first
     // place, is checked on every one of these seeds with no tolerance at all.
     const ANALOGY_ITEMS_PER_LONG_TEST_CAP = 10.0;
-    const ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED = 5;
+    const ANALOGY_ITEMS_PER_LONG_TEST_EXPECTED = 5 * (2 / 3) + 10 * (2 / 4);
     const MEAN_TOLERANCE = 0.05;
 
     let analogyItems = 0;
@@ -639,15 +801,16 @@ describe("format-aware family subsampling", () => {
           const drawn = new Set(inBand.map((slot) => slot.familyId));
           if (band !== "warmup") {
             expect([...drawn].filter(isAnalogyLayoutFamily).length, `${profile} seed ${seed} ${band}`)
-              .toBeLessThanOrEqual(MAXIMUM_ANALOGY_LAYOUT_FAMILIES_PER_DRAW);
+              .toBeLessThanOrEqual(analogyCeiling(band));
           }
         }
 
         // A family may hold two bands only as far as the profile's slack allows
-        // — the gap between the family slots its band draws add up to and the
-        // distinct families it must still contain. That is two for a long test
-        // and none for a short one, so a short test never repeats a mechanism
-        // across bands and a long test permits at most two cross-band repeats.
+        // — the gap between the family places its band draws add up to and the
+        // distinct families it must still contain. That is one for a long test
+        // (11 places, 10 distinct families) and none for a short one, so a short
+        // test never repeats a mechanism across bands and a long test permits
+        // one cross-band repeat, which composed-transform-v2 always takes.
         const bandsPerFamily = new Map<string, Set<string>>();
         const bucketsPerFamily = new Map<string, Set<string>>();
         for (const slot of schedule) {
@@ -658,7 +821,12 @@ describe("format-aware family subsampling", () => {
           buckets.add(slot.difficultyBucket);
           bucketsPerFamily.set(slot.familyId, buckets);
         }
-        const slack = maximumDistinctFamilies(profile, REGISTRY) - MINIMUM_DISTINCT_FAMILIES[profile];
+        const places = EXPANDED_PROFILE_BANDS.reduce((sum, band) => {
+          const pool = eligibleFamiliesForBand(REGISTRY, band).length;
+          const drawn = Math.min(FAMILY_SUBSAMPLE_SIZES[band] ?? pool, pool);
+          return sum + Math.min(drawn, BAND_SCHEDULE[profile][band]);
+        }, 0);
+        const slack = places - MINIMUM_DISTINCT_FAMILIES[profile];
         const spanning = [...bandsPerFamily].filter(([, bands]) => bands.size > 1);
         expect(spanning.length, `${profile} seed ${seed}`).toBeLessThanOrEqual(slack);
         // And a family that does hold two bands asks a different question in
@@ -761,17 +929,16 @@ describe("public item ids", () => {
   it("never leaks the generation seed", () => {
     // Embedding the seed in the id let anyone brute-force four hex digits and
     // regenerate the whole quiz, answers included.
-    const seed = "0123456789abcdef0123456789abcdef";
+    // Still deterministic — the same seed replays the same ids — which the
+    // deterministic-assembly test above proves by replaying this very quiz.
     for (const profile of EXPANDED_PROFILES) {
-      const quiz = assembleExpandedQuiz(seed, profile, REGISTRY);
+      const quiz = sharedQuiz(profile);
       for (const puzzle of quiz) {
-        expect(puzzle.id).not.toContain(seed);
-        expect(puzzle.id).not.toContain(seed.slice(0, 8));
+        expect(puzzle.id).not.toContain(SHARED_SEED);
+        expect(puzzle.id).not.toContain(SHARED_SEED.slice(0, 8));
       }
       const ids = quiz.map((puzzle) => puzzle.id);
       expect(new Set(ids).size).toBe(ids.length);
-      // Still deterministic: the same seed replays the same ids.
-      expect(assembleExpandedQuiz(seed, profile, REGISTRY).map((p) => p.id)).toEqual(ids);
     }
   });
 });

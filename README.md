@@ -14,16 +14,17 @@ The public product offers a 5-question sample and a 30-question test drawn from 
 generated visual-family pool. Answers stay encrypted until server-side submission. Design:
 [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
-### Hard quiz generation latency (deterministic probe)
+### Test generation latency
 
-Current hard-ramp probe (`bench-seed-1`…`bench-seed-120`) measured on `2026-08-15`:
+Measured 2026-09-29 on the development machine on `scene-families-v19`, fresh random seeds:
 
-- deterministic attempt ceiling: `100` attempts per slot (`MAX_ATTEMPTS` in `generate.ts`)
-- median generation time: `12.34 ms` for 5 questions
-- 95th-percentile generation time: `35.87 ms` for 5 questions
-- maximum generation time: `169.27 ms` for 5 questions
+| Test | Seeds | Median | 95th percentile | Slowest |
+|---|---:|---:|---:|---:|
+| 30 questions | 50 | 321 ms | 434 ms | 502 ms |
+| 5 questions | 100 | 54 ms | 129 ms | 232 ms |
 
-This remains within start-button latency expectations for local runs.
+The browser gives up on starting a test after 20 seconds, so this leaves a wide margin even on
+slower serverless hardware.
 
 ---
 
@@ -39,11 +40,15 @@ Local development works without an env file. Production must set a stable
 also needs relay settings; copy `.env.example` → `.env.local`:
 
 ```
-RELAY_BASE_URL=https://llm-relay.ebarakos.workers.dev/v1
-RELAY_PROVIDER=openrouter
-RELAY_MODEL=deepseek/deepseek-chat-v3-0324
-OPENROUTER_API_KEY=sk-or-...   # required for the default openrouter provider
+RELAY_BASE_URL=http://localhost:8787/v1   # the local relay (../llm-relay under wrangler dev)
+RELAY_PROVIDER=codex                      # your own Codex sign-in, through the relay's harness bridge
+RELAY_MODEL=sol
+RELAY_EFFORT=high
 ```
+
+Without a local relay and bridge, use the hosted relay with a vision model instead, as the
+recorded probes did: `RELAY_BASE_URL=https://llm-relay.ebarakos.workers.dev/v1`,
+`RELAY_PROVIDER=openrouter`, `RELAY_MODEL=google/gemini-3.5-flash`, plus `OPENROUTER_API_KEY`.
 
 No model call is made when a human starts or submits a test. Relay access is used only when
 an agent takes the visual test or during offline model experiments.
@@ -77,7 +82,7 @@ Use `npm run vercel:setup -- --dry-run` to inspect the intended work without con
 ## Architecture
 
 ```
-fresh seed → versioned procedural generator → rule + uniqueness checks → public puzzle
+fresh seed → versioned scene generator → rule + uniqueness checks → public puzzle
                                                           │                 │
                                                           │                 └─► human UI
                                                           ▼
@@ -90,17 +95,17 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
 
 - `src/items/rules.ts` — the rule DSL, semantic validator, bounded operator grammar,
   and full-grammar uniqueness oracle.
-- `src/items/generate.ts` — seeded, versioned compact quiz generator; `procedural-v1`
-  and `procedural-v2` remain replayable, while `procedural-v3` removes the opaque
-  operator equation from the current compact test.
 - `src/items/expanded-quiz.ts` — seeded 5- and 30-question assembler over the live scene
   families and difficulty bands.
+- `src/items/blind-options.ts` — the options-only solvers that check no answer can be
+  picked from the six options alone (`npm run families:verify` fails a bucket above 30%).
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
   renderer shared by generated and reference items.
 - `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
 - `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — answer-free delivery and
   authenticated, encrypted server-side scoring.
-- `src/lib/model.ts` — optional offline model item-writer; it is not in the human request path.
+- `src/lib/model.ts` — the relay-routed model client for the offline agent harness; nothing in
+  the human request path calls a model.
 - `src/items/compose-image.tsx` + `src/lib/solver.ts` + `scripts/agent-run.ts` — agent
   mode: render the same SVG a human sees → PNG → vision model via the relay (symbolic JSON
   channel for text-only models; recorded separately, never pooled with image results).
@@ -127,7 +132,7 @@ npm run lint         # ESLint
 npm run typecheck    # tsc --noEmit
 npm test             # vitest run
 npm run build        # production build
-npm run bank:topup   # add items (--count N --source procedural|model --seed N)
+npm run bank:topup   # rebuild the emergency bank (--replace --per-bucket N --seed S)
 npm run bank:verify  # bank integrity gate (run before committing bank changes)
 npm run agent:smoke  # relay multimodal smoke test (vision models)
 npm run agent:run    # solver harness (--all --channel image --repeat N ...)
@@ -136,7 +141,7 @@ npm run render:item  # PNG fixtures of bank items (data/fixtures/)
 npm run vercel:setup # one-time Vercel secrets + Git deployment bootstrap
 ```
 
-See [CLAUDE.md](CLAUDE.md) for full project context, [BRAINSTORM.md](BRAINSTORM.md) for
+See [CLAUDE.md](CLAUDE.md) for full project context, [docs/brainstorm.md](docs/brainstorm.md) for
 deferred ideas, [TODO.md](TODO.md) for the single active pass, and
 [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md) for the
 current design.
