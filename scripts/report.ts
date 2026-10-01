@@ -45,7 +45,9 @@ import {
   EVALUATION_SETS,
   evaluationSetOfFile,
   groupAttemptFilesByPopulation,
+  outcomeOf,
   type AttemptFile,
+  type AttemptOutcome,
   type AttemptPopulation,
 } from "../src/lib/attempts";
 import { BankFileSchema, type BankItem } from "../src/items/bank";
@@ -444,6 +446,53 @@ function printReport(population: AttemptPopulation, bank: BankItem[]): void {
   } else {
     printHeader("Symbolic channel  [secondary / diagnostic]");
     console.log("  (no symbolic-channel attempts recorded)");
+  }
+
+  printOptionsOnlyTable(reportableAttemptFiles(files, args["include-partial"]));
+}
+
+/**
+ * The options-only arm (docs/plans/blind-answer-leak.md): the model saw the six
+ * options and not the question, so chance is 1 in 6 and anything above it is a
+ * shortcut the options give away. Its own table, never pooled with the image
+ * channel's.
+ *
+ * The shortcut is read off the attempts where the model picked a letter. A
+ * harness failure (timeout, rate limit, transport) or a reply with no letter
+ * counts as wrong in the strict denominator everywhere else, but here it would
+ * make the shortcut look smaller than it is, so both are shown apart. Rows are
+ * one provider and model each: the same model behind two providers is two rows.
+ */
+function printOptionsOnlyTable(files: AttemptFile[]): void {
+  const HARNESS_FAILURES = new Set<AttemptOutcome>(["timeout", "rate-limit", "transport-failure"]);
+  const rows = new Map<string, { attempts: number; failed: number; noLetter: number; picked: number; correct: number }>();
+  for (const file of files) {
+    if (file.channel !== "options-only") continue;
+    const key = `${file.provider}/${file.model}`;
+    const row = rows.get(key) ?? { attempts: 0, failed: 0, noLetter: 0, picked: 0, correct: 0 };
+    for (const attempt of file.attempts) {
+      const outcome = outcomeOf(attempt);
+      row.attempts += 1;
+      if (HARNESS_FAILURES.has(outcome)) row.failed += 1;
+      else if (outcome === "unparseable") row.noLetter += 1;
+      else {
+        row.picked += 1;
+        if (outcome === "correct") row.correct += 1;
+      }
+    }
+    rows.set(key, row);
+  }
+  if (rows.size === 0) return;
+  printHeader("Options-only arm  [question hidden — chance is 16.7%]");
+  console.log("  " + [
+    pad("provider/model", 36), pad("attempts", 8, true), pad("failed", 6, true),
+    pad("no letter", 9, true), pad("picked", 6, true), pad("right of picked", 15, true),
+  ].join("  "));
+  for (const [key, row] of rows) {
+    console.log("  " + [
+      pad(key, 36), pad(row.attempts, 8, true), pad(row.failed, 6, true), pad(row.noLetter, 9, true),
+      pad(row.picked, 6, true), pad(row.picked > 0 ? pct(row.correct / row.picked) : "—", 15, true),
+    ].join("  "));
   }
 }
 

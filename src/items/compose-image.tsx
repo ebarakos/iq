@@ -271,13 +271,25 @@ function optionGrid(n: number, perRow: number): { cols: number; rows: number } {
 /**
  * Compose a puzzle (stem + lettered options) into one self-contained `<svg>`.
  * Target ~800px wide, height auto-derived from content.
+ *
+ * `optionsOnly` draws the lettered option row and nothing else: the agent
+ * probe's options-only arm (docs/plans/blind-answer-leak.md), which measures
+ * how much of the answer a model can read off the options without the question.
  */
-export function PuzzleImage({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Visual> }): ReactElement {
+export function PuzzleImage({
+  puzzle,
+  optionsOnly = false,
+}: {
+  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>;
+  optionsOnly?: boolean;
+}): ReactElement {
   const elems: ReactElement[] = [];
   let cursorY = PAD;
 
   // ── Stem ──
-  if (puzzle.layout === "conceptGroups") {
+  if (optionsOnly) {
+    cursorY -= SECTION_GAP;
+  } else if (puzzle.layout === "conceptGroups") {
     const rowWidth = SEP + GAP + CELL * 3 + GAP * 2;
     const startX = (WIDTH - rowWidth) / 2;
     const groups = [puzzle.stem.slice(0, 3), puzzle.stem.slice(3, 6)];
@@ -468,10 +480,13 @@ export function PuzzleImage({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<
  * never call it. The returned string carries an `xmlns` (added by PuzzleImage)
  * so it is a valid standalone document for resvg.
  */
-export function puzzleToSvg(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): string {
+export function puzzleToSvg(
+  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>,
+  options: { optionsOnly?: boolean } = {},
+): string {
   // Synchronous, server-only resolution via createRequire so this module never
   // pulls react-dom/server into a client/edge bundle merely by being imported.
   const require = createRequire(import.meta.url);
   const { renderToStaticMarkup } = require("react-dom/server") as typeof import("react-dom/server");
-  return renderToStaticMarkup(<PuzzleImage puzzle={puzzle} />);
+  return renderToStaticMarkup(<PuzzleImage puzzle={puzzle} optionsOnly={options.optionsOnly} />);
 }

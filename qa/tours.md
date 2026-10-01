@@ -1,4 +1,4 @@
-# ui-qa tours — aiq visual IQ test
+# ui-qa tours — IQ visual reasoning gym
 
 User-goal journeys for the quiz app. Maintained by ui-qa runs; human-reviewable.
 App under test: `npx next start -p 3100` (production build). `QUIZ_TOKEN_SECRET` must be set in the server's environment or every test start fails with "Test scoring is temporarily unavailable" — use a throwaway local value for QA.

@@ -1,4 +1,4 @@
-# aiq — Brainstorm
+# IQ visual reasoning gym — Brainstorm
 
 This file holds ideas that are not approved work. The current design is
 [deterministic novel tests](plans/deterministic-novel-tests.md), and the
@@ -6,7 +6,7 @@ only active implementation list is [TODO.md](../TODO.md).
 
 ## Product meaning
 
-aiq is a visual-reasoning test for people and AI agents that exposes where their
+The IQ visual reasoning gym is for people and AI agents, and exposes where their
 difficulty profiles differ. It is not a standardized IQ score yet.
 
 ## Settled questions
@@ -134,3 +134,4 @@ Short dated notes, appended as they come up: what and why, no proof needed.
 - 2026-09-28: before any score is stored, shared, or served to agents over HTTP, quiz tokens must become single-use. `/api/submit` returns every `answerIndex` and accepts the same token again until it expires (2 hours), so submitting blanks and then resubmitting the returned answers scores full marks, on time. Harmless while nothing is stored; the fix needs server state (a key-value store keyed on the token's IV).
 - 2026-09-28: before the next pilot sitting, fix two things on the pilot page: it shows each item's family, band and bucket above the puzzle while the participant solves it (`src/app/prototypes/prototype-pilot.tsx:393`), and the recorded responses live only in React state, so a reload loses the sitting (`:157`). Sittings are scarce.
 - 2026-09-29: deletion candidate — the wide gate strip is still supported by `schema.ts` and `render.tsx`, but since the d6 paths were deleted no generator draws it. Removing the branch also drops its width tests.
+- 2026-10-01: a leaderboard for the 30-question test, with the recorded agent probes as fixed rows ("gpt-5.6-sol, 76%"), so a person sees where they stand against the models — the human–agent gap made personal. Easiest store: Upstash Redis through the Vercel Marketplace (free tier, one env var), a sorted set ranked by score then time, written only by `/api/submit` from its own scoring after an on-time submission, with the taker adding a short display name. It needs single-use tokens first (the 2026-09-28 idea above) or the replay gives everyone 30/30; the same Redis can hold the used-token marks. Each test is drawn fresh, so rank only the 30-question length, whose band schedule is fixed.

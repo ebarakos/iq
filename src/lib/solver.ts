@@ -8,14 +8,18 @@ import { puzzleToSvg } from "@/items/compose-image";
  * Agent solver — sends one puzzle through the relay to a vision (or text) model
  * and records which lettered option it picks.
  *
- * Two channels:
- *   - image:    the same composed SVG a human sees, rendered to PNG and sent as
- *               a multimodal image part. The only human-comparable channel.
- *   - symbolic: the raw cell spec as JSON (answerIndex / explanation / rule
- *               STRIPPED) for text-only models. Diagnostic, secondary.
+ * Three channels:
+ *   - image:        the same composed SVG a human sees, rendered to PNG and sent
+ *                   as a multimodal image part. The only human-comparable channel.
+ *   - symbolic:     the raw cell spec as JSON (answerIndex / explanation / rule
+ *                   STRIPPED) for text-only models. Diagnostic, secondary.
+ *   - options-only: the lettered option row alone, as an image, told that the
+ *                   question is hidden. Measures the shortcut the options give
+ *                   away; chance is 1 in 6 (docs/plans/blind-answer-leak.md).
  *
  * The prompt is fixed, neutral, and versioned so reports never silently mix
- * prompt revisions (see AttemptFile.promptVersion).
+ * prompt revisions (see AttemptFile.promptVersion). The options-only prompt
+ * differs by one clause, and its channel keeps it a population of its own.
  */
 
 /**
@@ -29,6 +33,11 @@ export const SOLVER_PROMPT_VERSION = "solver-v3";
 /** Fixed neutral instruction — identical across channels and models. */
 const SOLVER_PROMPT =
   "This is a visual puzzle. Exactly one lettered option is correct. Reply with ONLY the letter.";
+
+/** The same instruction for the options-only arm, saying what is missing. */
+const OPTIONS_ONLY_PROMPT =
+  "These are the lettered answer options of a visual puzzle; the question itself is not shown. " +
+  "Exactly one lettered option is correct. Reply with ONLY the letter.";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -62,6 +71,12 @@ export interface SolveOutcome {
   /** Raw model reply (untruncated; the harness truncates before recording). */
   raw: string;
   latencyMs: number;
+  /**
+   * The model the reply says answered (its `model` field). With the Codex
+   * bridge's `default` the request names no model, so this is the only record
+   * of which one ran; the harness keeps one model per artifact by it.
+   */
+  modelUsed?: string;
 }
 
 /**
@@ -120,11 +135,14 @@ function symbolicPayload(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): string 
 }
 
 /** Render a puzzle's composed SVG to PNG bytes via resvg (lazily imported). */
-async function renderPng(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): Promise<Uint8Array> {
+async function renderPng(
+  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>,
+  optionsOnly = false,
+): Promise<Uint8Array> {
   // Dynamic import keeps the native @resvg/resvg-js module out of the dependency
   // graph when solver.ts is imported in vitest (symbolic-only / parser tests).
   const { Resvg } = await import("@resvg/resvg-js");
-  const svg = puzzleToSvg(puzzle);
+  const svg = puzzleToSvg(puzzle, { optionsOnly });
   const resvg = new Resvg(svg, { font: { loadSystemFonts: true } });
   return resvg.render().asPng();
 }
@@ -157,17 +175,19 @@ export async function solveItem(
 
   const started = Date.now();
   let raw = "";
+  let modelUsed: string | undefined;
 
-  if (channel === "image") {
-    const png = await renderPng(puzzle);
-    const { text } = await generateText({
+  if (channel === "image" || channel === "options-only") {
+    const optionsOnly = channel === "options-only";
+    const png = await renderPng(puzzle, optionsOnly);
+    const { text, response } = await generateText({
       model,
       messages: [
         {
           role: "user",
           content: [
             { type: "image", image: png, mediaType: "image/png" },
-            { type: "text", text: SOLVER_PROMPT },
+            { type: "text", text: optionsOnly ? OPTIONS_ONLY_PROMPT : SOLVER_PROMPT },
           ],
         },
       ],
@@ -175,8 +195,9 @@ export async function solveItem(
       abortSignal,
     });
     raw = text;
+    modelUsed = response.modelId;
   } else {
-    const { text } = await generateText({
+    const { text, response } = await generateText({
       model,
       messages: [
         {
@@ -188,11 +209,13 @@ export async function solveItem(
       abortSignal,
     });
     raw = text;
+    modelUsed = response.modelId;
   }
 
   return {
     chosen: parseAnswerLetter(raw, optionCount),
     raw,
     latencyMs: Date.now() - started,
+    modelUsed,
   };
 }

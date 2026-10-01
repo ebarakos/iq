@@ -7,6 +7,7 @@ import {
   countUnansweredAnswers,
   needsBlankSubmissionConfirmation,
   parseStoredSession,
+  serverClockOffsetSeconds,
   type StoredSession,
 } from "@/lib/quiz-progress";
 
@@ -62,6 +63,10 @@ const START_TIMEOUT_MS = 20000;
 /** Mirrors START_TIMEOUT_MS: scoring an already-finished test should not hang
  *  indefinitely either, and a timed-out submission must not lose the test. */
 const SUBMIT_TIMEOUT_MS = 20000;
+/** Space between the sticky clock and a question card scrolled up under it. */
+const QUESTION_TOP_GAP_PX = 12;
+/** The release version, inlined at build from package.json (next.config.ts). */
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -263,6 +268,7 @@ export default function Page() {
     });
 
     try {
+      const requestSentAtMs = Date.now();
       const data = await Promise.race([
         postJson<GenerateResponse>("/api/generate", { profile }),
         timeout,
@@ -278,11 +284,13 @@ export default function Page() {
         Math.floor(Date.now() / 1000) + secondsPerQuestion * data.puzzles.length;
       setAnswerDeadline(deadline);
       // The countdown runs on the server's clock: how far ahead (or behind)
-      // it sat when this response arrived, added back at every tick. A
-      // session saved before this field existed reads as 0 (the client's own
-      // clock), matching how it already behaved.
-      const clientNowAtReceipt = Math.floor(Date.now() / 1000);
-      setClockOffset(typeof data.serverNow === "number" ? data.serverNow - clientNowAtReceipt : 0);
+      // it sits, added back at every tick (`serverClockOffsetSeconds` says why
+      // the estimate is taken from when the request left). A session saved
+      // before this field existed reads as 0 (the client's own clock),
+      // matching how it already behaved.
+      setClockOffset(typeof data.serverNow === "number"
+        ? serverClockOffsetSeconds(data.serverNow, requestSentAtMs)
+        : 0);
       autoSubmitted.current = false;
       setMeta({
         profile: data.profile ?? profile,
@@ -414,7 +422,8 @@ export default function Page() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8">
       <header className="mb-8 flex items-baseline justify-between">
         <h1 className="text-2xl font-bold tracking-tight">
-          aiq <span className="font-normal text-gray-400">· visual reasoning test</span>
+          IQ <span className="font-normal text-gray-400">visual reasoning gym</span>
+          {APP_VERSION && <span className="ml-2 text-xs font-normal text-gray-400">v{APP_VERSION}</span>}
         </h1>
         {(phase === "active" || phase === "result") && (
           <button
@@ -673,13 +682,26 @@ function Solver({
 }) {
   const isLast = index === total - 1;
   const optionCount = puzzle.options.length;
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // A new question starts at its top. Without this the page keeps the previous
   // question's scroll position, so answering from the options and pressing Next
   // drops the player into the middle of the next puzzle with its stem — the part
   // they must read first — above the fold.
+  //
+  // Where the whole question fits below the navigator, that top is the page's
+  // top, so the navigator stays in view. Where it does not, the question gets
+  // the screen: on a 375 px phone the 30-question navigator wraps to five rows
+  // and pushed every diagram 424 px down (bug of 2026-09-28), so the card lands
+  // just under the sticky clock instead and the navigator is a scroll up.
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "auto" });
+    const card = cardRef.current;
+    if (!card) return;
+    const cardTop = card.getBoundingClientRect().top + window.scrollY;
+    const fits = cardTop + card.offsetHeight <= window.innerHeight;
+    const underClock = cardTop - (stickyRef.current?.offsetHeight ?? 0) - QUESTION_TOP_GAP_PX;
+    window.scrollTo({ top: fits ? 0 : Math.max(0, underClock), behavior: "auto" });
   }, [index]);
 
   // Keyboard shortcuts: digits 1–6 / letters a–f select options; arrows navigate;
@@ -741,7 +763,7 @@ function Solver({
           clock scrolls away exactly when a player is deciding how long to spend
           — which is the whole-test timer's entire point. Full-bleed via -mx-4
           against the page's px-4. */}
-      <div className="sticky top-0 z-20 -mx-4 mb-5 border-b border-gray-200 bg-gray-50/95 px-4 py-2 backdrop-blur-sm">
+      <div ref={stickyRef} className="sticky top-0 z-20 -mx-4 mb-5 border-b border-gray-200 bg-gray-50/95 px-4 py-2 backdrop-blur-sm">
         <div className="flex items-center justify-between text-sm text-gray-500">
           <span>
             Question {index + 1} of {total}{selected === null ? " · Unanswered" : ""}
@@ -783,7 +805,7 @@ function Solver({
         </p>
       </nav>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div ref={cardRef} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         {puzzle.stem.length > 0 ? (
           <div className="mb-6 rounded-xl bg-gray-50 p-4" aria-label="Puzzle diagram">
             <StemView puzzle={puzzle} />

@@ -1,4 +1,4 @@
-# aiq — IQ tests for humans and agents
+# IQ visual reasoning gym (repo `aiq`) — for humans and agents
 
 > A web app that generates visual IQ-style puzzles of increasing difficulty and
 > administers them to **both humans and AI agents**, using a difficulty ladder to
@@ -55,7 +55,7 @@ env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` ru
 
 ## LLM Relay
 
-All model calls (generating test items, and any agent-side solving/calibration)
+All model calls (agent-side solving and calibration; test items are generated in pure code)
 go through [`llm-relay`](../llm-relay) — a Cloudflare Worker proxy. **No provider
 API keys live in this repo.** The relay manages keys, enforces rate limits, and
 lets us swap providers centrally.
@@ -69,7 +69,7 @@ RELAY_MODEL      # required — model name, e.g. llama3.1-8b
 RELAY_EFFORT     # harness providers only — low|medium|high, default for agent:run
 ```
 
-**Project default since 2026-08-27: `codex` / `sol` at effort `high`**, over the
+**Project default since 2026-08-27: `codex` / `default` at effort `high`** (Codex's own default model, recorded per run as the model that answered), over the
 LOCAL relay (`http://localhost:8787/v1`). That needs `../llm-relay` running under
 `wrangler dev` AND the codex harness bridge up; without both, `agent:run` fails to
 connect and the hosted OpenRouter line in `.env.example` is the fallback.

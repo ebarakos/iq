@@ -3,8 +3,36 @@ import {
   countUnansweredAnswers,
   needsBlankSubmissionConfirmation,
   parseStoredSession,
+  serverClockOffsetSeconds,
   type StoredSession,
 } from "./quiz-progress";
+
+describe("the countdown's server clock", () => {
+  it("never runs behind the server however slowly the start response travels", () => {
+    // Codex's review of 2026-09-30: `serverNow` is stamped before the response
+    // travels, so pairing it with the arrival left a 15-second response 15
+    // seconds behind the server — past the 10-second scoring grace.
+    const serverAheadBy = 50; // the device clock is 50 s slow
+    const sentAtMs = 1_000_000_000_000;
+    for (const { uploadMs, assemblyMs, downloadMs } of [
+      { uploadMs: 100, assemblyMs: 600, downloadMs: 15_000 },
+      { uploadMs: 15_000, assemblyMs: 600, downloadMs: 100 },
+      { uploadMs: 80, assemblyMs: 400, downloadMs: 120 },
+    ]) {
+      const stampedAtMs = sentAtMs + uploadMs + assemblyMs;
+      const serverNow = Math.floor(stampedAtMs / 1000) + serverAheadBy;
+      const arrivedAtMs = stampedAtMs + downloadMs;
+      const offset = serverClockOffsetSeconds(serverNow, sentAtMs);
+      const estimatedServerAtArrival = arrivedAtMs / 1000 + offset;
+      const trueServerAtArrival = arrivedAtMs / 1000 + serverAheadBy;
+      const roundTrip = (arrivedAtMs - sentAtMs) / 1000;
+      // Never behind by more than the server's own whole-second stamp, never
+      // ahead by more than the round trip.
+      expect(estimatedServerAtArrival).toBeGreaterThan(trueServerAtArrival - 1);
+      expect(estimatedServerAtArrival).toBeLessThanOrEqual(trueServerAtArrival + roundTrip);
+    }
+  });
+});
 
 const saved: StoredSession<{ id: string }, { score: number }, { profile: string }> = {
   phase: "result",

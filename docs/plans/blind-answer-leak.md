@@ -165,6 +165,24 @@ Result: every served bucket's worst gated strategy is at most 25.6% (`relational
 exclude-lone-aspect), against 28.5% before; a long test assembles in about 0.63 s at the
 median (0.40 s before, when agreement pruned the search).
 
+## Agent probe (2026-09-30)
+
+`codex` / `gpt-5.6-sol` at effort `high` over the local relay, image channel, `solver-v3`,
+`scene-families-v19` as committed that day. Artifacts in `data/attempts/2026-09-30T*`.
+
+| Arm | Items | Right | Notes |
+|---|---|---|---|
+| Public long-test items, question shown (seed `probe-v19`) | 90 | 76% (68/90); 82% of the 83 answered | 7 timeouts: 5 at the 300 s limit (4 of them `combining-machine-v1`), 2 spanning a laptop suspend |
+| Same 90 items, options only (`--channel options-only`) | 90 | 13% (12/90) | chance is 16.7%; no shortcut detected (95% interval about 6–20%) |
+| Held-out composed programs (seed `probe-v19-held-out`) | 40 | 95% (38/40) | the transfer split is not hard for this model |
+
+The options-only arm is the answer to this plan's question: a frontier model shown only the
+six options does no better than a blind guess. Where the question is shown, the families it
+got wrong most often when it answered were `second-order-sequence-v2` (9 of 14),
+`compositional-analogy-v2` (5 of 8) and `attribute-pairing-v1` (6 of 9, a warmup family);
+`combining-machine-v1` answered only 2 of 6 inside 300 s, both right. None of these numbers
+pool with the v10/v11 probes: the model, provider and effort all differ.
+
 ## What is left
 
-- Nothing gated. The agent probe (`TODO.md`) is the next evidence.
+- Nothing gated.

@@ -2,7 +2,7 @@
   "name": "aiq",
   "version": "0.1.0",
   "private": true,
-  "description": "Visual IQ-style tests for humans and agents (MVP prototype)",
+  "description": "A visual reasoning gym for humans and agents (MVP prototype)",
   "type": "module",
   "scripts": {
     "dev": "next dev",

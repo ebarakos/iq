@@ -14,7 +14,8 @@
  *          --seed S (default random; makes a generated or held-out run replayable)
  *          --items N (coverage is still required; --all takes one whole generated test)
  *          --no-coverage (custom generated run; default 20 items)
- *          --channel image|symbolic
+ *          --channel image|symbolic|options-only (options-only shows the option
+ *                              row without the question: the blind-answer arm)
  *          --provider X  --model Y (default RELAY_PROVIDER/RELAY_MODEL env)
  *          --repeat N (default 1)  --concurrency N (default 2)
  *          --thinking-budget N (forwarded as the relay X-Thinking-Budget header,
@@ -93,6 +94,7 @@ import { solveItem, SOLVER_PROMPT_VERSION } from "../src/lib/solver";
 import {
   AttemptFileSchema,
   ATTEMPT_OUTCOMES,
+  ChannelSchema,
   EVALUATION_SETS,
   evaluationSetOf,
   outcomeOf,
@@ -560,10 +562,11 @@ const DIFFICULTY_TIER = (d: number): string => (d <= 2 ? "easy (1-2)" : d === 3 
 
 async function main() {
   const args = readArgs();
-  const channel = args.channel as Channel;
-  if (channel !== "image" && channel !== "symbolic") {
-    throw new Error(`--channel must be "image" or "symbolic" (got "${args.channel}")`);
+  const channelResult = ChannelSchema.safeParse(args.channel);
+  if (!channelResult.success) {
+    throw new Error(`--channel must be one of ${ChannelSchema.options.join(", ")} (got "${args.channel}")`);
   }
+  const channel: Channel = channelResult.data;
 
   const provider = args.provider ?? process.env.RELAY_PROVIDER;
   const model = args.model ?? process.env.RELAY_MODEL;
@@ -692,6 +695,10 @@ async function main() {
   const attempts: Attempt[] = [];
   let aborted = false;
   let nextIndex = 0;
+  // The model the replies say answered. A run asking the Codex bridge for
+  // `default` names none, and Codex can move its default between two calls;
+  // one artifact must hold one model, so a change stops the run.
+  let modelUsed: string | undefined;
 
   const worker = async () => {
     while (!aborted) {
@@ -705,6 +712,15 @@ async function main() {
         // The solver receives the same answer-free contract as a browser. The
         // canonical puzzle stays local only for scoring and artifact metadata.
         const outcome = await solveItem(toPublicPuzzle(shuffled), channel, { provider, model, thinkingBudget, effort });
+        if (outcome.modelUsed) {
+          modelUsed ??= outcome.modelUsed;
+          if (outcome.modelUsed !== modelUsed) {
+            // Not recorded: it answered as a different model than the run's.
+            aborted = true;
+            console.error(`\nthe answering model changed from ${modelUsed} to ${outcome.modelUsed} — aborting run after ${attempts.length} attempts`);
+            return;
+          }
+        }
         const chosen = canonicalIndex(canonical, shuffled, outcome.chosen);
         const correct = chosen !== null && chosen === canonical.answerIndex;
         attempts.push({
@@ -746,13 +762,17 @@ async function main() {
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
   // ── Artifact ──
-  const modelSlug = model.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Recorded under the model that answered, so runs of a moving default never
+  // share a name; the name asked for is kept beside it when they differ.
+  const recordedModel = modelUsed ?? model;
+  const modelSlug = recordedModel.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const runId = `${startedAt.replace(/:/g, "-")}-${modelSlug}-${channel}`;
   const artifact: AttemptFile = AttemptFileSchema.parse({
     runId,
     startedAt,
     provider,
-    model,
+    model: recordedModel,
+    requestedModel: recordedModel !== model ? model : undefined,
     channel,
     promptVersion: SOLVER_PROMPT_VERSION,
     source,

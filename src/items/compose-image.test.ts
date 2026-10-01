@@ -146,9 +146,9 @@ function firstOfType(type: PuzzleType): Puzzle {
   return fixture;
 }
 
-async function puzzleToSvg(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>) {
+async function puzzleToSvg(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>, options?: { optionsOnly?: boolean }) {
   const { puzzleToSvg } = await import("./compose-image");
-  return puzzleToSvg(puzzle);
+  return puzzleToSvg(puzzle, options);
 }
 
 type ShapeNode = {
@@ -253,6 +253,24 @@ describe("puzzleToSvg", () => {
       for (const label of LETTERS.slice(puzzle.options.length)) {
         expect(svg).not.toContain(`>${label}</text>`);
       }
+    }
+  });
+
+  it("draws only the lettered options for the options-only probe arm", async () => {
+    for (const type of ["matrix", "sequence", "analogy", "operatorInduction"] as const) {
+      const puzzle = firstOfType(type);
+      const full = await puzzleToSvg(puzzle);
+      const optionsOnly = await puzzleToSvg(puzzle, { optionsOnly: true });
+      for (const label of LETTERS.slice(0, puzzle.options.length)) {
+        expect(optionsOnly).toContain(`>${label}</text>`);
+      }
+      // No stem: no query mark, and exactly the options' cells are drawn.
+      expect(optionsOnly).not.toContain(">?</text>");
+      // One positioned cell per drawn panel (a scene nests its own graphic inside).
+      const cells = (svg: string) => (svg.match(/<svg x="/g) ?? []).length;
+      expect(cells(optionsOnly), type).toBe(puzzle.options.length);
+      expect(cells(full), type).toBeGreaterThan(puzzle.options.length);
+      expect(optionsOnly.length).toBeLessThan(full.length);
     }
   });
 

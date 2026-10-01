@@ -75,8 +75,14 @@ describe("AttemptFileSchema round-trip", () => {
     // Round-trips through JSON unchanged.
     expect(AttemptFileSchema.parse(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
 
-    // Invalid channel is rejected.
+    // A run that asked for a moving default is recorded under the model that
+    // answered, with the name it asked for kept beside it.
+    const defaultRun = { ...artifact, provider: "codex", model: "gpt-6-astra", requestedModel: "default" };
+    expect(AttemptFileSchema.parse(defaultRun).requestedModel).toBe("default");
+    expect(AttemptFileSchema.parse(artifact).requestedModel).toBeUndefined();
+    // Invalid channel is rejected; the options-only probe arm is a channel of its own.
     expect(AttemptFileSchema.safeParse({ ...artifact, channel: "audio" }).success).toBe(false);
+    expect(AttemptFileSchema.safeParse({ ...artifact, channel: "options-only" }).success).toBe(true);
     // A whole reasoning reply fits; a transcript does not.
     const auditableRaw = { ...artifact, attempts: [{ ...artifact.attempts[0], raw: "x".repeat(2000) }] };
     expect(AttemptFileSchema.safeParse(auditableRaw).success).toBe(true);

@@ -17,6 +17,24 @@ export function needsBlankSubmissionConfirmation(
  * the snapshot without a type error; `parseStoredSession` still accepts the
  * older sessions that predate a field.
  */
+/**
+ * How far the server's clock runs ahead of the browser's, in seconds, from the
+ * `serverNow` of the response that started the test.
+ *
+ * The server stamped `serverNow` at some moment between the request leaving the
+ * browser and the response arriving, and which moment is unknown. Pairing it
+ * with the arrival (as the page did until 2026-09-30) put the countdown behind
+ * the server by the whole transit time: a 15-second response left 15 seconds
+ * on the clock after the sealed deadline, past the 10-second scoring grace.
+ * Pairing it with the moment the request left instead can only put the
+ * countdown ahead, so it may end early by at most one round trip (the start
+ * request times out at 20 seconds) but never lets an automatic submission
+ * arrive late. Milliseconds, so no whole second is lost to rounding here.
+ */
+export function serverClockOffsetSeconds(serverNow: number, requestSentAtMs: number): number {
+  return serverNow - requestSentAtMs / 1000;
+}
+
 export interface StoredSession<Puzzle, Review, Meta> {
   phase: "active" | "result";
   puzzles: Puzzle[];

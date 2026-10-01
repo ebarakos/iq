@@ -1,6 +1,6 @@
-# aiq
+# IQ visual reasoning gym
 
-Visual IQ-style tests for **humans and AI agents** — the same puzzles, two audiences.
+A visual reasoning gym for **humans and AI agents** — the same puzzles, two audiences.
 
 Items are generated from a fresh random seed after the test starts. Every item carries a
 machine-readable **rule** or constraint witness, and pure code re-derives its answer. Humans
@@ -42,7 +42,7 @@ also needs relay settings; copy `.env.example` → `.env.local`:
 ```
 RELAY_BASE_URL=http://localhost:8787/v1   # the local relay (../llm-relay under wrangler dev)
 RELAY_PROVIDER=codex                      # your own Codex sign-in, through the relay's harness bridge
-RELAY_MODEL=sol
+RELAY_MODEL=default                       # whatever Codex defaults to; runs record the model that answered
 RELAY_EFFORT=high
 ```
 

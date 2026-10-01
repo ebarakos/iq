@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "aiq | visual reasoning test",
-  description: "Fresh visual reasoning tests for humans and AI agents.",
+  title: "IQ visual reasoning gym",
+  description: "A visual reasoning gym for humans and AI agents.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

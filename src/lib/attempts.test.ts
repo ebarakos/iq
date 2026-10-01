@@ -472,7 +472,10 @@ describe("report --write population gate", () => {
 
   it("refuses a held-out population outright, even when named exactly", { timeout: 60_000 }, () => {
     const before = readFileSync(BANK_PATH, "utf8");
-    const result = runReport(["--write", "--evaluation-set", "held-out"]);
+    // Named by generator too since 2026-09-30, when the v19 probe added a
+    // second held-out population beside v11's: without it two match, and the
+    // report refuses for that reason before reaching this one.
+    const result = runReport(["--write", "--evaluation-set", "held-out", "--generator-version", "scene-families-v11"]);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("refusing --write for a held-out population");
     expect(readFileSync(BANK_PATH, "utf8")).toBe(before);

@@ -10,7 +10,13 @@ import { GenerationMetadataSchema } from "@/items/schema";
  * calibrate.ts gains a data source later, not a rewrite.
  */
 
-export const ChannelSchema = z.enum(["image", "symbolic"]);
+/**
+ * `options-only` is the probe arm that shows the model the six options and not
+ * the question (docs/plans/blind-answer-leak.md). Chance is 1 in 6; anything
+ * above it is a shortcut the options give away. It is its own population: the
+ * calibration rollups read only `image` and `symbolic`, so it is never pooled.
+ */
+export const ChannelSchema = z.enum(["image", "symbolic", "options-only"]);
 export type Channel = z.infer<typeof ChannelSchema>;
 
 export const AttemptOutcomeSchema = z.enum([
@@ -135,7 +141,14 @@ export const AttemptFileSchema = z.object({
   runId: z.string().min(1), // <ISO-ts>-<model-slug>-<channel>
   startedAt: z.string(),
   provider: z.string().min(1),
+  /** The model that answered, as the replies named it (the requested name when they named none). */
   model: z.string().min(1),
+  /**
+   * The name the run asked for, kept only when the answering model differs:
+   * a Codex `default` run is recorded under the model Codex chose, never under
+   * "default", whose meaning moves when Codex changes its default.
+   */
+  requestedModel: z.string().min(1).optional(),
   channel: ChannelSchema,
   /** Solver prompt version — reports group by this so prompt drift never pollutes comparisons. */
   promptVersion: z.string().min(1),
