@@ -1,18 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
-import type { SceneCellSpec } from "./domains";
-import type { Cell, Panel, Puzzle, PublicPuzzle, Scene, SceneToken, Visual } from "./schema";
-import { isBlank, isScene } from "./schema";
+import React from "react";
+import type { SceneTokenSpec } from "./domains";
+import type { Panel, Puzzle, PublicPuzzle, Scene, SceneToken } from "./schema";
+import { isBlank } from "./schema";
+import { gatePieceTexture, type GatePieceTexture } from "./gate-pieces";
 
-/**
- * Short factual description of a drawable for screen readers, e.g. "2 solid
- * medium triangles, rotated 90°". Takes the wider scene spec so scene tokens
- * (which may be arrows) describe through exactly the same sentence.
- */
-export function describeCell(cell: SceneCellSpec): string {
-  const countWord = cell.count === 1 ? "1" : String(cell.count);
-  const shapeWord = cell.count === 1 ? cell.shape : `${cell.shape}s`;
-  const rotPart = cell.rotation !== 0 ? `, rotated ${cell.rotation}°` : "";
-  return `${countWord} ${cell.fill} ${cell.size === "s" ? "small" : cell.size === "l" ? "large" : "medium"} ${shapeWord}${rotPart}`;
+/** Short factual description of one token for screen readers, e.g. "1 solid large triangle, rotated 90°". */
+export function describeToken(token: SceneTokenSpec): string {
+  const rotPart = token.rotation !== 0 ? `, rotated ${token.rotation}°` : "";
+  return `1 ${token.fill} ${token.size === "s" ? "small" : token.size === "l" ? "large" : "medium"} ${token.shape}${rotPart}`;
 }
 
 /** Factual screen-reader description using the same categorical scene data. */
@@ -21,10 +16,10 @@ export function describeScene(scene: Scene): string {
   for (const placement of [...scene.objects].sort((a, b) => a.row - b.row || a.column - b.column)) {
     const position = `row ${placement.row + 1}, column ${placement.column + 1}`;
     if (placement.object.kind === "token") {
-      parts.push(`${describeCell({ ...placement.object, count: 1 })} at ${position}`);
+      parts.push(`${describeToken(placement.object)} at ${position}`);
     } else {
       const contents = placement.object.contents
-        .map((token) => describeCell({ ...token, count: 1 }))
+        .map((token) => describeToken(token))
         .join(" and ");
       parts.push(`${contents} inside an outline ${placement.object.shape} at ${position}`);
     }
@@ -40,18 +35,16 @@ export function describeScene(scene: Scene): string {
   return parts.join("; ");
 }
 
-export function describeVisual(visual: Visual): string {
-  return isScene(visual) ? describeScene(visual) : describeCell(visual);
-}
-
 /**
  * Deterministic SVG renderer. Pure functions of the puzzle data — no LLM, no
- * randomness — so a given Cell always draws identically. This is what guarantees
+ * randomness — so a given scene always draws identically. This is what guarantees
  * the displayed puzzle matches the generator's declared answer.
  */
 
 const STROKE = "#111827"; // gray-900
 const HALF_FILL = "#9ca3af"; // gray-400 — the "half" (shaded) state
+/** gray-500: darker than a board's grid lines, lighter than any shape. */
+export const FLOW_ARROW_STROKE = "#6b7280";
 export const CELL_VIEWBOX = 100;
 export const CELL_CANVAS_PADDING = 6;
 export const SCENE_BOARD_INSET = 6;
@@ -59,27 +52,6 @@ export const SCENE_GRID_STROKE = 2;
 export const SCENE_CONNECTION_STROKE = 6;
 
 type Pt = { x: number; y: number };
-
-/** Where to place `count` shapes inside a 100×100 cell, with a base radius. */
-function layoutFor(count: number): { pts: Pt[]; baseR: number } {
-  switch (count) {
-    case 1:
-      return { pts: [{ x: 50, y: 50 }], baseR: 30 };
-    case 2:
-      return { pts: [{ x: 30, y: 50 }, { x: 70, y: 50 }], baseR: 18 };
-    case 3:
-      return { pts: [{ x: 50, y: 30 }, { x: 32, y: 68 }, { x: 68, y: 68 }], baseR: 16 };
-    default:
-      return {
-        pts: [{ x: 32, y: 32 }, { x: 68, y: 32 }, { x: 32, y: 68 }, { x: 68, y: 68 }],
-        baseR: 16,
-      };
-  }
-}
-
-// Legibility doctrine: small vs large must be unmistakable at a glance (the
-// generator only uses "s" and "l"; "m" remains renderable for legacy data).
-const SIZE_SCALE: Record<Cell["size"], number> = { s: 0.55, m: 1, l: 1.3 };
 
 /** Regular n-gon points (vertex pointing up) around (cx, cy) with radius r. */
 function polygon(cx: number, cy: number, r: number, n: number): string {
@@ -118,32 +90,44 @@ function arrow(cx: number, cy: number, r: number): string {
     .join(" ");
 }
 
+/**
+ * Inner radius of a star's notches, as a share of its outer radius.
+ *
+ * 0.42 until 2026-10-04, when a star's arms were too thin for grey to read:
+ * after its 3-unit outline, a grey star showed about two thirds of the grey a
+ * grey triangle of the same size shows, and Opus 5.5 lost an easy question
+ * because it could not see a star turn from white to grey. At 0.55 a grey star
+ * shows more grey than a grey triangle; a test in compose-image.test.ts keeps it
+ * there at the 64px review and 80px solve board sizes.
+ */
+export const STAR_INNER_RATIO = 0.55;
+
 /** 5-point star points around (cx, cy). */
 function star(cx: number, cy: number, r: number): string {
   const pts: string[] = [];
   for (let i = 0; i < 10; i++) {
-    const rr = i % 2 === 0 ? r : r * 0.42;
+    const rr = i % 2 === 0 ? r : r * STAR_INNER_RATIO;
     const a = (-90 + i * 36) * (Math.PI / 180);
     pts.push(`${(cx + rr * Math.cos(a)).toFixed(2)},${(cy + rr * Math.sin(a)).toFixed(2)}`);
   }
   return pts.join(" ");
 }
 
-function fillProps(fill: Cell["fill"]): { fill: string; stroke: string; strokeWidth: number } {
+function fillProps(fill: SceneToken["fill"]): { fill: string; stroke: string; strokeWidth: number } {
   if (fill === "solid") return { fill: STROKE, stroke: STROKE, strokeWidth: 2 };
   if (fill === "half") return { fill: HALF_FILL, stroke: STROKE, strokeWidth: 3 };
   return { fill: "none", stroke: STROKE, strokeWidth: 4 }; // outline
 }
 
-function Shape({ cell, at, r }: { cell: SceneCellSpec; at: Pt; r: number }) {
-  const fp = fillProps(cell.fill);
+function Shape({ token, at, r }: { token: SceneTokenSpec; at: Pt; r: number }) {
+  const fp = fillProps(token.fill);
   const common = {
     ...fp,
     strokeLinejoin: "round" as const,
-    transform: `rotate(${cell.rotation} ${at.x} ${at.y})`,
+    transform: `rotate(${token.rotation} ${at.x} ${at.y})`,
   };
 
-  switch (cell.shape) {
+  switch (token.shape) {
     case "circle":
       return <circle cx={at.x} cy={at.y} r={r} {...fp} />;
     case "square": {
@@ -167,27 +151,12 @@ function Shape({ cell, at, r }: { cell: SceneCellSpec; at: Pt; r: number }) {
   }
 }
 
-function tokenAsCell(token: SceneToken): SceneCellSpec {
-  return { shape: token.shape, count: 1, rotation: token.rotation, fill: token.fill, size: token.size };
-}
-
-/**
- * Anything the shared renderer can draw. `Visual` (a `Cell` or a `Scene`) is the
- * puzzle-data form; a scene token pulled out of its board is a `SceneCellSpec`,
- * which is the same drawable spec with the scene-only arrow shape allowed.
- */
-export type Drawable = Scene | SceneCellSpec;
-
-function isDrawableScene(drawable: Drawable): drawable is Scene {
-  return "kind" in drawable && drawable.kind === "scene";
-}
-
 /**
  * The glyphs of a machine gate cell, in the order they are applied.
  *
  * A gate panel carries no board: `gateVisual` (src/items/scene-families.ts)
  * writes one token per gate id into ascending board columns, so a worked row
- * shows one glyph and a query row shows the two to four glyphs of a combined
+ * shows one glyph and a query row shows the two or three glyphs of a combined
  * gate. Drawing that panel as a board packs every glyph into a third of a third
  * of a cell — about 7px on a 375px phone, which is what made the combined gate
  * unreadable in the 2026-08-24 QA pass. Reading the tokens out lets both
@@ -197,9 +166,8 @@ function isDrawableScene(drawable: Drawable): drawable is Scene {
  * board-free token scene (nothing else is expected in a gate cell, but a
  * renderer must never drop a panel it does not recognise).
  */
-export function gateGlyphs(panel: Panel<Visual>): Drawable[] {
+export function gateGlyphs(panel: Panel): Array<Scene | SceneToken> {
   if (isBlank(panel)) return [];
-  if (!isScene(panel)) return [panel];
   const tokens = panel.objects.flatMap((placement) =>
     placement.object.kind === "token"
       ? [{ row: placement.row, column: placement.column, token: placement.object }]
@@ -209,7 +177,106 @@ export function gateGlyphs(panel: Panel<Visual>): Drawable[] {
   }
   return tokens
     .sort((left, right) => left.column - right.column || left.row - right.row)
-    .map((placement) => tokenAsCell(placement.token));
+    .map((placement) => placement.token);
+}
+
+/**
+ * A gate panel as jigsaw textures, in application order, or null when any of
+ * its glyphs is not a gate glyph (the panel is then drawn as it is).
+ */
+export function gatePieces(panel: Panel): GatePieceTexture[] | null {
+  const glyphs = gateGlyphs(panel);
+  if (glyphs.length === 0) return null;
+  const textures = glyphs.map((glyph) =>
+    glyph.kind === "token" ? gatePieceTexture(glyph.shape, glyph.fill) : null);
+  return textures.every((texture): texture is GatePieceTexture => texture !== null) ? textures : null;
+}
+
+/**
+ * One jigsaw piece in its own units, tab to the right: a 38 × 30 body, a tab
+ * of radius 6 on the right edge and a notch of the same size cut into the left
+ * one. Pieces `JIGSAW_PIECE_STEP` apart fit tab into notch.
+ */
+export const JIGSAW_PIECE_WIDTH = 46;
+export const JIGSAW_PIECE_HEIGHT = 32;
+export const JIGSAW_PIECE_STEP = 38;
+const JIGSAW_PIECE_PATH = "M1 1 H39 V10 A6 6 0 0 1 39 22 V31 H1 V22 A6 6 0 0 0 1 10 Z";
+const JIGSAW_INK = "#374151"; // gray-700: dark against white, lighter than the outline
+/** Where a texture may draw: inside the body, clear of the notch and the tab. */
+const JIGSAW_TEXTURE_AREA = { x0: 9, x1: 36, y0: 4, y1: 28 } as const;
+
+/** Laid-out size, in piece units, of `count` pieces snapped together. */
+export function jigsawStripSize(count: number, direction: "right" | "down"): { width: number; height: number } {
+  const length = JIGSAW_PIECE_STEP * (Math.max(1, count) - 1) + JIGSAW_PIECE_WIDTH;
+  return direction === "right"
+    ? { width: length, height: JIGSAW_PIECE_HEIGHT }
+    : { width: JIGSAW_PIECE_HEIGHT, height: length };
+}
+
+/** Parallel rising 45° lines ("/") across the texture area. */
+function hatchLines(spacing: number): [number, number, number, number][] {
+  const { x0, x1, y0, y1 } = JIGSAW_TEXTURE_AREA;
+  const lines: [number, number, number, number][] = [];
+  // x + y = c
+  for (let c = x0 + y0 + spacing / 2; c < x1 + y1; c += spacing) {
+    const from = Math.max(x0, c - y1);
+    const to = Math.min(x1, c - y0);
+    if (to - from > 1) lines.push([from, c - from, to, c - to]);
+  }
+  return lines;
+}
+
+function jigsawTexture(texture: GatePieceTexture): React.ReactNode {
+  const line = ([x1, y1, x2, y2]: [number, number, number, number], width: number, key: string) => (
+    <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={JIGSAW_INK} strokeWidth={width} strokeLinecap="round" />
+  );
+  switch (texture) {
+    case "dark":
+      return null;
+    case "dotted":
+      return [13, 20, 27, 34].flatMap((x) => [9, 16, 23].map((y) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r={2} fill={JIGSAW_INK} />
+      )));
+    case "striped":
+      return hatchLines(6).map((segment, index) => line(segment, 2.2, `s${index}`));
+  }
+}
+
+/**
+ * Gate pieces snapped together, tabs pointing the way the board travels:
+ * right on a wide screen and in the agent image, down when a phone stacks
+ * them. Shared by both renderers; it draws in piece units at the origin.
+ */
+export function JigsawPieces({ textures, direction }: { textures: GatePieceTexture[]; direction: "right" | "down" }) {
+  return (
+    <g>
+      {textures.map((texture, index) => (
+        <g
+          key={index}
+          data-gate-piece={texture}
+          transform={direction === "right"
+            ? `translate(${index * JIGSAW_PIECE_STEP} 0)`
+            : `translate(${JIGSAW_PIECE_HEIGHT} ${index * JIGSAW_PIECE_STEP}) rotate(90)`}
+        >
+          <path
+            d={JIGSAW_PIECE_PATH}
+            fill={texture === "dark" ? JIGSAW_INK : "#ffffff"}
+            stroke={STROKE}
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
+          {jigsawTexture(texture)}
+        </g>
+      ))}
+    </g>
+  );
+}
+
+/** What a screen reader hears for a gate: the piece, or the pieces in order. */
+export function describeGatePieces(textures: readonly GatePieceTexture[]): string {
+  return textures.length === 1
+    ? `machine: ${textures[0]} jigsaw piece`
+    : `machine: ${textures.length} jigsaw pieces snapped together, used in tab order: ${textures.join(", ")}`;
 }
 
 const SCENE_TOKEN_SCALE: Record<SceneToken["size"], number> = { m: 0.3, l: 0.39 };
@@ -321,7 +388,7 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
         if (object.kind === "token") {
           return (
             <g key={`object-${placement.row}-${placement.column}`} data-scene-position={`${placement.row}:${placement.column}`} data-scene-kind="token">
-              <Shape cell={tokenAsCell(object)} at={center} r={slotSize * SCENE_TOKEN_SCALE[object.size]} />
+              <Shape token={object} at={center} r={slotSize * SCENE_TOKEN_SCALE[object.size]} />
             </g>
           );
         }
@@ -331,7 +398,7 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
         return (
           <g key={`object-${placement.row}-${placement.column}`} data-scene-position={`${placement.row}:${placement.column}`} data-scene-kind="container">
             <Shape
-              cell={{ shape: object.shape, count: 1, rotation: 0, fill: "outline", size: "l" }}
+              token={{ shape: object.shape, rotation: 0, fill: "outline", size: "l" }}
               at={center}
               r={containerRadius}
             />
@@ -343,7 +410,7 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
               return (
                 <Shape
                   key={index}
-                  cell={tokenAsCell(token)}
+                  token={token}
                   at={{ x: center.x + offset, y: center.y }}
                   r={containerRadius * radiusScale}
                 />
@@ -354,26 +421,6 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
       })}
     </svg>
   );
-}
-
-/** Render a single cell's graphic into a 100×100 viewBox. */
-export function CellGraphic({ cell, className }: { cell: SceneCellSpec; className?: string }) {
-  const { pts, baseR } = layoutFor(cell.count);
-  const r = baseR * SIZE_SCALE[cell.size];
-  return (
-    <svg viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`} className={className} role="img" aria-label={describeCell(cell)}>
-      {pts.map((p, i) => (
-        <Shape key={i} cell={cell} at={p} r={r} />
-      ))}
-    </svg>
-  );
-}
-
-/** Shared entry point used by the browser and standalone-image renderers. */
-export function VisualGraphic({ visual, className }: { visual: Drawable; className?: string }) {
-  return isDrawableScene(visual)
-    ? <SceneGraphic scene={visual} className={className} />
-    : <CellGraphic cell={visual} className={className} />;
 }
 
 /** A blank panel — the cell to be solved. */
@@ -387,356 +434,250 @@ export function BlankGraphic({ className }: { className?: string }) {
   );
 }
 
-function PanelBox({ panel }: { panel: Drawable | { blank: true } }) {
+/**
+ * One stem picture in its frame. The frame's inner padding is 3px on a phone
+ * and `CELL_CANVAS_PADDING` (6px) from `sm:` up: a phone row can need its
+ * boards a little narrower than 80px, and the thinner padding hands most of
+ * that back to the drawing.
+ */
+function PanelBox({ panel }: { panel: Panel }) {
   return (
-    <div
-      className="flex aspect-square items-center justify-center rounded-md border border-gray-200 bg-white"
-      style={{ padding: `${CELL_CANVAS_PADDING}px`, boxSizing: "border-box" }}
-    >
+    <div className="box-border flex aspect-square items-center justify-center rounded-md border border-gray-200 bg-white p-[3px] sm:p-1.5">
       {"blank" in panel ? (
         <BlankGraphic className="h-full w-full" />
       ) : (
-        <VisualGraphic visual={panel} className="h-full w-full" />
+        <SceneGraphic scene={panel} className="h-full w-full" />
       )}
     </div>
   );
 }
 
 /**
- * Room a machine row has to lay itself out in on the narrowest phone the app
- * serves, in CSS pixels.
+ * Room the stem has on the narrowest phone the app serves, in CSS pixels.
  *
  * 375px of viewport, less the page's 16px side padding (32), the question
- * card's 1px borders (2) and 24px padding (48), and the diagram panel's 16px
- * padding (32). Anything wider than this is cut off, and a cut-off gate strip
- * is exactly what the 2026-08-24 QA pass caught. `gateStripWidth` below is
- * measured against it by test rather than eyeballed in a browser.
+ * card's 1px borders (2) and its 12px phone padding (24), and the diagram
+ * panel's 8px phone padding (16). Until 2026-10-03 the card and panel kept
+ * their desktop padding on a phone and the stem had 261px, which is why every
+ * table row and sequence used to fold. Every phone layout below is priced
+ * against this number by test, from the classes its markup really carries.
  */
-export const NARROW_VIEWPORT_STEM_WIDTH = 261;
+export const NARROW_VIEWPORT_STEM_WIDTH = 301;
 
 /**
- * Gate strip geometry, in CSS pixels at the narrowest viewport. Each constant
- * is the Tailwind class the markup below actually uses, so the two cannot
- * drift apart without the strip-width test noticing.
- *
- * "Cannot drift" is now checked rather than asserted. Until 2026-08-26 the
- * markup gave a non-wide glyph `w-20` (80px) while this constant said 56px, so
- * a three-glyph strip really laid out at 308px and overflowed the 261px a
- * phone has by 47px, with nothing to catch it. The glyph cell is back to
- * `w-14 sm:w-20` — 56px on a phone, the size the four-gate strip's own comment
- * always claimed — and a test in compose-image.test.ts now rebuilds the width
- * from the classes the rendered markup carries.
+ * Gate geometry, in CSS pixels on a phone. One gate is one piece lying on its
+ * side, 56px wide. Several stack top to bottom in a 40px column, tabs down, so
+ * a machine row (input, gate, output) stays on one line, which is what keeps a
+ * table reading as a table.
  */
-export const GATE_GLYPH_WIDTH = 56; // w-14
-export const GATE_SEPARATOR_WIDTH = 20; // w-5
-/** A four-gate strip trades glyph width for the fourth glyph; three still fit at full size. */
-export const WIDE_GATE_GLYPH_COUNT = 4;
-export const WIDE_GATE_GLYPH_WIDTH = 44; // w-11
-export const WIDE_GATE_SEPARATOR_WIDTH = 14; // w-3.5
-export const GATE_STRIP_GAP = 4; // gap-1
-export const GATE_STRIP_FRAME = 6; // p-1 plus border-2, per side
+export const GATE_PIECE_WIDTH = 56; // w-14
+export const GATE_STACK_WIDTH = 40; // w-10
 
-/**
- * At five glyphs the strip drops the "→" columns between them and keeps the
- * glyph exactly the size a four-gate strip already uses.
- *
- * The arithmetic leaves no other choice. Five 44px glyphs are 220px on their
- * own; the 261px a 375px phone has leaves 41px for everything else, and the
- * dashed frame takes 12 of it. Four arrow columns and eight gaps cannot fit in
- * the remaining 29px at any size a person could read. The alternative — keeping
- * the arrows and shrinking the glyph — is barred: the drawn shape inside a 44px
- * glyph cell already sits within a third of a pixel of this project's measured
- * legibility floor (the solid square spans 24.27px against a 24px floor), so
- * one Tailwind step down would put the mark below it, and the doctrine forbids
- * buying depth with smaller marks. What the strip loses is a decorative
- * ordering cue that the instruction ("apply the five query gates from left to
- * right"), the group label, and the worked rows above all still carry.
- */
-export const UNSEPARATED_GATE_GLYPH_COUNT = 5;
-
-/** Laid-out width of a gate strip holding `glyphCount` glyphs. */
+/** Laid-out width on a phone of a gate holding `glyphCount` pieces. */
 export function gateStripWidth(glyphCount: number): number {
-  if (glyphCount === 0) return GATE_GLYPH_WIDTH;
-  const wide = glyphCount >= WIDE_GATE_GLYPH_COUNT;
-  const glyph = wide ? WIDE_GATE_GLYPH_WIDTH : GATE_GLYPH_WIDTH;
-  const separator = wide ? WIDE_GATE_SEPARATOR_WIDTH : GATE_SEPARATOR_WIDTH;
-  const separators = glyphCount >= UNSEPARATED_GATE_GLYPH_COUNT ? 0 : glyphCount - 1;
-  // One gap between every pair of the strip's children: glyphs and separators.
-  const gaps = Math.max(0, glyphCount + separators - 1);
-  return glyphCount * glyph +
-    separators * separator +
-    gaps * GATE_STRIP_GAP +
-    GATE_STRIP_FRAME * 2;
+  return glyphCount > 1 ? GATE_STACK_WIDTH : GATE_PIECE_WIDTH;
 }
 
 /**
- * Analogy pair geometry, in CSS pixels at the narrowest viewport — priced the
- * same way `gateStripWidth` prices a gate strip, from the Tailwind width
- * classes the analogy markup actually uses (`w-20` panels, `w-6`/`w-8` fixed
- * colon columns, `gap-1`). One pair ("A : B") fits `NARROW_VIEWPORT_STEM_WIDTH`
- * comfortably; the full "A : B :: C : ?" line does not, which is exactly why
- * the analogy strip wraps its two pairs onto separate lines instead of
- * scrolling one of them out of view.
+ * From `sm:` up the pieces lie side by side, 1.6px per piece unit: 74px for
+ * one, 195px for three. Literal class names: Tailwind only generates the
+ * classes it can see written out.
  */
-export const ANALOGY_PANEL_WIDTH = 80; // w-20
-export const ANALOGY_COLON_WIDTH = 24; // w-6
-export const ANALOGY_DOUBLE_COLON_WIDTH = 32; // w-8
-export const ANALOGY_STRIP_GAP = 4; // gap-1
+const WIDE_GATE_STRIP_WIDTHS: Record<number, string> = {
+  1: "sm:w-[74px]", 2: "sm:w-[134px]", 3: "sm:w-[195px]",
+};
 
-/** Laid-out width of one analogy pair ("A : B", or the trailing "C : ?" half). */
-export function analogyPairWidth(): number {
-  return ANALOGY_PANEL_WIDTH * 2 + ANALOGY_COLON_WIDTH + ANALOGY_STRIP_GAP * 2;
+function JigsawStrip({ textures, direction, className }: {
+  textures: GatePieceTexture[];
+  direction: "right" | "down";
+  className: string;
+}) {
+  const { width, height } = jigsawStripSize(textures.length, direction);
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className={className} aria-hidden="true" data-gate-strip={direction}>
+      <JigsawPieces textures={textures} direction={direction} />
+    </svg>
+  );
 }
 
 /**
- * A machine gate: the dashed frame plus one full-size cell per gate glyph, read
- * left to right. A combined query gate used to be squeezed into a single cell,
- * which left each glyph about 7px wide on a phone; giving every glyph the cell a
- * worked row gives its own gate keeps the query readable at the same size the
- * user has already learned to read.
- *
- * The strip never wraps. A wrapped strip stops reading as one ordered program,
- * so a four-gate strip takes narrower glyphs and a narrower arrow instead —
- * still far larger than the cell-share it would get on a board, and `254px`
- * against the `261px` a phone actually has. A five-gate strip keeps that same
- * glyph and drops the arrow columns instead: `248px`, and the mark never
- * shrinks (see `UNSEPARATED_GATE_GLYPH_COUNT`).
+ * A machine gate: its jigsaw pieces, in application order (owner's choice,
+ * 2026-10-04; the dashed box of board shapes it replaces is in
+ * docs/plans/gate-order-and-labels.md). The pieces carry the order themselves,
+ * tab into notch, so no arrows sit between them.
  */
-function GateBox({ panel }: { panel: Panel<Visual> }) {
-  const glyphs = gateGlyphs(panel);
-  // A gate cell always holds at least one glyph. An empty one would be a data
-  // error, and it draws as an ordinary panel rather than an empty dashed frame.
-  if (glyphs.length === 0) {
+function GateBox({ panel }: { panel: Panel }) {
+  const textures = gatePieces(panel);
+  // Every served gate glyph has a piece; anything else is a data error, and it
+  // draws as an ordinary panel rather than disappearing.
+  if (!textures) {
     return <div className="w-14 shrink-0 sm:w-20"><PanelBox panel={panel} /></div>;
   }
-  const wide = glyphs.length >= WIDE_GATE_GLYPH_COUNT;
-  const separated = glyphs.length < UNSEPARATED_GATE_GLYPH_COUNT;
+  const stacked = textures.length > 1;
   return (
-    <div
-      className="flex shrink-0 flex-nowrap items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-gray-500 bg-white p-1"
-      // A bare div's aria-label is ignored by screen readers; the label only
-      // reaches them once the element has a role of its own.
-      role={glyphs.length > 1 ? "group" : undefined}
-      aria-label={glyphs.length > 1 ? `${glyphs.length} gates, applied left to right` : undefined}
-    >
-      {glyphs.map((glyph, index) => (
-        <React.Fragment key={index}>
-          {index > 0 && separated && (
-            <span
-              className={`shrink-0 text-center text-gray-400 ${wide ? "w-3.5 text-sm" : "w-5 text-lg"}`}
-              aria-hidden="true"
-            >→</span>
-          )}
-          <div className={`shrink-0 ${wide ? "w-11 sm:w-16" : "w-14 sm:w-20"}`}>
-            <PanelBox panel={glyph} />
-          </div>
-        </React.Fragment>
-      ))}
+    <div className="flex shrink-0 items-center justify-center" role="img" aria-label={describeGatePieces(textures)}>
+      <JigsawStrip
+        textures={textures}
+        direction={stacked ? "down" : "right"}
+        className={`h-auto sm:hidden ${stacked ? "w-10" : "w-14"}`}
+      />
+      <JigsawStrip
+        textures={textures}
+        direction="right"
+        className={`hidden h-auto sm:block ${WIDE_GATE_STRIP_WIDTHS[textures.length] ?? WIDE_GATE_STRIP_WIDTHS[3]}`}
+      />
     </div>
   );
 }
 
 /**
- * A horizontal strip of panels that scrolls when it is wider than the space it
- * has, with a fade and a chevron on whichever edge is currently cut off.
- *
- * The 2026-08-24 QA pass caught an eight-panel row showing its later panels as a
- * sliver with nothing to say the row continued. The markers are measured, not
- * assumed: the first paint carries none, and a strip that fits never grows one.
+ * Table row geometry on a phone, priced like the gate strip: a machine row is
+ * input → gate → output with 80px boards and 16px arrows, `gap-1` apart.
  */
-/**
- * A horizontal strip of panels.
- *
- * `wrap` is for strips whose panels are a plain left-to-right list: they may
- * fold onto a second line so every panel stays on screen at once, which a
- * sequence needs — you cannot compare term 1 with term 5 while one of them is
- * scrolled away. Strips whose panels come in glued pairs (analogy `A : B`, a
- * machine's `in → out`) must NOT wrap, or a line break lands between a pair and
- * invents a grouping the puzzle does not have; those keep scrolling instead.
- */
-function ScrollStrip({ children, label, wrap = false }: { children: React.ReactNode; label?: string; wrap?: boolean }) {
-  const viewport = useRef<HTMLDivElement | null>(null);
-  const content = useRef<HTMLDivElement | null>(null);
-  const [cut, setCut] = useState({ start: false, end: false });
+export const TABLE_PANEL_WIDTH = 80; // w-20
+export const TABLE_ARROW_WIDTH = 16; // w-4
+export const TABLE_GAP = 4; // gap-1
 
-  useEffect(() => {
-    const node = viewport.current;
-    if (!node) return;
-    const measure = () => {
-      const hidden = node.scrollWidth - node.clientWidth;
-      setCut({ start: node.scrollLeft > 1, end: hidden - node.scrollLeft > 1 });
-    };
-    measure();
-    node.addEventListener("scroll", measure, { passive: true });
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(node);
-    if (content.current) observer?.observe(content.current);
-    return () => {
-      node.removeEventListener("scroll", measure);
-      observer?.disconnect();
-    };
-  }, []);
-
-  return (
-    <div className="relative">
-      <div ref={viewport} className="overflow-x-auto" aria-label={label}>
-        {/* w-max + auto margins centre a strip that fits and left-align one that
-            does not: a centred overflowing strip hides its first panel where no
-            scroll can reach it. */}
-        <div
-          ref={content}
-          className={`mx-auto flex items-center gap-1 sm:gap-2 ${
-            wrap ? "w-full flex-wrap justify-center gap-y-2" : "w-max flex-nowrap"
-          }`}
-        >
-          {children}
-        </div>
-      </div>
-      {cut.start && <StripEdge side="start" />}
-      {cut.end && <StripEdge side="end" />}
-    </div>
-  );
+/** Laid-out width of a machine row on a phone whose gate holds `glyphCount` glyphs. */
+export function machineRowWidth(glyphCount: number): number {
+  return TABLE_PANEL_WIDTH * 2 + TABLE_ARROW_WIDTH * 2 + TABLE_GAP * 4 + gateStripWidth(glyphCount);
 }
 
-/** The fade plus chevron that marks a cut-off edge of a scrolling strip. */
-function StripEdge({ side }: { side: "start" | "end" }) {
+/**
+ * Sequence geometry. Every picture carries its number above it and an arrow
+ * column in front of it — the first picture's arrow column is empty, which
+ * keeps the pictures of a folded second line under those of the first, and
+ * makes a folded line open with "→", which reads as "continued".
+ */
+export const SEQUENCE_PANEL_WIDTH = 80; // w-20 (5rem)
+export const SEQUENCE_ARROW_WIDTH = 14; // 0.875rem
+/** Between an arrow and its picture (`gap-x-0.5`), and between pictures (`gap-x-1`). */
+export const SEQUENCE_ARROW_GAP = 2;
+export const SEQUENCE_GAP = 4;
+/** Most pictures on one line below `md:`, and from `md:` up. */
+export const SEQUENCE_PHONE_MAX_PER_LINE = 3;
+export const SEQUENCE_WIDE_MAX_PER_LINE = 6;
+
+/**
+ * Pictures per line when `count` pictures fold into lines of at most `max`: as
+ * few lines as possible, then as even as possible. Four pictures fold 2 + 2 and
+ * six fold 3 + 3 — never three plus a lone "?", which is what made a folded
+ * sequence look like a matrix before 2026-10-03.
+ */
+export function sequencePerLine(count: number, max: number): number {
+  if (count <= 0) return 1;
+  return Math.ceil(count / Math.ceil(count / max));
+}
+
+/** Laid-out width of one sequence line holding `perLine` pictures. */
+export function sequenceLineWidth(perLine: number): number {
+  return perLine * (SEQUENCE_ARROW_WIDTH + SEQUENCE_ARROW_GAP + SEQUENCE_PANEL_WIDTH) +
+    (perLine - 1) * SEQUENCE_GAP;
+}
+
+// Literal class names: Tailwind only generates the classes it can see written out.
+const PHONE_SEQUENCE_COLUMNS: Record<number, string> = {
+  1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3",
+};
+const WIDE_SEQUENCE_COLUMNS: Record<number, string> = {
+  1: "md:grid-cols-1", 2: "md:grid-cols-2", 3: "md:grid-cols-3",
+  4: "md:grid-cols-4", 5: "md:grid-cols-5", 6: "md:grid-cols-6",
+};
+
+/**
+ * Analogy row geometry: "A → B", then "C → ?" directly beneath it. One row is
+ * two 80px boards, a 32px arrow, `gap-1` between them and `px-2` round them.
+ */
+export const ANALOGY_PANEL_WIDTH = 80; // w-20
+export const ANALOGY_ARROW_WIDTH = 32; // w-8
+export const ANALOGY_ROW_GAP = 4; // gap-1
+export const ANALOGY_ROW_PADDING = 8; // px-2
+
+/** Laid-out width of one analogy row. */
+export function analogyRowWidth(): number {
+  return ANALOGY_PANEL_WIDTH * 2 + ANALOGY_ARROW_WIDTH + ANALOGY_ROW_GAP * 2 + ANALOGY_ROW_PADDING * 2;
+}
+
+/**
+ * The arrow between pictures, drawn rather than typed so it is equally bold in
+ * every font a phone might fall back to. Decorative: the layout's label says
+ * what it means.
+ */
+function FlowArrow({ direction = "right", className = "" }: { direction?: "right" | "down"; className?: string }) {
   return (
-    <div
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
       aria-hidden="true"
-      data-strip-edge={side}
-      className={`pointer-events-none absolute inset-y-0 flex w-10 items-center ${
-        side === "end"
-          ? "right-0 justify-end bg-gradient-to-l from-gray-50 via-gray-50 to-transparent"
-          : "left-0 justify-start bg-gradient-to-r from-gray-50 via-gray-50 to-transparent"
-      }`}
+      data-flow-arrow={direction}
+      fill="none"
+      stroke={FLOW_ARROW_STROKE}
+      strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke={STROKE} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-        <polyline points={side === "end" ? "9,5 16,12 9,19" : "15,5 8,12 15,19"} />
-      </svg>
-    </div>
+      <g transform={direction === "down" ? "rotate(90 12 12)" : undefined}>
+        <line x1="3" y1="12" x2="20" y2="12" />
+        <polyline points="13,5 20,12 13,19" />
+      </g>
+    </svg>
   );
 }
 
 /** Render a puzzle's stem (the question) according to its layout. */
-export function StemView({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Visual> }) {
-  if (puzzle.layout === "conceptGroups") {
-    const positive = puzzle.stem.slice(0, 3);
-    const negative = puzzle.stem.slice(3, 6);
-    const group = (label: string, panels: typeof positive) => (
-      <div className="grid grid-cols-[1.5rem_repeat(3,minmax(0,3.5rem))] items-center justify-center gap-1 sm:grid-cols-[1.5rem_repeat(3,minmax(0,5rem))] sm:gap-2">
-        <span className="text-center text-xl font-semibold text-gray-500" aria-hidden="true">{label}</span>
-        {panels.map((panel, index) => (
-          <div key={index} className="w-full"><PanelBox panel={panel} /></div>
-        ))}
-      </div>
-    );
-    return (
-      <div className="mx-auto flex flex-col gap-3" aria-label="Examples that belong, then examples that do not belong">
-        {group("✓", positive)}
-        {group("×", negative)}
-      </div>
-    );
-  }
-
+export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
   if (puzzle.layout === "grid3x3") {
+    // Arrows only when the rule runs one way: an arrow column before the third
+    // board of every row says "these two make this one, across". A grid whose
+    // rule runs down the columns too reads both ways and draws no arrows
+    // (owner's decision, 2026-10-03), like a grid built before `gridFlow`.
+    if (puzzle.gridFlow !== "rows") {
+      return (
+        <div className="mx-auto grid w-full max-w-[280px] grid-cols-3 gap-2">
+          {puzzle.stem.map((panel, i) => (
+            <PanelBox key={i} panel={panel} />
+          ))}
+        </div>
+      );
+    }
+    const cells: React.ReactNode[] = [];
+    for (let row = 0; row < 3; row++) {
+      const [first, second, third] = puzzle.stem.slice(row * 3, row * 3 + 3);
+      cells.push(
+        <PanelBox key={`${row}-0`} panel={first} />,
+        <PanelBox key={`${row}-1`} panel={second} />,
+        <FlowArrow key={`${row}-arrow`} className="h-3 w-3" />,
+        <PanelBox key={`${row}-2`} panel={third} />,
+      );
+    }
     return (
-      <div className="mx-auto grid w-full max-w-[280px] grid-cols-3 gap-2">
-        {puzzle.stem.map((panel, i) => (
-          <PanelBox key={i} panel={panel} />
-        ))}
+      <div
+        className="mx-auto grid w-full max-w-[300px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-2"
+        aria-label="3 by 3 grid: in every row, the first two boards make the third"
+      >
+        {cells}
       </div>
     );
   }
-
-  if (puzzle.layout === "operatorTable") {
-    const rows = Array.from({ length: puzzle.stem.length / 3 }, (_, index) =>
-      puzzle.stem.slice(index * 3, index * 3 + 3),
-    );
-    return (
-      <div className="mx-auto flex w-full max-w-[390px] flex-col items-center gap-3">
-        {puzzle.operatorLegend && (
-          <div className="flex items-center justify-center gap-1" aria-label="Shape order">
-            {puzzle.operatorLegend.shapeCycle.map((shape, index) => (
-              <React.Fragment key={shape}>
-                {index > 0 && <span className="text-gray-400">→</span>}
-                <div className="w-8">
-                  <CellGraphic
-                    cell={{ shape, count: 1, rotation: 0, fill: "outline", size: "l" }}
-                    className="h-full w-full"
-                  />
-                </div>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        {rows.map(([left, right, output], index) => (
-          <div key={index} className="flex w-full items-center justify-center gap-2">
-            <div className="w-16">{left && <PanelBox panel={left} />}</div>
-            <span className="text-xl font-semibold text-gray-400" aria-label="combined with">◆</span>
-            <div className="w-16">{right && <PanelBox panel={right} />}</div>
-            <span className="text-xl font-semibold text-gray-400">→</span>
-            <div className="w-16">{output && <PanelBox panel={output} />}</div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
 
   if (puzzle.layout === "machineTable") {
     const rows = Array.from({ length: puzzle.stem.length / 3 }, (_, index) =>
       puzzle.stem.slice(index * 3, index * 3 + 3),
     );
-    // Any row can be wider than a 375px phone, not only a query row carrying a
-    // multi-glyph gate — even one ordinary worked row (two panels, two arrows,
-    // one single-glyph gate) already exceeds the 261px budget on its own — so
-    // every row wraps rather than shrinking back into an unreadable line. Each
-    // row gets its own boxed background and the rows sit a clearly bigger gap
-    // apart than a wrapped row's own lines do, so a wrapped row still reads as
-    // one unit rather than blurring into its neighbour.
+    // Every row is one line at every width: input → gate → output. On a phone
+    // a multi-gate strip stacks its pieces instead of widening the row
+    // (`machineRowWidth` prices it). A row that folded put its output alone
+    // on a second line, which read as the start of another row. `sm:flex-wrap`
+    // is only a safety net for strips wider than any served bucket draws.
     return (
-      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-4" aria-label="Worked transformation paths followed by one query path">
+      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3" aria-label="Worked transformation paths followed by one query path">
         {rows.map(([input, gate, output], index) => (
-          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-2 rounded-lg bg-gray-100/70 py-2 sm:gap-x-2">
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-              <div className="w-20 shrink-0">{input && <PanelBox panel={input} />}</div>
-              <span className="text-xl text-gray-400" aria-hidden="true">→</span>
-            </div>
+          <div key={index} className="flex w-full flex-nowrap items-center justify-center gap-1 rounded-lg bg-gray-100/70 py-2 sm:flex-wrap sm:gap-2">
+            <div className="w-20 shrink-0">{input && <PanelBox panel={input} />}</div>
+            <FlowArrow className="h-4 w-4 shrink-0" />
             {gate && <GateBox panel={gate} />}
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-              <span className="text-xl text-gray-400" aria-hidden="true">→</span>
-              <div className="w-20 shrink-0">{output && <PanelBox panel={output} />}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (puzzle.layout === "combineTable") {
-    // (left, gate, right, output) per row. The gate glyph sits BETWEEN the two
-    // boards it combines, which is the whole difference from a machine table:
-    // there the gate transforms one board and stands before it. Rows are
-    // boxed and gapped exactly as machineTable's — see the comment there.
-    const rows = Array.from({ length: puzzle.stem.length / 4 }, (_, index) =>
-      puzzle.stem.slice(index * 4, index * 4 + 4),
-    );
-    return (
-      <div
-        className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-4"
-        aria-label="Worked combinations followed by one query combination"
-      >
-        {rows.map(([left, gate, right, output], index) => (
-          <div key={index} className="flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-2 rounded-lg bg-gray-100/70 py-2 sm:gap-x-2">
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-              <div className="w-20 shrink-0">{left && <PanelBox panel={left} />}</div>
-            </div>
-            {gate && <GateBox panel={gate} />}
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-              <div className="w-20 shrink-0">{right && <PanelBox panel={right} />}</div>
-              <span className="text-xl text-gray-400" aria-hidden="true">→</span>
-              <div className="w-20 shrink-0">{output && <PanelBox panel={output} />}</div>
-            </div>
+            <FlowArrow className="h-4 w-4 shrink-0" />
+            <div className="w-20 shrink-0">{output && <PanelBox panel={output} />}</div>
           </div>
         ))}
       </div>
@@ -744,44 +685,46 @@ export function StemView({ puzzle }: { puzzle: Puzzle<Visual> | PublicPuzzle<Vis
   }
 
   if (puzzle.layout === "analogy") {
-    // [A, B, C] rendered as  A : B  ::  C : ?
+    // [A, B, C] rendered as two aligned rows: "A → B" over "C → ?". The old
+    // "A : B :: C : ?" line folded at "::" on a phone, and its notation was
+    // unfamiliar; stacked rows say "the same change, again" at every width.
     const [a, b, c] = puzzle.stem;
-    // Each pair ("A : B", ":: C : ?") is one non-wrapping flex item —
-    // `analogyPairWidth()` prices it against NARROW_VIEWPORT_STEM_WIDTH below.
-    // On a 375px phone the full line does not fit, so the two pairs wrap onto
-    // their own line at "::" instead of scrolling: scrolling the first pair
-    // out of view would defeat the comparison the puzzle asks for, and a pair
-    // itself never splits.
+    const pairs: [Panel | undefined, Panel][] = [[a, b ?? { blank: true }], [c, { blank: true }]];
     return (
       <div
-        className="mx-auto flex w-full flex-wrap items-center justify-center gap-x-1 gap-y-2 sm:flex-nowrap sm:gap-x-2"
-        aria-label="Analogy: the first pair, then the pair to complete"
+        className="mx-auto flex w-max flex-col gap-2"
+        aria-label="Analogy: the top pair shows a change; the bottom pair makes the same change"
       >
-        <div className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2">
-          <div className="w-20 shrink-0">{a && <PanelBox panel={a} />}</div>
-          <span className="w-6 shrink-0 text-center text-2xl font-semibold text-gray-400">:</span>
-          <div className="w-20 shrink-0">{b && <PanelBox panel={b} />}</div>
-        </div>
-        <div className="flex shrink-0 flex-nowrap items-center gap-1 sm:gap-2">
-          <span className="w-8 shrink-0 text-center text-2xl font-semibold text-gray-400">::</span>
-          <div className="w-20 shrink-0">{c && <PanelBox panel={c} />}</div>
-          <span className="w-6 shrink-0 text-center text-2xl font-semibold text-gray-400">:</span>
-          <div className="w-20 shrink-0">
-            <PanelBox panel={{ blank: true }} />
+        {pairs.map(([left, right], index) => (
+          <div key={index} className="flex flex-nowrap items-center gap-1 rounded-lg bg-gray-100/70 px-2 py-2">
+            <div className="w-20 shrink-0">{left && <PanelBox panel={left} />}</div>
+            <FlowArrow className="h-7 w-8 shrink-0" />
+            <div className="w-20 shrink-0"><PanelBox panel={right} /></div>
           </div>
-        </div>
+        ))}
       </div>
     );
   }
 
-  // row (sequence) — also used as a generic horizontal strip
+  // row (sequence): numbered pictures with an arrow before each one after the
+  // first, folding into balanced lines on a phone. Numbers make a fold
+  // harmless — "→ 4" opening a line says "continued" — and keep a folded
+  // sequence from looking like a matrix, which carries no numbers.
+  const count = puzzle.stem.length;
+  const phoneColumns = PHONE_SEQUENCE_COLUMNS[sequencePerLine(count, SEQUENCE_PHONE_MAX_PER_LINE)];
+  const wideColumns = WIDE_SEQUENCE_COLUMNS[sequencePerLine(count, SEQUENCE_WIDE_MAX_PER_LINE)];
   return (
-    <ScrollStrip label="Sequence, left to right" wrap>
+    <div
+      className={`mx-auto grid w-max gap-x-1 gap-y-3 ${phoneColumns} ${wideColumns}`}
+      aria-label="Sequence: pictures in numbered order, ending with the missing one"
+    >
       {puzzle.stem.map((panel, i) => (
-        <div key={i} className="w-20 shrink-0">
-          <PanelBox panel={panel} />
+        <div key={i} className="grid grid-cols-[0.875rem_5rem] items-center gap-x-0.5 gap-y-0.5" data-sequence-step={i + 1}>
+          <span className="col-start-2 text-center text-sm font-semibold text-gray-500" aria-hidden="true">{i + 1}</span>
+          <FlowArrow className={`col-start-1 row-start-2 h-3.5 w-3.5 ${i === 0 ? "invisible" : ""}`} />
+          <div className="col-start-2 row-start-2"><PanelBox panel={panel} /></div>
         </div>
       ))}
-    </ScrollStrip>
+    </div>
   );
 }

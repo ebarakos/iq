@@ -1,18 +1,15 @@
-import { isInstantlyDistinct, visualSignature } from "./domains";
 import {
   areScenesCategoricallyDistinct,
-  isCell,
-  isScene,
   sceneSignature,
-  VisualPuzzleSchema,
+  PuzzleSchema,
   type Puzzle,
-  type Visual,
+  type Scene,
 } from "./schema";
 
 /** A concrete reason one option fails a family's rule or constraint system. */
-export interface DistractorWitness<Witness = unknown> {
+export interface DistractorWitness {
   optionIndex: number;
-  witness: Witness;
+  witness: string;
 }
 
 /**
@@ -23,11 +20,11 @@ export interface DistractorWitness<Witness = unknown> {
  * completions for a constraint family. Multiple equivalent rules may survive;
  * they are safe only when they all predict the same visible answer.
  */
-export interface ValidationReport<V extends Visual = Visual, Witness = unknown> {
-  derivedAnswer: V | null;
+export interface ValidationReport {
+  derivedAnswer: Scene | null;
   solutionCount: number;
   usedCueIds: readonly string[];
-  distractorWitnesses: readonly DistractorWitness<Witness>[];
+  distractorWitnesses: readonly DistractorWitness[];
 }
 
 /**
@@ -36,43 +33,18 @@ export interface ValidationReport<V extends Visual = Visual, Witness = unknown> 
  * Family implementations own their bounded solver and the names of visible
  * cues. The shared gate owns all cross-family acceptance invariants.
  */
-export interface FamilyDefinition<V extends Visual = Visual, Witness = unknown> {
+export interface FamilyDefinition {
   readonly familyId: string;
-  isVisual(visual: Visual): visual is V;
-  visibleCueIds(puzzle: Puzzle<V>): readonly string[];
-  validate(puzzle: Puzzle<V>): ValidationReport<V, Witness>;
+  visibleCueIds(puzzle: Puzzle): readonly string[];
+  validate(puzzle: Puzzle): ValidationReport;
   /** Canonical hidden-program identity, independent of the sampled visual surface. */
-  programFingerprint?(puzzle: Puzzle<V>): string;
+  programFingerprint?(puzzle: Puzzle): string;
   /** Canonical hidden-and-visible identity used when a caller checks replay. */
-  replayKey?(puzzle: Puzzle<V>): string;
-}
-
-/** A registry is homogeneous at its boundary; individual families may narrow internally. */
-export type FamilyRegistry<V extends Visual = Visual, Witness = unknown> = ReadonlyMap<
-  string,
-  FamilyDefinition<V, Witness>
->;
-
-/** Build a lookup registry while rejecting ambiguous family identities. */
-export function defineFamilyRegistry<V extends Visual, Witness>(
-  definitions: readonly FamilyDefinition<V, Witness>[],
-): FamilyRegistry<V, Witness> {
-  const registry = new Map<string, FamilyDefinition<V, Witness>>();
-  for (const definition of definitions) {
-    if (definition.familyId.trim().length === 0) {
-      throw new Error("familyId must not be empty");
-    }
-    if (registry.has(definition.familyId)) {
-      throw new Error(`duplicate familyId: ${definition.familyId}`);
-    }
-    registry.set(definition.familyId, definition);
-  }
-  return registry;
+  replayKey?(puzzle: Puzzle): string;
 }
 
 export type AcceptanceIssueCode =
   | "schema"
-  | "visual-vocabulary"
   | "solution-count"
   | "derived-answer"
   | "option-distinction"
@@ -92,26 +64,14 @@ export interface AcceptanceOptions {
   expectedReplayKey?: string;
 }
 
-export interface AcceptanceResult<V extends Visual = Visual, Witness = unknown> {
+export interface AcceptanceResult {
   accepted: boolean;
   issues: readonly AcceptanceIssue[];
-  /** Present once the shared runtime schema and family vocabulary both pass. */
-  puzzle?: Puzzle<V>;
+  /** Present once the shared runtime schema passes. */
+  puzzle?: Puzzle;
   /** Present once the family's validator has run. */
-  report?: ValidationReport<V, Witness>;
+  report?: ValidationReport;
   replayKey?: string;
-}
-
-function visualsAreCategoricallyDistinct(left: Visual, right: Visual): boolean {
-  if (isCell(left) && isCell(right)) return isInstantlyDistinct(left, right);
-  if (isScene(left) && isScene(right)) return areScenesCategoricallyDistinct(left, right);
-  return true;
-}
-
-function sameVisual(left: Visual, right: Visual): boolean {
-  if (isCell(left) && isCell(right)) return visualSignature(left) === visualSignature(right);
-  if (isScene(left) && isScene(right)) return sceneSignature(left) === sceneSignature(right);
-  return false;
 }
 
 function duplicateValues(values: readonly string[]): string[] {
@@ -131,12 +91,12 @@ function duplicateValues(values: readonly string[]): string[] {
  * A rejected candidate is returned with concrete issues instead of throwing;
  * programmer errors inside a family validator still surface normally.
  */
-export function acceptFamilyCandidate<V extends Visual, Witness>(
-  definition: FamilyDefinition<V, Witness>,
+export function acceptFamilyCandidate(
+  definition: FamilyDefinition,
   candidate: unknown,
   options: AcceptanceOptions = {},
-): AcceptanceResult<V, Witness> {
-  const parsed = VisualPuzzleSchema.safeParse(candidate);
+): AcceptanceResult {
+  const parsed = PuzzleSchema.safeParse(candidate);
   if (!parsed.success) {
     return {
       accepted: false,
@@ -147,23 +107,7 @@ export function acceptFamilyCandidate<V extends Visual, Witness>(
     };
   }
 
-  const parsedPuzzle = parsed.data;
-  const visuals = [
-    ...parsedPuzzle.stem.flatMap((panel) => "blank" in panel ? [] : [panel]),
-    ...parsedPuzzle.options,
-  ];
-  const wrongVocabulary = visuals.findIndex((visual) => !definition.isVisual(visual));
-  if (wrongVocabulary !== -1) {
-    return {
-      accepted: false,
-      issues: [{
-        code: "visual-vocabulary",
-        message: `${definition.familyId} does not accept every visual used by the puzzle`,
-      }],
-    };
-  }
-
-  const puzzle = parsedPuzzle as Puzzle<V>;
+  const puzzle = parsed.data;
   const report = definition.validate(puzzle);
   const issues: AcceptanceIssue[] = [];
 
@@ -176,7 +120,8 @@ export function acceptFamilyCandidate<V extends Visual, Witness>(
 
   const derivedMatches = report.derivedAnswer === null
     ? []
-    : puzzle.options.flatMap((option, index) => sameVisual(option, report.derivedAnswer!) ? [index] : []);
+    : puzzle.options.flatMap((option, index) =>
+      sceneSignature(option) === sceneSignature(report.derivedAnswer!) ? [index] : []);
   if (derivedMatches.length !== 1) {
     issues.push({
       code: "derived-answer",
@@ -191,7 +136,7 @@ export function acceptFamilyCandidate<V extends Visual, Witness>(
 
   for (let left = 0; left < puzzle.options.length; left++) {
     for (let right = left + 1; right < puzzle.options.length; right++) {
-      if (!visualsAreCategoricallyDistinct(puzzle.options[left], puzzle.options[right])) {
+      if (!areScenesCategoricallyDistinct(puzzle.options[left], puzzle.options[right])) {
         issues.push({
           code: "option-distinction",
           message: `options ${left} and ${right} are not categorically distinct`,

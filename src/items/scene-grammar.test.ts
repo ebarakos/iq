@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { sceneSignature, type Scene, type SceneToken } from "./schema";
 import {
   applySceneBinary,
+  applySceneComposedProgram,
   applySceneCompositionPrimitive,
-  applySceneExpression,
-  applySceneOrderedComposition,
   applySceneUnary,
-  enumerateSceneConcepts,
   enumerateSceneOrderedCompositions,
   enumerateSceneOrderedThreeStepCompositions,
   enumerateSceneUnaryOperations,
@@ -14,10 +12,6 @@ import {
   sceneComposedPrimitives,
   sceneComposedProgramFromSteps,
   sceneComposedProgramSteps,
-  sceneProgramFits,
-  sceneSatisfiesConcept,
-  sceneSatisfiesRelation,
-  type SceneExpression,
 } from "./scene-grammar";
 
 const token = (shape: SceneToken["shape"], fill: SceneToken["fill"] = "outline"): SceneToken => ({
@@ -125,26 +119,6 @@ describe("scene grammar", () => {
     expect(shapesAt("exclusive", 0, 0)).toEqual([]);
   });
 
-  it("composes bounded expressions and checks worked examples", () => {
-    const input = scene([{ row: 0, column: 0, object: token("circle") }]);
-    const expression: SceneExpression = {
-      op: "unary",
-      operation: { kind: "setFill", fill: "solid" },
-      input: {
-        op: "unary",
-        operation: { kind: "translate", rowDelta: 1, columnDelta: 1, wrap: false },
-        input: { op: "input", index: 0 },
-      },
-    };
-    const output = applySceneExpression(expression, [input]);
-    expect(output?.objects[0]).toMatchObject({
-      row: 1,
-      column: 1,
-      object: { fill: "solid" },
-    });
-    expect(sceneProgramFits(expression, [{ inputs: [input], output: output! }])).toBe(true);
-  });
-
   it("enumerates and applies visible ordered compositions", () => {
     const programs = enumerateSceneOrderedCompositions();
     expect(programs).toHaveLength(16);
@@ -154,8 +128,8 @@ describe("scene grammar", () => {
       { row: 2, column: 0, object: token("square") },
     ]);
     const program = programs[0];
-    const answer = applySceneOrderedComposition(input, program);
-    const reversed = applySceneOrderedComposition(input, { first: program.second, second: program.first });
+    const answer = applySceneComposedProgram(input, program);
+    const reversed = applySceneComposedProgram(input, { first: program.second, second: program.first });
     expect(answer).not.toBeNull();
     expect(reversed).not.toBeNull();
     expect(sceneSignature(answer!)).not.toBe(sceneSignature(reversed!));
@@ -164,19 +138,6 @@ describe("scene grammar", () => {
       at: { row: 0, column: 0 },
       fill: "half",
     })?.objects[0].object).toMatchObject({ fill: "half" });
-  });
-
-  it("enumerates and evaluates the complete bounded relation grammar", () => {
-    const adjacentMatching = scene([
-      { row: 1, column: 0, object: token("circle") },
-      { row: 1, column: 1, object: token("circle") },
-    ]);
-    expect(sceneSatisfiesRelation(adjacentMatching, { kind: "adjacent" })).toBe(true);
-    expect(sceneSatisfiesRelation(adjacentMatching, { kind: "same", attribute: "shape" })).toBe(true);
-    expect(sceneSatisfiesConcept(adjacentMatching, {
-      all: [{ kind: "adjacent" }, { kind: "same", attribute: "shape" }],
-    })).toBe(true);
-    expect(enumerateSceneConcepts()).toHaveLength(78);
   });
 
   it("uses canonical scene ordering for semantic comparisons", () => {

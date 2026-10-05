@@ -6,7 +6,7 @@ import {
   type EligibleFamily,
 } from "@/items/expanded-quiz";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
-import type { Puzzle, Visual } from "@/items/schema";
+import type { Puzzle } from "@/items/schema";
 import {
   coverageComplete,
   formatMissingCoverage,
@@ -25,8 +25,8 @@ import {
  * per key selects exactly what thirty assembled tests would, without paying for
  * nine hundred items.
  */
-function itemsForSchedules(schedules: readonly EligibleFamily[][]): Puzzle<Visual>[] {
-  const byKey = new Map<string, Puzzle<Visual>>();
+function itemsForSchedules(schedules: readonly EligibleFamily[][]): Puzzle[] {
+  const byKey = new Map<string, Puzzle>();
   return schedules.flat().map((slot) => {
     const key = `${slot.familyId}:${slot.band}:${slot.difficultyBucket}`;
     let item = byKey.get(key);

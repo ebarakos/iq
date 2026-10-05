@@ -1,14 +1,15 @@
 import { createRequire } from "node:module";
 import React, { type ReactElement } from "react";
-import type { Panel, Puzzle, PublicPuzzle, Visual } from "./schema";
+import type { Panel, Puzzle, PublicPuzzle, Scene } from "./schema";
 import { isBlank } from "./schema";
+import type { GatePieceTexture } from "./gate-pieces";
 import {
   CELL_CANVAS_PADDING,
   CELL_VIEWBOX,
-  UNSEPARATED_GATE_GLYPH_COUNT,
-  VisualGraphic,
-  gateGlyphs,
-  type Drawable,
+  JigsawPieces,
+  SceneGraphic,
+  gatePieces,
+  jigsawStripSize,
 } from "./render";
 
 /**
@@ -18,7 +19,7 @@ import {
  * Unlike `StemView` (which lays out with Tailwind-classed `<div>`s that mean
  * nothing outside the app's CSS), this renders the stem + lettered options into
  * a single standalone SVG using inline attributes only — no CSS classes carry
- * any styling. `VisualGraphic` is shared by both paths and draws with explicit
+ * any styling. `SceneGraphic` is shared by both paths and draws with explicit
  * geometry, fill, and stroke attributes, so nesting it in a positioned SVG
  * reproduces exactly what a human sees. Its `className` is left undefined; even
  * if set, class attributes are inert without a stylesheet.
@@ -34,19 +35,22 @@ const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const CELL = 110; // drawn cell side
 const GAP = 16; // gap between cells
 const PAD = 40; // outer padding
-const SEP = 36; // width reserved for ":" / "::" separators in analogy
+const SEP = 36; // width reserved for a "→" or "↓" separator
 const LABEL_H = 22; // height reserved under each option for its letter
 const SECTION_GAP = 56; // vertical gap between stem and options row
 const STROKE = "#111827"; // gray-900 — matches render.tsx
 const BORDER = "#9ca3af"; // gray-400 — cell borders / "?" glyph
+const STEP_NUMBER_FILL = "#6b7280"; // gray-500 — a sequence cell's position number
 const WIDTH = 800;
 const CELL_FRAME_STROKE = 2;
-const GATE_PAD = 10; // dashed gate frame's padding around the cells it holds
-/** Widest a stem line may be before it wraps. An image cannot scroll. */
+/** Agent-image scale of a gate's jigsaw pieces: one piece is about as wide as a cell. */
+const PIECE_SCALE = 2.3;
+/** Widest a stem line may be; a longer sequence folds into balanced lines. An image cannot scroll. */
 const CONTENT_WIDTH = WIDTH - PAD * 2;
 
 /** A bordered box that draws one cell (or a "?" for a blank) at (x, y). */
-function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Drawable | null; size?: number }) {
+function CellBox({ x, y, cell }: { x: number; y: number; cell: Scene | null }) {
+  const size = CELL;
   const innerOffset = CELL_CANVAS_PADDING;
   const innerSize = Math.max(0, size - innerOffset * 2);
   return (
@@ -62,7 +66,7 @@ function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Draw
         strokeWidth={CELL_FRAME_STROKE}
       />
       {cell ? (
-        // Nested SVG: VisualGraphic owns the shared 100x100 geometry used by the browser.
+        // Nested SVG: SceneGraphic owns the shared 100x100 geometry used by the browser.
         <svg
           x={x + innerOffset}
           y={y + innerOffset}
@@ -70,7 +74,7 @@ function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Draw
           height={innerSize}
           viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`}
         >
-          <VisualGraphic visual={cell} />
+          <SceneGraphic scene={cell} />
         </svg>
       ) : (
         <text
@@ -89,7 +93,7 @@ function CellBox({ x, y, cell, size = CELL }: { x: number; y: number; cell: Draw
   );
 }
 
-/** A separator glyph (":" or "::") centered in a SEP-wide column at (x, y). */
+/** A separator glyph ("→") centred in a SEP-wide column at (x, y). */
 function Separator({ x, y, text, height }: { x: number; y: number; text: string; height: number }) {
   return (
     <text
@@ -108,30 +112,13 @@ function Separator({ x, y, text, height }: { x: number; y: number; text: string;
 }
 
 type Piece =
-  | { kind: "cell"; cell: Drawable | null }
-  | { kind: "gate"; glyphs: Drawable[] }
+  | { kind: "cell"; cell: Scene | null }
+  | { kind: "pieces"; textures: GatePieceTexture[] }
   | { kind: "sep"; text: string };
-
-/**
- * Width of a dashed gate frame holding `count` glyph cells side by side.
- *
- * At five glyphs the "→" columns between them are dropped, exactly as the
- * browser strip drops them (see `UNSEPARATED_GATE_GLYPH_COUNT` in render.tsx):
- * five full-size cells plus four arrow columns would be 842px inside a canvas
- * that gives a stem line 720px, and no piece can be split across lines. Without
- * them the frame is 634px, the glyph cell keeps its full size, and the two
- * render paths still show the same thing.
- */
-function gateWidth(count: number): number {
-  // Cell to cell: one GAP, plus an arrow column and its second GAP while the
-  // strip still draws arrows.
-  const between = count >= UNSEPARATED_GATE_GLYPH_COUNT ? GAP : SEP + GAP * 2;
-  return count * CELL + Math.max(0, count - 1) * between + GATE_PAD * 2;
-}
 
 function pieceWidth(piece: Piece): number {
   if (piece.kind === "sep") return SEP;
-  if (piece.kind === "gate") return gateWidth(piece.glyphs.length);
+  if (piece.kind === "pieces") return jigsawStripSize(piece.textures.length, "right").width * PIECE_SCALE;
   return CELL;
 }
 
@@ -139,126 +126,94 @@ function lineWidth(pieces: Piece[]): number {
   return pieces.reduce((total, piece, index) => total + (index > 0 ? GAP : 0) + pieceWidth(piece), 0);
 }
 
-/**
- * Split a stem row into lines that fit `maxWidth`.
- *
- * An image cannot scroll, so a row wider than the canvas has to wrap or it is
- * simply cut off (an eight-panel sequence used to run 270px past the edge). A
- * row of equal cells is then re-split evenly, so eight panels read as two lines
- * of four rather than a lopsided five and three.
- */
-function wrapPieces(pieces: Piece[], maxWidth: number): Piece[][] {
-  const lines: Piece[][] = [];
-  let line: Piece[] = [];
-  for (const piece of pieces) {
-    if (line.length > 0 && lineWidth([...line, piece]) > maxWidth) {
-      lines.push(line);
-      line = [];
-    }
-    line.push(piece);
-  }
-  if (line.length > 0) lines.push(line);
-
-  // A separator belongs to what follows it: an arrow left stranded at the end of
-  // a line points at nothing, while "→ ?" opens the next line as a continuation.
-  for (let index = 0; index < lines.length - 1; index++) {
-    while (lines[index].length > 1 && lines[index][lines[index].length - 1].kind === "sep") {
-      lines[index + 1].unshift(lines[index].pop()!);
-    }
-  }
-
-  if (lines.length < 2 || !pieces.every((piece) => piece.kind === "cell")) return lines;
-  const perLine = Math.ceil(pieces.length / lines.length);
-  const even: Piece[][] = [];
-  for (let start = 0; start < pieces.length; start += perLine) {
-    even.push(pieces.slice(start, start + perLine));
-  }
-  return even;
-}
-
-/** The gate cell of a machine row: the dashed frame plus one cell per glyph. */
-function GateFrame({ x, y, glyphs, keyPrefix }: { x: number; y: number; glyphs: Drawable[]; keyPrefix: string }) {
-  const inner: ReactElement[] = [];
-  const separated = glyphs.length < UNSEPARATED_GATE_GLYPH_COUNT;
-  let cursorX = x + GATE_PAD;
-  glyphs.forEach((glyph, index) => {
-    if (index > 0 && separated) {
-      inner.push(<Separator key={`${keyPrefix}-order-${index}`} x={cursorX} y={y} text="→" height={CELL} />);
-      cursorX += SEP + GAP;
-    }
-    inner.push(<CellBox key={`${keyPrefix}-glyph-${index}`} x={cursorX} y={y} cell={glyph} />);
-    cursorX += CELL + GAP;
-  });
+/** A gate's pieces, snapped left to right and centred on the row's cells. */
+function GatePieces({ x, y, textures }: { x: number; y: number; textures: GatePieceTexture[] }) {
+  const height = jigsawStripSize(textures.length, "right").height * PIECE_SCALE;
   return (
-    <g>
-      <rect
-        x={x}
-        y={y - GATE_PAD}
-        width={gateWidth(glyphs.length)}
-        height={CELL + GATE_PAD * 2}
-        rx={18}
-        fill="#ffffff"
-        stroke={STROKE}
-        strokeWidth={3}
-        strokeDasharray="8 5"
-      />
-      {inner}
+    <g data-gate-pieces={textures.length} transform={`translate(${x} ${y + (CELL - height) / 2}) scale(${PIECE_SCALE})`}>
+      <JigsawPieces textures={textures} direction="right" />
     </g>
   );
 }
 
 /**
- * Draw one stem row, wrapping it across as many lines as it needs, and return
- * the y cursor left below it (one GAP under the last line).
+ * Draw one stem row, centred, and return the y cursor left one GAP below it.
+ * The widest row a served item draws, a machine row whose question snaps three
+ * pieces, fits the canvas with room to spare (a test holds it there).
  */
 function drawStemRow(pieces: Piece[], startY: number, keyPrefix: string, elems: ReactElement[]): number {
-  let cursorY = startY;
-  wrapPieces(pieces, CONTENT_WIDTH).forEach((line, lineIndex) => {
-    // A gate frame stands GATE_PAD proud of its cells on both sides; without the
-    // extra room the dashed frames of neighbouring machine rows would touch.
-    const pad = line.some((piece) => piece.kind === "gate") ? GATE_PAD : 0;
-    let x = (WIDTH - lineWidth(line)) / 2;
-    line.forEach((piece, pieceIndex) => {
-      const key = `${keyPrefix}-${lineIndex}-${pieceIndex}`;
-      if (piece.kind === "sep") {
-        elems.push(<Separator key={key} x={x} y={cursorY + pad} text={piece.text} height={CELL} />);
-      } else if (piece.kind === "gate") {
-        elems.push(<GateFrame key={key} x={x} y={cursorY + pad} glyphs={piece.glyphs} keyPrefix={key} />);
-      } else {
-        elems.push(<CellBox key={key} x={x} y={cursorY + pad} cell={piece.cell} />);
-      }
-      x += pieceWidth(piece) + GAP;
-    });
-    cursorY += CELL + pad * 2 + GAP;
+  let x = (WIDTH - lineWidth(pieces)) / 2;
+  pieces.forEach((piece, pieceIndex) => {
+    const key = `${keyPrefix}-${pieceIndex}`;
+    if (piece.kind === "sep") {
+      elems.push(<Separator key={key} x={x} y={startY} text={piece.text} height={CELL} />);
+    } else if (piece.kind === "pieces") {
+      elems.push(<GatePieces key={key} x={x} y={startY} textures={piece.textures} />);
+    } else {
+      elems.push(<CellBox key={key} x={x} y={startY} cell={piece.cell} />);
+    }
+    x += pieceWidth(piece) + GAP;
   });
-  return cursorY;
+  return startY + CELL + GAP;
 }
 
-function cellPiece(panel: Panel<Visual> | undefined): Piece {
+function cellPiece(panel: Panel | undefined): Piece {
   return { kind: "cell", cell: panel && !isBlank(panel) ? panel : null };
 }
 
+/** A gate panel as its jigsaw pieces; anything that is not a gate draws as a cell. */
+function gatePiece(panel: Panel | undefined): Piece {
+  const textures = panel ? gatePieces(panel) : null;
+  return textures ? { kind: "pieces", textures } : cellPiece(panel);
+}
+
+/** Height reserved above a sequence cell for its position number. */
+const STEP_NUMBER_H = 26;
+/** Most sequence cells on one line: four units of arrow column plus cell fit 720px. */
+const SEQUENCE_MAX_PER_LINE = Math.floor((CONTENT_WIDTH + GAP) / (SEP + GAP + CELL + GAP));
+
 /**
- * Build the horizontal stem strip for non-grid layouts (sequence / analogy /
- * oddOneOut).
+ * Draw a sequence row as the browser does: every cell numbered above, every
+ * cell after the first with a "→" in front, and every cell — the first too —
+ * reserving that arrow column so folded lines align. Lines are balanced, so six
+ * cells fold 3 + 3 and a folded line opens with "→". Returns the y cursor below
+ * the last line.
  */
-function stemRow(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): Piece[] {
-  if (puzzle.layout === "analogy") {
-    // A : B :: C : ?
-    const [a, b, cc] = puzzle.stem;
-    return [
-      cellPiece(a),
-      { kind: "sep", text: ":" },
-      cellPiece(b),
-      { kind: "sep", text: "::" },
-      cellPiece(cc),
-      { kind: "sep", text: ":" },
-      { kind: "cell", cell: null }, // the "?" to solve
-    ];
+function drawSequence(stem: readonly Panel[], startY: number, elems: ReactElement[]): number {
+  const lines = Math.ceil(stem.length / SEQUENCE_MAX_PER_LINE);
+  const perLine = Math.ceil(stem.length / lines);
+  const unit = SEP + GAP + CELL;
+  let cursorY = startY;
+  for (let start = 0; start < stem.length; start += perLine) {
+    const line = stem.slice(start, start + perLine);
+    let x = (WIDTH - (line.length * unit + (line.length - 1) * GAP)) / 2;
+    line.forEach((panel, offset) => {
+      const index = start + offset;
+      if (index > 0) {
+        elems.push(<Separator key={`step-arrow-${index}`} x={x} y={cursorY + STEP_NUMBER_H} text="→" height={CELL} />);
+      }
+      x += SEP + GAP;
+      elems.push(
+        <text
+          key={`step-number-${index}`}
+          x={x + CELL / 2}
+          y={cursorY + STEP_NUMBER_H / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={18}
+          fontFamily="sans-serif"
+          fontWeight="700"
+          fill={STEP_NUMBER_FILL}
+        >
+          {index + 1}
+        </text>,
+      );
+      elems.push(<CellBox key={`step-${index}`} x={x} y={cursorY + STEP_NUMBER_H} cell={panel && !isBlank(panel) ? panel : null} />);
+      x += CELL + GAP;
+    });
+    cursorY += STEP_NUMBER_H + CELL + GAP;
   }
-  // row (sequence) — N drawn cells then the trailing blank as "?".
-  // oddOneOut has an empty stem → no row pieces (options only).
-  return puzzle.stem.map((panel) => cellPiece(panel));
+  return cursorY;
 }
 
 /** Lay out `n` option boxes into rows of at most `perRow`, returning positions. */
@@ -280,7 +235,7 @@ export function PuzzleImage({
   puzzle,
   optionsOnly = false,
 }: {
-  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>;
+  puzzle: Puzzle | PublicPuzzle;
   optionsOnly?: boolean;
 }): ReactElement {
   const elems: ReactElement[] = [];
@@ -289,93 +244,16 @@ export function PuzzleImage({
   // ── Stem ──
   if (optionsOnly) {
     cursorY -= SECTION_GAP;
-  } else if (puzzle.layout === "conceptGroups") {
-    const rowWidth = SEP + GAP + CELL * 3 + GAP * 2;
-    const startX = (WIDTH - rowWidth) / 2;
-    const groups = [puzzle.stem.slice(0, 3), puzzle.stem.slice(3, 6)];
-    for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
-      let x = startX;
-      elems.push(
-        <Separator
-          key={`concept-label-${groupIndex}`}
-          x={x}
-          y={cursorY}
-          text={groupIndex === 0 ? "✓" : "×"}
-          height={CELL}
-        />,
-      );
-      x += SEP + GAP;
-      groups[groupIndex].forEach((panel, panelIndex) => {
-        elems.push(
-          <CellBox
-            key={`concept-${groupIndex}-${panelIndex}`}
-            x={x}
-            y={cursorY}
-            cell={panel && !isBlank(panel) ? panel : null}
-          />,
-        );
-        x += CELL + GAP;
-      });
-      cursorY += CELL + GAP;
-    }
-    cursorY -= GAP;
-  } else if (puzzle.layout === "operatorTable") {
-    const mini = 54;
-    if (puzzle.operatorLegend) {
-      const legendWidth = puzzle.operatorLegend.shapeCycle.length * mini +
-        (puzzle.operatorLegend.shapeCycle.length - 1) * SEP;
-      let legendX = (WIDTH - legendWidth) / 2;
-      for (let i = 0; i < puzzle.operatorLegend.shapeCycle.length; i++) {
-        if (i > 0) {
-          elems.push(<Separator key={`legend-arrow-${i}`} x={legendX} y={cursorY} text="→" height={mini} />);
-          legendX += SEP;
-        }
-        const shape = puzzle.operatorLegend.shapeCycle[i];
-        elems.push(
-          <CellBox
-            key={`legend-${shape}`}
-            x={legendX}
-            y={cursorY}
-            size={mini}
-            cell={{ shape, count: 1, rotation: 0, fill: "outline", size: "l" }}
-          />,
-        );
-        legendX += mini;
-      }
-      cursorY += mini + GAP;
-    }
-
-    const rowWidth = CELL * 3 + SEP * 2 + GAP * 4;
-    const startX = (WIDTH - rowWidth) / 2;
-    const rows = puzzle.stem.length / 3;
-    for (let row = 0; row < rows; row++) {
-      const [left, right, output] = puzzle.stem.slice(row * 3, row * 3 + 3);
-      let x = startX;
-      elems.push(<CellBox key={`op-${row}-left`} x={x} y={cursorY} cell={left && !isBlank(left) ? left : null} />);
-      x += CELL + GAP;
-      elems.push(<Separator key={`op-${row}-combine`} x={x} y={cursorY} text="◆" height={CELL} />);
-      x += SEP + GAP;
-      elems.push(<CellBox key={`op-${row}-right`} x={x} y={cursorY} cell={right && !isBlank(right) ? right : null} />);
-      x += CELL + GAP;
-      elems.push(<Separator key={`op-${row}-arrow`} x={x} y={cursorY} text="→" height={CELL} />);
-      x += SEP + GAP;
-      elems.push(<CellBox key={`op-${row}-output`} x={x} y={cursorY} cell={output && !isBlank(output) ? output : null} />);
-      cursorY += CELL + GAP;
-    }
-    cursorY -= GAP;
   } else if (puzzle.layout === "machineTable") {
     const rows = puzzle.stem.length / 3;
     for (let row = 0; row < rows; row++) {
       const [input, gate, output] = puzzle.stem.slice(row * 3, row * 3 + 3);
-      // A query gate holds two to five glyphs. Each one gets the cell a worked
-      // row gives its single gate, so the row is wider than the canvas and
-      // wraps, leaving the whole strip on one line of its own.
-      const glyphs = gate ? gateGlyphs(gate) : [];
+      // A query gate snaps two or three pieces together.
       cursorY = drawStemRow(
         [
           cellPiece(input),
           { kind: "sep", text: "→" },
-          glyphs.length > 0 ? { kind: "gate", glyphs } : cellPiece(gate),
+          gatePiece(gate),
           { kind: "sep", text: "→" },
           cellPiece(output),
         ],
@@ -385,45 +263,36 @@ export function PuzzleImage({
       );
     }
     cursorY -= GAP;
-  } else if (puzzle.layout === "combineTable") {
-    // (left, gate, right, output). The gate sits BETWEEN the two operands
-    // because it combines them; a machine row's gate sits before one board
-    // because it transforms it.
-    const rows = puzzle.stem.length / 4;
-    for (let row = 0; row < rows; row++) {
-      const [left, gate, right, output] = puzzle.stem.slice(row * 4, row * 4 + 4);
-      const glyphs = gate ? gateGlyphs(gate) : [];
-      cursorY = drawStemRow(
-        [
-          cellPiece(left),
-          glyphs.length > 0 ? { kind: "gate", glyphs } : cellPiece(gate),
-          cellPiece(right),
-          { kind: "sep", text: "→" },
-          cellPiece(output),
-        ],
-        cursorY,
-        `combine-${row}`,
-        elems,
-      );
-    }
-    cursorY -= GAP;
   } else if (puzzle.layout === "grid3x3") {
-    const gridW = CELL * 3 + GAP * 2;
+    // As in the browser: a "→" column before the third board of every row
+    // only when the rule runs across the rows alone. A grid that reads both
+    // ways draws no arrows.
+    const oneWay = puzzle.gridFlow === "rows";
+    const arrowColumn = oneWay ? SEP + GAP : 0;
+    const gridW = CELL * 3 + GAP * 2 + arrowColumn;
     const startX = (WIDTH - gridW) / 2;
+    const columnX = (col: number) => startX + col * (CELL + GAP) + (col === 2 ? arrowColumn : 0);
+    const rowY = (row: number) => cursorY + row * (CELL + GAP);
     for (let i = 0; i < 9; i++) {
       const panel = puzzle.stem[i];
       const row = Math.floor(i / 3);
       const col = i % 3;
-      const x = startX + col * (CELL + GAP);
-      const y = cursorY + row * (CELL + GAP);
-      elems.push(<CellBox key={`stem-${i}`} x={x} y={y} cell={panel && !isBlank(panel) ? panel : null} />);
+      elems.push(<CellBox key={`stem-${i}`} x={columnX(col)} y={rowY(row)} cell={panel && !isBlank(panel) ? panel : null} />);
     }
-    cursorY += CELL * 3 + GAP * 2;
+    if (oneWay) {
+      for (let row = 0; row < 3; row++) {
+        elems.push(<Separator key={`grid-arrow-${row}`} x={columnX(1) + CELL + GAP} y={rowY(row)} text="→" height={CELL} />);
+      }
+    }
+    cursorY = rowY(2) + CELL;
+  } else if (puzzle.layout === "analogy") {
+    // Two aligned rows, as in the browser: "A → B" over "C → ?".
+    const [a, b, c] = puzzle.stem;
+    cursorY = drawStemRow([cellPiece(a), { kind: "sep", text: "→" }, cellPiece(b)], cursorY, "analogy-0", elems);
+    cursorY = drawStemRow([cellPiece(c), { kind: "sep", text: "→" }, { kind: "cell", cell: null }], cursorY, "analogy-1", elems) - GAP;
   } else {
-    const pieces = stemRow(puzzle);
-    if (pieces.length > 0) {
-      cursorY = drawStemRow(pieces, cursorY, "stem", elems) - GAP;
-    }
+    // row (sequence): N drawn cells then the trailing blank as "?".
+    cursorY = drawSequence(puzzle.stem, cursorY, elems) - GAP;
   }
 
   cursorY += SECTION_GAP;
@@ -481,7 +350,7 @@ export function PuzzleImage({
  * so it is a valid standalone document for resvg.
  */
 export function puzzleToSvg(
-  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>,
+  puzzle: Puzzle | PublicPuzzle,
   options: { optionsOnly?: boolean } = {},
 ): string {
   // Synchronous, server-only resolution via createRequire so this module never

@@ -49,6 +49,42 @@ export type EvaluationSet = z.infer<typeof EvaluationSetSchema>;
 
 export const EVALUATION_SETS: readonly EvaluationSet[] = EvaluationSetSchema.options;
 
+/**
+ * The model's own report on one item, asked AFTER its scored answer in two
+ * follow-up turns of the same conversation (`--debrief`, owner's request of
+ * 2026-10-04). It never changes the score. The first turn asks for confidence,
+ * the rule it used, how hard the item was and anything hard to see, before the
+ * intended answer is shown; the second shows the intended answer and asks
+ * whether another option could be defended as well. Letters are the ones on
+ * the image the model saw (options are shuffled per attempt); `otherOption` is
+ * also mapped back to its canonical index. A field the model left out or got
+ * the wrong type for is null, and its raw reply is kept.
+ */
+export const DebriefSchema = z.object({
+  promptVersion: z.string().min(1),
+  /** Letter of the intended answer on the shuffled image. */
+  intendedLetter: z.string().length(1),
+  /** Letter the model answered with, or null when its reply had none. */
+  answeredLetter: z.string().length(1).nullable(),
+  before: z.object({
+    confidence: z.number().min(0).max(100).nullable(),
+    rule: z.string().nullable(),
+    difficulty: z.number().int().min(1).max(5).nullable(),
+    hardToSee: z.string().nullable(),
+  }).nullable(),
+  after: z.object({
+    onlyDefensible: z.boolean().nullable(),
+    otherOption: z.string().length(1).nullable(),
+    otherOptionIndex: z.number().int().min(0).nullable(),
+    otherRule: z.string().nullable(),
+    whatMisled: z.string().nullable(),
+    unclear: z.string().nullable(),
+  }).nullable(),
+  raw: z.object({ before: z.string().max(2000).optional(), after: z.string().max(2000).optional() }),
+  error: z.string().max(2000).optional(),
+});
+export type Debrief = z.infer<typeof DebriefSchema>;
+
 export const AttemptSchema = z.object({
   itemId: z.string().min(1),
   /** Canonical option index the model chose; null = reply was unparseable (counted incorrect). */
@@ -79,6 +115,8 @@ export const AttemptSchema = z.object({
    * the corpus into a transcript archive.
    */
   raw: z.string().max(2000).optional(),
+  /** The model's own report on the item, when the run asked for one. */
+  debrief: DebriefSchema.optional(),
   ts: z.string(), // ISO 8601
 }).superRefine((attempt, ctx) => {
   if (attempt.outcome === undefined) return;

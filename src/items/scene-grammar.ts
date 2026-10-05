@@ -1,7 +1,6 @@
 import { isSceneShapeOrientable } from "./domains";
 import {
   SceneSchema,
-  sceneSignature,
   type Scene,
   type SceneObject,
   type ScenePlacement,
@@ -75,6 +74,24 @@ export type SceneBinaryOperation =
   | "mask-out"
   /** Positions exactly one board occupies. */
   | "exclusive";
+
+/**
+ * The eight ways two boards combine. See `SceneBinaryOperation` for why this
+ * doubled on 2026-08-27; the short version is that the old four could not say
+ * what happens when the boards hold different tokens at one position, so the
+ * generator threw away every input pair that disagreed and the survivors looked
+ * like toys. The order is part of every seeded draw that picks from it.
+ */
+export const SCENE_BINARY_OPERATIONS = [
+  "union-left",
+  "union-right",
+  "intersection",
+  "overlap-left",
+  "overlap-right",
+  "subtract",
+  "mask-out",
+  "exclusive",
+] as const satisfies readonly SceneBinaryOperation[];
 
 export type SceneCompositionPrimitive =
   | {
@@ -192,36 +209,12 @@ export function enumerateSceneUnaryOperations(rows: number, columns: number): Sc
   return operations;
 }
 
-export type SceneExpression =
-  | { op: "input"; index: 0 | 1 }
-  | { op: "unary"; operation: SceneUnaryOperation; input: SceneExpression }
-  | {
-      op: "binary";
-      operation: SceneBinaryOperation;
-      left: SceneExpression;
-      right: SceneExpression;
-    };
-
-export type SceneRelation =
-  | { kind: "contains" }
-  | { kind: "adjacent" }
-  | { kind: "same"; attribute: "shape" | "fill" | "size" }
-  | { kind: "different"; attribute: "shape" | "fill" | "size" }
-  | { kind: "count"; comparison: "equal" | "ascendingRows" }
-  | { kind: "symmetry"; axis: "horizontal" | "vertical" };
-
-export type SceneConcept = { all: [SceneRelation] | [SceneRelation, SceneRelation] };
-
 function positionKey(position: ScenePosition): string {
   return `${position.row}:${position.column}`;
 }
 
 function objectKey(object: SceneObject): string {
   return JSON.stringify(object);
-}
-
-function placementKey(placement: ScenePlacement): string {
-  return `${positionKey(placement)}:${objectKey(placement.object)}`;
 }
 
 function normalize(scene: Scene): Scene | null {
@@ -399,15 +392,6 @@ export function applySceneCompositionPrimitive(
   return normalize({ ...input, objects });
 }
 
-/** Apply a two-step program in its declared left-to-right order. */
-export function applySceneOrderedComposition(
-  input: Scene,
-  program: SceneOrderedComposition,
-): Scene | null {
-  const afterFirst = applySceneCompositionPrimitive(input, program.first);
-  return afterFirst ? applySceneCompositionPrimitive(afterFirst, program.second) : null;
-}
-
 /**
  * The shared primitive pool every composed scene family draws from.
  *
@@ -517,15 +501,6 @@ export function enumerateSceneOrderedThreeStepCompositions(): SceneOrderedThreeS
     .map((steps) => ({ first: steps[0], second: steps[1], third: steps[2] }));
 }
 
-export function applySceneOrderedThreeStepComposition(
-  input: Scene,
-  program: SceneOrderedThreeStepComposition,
-): Scene | null {
-  const afterFirst = applySceneCompositionPrimitive(input, program.first);
-  const afterSecond = afterFirst ? applySceneCompositionPrimitive(afterFirst, program.second) : null;
-  return afterSecond ? applySceneCompositionPrimitive(afterSecond, program.third) : null;
-}
-
 /** Run a composed program of either length, left to right. */
 export function applySceneComposedProgram(input: Scene, program: SceneComposedProgram): Scene | null {
   let value: Scene | null = input;
@@ -533,14 +508,6 @@ export function applySceneComposedProgram(input: Scene, program: SceneComposedPr
     value = value && applySceneCompositionPrimitive(value, step);
   }
   return value;
-}
-
-export function sceneOrderedCompositionKey(program: SceneOrderedComposition): string {
-  return JSON.stringify(program);
-}
-
-export function sceneOrderedThreeStepCompositionKey(program: SceneOrderedThreeStepComposition): string {
-  return JSON.stringify(program);
 }
 
 /** Stable key for a composed program of either length. */
@@ -578,108 +545,4 @@ export function applySceneBinary(
   }
   if (objects.length === 0) return null;
   return normalize({ kind: "scene", rows: left.rows, columns: left.columns, objects, tiles: [] });
-}
-
-export function sceneExpressionDepth(expression: SceneExpression): number {
-  if (expression.op === "input") return 0;
-  if (expression.op === "unary") return 1 + sceneExpressionDepth(expression.input);
-  return 1 + Math.max(sceneExpressionDepth(expression.left), sceneExpressionDepth(expression.right));
-}
-
-export function applySceneExpression(expression: SceneExpression, inputs: readonly Scene[]): Scene | null {
-  if (sceneExpressionDepth(expression) > 3) return null;
-  if (expression.op === "input") return inputs[expression.index] ?? null;
-  if (expression.op === "unary") {
-    const input = applySceneExpression(expression.input, inputs);
-    return input ? applySceneUnary(input, expression.operation) : null;
-  }
-  const left = applySceneExpression(expression.left, inputs);
-  const right = applySceneExpression(expression.right, inputs);
-  return left && right ? applySceneBinary(left, right, expression.operation) : null;
-}
-
-function topLevelTokens(scene: Scene): ScenePlacement[] {
-  return scene.objects.filter((placement) => placement.object.kind === "token");
-}
-
-/** Evaluate one bounded, human-nameable relation over a scene. */
-export function sceneSatisfiesRelation(scene: Scene, relation: SceneRelation): boolean {
-  if (relation.kind === "contains") {
-    return scene.objects.some((placement) => placement.object.kind === "container");
-  }
-  if (relation.kind === "symmetry") {
-    const reflected = applySceneUnary(scene, { kind: "reflect", axis: relation.axis });
-    return reflected !== null && sceneSignature(reflected) === sceneSignature(scene);
-  }
-  const tokens = topLevelTokens(scene);
-  if (relation.kind === "adjacent") {
-    return tokens.some((first, index) => tokens.slice(index + 1).some((second) =>
-      Math.abs(first.row - second.row) + Math.abs(first.column - second.column) === 1,
-    ));
-  }
-  if (relation.kind === "count") {
-    const counts = Array.from({ length: scene.rows }, (_, row) => tokens.filter((token) => token.row === row).length);
-    return relation.comparison === "equal"
-      ? counts.every((count) => count === counts[0])
-      : counts.every((count, index) => index === 0 || count > counts[index - 1]);
-  }
-  if (tokens.length < 2) return false;
-  const values = tokens.map((placement) => placement.object.kind === "token" && placement.object[relation.attribute]);
-  return relation.kind === "same"
-    ? values.every((value) => value === values[0])
-    : new Set(values).size === values.length;
-}
-
-export function sceneSatisfiesConcept(scene: Scene, concept: SceneConcept): boolean {
-  return concept.all.every((relation) => sceneSatisfiesRelation(scene, relation));
-}
-
-export const SCENE_RELATION_GRAMMAR: readonly SceneRelation[] = [
-  { kind: "contains" },
-  { kind: "adjacent" },
-  { kind: "same", attribute: "shape" },
-  { kind: "same", attribute: "fill" },
-  { kind: "same", attribute: "size" },
-  { kind: "different", attribute: "shape" },
-  { kind: "different", attribute: "fill" },
-  { kind: "different", attribute: "size" },
-  { kind: "count", comparison: "equal" },
-  { kind: "count", comparison: "ascendingRows" },
-  { kind: "symmetry", axis: "horizontal" },
-  { kind: "symmetry", axis: "vertical" },
-] as const;
-
-/** Complete bounded concept grammar: one relation or a conjunction of two. */
-export function enumerateSceneConcepts(): SceneConcept[] {
-  const concepts: SceneConcept[] = SCENE_RELATION_GRAMMAR.map((relation) => ({ all: [relation] }));
-  for (let left = 0; left < SCENE_RELATION_GRAMMAR.length; left++) {
-    for (let right = left + 1; right < SCENE_RELATION_GRAMMAR.length; right++) {
-      concepts.push({ all: [SCENE_RELATION_GRAMMAR[left], SCENE_RELATION_GRAMMAR[right]] });
-    }
-  }
-  return concepts;
-}
-
-/** Programs are equivalent on evidence only when every visible output matches. */
-export function sceneProgramFits(
-  expression: SceneExpression,
-  examples: readonly { inputs: readonly Scene[]; output: Scene }[],
-): boolean {
-  return examples.every((example) => {
-    const output = applySceneExpression(expression, example.inputs);
-    return output !== null && sceneSignature(output) === sceneSignature(example.output);
-  });
-}
-
-/** Stable key used for fingerprints, deduplication, and diagnostics. */
-export function sceneExpressionKey(expression: SceneExpression): string {
-  if (expression.op === "input") return `input:${expression.index}`;
-  if (expression.op === "unary") {
-    return `unary:${JSON.stringify(expression.operation)}(${sceneExpressionKey(expression.input)})`;
-  }
-  return `${expression.operation}(${sceneExpressionKey(expression.left)},${sceneExpressionKey(expression.right)})`;
-}
-
-export function scenePlacementSignature(placement: ScenePlacement): string {
-  return placementKey(placement);
 }

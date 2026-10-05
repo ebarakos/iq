@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StemView, VisualGraphic, describeVisual } from "@/items/render";
+import { SceneGraphic, StemView, describeScene } from "@/items/render";
 import type {
   PrototypePilotItemAggregate,
   PrototypePilotPacket,
@@ -409,7 +409,7 @@ export function PrototypePilot({
               type="button"
               disabled={grade !== null || grading || itemState !== "ready"}
               onClick={() => setSelected(optionIndex)}
-              aria-label={`Option ${LETTERS[optionIndex]}: ${describeVisual(option)}${
+              aria-label={`Option ${LETTERS[optionIndex]}: ${describeScene(option)}${
                 grade === null
                   ? ""
                   : grade.answerIndex === optionIndex
@@ -442,7 +442,7 @@ export function PrototypePilot({
                   <span className="ml-1 font-normal text-red-700">your choice</span>
                 )}
               </span>
-              <VisualGraphic visual={option} className="mx-auto mt-2 h-20 w-20" />
+              <SceneGraphic scene={option} className="mx-auto mt-2 h-20 w-20" />
             </button>
           ))}
         </div>

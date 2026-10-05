@@ -1,14 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   acceptFamilyCandidate,
-  defineFamilyRegistry,
   type FamilyDefinition,
   type ValidationReport,
 } from "./family";
-import { isCell, type Cell, type Puzzle, type Visual } from "./schema";
+import type { Puzzle, Scene, SceneToken } from "./schema";
 
-function cell(count: number, fill: Cell["fill"] = "solid"): Cell {
-  return { shape: "square", count, rotation: 0, fill, size: "s" };
+/** A 2×2 board holding one large circle. */
+function board(row: number, column: number, fill: SceneToken["fill"] = "solid"): Scene {
+  return {
+    kind: "scene",
+    rows: 2,
+    columns: 2,
+    objects: [{ row, column, object: { kind: "token", shape: "circle", rotation: 0, fill, size: "l" } }],
+    tiles: [],
+  };
 }
 
 const puzzle: Puzzle = {
@@ -17,33 +23,32 @@ const puzzle: Puzzle = {
   instruction: "Choose the next panel.",
   difficulty: 1,
   layout: "row",
-  stem: [cell(1), cell(2), cell(3), { blank: true }],
-  options: [cell(4), cell(1, "outline"), cell(2, "half"), cell(3, "outline")],
+  stem: [board(0, 0), board(0, 1), board(1, 1), { blank: true }],
+  options: [board(1, 0), board(0, 0, "outline"), board(0, 1, "half"), board(1, 1, "outline")],
   answerIndex: 0,
-  explanation: "The count increases by one.",
+  explanation: "The circle walks round the board.",
 };
 
-function report(overrides: Partial<ValidationReport<Cell, string>> = {}): ValidationReport<Cell, string> {
+function report(overrides: Partial<ValidationReport> = {}): ValidationReport {
   return {
     derivedAnswer: puzzle.options[0],
     solutionCount: 1,
-    usedCueIds: ["count-step"],
+    usedCueIds: ["walk-step"],
     distractorWitnesses: [
-      { optionIndex: 1, witness: "count restarted" },
+      { optionIndex: 1, witness: "walk restarted" },
       { optionIndex: 2, witness: "fill changed" },
-      { optionIndex: 3, witness: "count did not advance" },
+      { optionIndex: 3, witness: "circle did not move" },
     ],
     ...overrides,
   };
 }
 
 function family(
-  validate: FamilyDefinition<Cell, string>["validate"] = () => report(),
-): FamilyDefinition<Cell, string> {
+  validate: FamilyDefinition["validate"] = () => report(),
+): FamilyDefinition {
   return {
     familyId: "sequence-test-v1",
-    isVisual: isCell,
-    visibleCueIds: () => ["count-step"],
+    visibleCueIds: () => ["walk-step"],
     validate,
     replayKey: (candidate) => JSON.stringify(candidate),
   };
@@ -84,15 +89,15 @@ describe("acceptFamilyCandidate", () => {
   it("rejects unused or undeclared cues and incomplete distractor evidence", () => {
     const definition = {
       ...family(),
-      visibleCueIds: () => ["count-step", "decorative-arrow"],
+      visibleCueIds: () => ["walk-step", "decorative-arrow"],
       validate: () => report({
-        usedCueIds: ["count-step", "hidden-cue"],
+        usedCueIds: ["walk-step", "hidden-cue"],
         distractorWitnesses: [
-          { optionIndex: 1, witness: "count restarted" },
-          { optionIndex: 3, witness: "count did not advance" },
+          { optionIndex: 1, witness: "walk restarted" },
+          { optionIndex: 3, witness: "circle did not move" },
         ],
       }),
-    } satisfies FamilyDefinition<Cell, string>;
+    } satisfies FamilyDefinition;
 
     const result = acceptFamilyCandidate(definition, puzzle);
     expect(result.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining([
@@ -126,32 +131,5 @@ describe("acceptFamilyCandidate", () => {
     delete noReplay.replayKey;
     expect(acceptFamilyCandidate(noReplay, puzzle, { expectedReplayKey: "key" }).issues)
       .toContainEqual(expect.objectContaining({ code: "replay-key" }));
-  });
-});
-
-describe("defineFamilyRegistry", () => {
-  it("indexes family definitions and rejects duplicate ids", () => {
-    const definition = family();
-    const registry = defineFamilyRegistry([definition]);
-    expect(registry.get(definition.familyId)).toBe(definition);
-    expect(() => defineFamilyRegistry([definition, definition])).toThrow("duplicate familyId");
-  });
-
-  it("supports a visual-wide registry contract", () => {
-    const definition: FamilyDefinition<Visual, string> = {
-      familyId: "visual-wide-v1",
-      isVisual: (visual): visual is Visual => isCell(visual),
-      visibleCueIds: () => [],
-      validate: (candidate) => ({
-        derivedAnswer: candidate.options[0],
-        solutionCount: 1,
-        usedCueIds: [],
-        distractorWitnesses: candidate.options.slice(1).map((_, index) => ({
-          optionIndex: index + 1,
-          witness: "fails",
-        })),
-      }),
-    };
-    expect(defineFamilyRegistry([definition]).has("visual-wide-v1")).toBe(true);
   });
 });

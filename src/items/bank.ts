@@ -4,13 +4,10 @@ import bankFile from "../../data/bank/items.json";
 import {
   PuzzleSchema,
   isBlank,
-  isScene,
   sceneSignature,
-  visualSignature,
   type Puzzle,
   type PuzzleSet,
   type PuzzleType,
-  type Visual,
 } from "./schema";
 import {
   eligibleFamiliesForBand,
@@ -33,8 +30,8 @@ import { seededRng, shuffled, type Seed } from "../lib/rng";
  * corpus. Loaded via a static JSON import so it works identically on Vercel
  * serverless with zero fs/tracing config. Items are stored in canonical
  * (unshuffled) option order for stable diffs and shuffled at serve time. Bank
- * invariants are enforced by `scripts/bank-verify.ts`: expanded items replay
- * through their current generator and legacy items pass `checkRule`.
+ * invariants are enforced by `scripts/bank-verify.ts`: every item replays
+ * through its current generator.
  */
 
 export const BankItemSchema = z.object({
@@ -43,15 +40,13 @@ export const BankItemSchema = z.object({
   /** Content-addressed identity (see fingerprintPuzzle) — dedup + stable ids. */
   fingerprint: z.string().min(1),
   provenance: z.object({
-    source: z.enum(["procedural", "model", "handAuthored", "expanded"]),
-    provider: z.string().optional(), // when source = "model"
-    model: z.string().optional(),
-    seed: z.union([z.number(), z.string()]).optional(),
+    source: z.literal("expanded"),
+    seed: z.string().optional(),
     profile: z.enum(["short-5", "long-30"]).optional(),
     generatorVersion: z.string().optional(),
     /**
-     * Normalized withdrawal list this item was generated under (source
-     * "expanded"). The withdrawal list is an input to the assembler, so replay
+     * Normalized withdrawal list this item was generated under. The
+     * withdrawal list is an input to the assembler, so replay
      * must use the stored value: verifying against the runtime list makes every
      * expanded item fail the moment an operator withdraws any family.
      */
@@ -83,16 +78,11 @@ export type BankFile = z.infer<typeof BankFileSchema>;
  * order ("·" for blanks), SORTED option signatures (shuffle-invariant), and the
  * answer's signature (same stem + different correct answer = different item).
  */
-export function fingerprintPuzzle(p: Puzzle<Visual>): string {
-  const signature = (visual: Visual) => isScene(visual) ? sceneSignature(visual) : visualSignature(visual);
-  const stemSigs = p.stem.map((panel) => (isBlank(panel) ? "·" : signature(panel)));
-  const optionSigs = p.options.map(signature).sort();
-  const answerSig = signature(p.options[p.answerIndex]);
-  const base = [p.type, p.layout, stemSigs.join(","), optionSigs.join(","), answerSig];
-  // Preserve every legacy bank fingerprint byte-for-byte; only the new family
-  // appends its visible nominal ordering.
-  if (p.operatorLegend) base.push(p.operatorLegend.shapeCycle.join(">"));
-  const canonical = base.join("|");
+export function fingerprintPuzzle(p: Puzzle): string {
+  const stemSigs = p.stem.map((panel) => (isBlank(panel) ? "·" : sceneSignature(panel)));
+  const optionSigs = p.options.map(sceneSignature).sort();
+  const answerSig = sceneSignature(p.options[p.answerIndex]);
+  const canonical = [p.type, p.layout, stemSigs.join(","), optionSigs.join(","), answerSig].join("|");
   return createHash("sha256").update(canonical).digest("hex").slice(0, 10);
 }
 
@@ -100,12 +90,10 @@ const ID_PREFIX: Record<PuzzleType, string> = {
   matrix: "mx",
   sequence: "sq",
   analogy: "an",
-  oddOneOut: "oo",
-  operatorInduction: "op",
 };
 
 /** The bank id a puzzle should carry: `<typePrefix>-<fingerprint>`. */
-export function bankIdFor(p: Puzzle<Visual>): string {
+export function bankIdFor(p: Puzzle): string {
   return `${ID_PREFIX[p.type]}-${fingerprintPuzzle(p)}`;
 }
 
@@ -150,7 +138,7 @@ export function expandedBankKey(
 }
 
 /** The key a banked puzzle covers, or null when it is not a current expanded item. */
-export function expandedBankKeyOf(puzzle: Puzzle<Visual>): string | null {
+export function expandedBankKeyOf(puzzle: Puzzle): string | null {
   const generation = puzzle.generation;
   if (!generation || generation.generatorVersion !== EXPANDED_GENERATOR_VERSION) return null;
   if (!puzzle.band) return null;
@@ -193,7 +181,6 @@ export function expandedBankCoverage(
     .map((key) => [key, 0]));
   const strays: string[] = [];
   for (const item of items) {
-    if (item.provenance.source !== "expanded") continue;
     const key = expandedBankKeyOf(item.puzzle);
     if (key === null || !countsByKey.has(key)) {
       strays.push(`${item.puzzle.id} (${key ?? "no current-version key"})`);
@@ -207,7 +194,7 @@ export function expandedBankCoverage(
   return { countsByKey, short, strays };
 }
 
-function shuffleOptionsWithSeed<V extends Visual>(puzzle: Puzzle<V>, seed: Seed, slot: number): Puzzle<V> {
+function shuffleOptionsWithSeed(puzzle: Puzzle, seed: Seed, slot: number): Puzzle {
   const order = shuffled(
     seededRng(seed, `expanded-bank-options:${slot}:${puzzle.id}`),
     puzzle.options.map((_, index) => index),
@@ -223,8 +210,7 @@ function shuffleOptionsWithSeed<V extends Visual>(puzzle: Puzzle<V>, seed: Seed,
  * Build an emergency quiz from expanded-family bank entries.
  *
  * The live assembler owns the schedule, so fallback keeps the same band counts,
- * family draws, repeat caps, and easiest-first ordering instead of silently
- * falling back to the legacy type-based ramp.
+ * family draws, repeat caps, and easiest-first ordering.
  */
 export function sampleExpandedBankQuiz(
   items: BankItem[] = loadBank(),
@@ -235,7 +221,6 @@ export function sampleExpandedBankQuiz(
 ): SampledQuiz {
   const schedule = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds);
   const usable = items.filter((item) =>
-    item.provenance.source === "expanded" &&
     item.provenance.generatorVersion === EXPANDED_GENERATOR_VERSION &&
     item.puzzle.generation?.generatorVersion === EXPANDED_GENERATOR_VERSION &&
     item.puzzle.familyId !== undefined &&
@@ -292,7 +277,7 @@ export function sampleExpandedBankQuiz(
   });
 
   return {
-    puzzles: chosen.map((entry, index) => shuffleOptionsWithSeed(entry.puzzle, seed, index)) as PuzzleSet,
+    puzzles: chosen.map((entry, index) => shuffleOptionsWithSeed(entry.puzzle, seed, index)),
     items: chosen.map((entry) => entry.item),
   };
 }

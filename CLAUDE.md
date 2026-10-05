@@ -38,6 +38,9 @@ env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` ru
 
 ## Hard rules
 
+- **Explanations are for the taker:** an item's `explanation` (the review screen) says what to look at
+  and how to reach the answer, in the picture's words. Never how the item was made — no distractors,
+  near misses, grammars, programs, worked rows, tokens. A test in `scene-families.test.ts` enforces it.
 - **Visual-only ("visibility only"):** Items are intended to be purely visual /
   language-independent — no text comprehension, no culture-specific knowledge —
   so the test is fair across humans and vision-capable agents.

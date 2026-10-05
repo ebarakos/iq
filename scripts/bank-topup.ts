@@ -20,7 +20,7 @@
  * source the bank ever needed, and this script no longer makes a model call.
  *
  * Every banked item is re-id'd to its content-addressed id, deduped by
- * fingerprint, schema-validated, and rule-checked before the file is written.
+ * fingerprint, and schema-validated before the file is written.
  * (The 12 hand-authored MVP items were migrated in on 2026-06-10; the retired
  * fallback.ts is gone — the bank itself is the resilience path now.)
  */
@@ -48,7 +48,7 @@ import {
   normalizeWithdrawnFamilyIds,
   readWithdrawnFamilyIds,
 } from "../src/items/family-promotion";
-import type { Puzzle, Visual } from "../src/items/schema";
+import type { Puzzle } from "../src/items/schema";
 
 const BANK_PATH = new URL("../data/bank/items.json", import.meta.url).pathname;
 
@@ -69,7 +69,7 @@ function loadFile(): { version: 1; items: BankItem[] } {
 }
 
 /** Re-id to the content-addressed id, validate, and wrap as a BankItem. */
-function toBankItem(puzzle: Puzzle<Visual>, provenance: BankItem["provenance"]): BankItem {
+function toBankItem(puzzle: Puzzle, provenance: BankItem["provenance"]): BankItem {
   const canonical = { ...puzzle, id: bankIdFor(puzzle) };
   if (
     canonical.generation?.generatorVersion !== EXPANDED_GENERATOR_VERSION ||

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PublicPuzzle, Visual } from "@/items/schema";
-import { StemView, VisualGraphic, describeVisual } from "@/items/render";
+import type { Layout, PublicPuzzle } from "@/items/schema";
+import { SceneGraphic, StemView, describeScene } from "@/items/render";
 import {
   countUnansweredAnswers,
   needsBlankSubmissionConfirmation,
@@ -22,7 +22,7 @@ const PROFILE_LABELS: Record<TestProfile, string> = {
 };
 
 interface GenerateResponse {
-  puzzles: PublicPuzzle<Visual>[];
+  puzzles: PublicPuzzle[];
   quizToken: string;
   profile?: TestProfile;
   /** Server-issued end of the test, in epoch seconds. The browser only displays it. */
@@ -69,6 +69,31 @@ const QUESTION_TOP_GAP_PX = 12;
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
+
+/**
+ * How to read each kind of question, shown above the diagram on the
+ * 5-question sample only. Chosen by layout, which the picture already shows,
+ * so a note names what to compare and never what the change is. The sample is
+ * practice; the 30-question test stays without instructions while solving
+ * (docs/plans/unambiguous-reading.md).
+ */
+const SAMPLE_GUIDES: Partial<Record<Layout, string>> = {
+  row:
+    "Read the pictures in number order. Follow each shape on its own from one picture to the " +
+    "next: where it sits and what fill it has. The missing picture is the next step of the same pattern.",
+  analogy:
+    "The top row shows a change: the left board becomes the right board. Compare the two square by " +
+    "square, looking at positions, fills, shapes and which way arrows point. Then make exactly the same " +
+    "change to the board in the bottom row.",
+  grid3x3:
+    "The first two boards of a line make the third. When arrows are shown, only the rows work that " +
+    "way; with no arrows, look across the rows and down the columns. Compare the boards square by " +
+    "square: which squares hold a shape, and which shape.",
+  machineTable:
+    "Each jigsaw piece is a machine that changes a board. The rows above show each piece on its own. " +
+    "The last row snaps several pieces together; the board goes through them one after another, the " +
+    "way their tabs point. Watch positions, fills, shapes and which way arrows point.",
+};
 
 /**
  * Plain POST helper, replacing the llm-relay widget's `apiFetch`. This app
@@ -137,11 +162,11 @@ type TestMeta = {
   notice?: string;
 };
 
-type SavedSession = StoredSession<PublicPuzzle<Visual>, SubmitResponse, Partial<TestMeta>>;
+type SavedSession = StoredSession<PublicPuzzle, SubmitResponse, Partial<TestMeta>>;
 
 export default function Page() {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [puzzles, setPuzzles] = useState<PublicPuzzle<Visual>[]>([]);
+  const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [quizToken, setQuizToken] = useState("");
   const [review, setReview] = useState<SubmitResponse | null>(null);
@@ -198,7 +223,7 @@ export default function Page() {
   // Restore in-progress session on mount (client-only; avoids hydration mismatch).
   useEffect(() => {
     try {
-      const restored = parseStoredSession<PublicPuzzle<Visual>, SubmitResponse, Partial<TestMeta>>(
+      const restored = parseStoredSession<PublicPuzzle, SubmitResponse, Partial<TestMeta>>(
         sessionStorage.getItem(SESSION_KEY),
       );
       if (!restored) return;
@@ -355,8 +380,10 @@ export default function Page() {
     if (!isRetry) {
       const unanswered = countUnansweredAnswers(answers);
       if (needsBlankSubmissionConfirmation(answers, automatic)) {
-        const questionLabel = unanswered === 1 ? "question" : "questions";
-        if (!window.confirm(`You have ${unanswered} unanswered ${questionLabel}. Submit anyway?`)) return;
+        const unansweredLabel = unanswered === 1
+          ? "1 unanswered question; it counts"
+          : `${unanswered} unanswered questions; they count`;
+        if (!window.confirm(`You have ${unansweredLabel} as incorrect. Submit your answers now?`)) return;
       }
       setWasAutomaticSubmit(automatic);
     }
@@ -462,6 +489,7 @@ export default function Page() {
           notice={current === 0 && meta?.source === "fallback"
             ? meta?.notice
             : undefined}
+          guide={meta?.profile === "short-5" ? SAMPLE_GUIDES[puzzles[current].layout] : undefined}
           onChoose={choose}
           onPrev={() => setCurrent((c) => Math.max(0, c - 1))}
           onNext={() => setCurrent((c) => Math.min(puzzles.length - 1, c + 1))}
@@ -489,12 +517,15 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
       <h2 className="text-xl font-semibold">Test instructions</h2>
       <p className="mt-3 text-gray-600">
-        Choose one answer for each visual puzzle. You can move between questions and change
-        answers before submitting.
+        Choose one answer for each visual puzzle. You can move between questions, change
+        answers, and press Submit answers at any time to finish early.
       </p>
       <p className="mt-3 text-gray-600">
         The timer gives one minute per question in a single countdown. Unanswered questions
         count as incorrect.
+      </p>
+      <p className="mt-3 text-gray-600">
+        The 5-question sample adds a short note to each question on how to read it.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
@@ -618,11 +649,8 @@ function bandLabel(band: string): string {
  * puzzle — the public puzzle type carries no family/band before answers ride
  * back from the server (see the "answer-free until scored" rule).
  */
-function puzzleTypeLabel(type: PublicPuzzle<Visual>["type"], familyId?: string): string {
-  if (familyId) return familyLabel(familyId);
-  return type === "operatorInduction"
-    ? "visual equation"
-    : type === "oddOneOut" ? "odd one out" : type;
+function puzzleTypeLabel(type: PublicPuzzle["type"], familyId?: string): string {
+  return familyId ? familyLabel(familyId) : type;
 }
 
 function NoticeBanner({ notice }: { notice?: string }) {
@@ -658,6 +686,7 @@ function Solver({
   selected,
   answers,
   notice,
+  guide,
   secondsLeft,
   lowTimeAt,
   onChoose,
@@ -666,12 +695,14 @@ function Solver({
   onGoTo,
   onFinish,
 }: {
-  puzzle: PublicPuzzle<Visual>;
+  puzzle: PublicPuzzle;
   index: number;
   total: number;
   selected: number | null;
   answers: readonly (number | null)[];
   notice?: string;
+  /** How to read this kind of question; the 5-question sample only. */
+  guide?: string;
   secondsLeft: number | null;
   lowTimeAt: number;
   onChoose: (i: number) => void;
@@ -805,9 +836,17 @@ function Solver({
         </p>
       </nav>
 
-      <div ref={cardRef} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      {/* Phone padding is trimmed so the diagram has 301px of a 375px screen;
+          every stem layout is priced against that (NARROW_VIEWPORT_STEM_WIDTH). */}
+      <div ref={cardRef} className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-6">
+        {guide && (
+          <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">How to read this</p>
+            <p className="mt-1">{guide}</p>
+          </div>
+        )}
         {puzzle.stem.length > 0 ? (
-          <div className="mb-6 rounded-xl bg-gray-50 p-4" aria-label="Puzzle diagram">
+          <div className="mb-6 rounded-xl bg-gray-50 p-2 sm:p-4" aria-label="Puzzle diagram">
             <StemView puzzle={puzzle} />
           </div>
         ) : (
@@ -827,7 +866,7 @@ function Solver({
               <button
                 key={i}
                 onClick={() => onChoose(i)}
-                aria-label={`Option ${LETTERS[i]}: ${describeVisual(opt)}`}
+                aria-label={`Option ${LETTERS[i]}: ${describeScene(opt)}`}
                 aria-pressed={isSel}
                 className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
                   isSel
@@ -838,7 +877,7 @@ function Solver({
                 <span className={`text-xs font-semibold ${isSel ? "text-gray-900" : "text-gray-400"}`}>
                   Option {LETTERS[i]} {isSel ? "· selected" : ""}
                 </span>
-                <VisualGraphic visual={opt} className="h-20 w-20" />
+                <SceneGraphic scene={opt} className="h-20 w-20" />
               </button>
             );
           })}
@@ -846,7 +885,7 @@ function Solver({
 
         {/* Keyboard hint — hidden on mobile to save space. */}
         <p className="mt-3 hidden text-center text-xs text-gray-400 sm:block">
-          Tip: press 1–6 or A–F to answer, ← → to navigate, Enter to {isLast ? "see results" : "continue"}
+          Tip: press 1–6 or A–F to answer, ← → to navigate, Enter to {isLast ? "submit your answers" : "continue"}
         </p>
       </div>
 
@@ -863,15 +902,27 @@ function Solver({
             onClick={() => onFinish()}
             className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
           >
-            See results
+            Submit answers
           </button>
         ) : (
-          <button
-            onClick={onNext}
-            className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
-          >
-            Next →
-          </button>
+          // Submitting is open on every question, not only the last: to check
+          // answers part-way, to finish early, or to stop. `onFinish` warns when
+          // questions are still unanswered.
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onFinish()}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+            >
+              Submit answers
+            </button>
+            <button
+              onClick={onNext}
+              className="rounded-lg bg-gray-900 px-6 py-2.5 font-medium text-white hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+            >
+              Next →
+            </button>
+          </div>
         )}
       </div>
     </section>
@@ -886,7 +937,7 @@ function Result({
   automatic,
   onRestart,
 }: {
-  puzzles: PublicPuzzle<Visual>[];
+  puzzles: PublicPuzzle[];
   answers: (number | null)[];
   review: SubmitResponse;
   meta: {
@@ -1000,7 +1051,7 @@ function ReviewItem({
   index,
   result,
 }: {
-  puzzle: PublicPuzzle<Visual>;
+  puzzle: PublicPuzzle;
   chosen: number | null;
   index: number;
   result: ReviewResult;
@@ -1012,7 +1063,7 @@ function ReviewItem({
     ? "grid grid-cols-4 gap-2"
     : "grid grid-cols-3 gap-2";
   return (
-    <div className={`rounded-xl border bg-white p-5 shadow-sm ${correct ? "border-green-300" : "border-red-200"}`}>
+    <div className={`rounded-xl border bg-white p-3 shadow-sm sm:p-5 ${correct ? "border-green-300" : "border-red-200"}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-500">
           Q{index + 1} · {puzzleTypeLabel(puzzle.type, result.familyId)}
@@ -1025,7 +1076,7 @@ function ReviewItem({
       </div>
 
       {puzzle.stem.length > 0 && (
-        <div className="mb-4 rounded-lg bg-gray-50 p-3">
+        <div className="mb-4 rounded-lg bg-gray-50 p-2 sm:p-3">
           <StemView puzzle={puzzle} />
         </div>
       )}
@@ -1046,7 +1097,7 @@ function ReviewItem({
           return (
             <div
               key={i}
-              aria-label={`Option ${LETTERS[i]}: ${describeVisual(opt)}${status ? ` (${status})` : ""}`}
+              aria-label={`Option ${LETTERS[i]}: ${describeScene(opt)}${status ? ` (${status})` : ""}`}
               className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 ${
                 isCorrect ? "border-green-400 bg-green-50" : isChosen ? "border-red-400 bg-red-50" : "border-gray-200"
               }`}
@@ -1054,7 +1105,7 @@ function ReviewItem({
               <span className={`text-xs font-semibold ${letterColor}`}>
                 {LETTERS[i]}
               </span>
-              <VisualGraphic visual={opt} className="h-16 w-16" />
+              <SceneGraphic scene={opt} className="h-16 w-16" />
               {noteText && (
                 <span className={`text-center text-xs font-medium leading-tight ${isCorrect ? "text-green-700" : "text-red-700"}`}>
                   {noteText}

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  BAND_TIME_BUDGET_SECONDS,
   CURRENT_FAMILY_PROMOTION_REGISTRY,
   EXPANDED_PROFILE_BANDS,
   type FamilyPromotionRegistry,
@@ -31,10 +30,9 @@ import {
 } from "./expanded-quiz";
 import {
   OPTIONS_PER_ITEM,
-  VisualPuzzleSetSchema,
-  visualElementSignature,
+  PuzzleSetSchema,
+  sceneSignature,
   type PuzzleSet,
-  type Visual,
 } from "./schema";
 import {
   generateSceneFamilyCandidate,
@@ -60,8 +58,8 @@ function bandOrder(profile: ExpandedProfile): string[] {
  * id-leak check below looks for inside the served ids.
  */
 const SHARED_SEED = "0123456789abcdef0123456789abcdef";
-const sharedQuizzes = new Map<ExpandedProfile, PuzzleSet<Visual>>();
-function sharedQuiz(profile: ExpandedProfile): PuzzleSet<Visual> {
+const sharedQuizzes = new Map<ExpandedProfile, PuzzleSet>();
+function sharedQuiz(profile: ExpandedProfile): PuzzleSet {
   let quiz = sharedQuizzes.get(profile);
   if (!quiz) {
     quiz = assembleExpandedQuiz(SHARED_SEED, profile, REGISTRY);
@@ -98,13 +96,14 @@ describe("eligible family pool", () => {
       .toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the fifteen family/band/bucket keys the battery serves", () => {
+  it("holds exactly the thirteen family/band/bucket keys the battery serves", () => {
     // v18 added the two combining-machine buckets to constraint-spatial, for
     // eighteen keys; retiring `parallel-evolution-v1` on 2026-09-28 took its two
     // composition buckets out again, and retiring `rule-switching-v2` on
     // 2026-09-29 took its warmup bucket out, leaving warmup with three.
     // `combining-machine-v1` was out of constraint-spatial from 2026-09-29 to
-    // 2026-09-30 (docs/plans/blind-answer-leak.md). The number is derived
+    // 2026-09-30 (docs/plans/blind-answer-leak.md), and retiring it on
+    // 2026-10-05 took its two buckets out for good. The number is derived
     // from the registry here, so adding or withdrawing a family without
     // revisiting the plan fails this test rather than quietly moving the
     // population the pilot packet and emergency bank are sized to.
@@ -112,9 +111,9 @@ describe("eligible family pool", () => {
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => `${family.familyId}:${band}:${bucket.bucket}`)));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(15);
+    expect(keys).toHaveLength(13);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
-      .toEqual([3, 4, 3, 2]);
+      .toEqual([3, 4, 2, 2]);
     // No key is d6 any more. The two that were are withdrawn, so the ladder
     // tops out at d5 until a mechanism earns a sixth rung some way other than
     // by adding gates — the lever the owner ruled out on 2026-08-27.
@@ -183,14 +182,12 @@ describe("assembleExpandedQuiz", () => {
       const replay = assembleExpandedQuiz(SHARED_SEED, profile, REGISTRY);
 
       expect(replay).toEqual(first);
-      expect(VisualPuzzleSetSchema.safeParse(first).success).toBe(true);
+      expect(PuzzleSetSchema.safeParse(first).success).toBe(true);
       expect(first).toHaveLength(questionCount(profile));
       expect(first.map((puzzle) => puzzle.band)).toEqual(bandOrder(profile));
       expect(first.every((puzzle) =>
         puzzle.generation!.generatorVersion === EXPANDED_GENERATOR_VERSION)).toBe(true);
       expect(first.every((puzzle) =>
-        puzzle.layout === "singleScene" ||
-        puzzle.stem.length === 0 ||
         puzzle.stem.filter((panel) => !("blank" in panel)).length >= 2)).toBe(true);
 
       // Every served question is exactly the slot its schedule planned: same
@@ -315,7 +312,7 @@ describe("assembleExpandedQuiz", () => {
     // identity, so two options that share one would silently mis-score a run.
     for (const profile of EXPANDED_PROFILES) {
       for (const puzzle of sharedQuiz(profile)) {
-        const identities = puzzle.options.map(visualElementSignature);
+        const identities = puzzle.options.map(sceneSignature);
         expect(new Set(identities).size).toBe(identities.length);
       }
     }
@@ -404,21 +401,18 @@ describe("assembleExpandedQuiz", () => {
     expect(maximumDistinctFamilies("long-30", REGISTRY, withdrawn)).toBe(9);
   });
 
-  it("survives one withdrawal only from the band with a family to spare", () => {
+  it("survives no withdrawal: a long test needs every served family", () => {
     // Since rule-switching-v2 retired (2026-09-29) a long test's ten distinct
     // families are exactly what the registry can supply, so withdrawing a
     // warmup, composition or induction-transfer family stops long tests from
-    // building. Constraint-spatial has three families and draws two (since
-    // combining-machine-v1 returned on 2026-09-30), so one of those can go.
+    // building. Constraint-spatial had a family to spare until the combining
+    // machine was retired on 2026-10-05; it now draws both of its two, so a
+    // withdrawal there stops long tests too.
     expect(maximumDistinctFamilies("long-30", REGISTRY, new Set()))
       .toBe(MINIMUM_DISTINCT_FAMILIES["long-30"]);
-    expect(() => assertProfilesRemainBuildable(REGISTRY, new Set(["attribute-pairing-v1"])))
-      .toThrow(/the long-30 test cannot be built/);
-    const withdrawn = new Set(["combining-machine-v1"]);
-    expect(() => assertProfilesRemainBuildable(REGISTRY, withdrawn)).not.toThrow();
-    for (const profile of EXPANDED_PROFILES) {
-      expect(planExpandedSchedule("safe-withdrawal", profile, REGISTRY, withdrawn))
-        .toHaveLength(questionCount(profile));
+    for (const familyId of ["attribute-pairing-v1", "relational-matrix-v2", "visual-set-algebra-v2"]) {
+      expect(() => assertProfilesRemainBuildable(REGISTRY, new Set([familyId])), familyId)
+        .toThrow(/WITHDRAWN_FAMILY_IDS has left the test unbuildable/);
     }
   });
 
@@ -437,9 +431,10 @@ describe("assembleExpandedQuiz", () => {
   });
 
   it("gives a family's later questions in a band its deeper bucket", () => {
-    // Three served families hold two validated buckets in one band: a band
+    // These served families hold two validated buckets in one band: a band
     // serves the shallower one first and the deeper one every time after, so
-    // repetition inside a band is a ramp, not a plateau.
+    // repetition inside a band is a ramp, not a plateau. (The combining machine
+    // was a third until it was retired on 2026-10-05.)
     const ramps = [
       {
         familyId: "compositional-analogy-v2",
@@ -450,11 +445,6 @@ describe("assembleExpandedQuiz", () => {
         familyId: "visual-set-algebra-v2",
         band: "constraint-spatial",
         buckets: ["visual-set-algebra-d4", "visual-set-algebra-d5"],
-      },
-      {
-        familyId: "combining-machine-v1",
-        band: "constraint-spatial",
-        buckets: ["combining-machine-d4", "combining-machine-d5"],
       },
     ] as const;
     for (const { familyId, band, buckets } of ramps) {
@@ -706,14 +696,13 @@ describe("format-aware family subsampling", () => {
     expect(composition[0].filter((family) => isAnalogyLayoutFamily(family.familyId)).map((family) => family.familyId))
       .toEqual(["compositional-analogy-v2", "inverse-analogy-v2"]);
 
-    // Constraint-spatial draws two of its three families, none analogy-shaped,
-    // so every pair is a draw. (While combining-machine was out of the band,
-    // 2026-09-29 to 2026-09-30, the one draw was both remaining families.)
+    // Constraint-spatial draws two from two since the combining machine was
+    // retired on 2026-10-05, so its one draw is both families (as it was while
+    // the combining machine was out of the band, 2026-09-29 to 2026-09-30).
     const constraint = draws("constraint-spatial");
-    expect(constraint).toHaveLength(3);
-    for (const draw of constraint) expect(draw).toHaveLength(2);
-    expect([...new Set(constraint.flat().map((family) => family.familyId))].sort())
-      .toEqual(["combining-machine-v1", "relational-matrix-v2", "visual-set-algebra-v2"]);
+    expect(constraint).toHaveLength(1);
+    expect(constraint[0].map((family) => family.familyId).sort())
+      .toEqual(["relational-matrix-v2", "visual-set-algebra-v2"]);
 
     // Induction-transfer now has exactly the two three-step transformation
     // families and draws both. The one-step switch belongs to warmup.
@@ -954,8 +943,6 @@ describe("cross-band family draws", () => {
     band: name,
     state: "code-valid" as const,
     validatedDifficultyBuckets,
-    perItemTimeBudgetSeconds: BAND_TIME_BUDGET_SECONDS[name],
-    fallbackAvailable: false,
   });
 
   const filler = (prefix: string, bandName: (typeof EXPANDED_PROFILE_BANDS)[number], count: number, difficulty: number) =>

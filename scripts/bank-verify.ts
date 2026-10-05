@@ -1,6 +1,6 @@
 /**
- * Verify the committed item bank: schema, expanded-seed replay or legacy rule
- * check, fingerprint and id integrity, uniqueness, four items for every
+ * Verify the committed item bank: schema, expanded-seed replay, fingerprint
+ * and id integrity, uniqueness, `BANK_ITEMS_PER_KEY` items for every
  * family/band/bucket key the registry can schedule, and fallback coverage for
  * both public lengths.
  */
@@ -24,7 +24,6 @@ import {
   normalizeWithdrawnFamilyIds,
   readWithdrawnFamilyIds,
 } from "../src/items/family-promotion";
-import { checkRule } from "../src/items/rules";
 
 const BANK_PATH = new URL("../data/bank/items.json", import.meta.url).pathname;
 
@@ -38,46 +37,41 @@ if (!parsed.success) {
   const replayCache = new Map<string, ReturnType<typeof assembleExpandedQuiz>>();
   for (const item of parsed.data.items) {
     const id = item.puzzle.id;
-    if (item.provenance.source === "expanded") {
-      const { seed, profile, generatorVersion, withdrawnFamilyIds } = item.provenance;
-      if (
-        typeof seed !== "string" ||
-        (profile !== "short-5" && profile !== "long-30") ||
-        generatorVersion !== EXPANDED_GENERATOR_VERSION ||
-        withdrawnFamilyIds === undefined
-      ) {
-        errors.push(
-          `${id}: expanded provenance must name the current generator, profile, string seed, and withdrawal list`,
+    const { seed, profile, generatorVersion, withdrawnFamilyIds } = item.provenance;
+    if (
+      typeof seed !== "string" ||
+      (profile !== "short-5" && profile !== "long-30") ||
+      generatorVersion !== EXPANDED_GENERATOR_VERSION ||
+      withdrawnFamilyIds === undefined
+    ) {
+      errors.push(
+        `${id}: expanded provenance must name the current generator, profile, string seed, and withdrawal list`,
+      );
+    } else {
+      // Replay against the withdrawal list the item was BUILT with, never the
+      // runtime one: withdrawing a family is a legitimate operator action and
+      // must not invalidate every previously banked item.
+      const storedWithdrawn = normalizeWithdrawnFamilyIds(withdrawnFamilyIds);
+      const replayKey = `${profile}:${seed}:${storedWithdrawn.join(",")}`;
+      let replay = replayCache.get(replayKey);
+      if (!replay) {
+        replay = assembleExpandedQuiz(
+          seed,
+          profile as ExpandedProfile,
+          CURRENT_FAMILY_PROMOTION_REGISTRY,
+          new Set(storedWithdrawn),
         );
+        replayCache.set(replayKey, replay);
+      }
+      const replayed = replay.find((puzzle) => fingerprintPuzzle(puzzle) === item.fingerprint);
+      if (!replayed) {
+        errors.push(`${id}: expanded seed replay does not contain this puzzle`);
       } else {
-        // Replay against the withdrawal list the item was BUILT with, never the
-        // runtime one: withdrawing a family is a legitimate operator action and
-        // must not invalidate every previously banked item.
-        const storedWithdrawn = normalizeWithdrawnFamilyIds(withdrawnFamilyIds);
-        const replayKey = `${profile}:${seed}:${storedWithdrawn.join(",")}`;
-        let replay = replayCache.get(replayKey);
-        if (!replay) {
-          replay = assembleExpandedQuiz(
-            seed,
-            profile as ExpandedProfile,
-            CURRENT_FAMILY_PROMOTION_REGISTRY,
-            new Set(storedWithdrawn),
-          );
-          replayCache.set(replayKey, replay);
-        }
-        const replayed = replay.find((puzzle) => fingerprintPuzzle(puzzle) === item.fingerprint);
-        if (!replayed) {
-          errors.push(`${id}: expanded seed replay does not contain this puzzle`);
-        } else {
-          const canonicalReplay = { ...replayed, id: bankIdFor(replayed) };
-          if (JSON.stringify(canonicalReplay) !== JSON.stringify(item.puzzle)) {
-            errors.push(`${id}: expanded seed replay differs from the stored puzzle`);
-          }
+        const canonicalReplay = { ...replayed, id: bankIdFor(replayed) };
+        if (JSON.stringify(canonicalReplay) !== JSON.stringify(item.puzzle)) {
+          errors.push(`${id}: expanded seed replay differs from the stored puzzle`);
         }
       }
-    } else {
-      const check = checkRule(item.puzzle);
-      if (!check.ok) errors.push(`${id}: checkRule failed — ${check.issues.join("; ")}`);
     }
     const fp = fingerprintPuzzle(item.puzzle);
     if (fp !== item.fingerprint) errors.push(`${id}: fingerprint mismatch (stored ${item.fingerprint}, computed ${fp})`);
@@ -88,8 +82,9 @@ if (!parsed.success) {
   // Per-key coverage. The fallback sampler answers a slot from the exact
   // family/band/bucket the schedule asked for; every rung below that exists
   // only for a bank that has fallen behind the registry. Checking the built
-  // file for four items per enabled key — and for items that no longer belong
-  // to any enabled key — is what keeps those rungs unreachable in practice.
+  // file for `BANK_ITEMS_PER_KEY` items per enabled key — and for items that
+  // no longer belong to any enabled key — is what keeps those rungs
+  // unreachable in practice.
   const coverage = expandedBankCoverage(
     parsed.data.items,
     CURRENT_FAMILY_PROMOTION_REGISTRY,

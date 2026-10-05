@@ -1,0 +1,1457 @@
+{
+  "runId": "2026-10-04T19-44-01.103Z-claude-opus-5-5-image",
+  "startedAt": "2026-10-04T19:44:01.103Z",
+  "provider": "claude-code",
+  "model": "claude-opus-5-5",
+  "channel": "image",
+  "promptVersion": "solver-v6",
+  "source": "generated",
+  "profile": "long-30",
+  "runSeed": "probe-v25-1",
+  "generatorVersion": "scene-families-v25",
+  "withdrawnFamilyIds": [],
+  "thinkingBudget": 1,
+  "effort": "high",
+  "repeat": 1,
+  "concurrency": 2,
+  "plannedAttempts": 30,
+  "completedAttempts": 30,
+  "status": "complete",
+  "attempts": [
+    {
+      "itemId": "expanded-1b67281c0561a67f-2",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5936,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "06adbeb76285acc5",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 92,
+          "rule": "The triangle moves 90° counterclockwise around the central square each step (right, top, left, bottom, right) while its fill cycles white, gray, black, so step 5 is a gray triangle on the right.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 92, \"rule\": \"The triangle moves 90° counterclockwise around the central square each step (right, top, left, bottom, right) while its fill cycles white, gray, black, so step 5 is a gray triangle on the right.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:07.041Z"
+    },
+    {
+      "itemId": "expanded-7e0647ccb0db422e-1",
+      "chosen": 5,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "public",
+      "latencyMs": 7869,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "be03680b10b85e72",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 62,
+          "rule": "The shape moves one cell to the right and keeps its shape; the example's black-to-white fill change does not clearly carry over to a gray fill, so I kept the star gray.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": "I saw that black becomes white but couldn't map gray to a specific fill, so I wrongly kept the star gray. I missed that D is the only option where the shape moves right and its fill changes at all.",
+          "unclear": "The example doesn't say what gray should become; it only shows black becoming white."
+        },
+        "raw": {
+          "before": "{\"confidence\": 62, \"rule\": \"The shape moves one cell to the right and keeps its shape; the example's black-to-white fill change does not clearly carry over to a gray fill, so I kept the star gray.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": \"I saw that black becomes white but couldn't map gray to a specific fill, so I wrongly kept the star gray. I missed that D is the only option where the shape moves right and its fill changes at all.\", \"unclear\": \"The example doesn't say what gray should become; it only shows black becoming white.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:08.974Z"
+    },
+    {
+      "itemId": "expanded-7772d285497203a0-3",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5150,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "44721e51b8362390",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 95,
+          "rule": "The shape moves down one cell while keeping its shape and fill, so the white star moves from the center to the bottom-middle cell.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 95, \"rule\": \"The shape moves down one cell while keeping its shape and fill, so the white star moves from the center to the bottom-middle cell.\", \"difficulty\": 1, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:25.826Z"
+    },
+    {
+      "itemId": "expanded-589843c1456e435f-4",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5403,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "8deef2bce36a15db",
+        "featureBucket": "spatial-transform-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 92,
+          "rule": "Every shape moves one cell to the right and keeps its fill, orientation and type.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 92, \"rule\": \"Every shape moves one cell to the right and keeps its fill, orientation and type.\", \"difficulty\": 1, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:32.990Z"
+    },
+    {
+      "itemId": "expanded-08cc999a22e5ca37-5",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 3749,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "d75f8f8493e23ffe",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 95,
+          "rule": "The black star moves clockwise around the corners (bottom-left, top-left, top-right, bottom-right) while the square stays in the center, so it returns to the bottom-left corner as a solid black star.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 95, \"rule\": \"The black star moves clockwise around the corners (bottom-left, top-left, top-right, bottom-right) while the square stays in the center, so it returns to the bottom-left corner as a solid black star.\", \"difficulty\": 1, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:44.884Z"
+    },
+    {
+      "itemId": "expanded-c435c8adef04bc76-6",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6403,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "14cc4007bbc6e14c",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 88,
+          "rule": "Each shape rotates 90° counterclockwise around the grid center, and its fill changes gray→white and black→gray.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"Each shape rotates 90° counterclockwise around the grid center, and its fill changes gray→white and black→gray.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:50.978Z"
+    },
+    {
+      "itemId": "expanded-388884f6c5d762dc-7",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6882,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "6de31ab5a75d35d5",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 88,
+          "rule": "Moving clockwise around the 8 outer cells, the square steps counterclockwise by 1, 2, 3, 4 and then 5 positions, which lands it in the top-right cell.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"Moving clockwise around the 8 outer cells, the square steps counterclockwise by 1, 2, 3, 4 and then 5 positions, which lands it in the top-right cell.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:44:59.397Z"
+    },
+    {
+      "itemId": "expanded-3d8a3977e5e2b566-8",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6841,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "13fdd6e2b8b483a2",
+        "featureBucket": "compositional-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 88,
+          "rule": "The whole grid rotates 90° clockwise, arrows turn with it, and fill colors cycle: gray becomes black and black becomes white.",
+          "difficulty": 2,
+          "hardToSee": "The gray versus white fills of the small arrows and stars were slightly hard to tell apart."
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The whole grid rotates 90° clockwise, arrows turn with it, and fill colors cycle: gray becomes black and black becomes white.\", \"difficulty\": 2, \"hard_to_see\": \"The gray versus white fills of the small arrows and stars were slightly hard to tell apart.\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:45:11.672Z"
+    },
+    {
+      "itemId": "expanded-ebdac5922e4a86b6-9",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 4993,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "58be6679651e64b5",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 88,
+          "rule": "The grid is flipped top-to-bottom, and each shape's fill changes from gray to black and from black to white (outline).",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The grid is flipped top-to-bottom, and each shape's fill changes from gray to black and from black to white (outline).\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:45:27.160Z"
+    },
+    {
+      "itemId": "expanded-c6794ca5527aeb26-10",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 11768,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "c24d194e78b3071f",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 60,
+          "rule": "The square visits the corners TL, BL, TR, BR, then reverses the same path (BR, TR, BL, TL), so frame 6 is top-right.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The repeated bottom-right in frames 4 and 5 was the only odd point; it reads best as the turning point where the path reverses."
+        },
+        "raw": {
+          "before": "{\"confidence\": 60, \"rule\": \"The square visits the corners TL, BL, TR, BR, then reverses the same path (BR, TR, BL, TL), so frame 6 is top-right.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"The repeated bottom-right in frames 4 and 5 was the only odd point; it reads best as the turning point where the path reverses.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:45:40.778Z"
+    },
+    {
+      "itemId": "expanded-9099c5088787e552-11",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7968,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "61d5be7c2f8f4c9c",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 85,
+          "rule": "The dark tile fills in the shape in the top-left cell, and the dotted tile rotates the grid positions 90° clockwise while arrows keep pointing up; applying both turns the diamond solid and gives triangle top-left, solid diamond top-right, and arrow bottom-right.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "It is not stated explicitly that the two joined tiles apply left to right. Reversing the order (rotate first, then fill the top-left shape) would give F, but reading left to right is the natural convention."
+        },
+        "raw": {
+          "before": "{\"confidence\": 85, \"rule\": \"The dark tile fills in the shape in the top-left cell, and the dotted tile rotates the grid positions 90° clockwise while arrows keep pointing up; applying both turns the diamond solid and gives triangle top-left, solid diamond top-right, and arrow bottom-right.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"It is not stated explicitly that the two joined tiles apply left to right. Reversing the order (rotate first, then fill the top-left shape) would give F, but reading left to right is the natural convention.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:45:58.383Z"
+    },
+    {
+      "itemId": "expanded-34294bbf5fcd7c72-12",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 11409,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "1579ce83dcedec66",
+        "featureBucket": "compositional-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 72,
+          "rule": "Positions flip vertically (top row swaps with bottom row), the arrow turns 90° counterclockwise, and shape fills change.",
+          "difficulty": 3,
+          "hardToSee": "The fill changes are inconsistent. The example arrow stays outlined while option F's arrow is solid black, and the square goes from gray to white, so the fill rule is unclear."
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The movement rule is not consistent. In the example the diamond moves from the middle row to the top row, which neither a vertical flip nor a cyclic row shift fully explains for both examples. F is still the only option where the arrow turns counterclockwise and the fills change white→black and gray→white."
+        },
+        "raw": {
+          "before": "{\"confidence\": 72, \"rule\": \"Positions flip vertically (top row swaps with bottom row), the arrow turns 90° counterclockwise, and shape fills change.\", \"difficulty\": 3, \"hard_to_see\": \"The fill changes are inconsistent. The example arrow stays outlined while option F's arrow is solid black, and the square goes from gray to white, so the fill rule is unclear.\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"The movement rule is not consistent. In the example the diamond moves from the middle row to the top row, which neither a vertical flip nor a cyclic row shift fully explains for both examples. F is still the only option where the arrow turns counterclockwise and the fills change white→black and gray→white.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:46:06.281Z"
+    },
+    {
+      "itemId": "expanded-9abb08dc8bd057d7-13",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5894,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "a14a0578e71d4e39",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 92,
+          "rule": "Each grid rotates 90° clockwise, and each shape's fill lightens one step (black→gray, gray→white).",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 92, \"rule\": \"Each grid rotates 90° clockwise, and each shape's fill lightens one step (black→gray, gray→white).\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:46:25.479Z"
+    },
+    {
+      "itemId": "expanded-69a0b536a0bb8a6a-15",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 8356,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "61d5be7c2f8f4c9c",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 88,
+          "rule": "The dark piece fills the outlined shape in the top-left cell, and the dotted piece rotates every shape's position 90° clockwise around the grid while the shapes keep their own orientation; applying both gives a filled circle top-right, an outline square top-left and an arrow bottom-right.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": "C",
+          "otherOptionIndex": 4,
+          "otherRule": "If the dotted rotation were applied before the dark fill, the square would move to the top-left and be filled, leaving an outline circle top-right and an arrow bottom-right, which is option C.",
+          "whatMisled": null,
+          "unclear": "The order of the two pieces matters. Reading left to right (fill first, then rotate) gives F, and that is the natural reading, but the puzzle never states the order explicitly."
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The dark piece fills the outlined shape in the top-left cell, and the dotted piece rotates every shape's position 90° clockwise around the grid while the shapes keep their own orientation; applying both gives a filled circle top-right, an outline square top-left and an arrow bottom-right.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": \"C\", \"other_rule\": \"If the dotted rotation were applied before the dark fill, the square would move to the top-left and be filled, leaving an outline circle top-right and an arrow bottom-right, which is option C.\", \"what_misled\": null, \"unclear\": \"The order of the two pieces matters. Reading left to right (fill first, then rotate) gives F, and that is the natural reading, but the puzzle never states the order explicitly.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:46:50.080Z"
+    },
+    {
+      "itemId": "expanded-d1fe3f2683f342c5-16",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7956,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "83412d68830ea3dc",
+        "featureBucket": "combining-machine-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "**A**",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": null,
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The order of the two combined pieces in row 3 was not stated, but reading them left to right (overlay, then removal) gives A, and no other order or reading produces an offered option consistent with rows 1–2."
+        },
+        "raw": {
+          "before": "{\"confidence\": 70, \"rule\": \"The dark piece overlays the two grids, keeping the left grid's shape where both have one; the dotted piece removes any shape that is identical in the same cell of the right grid; row 3 applies the overlay and then the removal.\"), \"difficulty\": 4, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"The order of the two combined pieces in row 3 was not stated, but reading them left to right (overlay, then removal) gives A, and no other order or reading produces an offered option consistent with rows 1–2.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:47:14.746Z"
+    },
+    {
+      "itemId": "expanded-2dfaab52103f186f-14",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6705,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "da1381c1b66c0c81",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 80,
+          "rule": "Two interleaved sequences: odd frames alternate the star between middle-left and middle-right, and even frames keep it at bottom-left, so frame 6 has the star at bottom-left.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"Two interleaved sequences: odd frames alternate the star between middle-left and middle-right, and even frames keep it at bottom-left, so frame 6 has the star at bottom-left.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:46:39.507Z"
+    },
+    {
+      "itemId": "expanded-ee6740243020ec69-17",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7092,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "1299c8d72ee5b408",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 85,
+          "rule": "The third panel keeps only the cells that are occupied in both of the first two panels, showing the second panel's shape there (row 3: top-right square and bottom-right star).",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 85, \"rule\": \"The third panel keeps only the cells that are occupied in both of the first two panels, showing the second panel's shape there (row 3: top-right square and bottom-right star).\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:47:46.546Z"
+    },
+    {
+      "itemId": "expanded-48f0902de199108b-19",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7563,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "0c5245364e1788d0",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 88,
+          "rule": "The third panel keeps the first panel's symbols, except any symbol that appears in the same position with the same shape in the second panel is removed.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The third panel keeps the first panel's symbols, except any symbol that appears in the same position with the same shape in the second panel is removed.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:48:10.335Z"
+    },
+    {
+      "itemId": "expanded-dd9f81091e65c764-18",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 12360,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "d603f80832e42535",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "**B**",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 80,
+          "rule": "Each tile is an operation on the left and right grids: dark keeps only cells filled in both, using the left shape; dotted removes left cells where the right grid has the same shape in the same cell; hatched overlays both grids, with the left shape winning on conflicts; chained tiles apply in order, each time with the right grid.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "It is not stated that each chained tile applies to the running result with the original right grid, but the examples and options make this the natural reading."
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"Each tile is an operation on the left and right grids: dark keeps only cells filled in both, using the left shape; dotted removes left cells where the right grid has the same shape in the same cell; hatched overlays both grids, with the left shape winning on conflicts; chained tiles apply in order, each time with the right grid.\", \"difficulty\": 4, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"It is not stated that each chained tile applies to the running result with the original right grid, but the examples and options make this the natural reading.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:47:59.789Z"
+    },
+    {
+      "itemId": "expanded-f1c7db132b110ee9-21",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7327,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "1299c8d72ee5b408",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 92,
+          "rule": "Each third-row panel overlays the first- and second-row panels in its column, and the first-row shape wins wherever both have a shape in the same cell.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 92, \"rule\": \"Each third-row panel overlays the first- and second-row panels in its column, and the first-row shape wins wherever both have a shape in the same cell.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:48:30.803Z"
+    },
+    {
+      "itemId": "expanded-ec963431c3e2f2bc-20",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 10288,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "c7b92d41b07e3033",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "**F**",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 80,
+          "rule": "Apply the strip's operations left to right, each combining the running grid with the right grid: hatched removes cells where both grids have the same shape, dotted keeps only cells occupied in both grids (with the left grid's shape), and dark overlays both grids with the left grid winning conflicts.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"Apply the strip's operations left to right, each combining the running grid with the right grid: hatched removes cells where both grids have the same shape, dotted keeps only cells occupied in both grids (with the left grid's shape), and dark overlays both grids with the left grid winning conflicts.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:48:33.640Z"
+    },
+    {
+      "itemId": "expanded-d47194744d4999a9-23",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 8137,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "3a5c4762d495a77d",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 88,
+          "rule": "The third panel in each row keeps only the shapes from the first panel whose positions are not occupied in the second panel.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The third panel in each row keeps only the shapes from the first panel whose positions are not occupied in the second panel.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:49:04.149Z"
+    },
+    {
+      "itemId": "expanded-6d14f4a38d288cbb-22",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 10389,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "16c52cc928ebd12b",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 80,
+          "rule": "Applied left to right, each tile combines the current grid with the right grid: striped keeps the left shapes whose cells are also occupied on the right, dotted removes the left shapes that exactly match the right grid, and dark overlays both grids with the left shapes taking priority.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "It is not stated that the three tiles apply in sequence from left to right, each using the same right grid, but this reading gives B and matches the single-tile examples."
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"Applied left to right, each tile combines the current grid with the right grid: striped keeps the left shapes whose cells are also occupied on the right, dotted removes the left shapes that exactly match the right grid, and dark overlays both grids with the left shapes taking priority.\", \"difficulty\": 4, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"It is not stated that the three tiles apply in sequence from left to right, each using the same right grid, but this reading gives B and matches the single-tile examples.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:48:54.778Z"
+    },
+    {
+      "itemId": "expanded-76673d1a9abb5035-25",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7357,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "relational-matrix-v2",
+        "programFingerprint": "580f808770b69657",
+        "featureBucket": "relational-matrix-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 80,
+          "rule": "In each row, the third grid overlays the shapes of the first two grids, and where both have a shape in the same cell, the first grid's shape is kept (as with the diamond over the triangle in row 2).",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"In each row, the third grid overlays the shapes of the first two grids, and where both have a shape in the same cell, the first grid's shape is kept (as with the diamond over the triangle in row 2).\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:49:28.582Z"
+    },
+    {
+      "itemId": "expanded-e687c6e5b3dae6fb-24",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 13141,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "d2c582953a13c26b",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "**F**",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 80,
+          "rule": "Each strip is an operation applied left to right with the second grid: striped removes cells identical in both grids, solid keeps only cells occupied in both (left shape wins), and dotted merges both grids (left shape wins on conflicts), giving a star at bottom-left, a circle in the center and a square at bottom-right.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The example rows don't show how a chain of three operators uses the right grid. I assumed each operator in turn combines the running result with the same right grid. Under that reading, striped removes the matching square, solid keeps only the star, and dotted adds the circle and square, giving F."
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"Each strip is an operation applied left to right with the second grid: striped removes cells identical in both grids, solid keeps only cells occupied in both (left shape wins), and dotted merges both grids (left shape wins on conflicts), giving a star at bottom-left, a circle in the center and a square at bottom-right.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"The example rows don't show how a chain of three operators uses the right grid. I assumed each operator in turn combines the running result with the same right grid. Under that reading, striped removes the matching square, solid keeps only the star, and dotted adds the circle and square, giving F.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:49:31.704Z"
+    },
+    {
+      "itemId": "expanded-ea9860d981393385-26",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7156,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "1fffb60e4b3bafb5",
+        "featureBucket": "composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 85,
+          "rule": "Each puzzle piece is a transformation applied in order: dots rotate the arrow 90° clockwise, the dark piece fills the top-left shape gray, and the striped piece flips the grid vertically.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The puzzle assumes the pieces apply left to right, though this is never stated. Applying the dark (fill) piece after the flip would give F instead, but the left-to-right reading is the natural one."
+        },
+        "raw": {
+          "before": "{\"confidence\": 85, \"rule\": \"Each puzzle piece is a transformation applied in order: dots rotate the arrow 90° clockwise, the dark piece fills the top-left shape gray, and the striped piece flips the grid vertically.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"The puzzle assumes the pieces apply left to right, though this is never stated. Applying the dark (fill) piece after the flip would give F instead, but the left-to-right reading is the natural one.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:49:53.925Z"
+    },
+    {
+      "itemId": "expanded-7bffcef9a008807e-27",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7530,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "b5d835ff13de45db",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 88,
+          "rule": "The solid dark piece mirrors the grid left-to-right, the dotted piece recolors the shapes gray, and the hatched piece adds a copy of the triangle in the cell to its left; applied in order, this gives two gray triangles in the middle row (center and right) and a gray circle at bottom right.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The solid dark piece mirrors the grid left-to-right, the dotted piece recolors the shapes gray, and the hatched piece adds a copy of the triangle in the cell to its left; applied in order, this gives two gray triangles in the middle row (center and right) and a gray circle at bottom right.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:50:02.790Z"
+    },
+    {
+      "itemId": "expanded-6a3c7890e402cf97-28",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7664,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "1ff8f80945cd390d",
+        "featureBucket": "composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 90,
+          "rule": "The dark tile fills the shape in the top-left cell, the dotted tile mirrors the grid left-to-right, and the hatched tile rotates arrows 90° counterclockwise; applying them in order gives an outlined left arrow top-left, a filled circle top-right and a square bottom-right.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 90, \"rule\": \"The dark tile fills the shape in the top-left cell, the dotted tile mirrors the grid left-to-right, and the hatched tile rotates arrows 90° counterclockwise; applying them in order gives an outlined left arrow top-left, a filled circle top-right and a square bottom-right.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:50:20.115Z"
+    },
+    {
+      "itemId": "expanded-05a2368e20ad51a7-29",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 9034,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "8c93f094a910a96e",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "**C**",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 88,
+          "rule": "The dark tile rotates the grid 90° counterclockwise, the dotted tile fills all hollow shapes, and the hatched tile adds a filled circle in the center cell, applied in order.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The hatched tile's single example fits both 'add a circle in the center' and 'add a circle diagonally down-left of the existing circle', but both readings give C."
+        },
+        "raw": {
+          "before": "{\"confidence\": 88, \"rule\": \"The dark tile rotates the grid 90° counterclockwise, the dotted tile fills all hollow shapes, and the hatched tile adds a filled circle in the center cell, applied in order.\", \"difficulty\": 2, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"The hatched tile's single example fits both 'add a circle in the center' and 'add a circle diagonally down-left of the existing circle', but both readings give C.\"}"
+        }
+      },
+      "ts": "2026-10-04T19:50:34.541Z"
+    },
+    {
+      "itemId": "expanded-9c33274d65ba46bd-30",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 9421,
+      "generation": {
+        "generatorVersion": "scene-families-v25",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "95718589300b0b77",
+        "featureBucket": "composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 80,
+          "rule": "Each tile applies one transformation in order: hatched fills the shape in the top-left cell, dotted rotates arrows 90° counterclockwise, and dark rotates every shape's position 90° clockwise around the grid while keeping each shape's orientation.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\": 80, \"rule\": \"Each tile applies one transformation in order: hatched fills the shape in the top-left cell, dotted rotates arrows 90° counterclockwise, and dark rotates every shape's position 90° clockwise around the grid while keeping each shape's orientation.\", \"difficulty\": 3, \"hard_to_see\": \"nothing\"}",
+          "after": "{\"only_defensible\": true, \"other_option\": null, \"other_rule\": null, \"what_misled\": null, \"unclear\": \"nothing\"}"
+        }
+      },
+      "ts": "2026-10-04T19:50:44.871Z"
+    }
+  ]
+}

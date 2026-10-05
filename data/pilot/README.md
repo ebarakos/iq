@@ -37,7 +37,8 @@ is replaced when a new generator population ships, so older aggregates remain
 historical evidence but are no longer replayable unless their matching manifest
 was preserved separately. A mismatched packet id, fingerprint, item set, or
 schema version is a hard error naming exactly what disagreed. Both v3 aggregates
-below predate the current v17 manifest and now fail that fingerprint check.
+below predate the current manifest, last regenerated for `scene-families-v30` on
+2026-10-05, and fail that fingerprint check.
 
 Aggregate exports from the pilot screen are schema
 `prototype-pilot-aggregate-v2`: one row of counts per item, five-second solve

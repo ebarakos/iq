@@ -328,6 +328,92 @@ function loneAspectOptions(options: readonly Scene[]): Set<number> {
   return lone;
 }
 
+/**
+ * One clue: a single fact about a board that one part of a rule can tell a
+ * solver on its own. The owner's rule of 2026-10-03: the answer must never be
+ * guessable "with 1 out of x clues needed to solve a test", so every clue any
+ * option shows is held by at least two options (`optionsAloneOnAClue`).
+ * Holding it for every option, not only the answer, is what keeps the answer
+ * from standing out as the one option that is never alone.
+ *
+ * What counts as one clue depends on how the family's rule acts on a board
+ * (`ClueModel`):
+ *
+ *  - `features`, for rules made of separate changes (a move, a fill step, a
+ *    turn, a copy): each whole-board aspect (`DISTRACTOR_ASPECTS`: where the
+ *    shapes stand, which shapes, which fills, which turns, how many), and the
+ *    square, fill and turn of every shape that each option holds exactly once
+ *    ("the triangle ends up black"). A shape that some option lacks or holds
+ *    twice is itself something the rule decides, so a fact about it would
+ *    already need the shape clue too; the shapes aspect covers it. What
+ *    stands on one square is not a clue here: it usually takes every change
+ *    to know.
+ *  - `squares`, for rules that combine two boards square by square: what
+ *    stands on each square. There a solver works out one square at a time,
+ *    and the whole-board aspects need every square at once.
+ */
+export const CLUE_MODELS = ["features", "squares"] as const;
+export type ClueModel = (typeof CLUE_MODELS)[number];
+
+export interface ClueBoard {
+  /** One value per clue every board has: the aspects, or the squares. */
+  fixed: readonly string[];
+  /** Square, fill and turn of each shape the board holds exactly once (`features` only). */
+  once: ReadonlyMap<string, readonly [string, string, string]>;
+}
+
+export const SHAPE_CLUE_PARTS = ["square", "fill", "turn"] as const;
+
+export function clueBoard(scene: Scene, model: ClueModel): ClueBoard {
+  if (model === "squares") {
+    const fixed: string[] = [];
+    const cells = cellContents(scene);
+    for (let row = 0; row < scene.rows; row++) {
+      for (let column = 0; column < scene.columns; column++) fixed.push(cells.get(`${row}:${column}`)!);
+    }
+    return { fixed, once: new Map() };
+  }
+  const held = new Map<string, ScenePlacement[]>();
+  for (const placement of scene.objects) {
+    const token = tokenOf(placement);
+    if (token) held.set(token.shape, [...(held.get(token.shape) ?? []), placement]);
+  }
+  const once = new Map<string, readonly [string, string, string]>();
+  for (const [shape, placements] of held) {
+    if (placements.length !== 1) continue;
+    const [placement] = placements;
+    const token = tokenOf(placement)!;
+    once.set(shape, [`${placement.row},${placement.column}`, token.fill, String(token.rotation)]);
+  }
+  return { fixed: DISTRACTOR_ASPECTS.map((aspect) => aspect.of(scene)), once };
+}
+
+/** The shapes every board holds exactly once: the ones a solver can follow by shape. */
+export function followedShapes(boards: readonly ClueBoard[]): string[] {
+  return [...(boards[0]?.once.keys() ?? [])].filter((shape) => boards.every((board) => board.once.has(shape)));
+}
+
+/**
+ * The options that hold some clue no other option holds. Empty means one clue
+ * never narrows the six to one, whichever option is the answer.
+ */
+export function optionsAloneOnAClue(options: readonly Scene[], model: ClueModel): Set<number> {
+  const boards = options.map((option) => clueBoard(option, model));
+  const alone = new Set<number>();
+  const markAlone = (read: (board: ClueBoard) => string | undefined) => {
+    const values = boards.map(read);
+    values.forEach((value, index) => {
+      if (values.filter((other) => other === value).length === 1) alone.add(index);
+    });
+  };
+  const fixedCount = Math.max(...boards.map((board) => board.fixed.length));
+  for (let clue = 0; clue < fixedCount; clue++) markAlone((board) => board.fixed[clue]);
+  for (const shape of followedShapes(boards)) {
+    SHAPE_CLUE_PARTS.forEach((_, part) => markAlone((board) => board.once.get(shape)![part]));
+  }
+  return alone;
+}
+
 /** Each solver's credit on one item, read from the options exactly as given. */
 export function blindCredits(options: readonly Scene[], answerIndex: number): Record<BlindSolver, number> {
   const scores = blindSolverScores(options);

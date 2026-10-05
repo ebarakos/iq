@@ -102,7 +102,6 @@ export async function POST(req: NextRequest) {
     console.error(`generate: ${profile} assembly failed —`, error);
     try {
       const fallback = loadBank().filter((item) =>
-        item.puzzle.type !== "operatorInduction" &&
         !(item.puzzle.familyId && WITHDRAWN_FAMILY_IDS.has(item.puzzle.familyId)));
       const { puzzles } = sampleExpandedBankQuiz(
         fallback,

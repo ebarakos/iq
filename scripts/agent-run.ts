@@ -21,6 +21,11 @@
  *          --thinking-budget N (forwarded as the relay X-Thinking-Budget header,
  *                              and recorded in the artifact — a probe run under a
  *                              different budget is a different population)
+ *          --debrief (image channel: after each scored answer, two more turns ask
+ *                              the model for its confidence, rule, difficulty and
+ *                              anything hard to see, then — with the intended answer
+ *                              shown — whether another option is as defensible;
+ *                              recorded per attempt, never changes the score)
  *
  * The default source is the live generator, so a run measures the same
  * questions people get. The bank stays available as the fixed regression
@@ -82,15 +87,23 @@ import {
 import {
   shuffleOptions,
   toPublicPuzzle,
-  visualElementSignature,
-  VisualPuzzleSchema,
+  PuzzleSchema,
+  sceneSignature,
   type Puzzle,
   type PuzzleType,
   type ReasoningBand,
-  type Visual,
 } from "../src/items/schema";
 import { seededRng } from "../src/lib/rng";
-import { solveItem, SOLVER_PROMPT_VERSION } from "../src/lib/solver";
+import {
+  debriefItem,
+  DEBRIEF_PROMPT_VERSION,
+  optionLetter,
+  readDebriefAfter,
+  readDebriefBefore,
+  solveItem,
+  SOLVER_PROMPT_VERSION,
+  type SolverOpts,
+} from "../src/lib/solver";
 import {
   AttemptFileSchema,
   ATTEMPT_OUTCOMES,
@@ -102,6 +115,7 @@ import {
   type AttemptFile,
   type AttemptOutcome,
   type Channel,
+  type Debrief,
   type EvaluationSet,
 } from "../src/lib/attempts";
 import { isRateLimitError } from "../src/lib/relay-errors";
@@ -155,13 +169,14 @@ function readArgs() {
       // read it as a body field. Defaults to RELAY_EFFORT so a project can pin
       // one without repeating the flag; recorded in the artifact either way.
       effort: { type: "string" },
+      debrief: { type: "boolean", default: false },
     },
   }).values;
 }
 
 /** Sample N items spread across types/difficulties (group by type, round-robin). */
-function sampleItems(pool: Puzzle<Visual>[], n: number): Puzzle<Visual>[] {
-  const byType = new Map<PuzzleType, Puzzle<Visual>[]>();
+function sampleItems(pool: Puzzle[], n: number): Puzzle[] {
+  const byType = new Map<PuzzleType, Puzzle[]>();
   for (const puzzle of pool) {
     const list = byType.get(puzzle.type) ?? [];
     list.push(puzzle);
@@ -172,7 +187,7 @@ function sampleItems(pool: Puzzle<Visual>[], n: number): Puzzle<Visual>[] {
     list.sort((a, b) => a.difficulty - b.difficulty);
   }
   const queues = [...byType.values()];
-  const picked: Puzzle<Visual>[] = [];
+  const picked: Puzzle[] = [];
   let i = 0;
   while (picked.length < n && queues.some((q) => q.length > 0)) {
     const q = queues[i % queues.length];
@@ -184,17 +199,17 @@ function sampleItems(pool: Puzzle<Visual>[], n: number): Puzzle<Visual>[] {
 
 /** Map a chosen index in the shuffled puzzle back to the canonical option index. */
 function canonicalIndex(
-  canonical: Puzzle<Visual>,
-  shuffled: Puzzle<Visual>,
+  canonical: Puzzle,
+  shuffled: Puzzle,
   chosenShuffled: number | null,
 ): number | null {
   if (chosenShuffled === null) return null;
   const chosenVisual = shuffled.options[chosenShuffled];
   if (!chosenVisual) return null;
-  // Identity covers both compact cells and board scenes; options are guaranteed
-  // distinct by the schema, so the first match is unambiguous.
-  const sig = visualElementSignature(chosenVisual);
-  const idx = canonical.options.findIndex((opt) => visualElementSignature(opt) === sig);
+  // Options are guaranteed distinct by the schema, so the first match is
+  // unambiguous.
+  const sig = sceneSignature(chosenVisual);
+  const idx = canonical.options.findIndex((opt) => sceneSignature(opt) === sig);
   return idx >= 0 ? idx : null;
 }
 
@@ -204,11 +219,11 @@ function canonicalIndex(
  * Each test gets its own child seed off the run seed, so `--seed` replays the
  * whole run item for item.
  */
-function generatedPool(profile: ExpandedProfile, seed: string, wanted: number): Puzzle<Visual>[] {
+function generatedPool(profile: ExpandedProfile, seed: string, wanted: number): Puzzle[] {
   const registry = CURRENT_FAMILY_PROMOTION_REGISTRY;
   const withdrawn = readWithdrawnFamilyIds();
   const tests = Math.max(1, Math.ceil(wanted / questionCount(profile)));
-  const pool: Puzzle<Visual>[] = [];
+  const pool: Puzzle[] = [];
   for (let index = 0; index < tests; index++) {
     pool.push(...assembleExpandedQuiz(`${seed}:${index}`, profile, registry, withdrawn));
   }
@@ -220,12 +235,12 @@ function generatedCoveragePool(
   profile: ExpandedProfile,
   seed: string,
   wanted: number | undefined,
-): { pool: Puzzle<Visual>[]; coverageItems: Puzzle<Visual>[] } {
+): { pool: Puzzle[]; coverageItems: Puzzle[] } {
   const registry = CURRENT_FAMILY_PROMOTION_REGISTRY;
   const withdrawn = readWithdrawnFamilyIds();
   const requirements = standardProbeRequirements(registry, withdrawn);
-  const pool: Puzzle<Visual>[] = [];
-  let coverageItems: Puzzle<Visual>[] = [];
+  const pool: Puzzle[] = [];
+  let coverageItems: Puzzle[] = [];
 
   for (let index = 0; index < 100; index++) {
     pool.push(...assembleExpandedQuiz(`${seed}:${index}`, profile, registry, withdrawn));
@@ -341,7 +356,7 @@ export function heldOutItemId(seed: string, bucket: string, index: number): stri
 }
 
 /** Hash of everything a solver can see, used to keep two held-out items distinct. */
-function visibleHeldOutFingerprint(puzzle: Pick<Puzzle<Visual>, "stem" | "options" | "answerIndex">): string {
+function visibleHeldOutFingerprint(puzzle: Pick<Puzzle, "stem" | "options" | "answerIndex">): string {
   return createHash("sha256")
     .update(JSON.stringify({
       stem: puzzle.stem,
@@ -368,8 +383,8 @@ export function heldOutBucketPool(
   seed: string,
   entry: HeldOutBucket,
   count: number,
-): Puzzle<Visual>[] {
-  const items: Puzzle<Visual>[] = [];
+): Puzzle[] {
+  const items: Puzzle[] = [];
   const seenVisible = new Set<string>();
   const programs = heldOutProgramsByFingerprint(entry.gateCount);
   const uncovered = new Set(reservedHeldOutPrimitives(entry.gateCount));
@@ -452,7 +467,7 @@ export function heldOutBucketPool(
     }
     seenVisible.add(visible);
     for (const primitive of primitives) uncovered.delete(primitive);
-    items.push(VisualPuzzleSchema.parse(puzzle));
+    items.push(PuzzleSchema.parse(puzzle));
   }
 
   return items;
@@ -465,7 +480,7 @@ export function heldOutBucketPool(
  * The validation remains generic if another held-out bucket is added. There is
  * currently one, so every positive whole item count divides cleanly.
  */
-export function heldOutSourcePool(seed: string, count: number): Puzzle<Visual>[] {
+export function heldOutSourcePool(seed: string, count: number): Puzzle[] {
   const buckets = heldOutBuckets();
   if (!Number.isInteger(count) || count <= 0) {
     throw new Error(`--source held-out needs a positive whole item count; got ${count}`);
@@ -496,7 +511,7 @@ export interface HeldOutCoverageReport {
  * reserved primitive its buckets are built from, and does it contain every
  * program-complexity class those buckets declare.
  */
-export function heldOutCoverage(items: readonly Puzzle<Visual>[]): HeldOutCoverageReport {
+export function heldOutCoverage(items: readonly Puzzle[]): HeldOutCoverageReport {
   const buckets = heldOutBuckets();
   const missingPrimitives: { bucket: string; primitives: string[] }[] = [];
   const itemsPerBucket: { bucket: string; items: number }[] = [];
@@ -560,6 +575,50 @@ function errorOutcome(error: unknown): AttemptOutcome {
 
 const DIFFICULTY_TIER = (d: number): string => (d <= 2 ? "easy (1-2)" : d === 3 ? "mid (3)" : "hard (4-5)");
 
+/**
+ * The model's own report on an item it has just answered (`--debrief`). A relay
+ * failure here is recorded on the debrief and never touches the attempt; a turn
+ * that completed before it is kept. A reply from a model other than the one
+ * that answered is dropped (`debriefItem`), and the error names both.
+ */
+async function debriefAttempt(
+  canonical: Puzzle,
+  shuffled: Puzzle,
+  answered: { chosen: number | null; raw: string; modelUsed?: string },
+  opts: SolverOpts,
+): Promise<Debrief> {
+  const record: Debrief = {
+    promptVersion: DEBRIEF_PROMPT_VERSION,
+    intendedLetter: optionLetter(shuffled.answerIndex),
+    answeredLetter: answered.chosen === null ? null : optionLetter(answered.chosen),
+    before: null,
+    after: null,
+    raw: {},
+  };
+  try {
+    const replies = await debriefItem(toPublicPuzzle(shuffled), answered.raw, shuffled.answerIndex, answered.modelUsed, opts);
+    if (replies.before) {
+      record.raw.before = replies.before.raw.slice(0, RAW_REPLY_CHARS);
+      record.before = readDebriefBefore(replies.before.raw);
+    }
+    if (replies.after) {
+      record.raw.after = replies.after.raw.slice(0, RAW_REPLY_CHARS);
+      const after = readDebriefAfter(replies.after.raw, shuffled.options.length);
+      record.after = after && {
+        ...after,
+        otherOptionIndex: after.otherOption === null
+          ? null
+          : canonicalIndex(canonical, shuffled, shuffled.options.findIndex((_, index) => optionLetter(index) === after.otherOption)),
+      };
+    }
+    if (replies.error) record.error = replies.error.slice(0, RAW_REPLY_CHARS);
+  } catch (err) {
+    // Rendering the picture or building the client failed before any turn ran.
+    record.error = (err instanceof Error ? err.message : String(err)).slice(0, RAW_REPLY_CHARS);
+  }
+  return record;
+}
+
 async function main() {
   const args = readArgs();
   const channelResult = ChannelSchema.safeParse(args.channel);
@@ -567,6 +626,9 @@ async function main() {
     throw new Error(`--channel must be one of ${ChannelSchema.options.join(", ")} (got "${args.channel}")`);
   }
   const channel: Channel = channelResult.data;
+  if (args.debrief && channel !== "image") {
+    throw new Error("--debrief asks about the picture the model answered, so it needs --channel image");
+  }
 
   const provider = args.provider ?? process.env.RELAY_PROVIDER;
   const model = args.model ?? process.env.RELAY_MODEL;
@@ -628,7 +690,7 @@ async function main() {
   }
 
   const seed = args.seed ?? randomBytes(8).toString("hex");
-  let items: Puzzle<Visual>[];
+  let items: Puzzle[];
   if (source === "held-out") {
     const buckets = heldOutBuckets();
     items = heldOutSourcePool(seed, requestedItems ?? buckets.length * HELD_OUT_ITEMS_PER_BUCKET);
@@ -639,7 +701,7 @@ async function main() {
         `every reserved primitive and program-complexity class present`,
     );
   } else if (source === "bank") {
-    const pool = loadBank().map((item) => item.puzzle as Puzzle<Visual>);
+    const pool = loadBank().map((item) => item.puzzle as Puzzle);
     const wanted = args.all ? pool.length : (requestedItems ?? 20);
     items = wanted >= pool.length ? pool : sampleItems(pool, wanted);
   } else if (args["no-coverage"]) {
@@ -677,7 +739,7 @@ async function main() {
   const heldOutItemIds = source === "held-out" ? new Set(items.map((item) => item.id)) : new Set<string>();
 
   // Build the full work list: each sampled item × repeat.
-  const work: Puzzle<Visual>[] = [];
+  const work: Puzzle[] = [];
   for (let r = 0; r < repeat; r++) work.push(...items);
 
   const startedAt = new Date().toISOString();
@@ -723,7 +785,7 @@ async function main() {
         }
         const chosen = canonicalIndex(canonical, shuffled, outcome.chosen);
         const correct = chosen !== null && chosen === canonical.answerIndex;
-        attempts.push({
+        const attempt: Attempt = {
           itemId: canonical.id,
           chosen,
           correct,
@@ -734,7 +796,12 @@ async function main() {
           attemptBudget: 1,
           raw: outcome.raw.slice(0, RAW_REPLY_CHARS),
           ts: new Date().toISOString(),
-        });
+        };
+        // Asked only once the answer is recorded, so it can never move the score.
+        if (args.debrief) {
+          attempt.debrief = await debriefAttempt(canonical, shuffled, outcome, { provider, model, thinkingBudget, effort });
+        }
+        attempts.push(attempt);
       } catch (err) {
         const outcome = errorOutcome(err);
         attempts.push({
@@ -820,7 +887,7 @@ async function main() {
 }
 
 /** Console table: pass rate overall, by difficulty tier, type, and family. */
-function report(attempts: Attempt[], items: Puzzle<Visual>[]) {
+function report(attempts: Attempt[], items: Puzzle[]) {
   if (attempts.length === 0) {
     console.log("\nno attempts recorded.");
     return;
@@ -887,6 +954,42 @@ function report(attempts: Attempt[], items: Puzzle<Visual>[]) {
     console.log("\nby reasoning family:");
     for (const [family, rows] of [...byFamily].sort(([a], [b]) => String(a).localeCompare(String(b)))) {
       console.log(`  ${String(family).padEnd(26)} ${rate(rows)}`);
+    }
+  }
+
+  // The model's own report (`--debrief`), per family: its mean confidence and
+  // difficulty, how often it called another option as defensible as the
+  // intended one, and how often something was hard to see. Then every item it
+  // flagged, for a person to look at before anything changes.
+  const debriefed = attempts.filter((attempt) => attempt.debrief);
+  if (debriefed.length === 0) return;
+  const mean = (values: (number | null | undefined)[]) => {
+    const present = values.filter((value): value is number => typeof value === "number");
+    return present.length === 0 ? "—" : (present.reduce((sum, value) => sum + value, 0) / present.length).toFixed(1);
+  };
+  const said = (value: string | null | undefined) => value !== null && value !== undefined && !/^nothing\.?$/i.test(value);
+  console.log("\nthe model's own report, by family (confidence 0-100, difficulty 1-5):");
+  console.log(`  ${"family".padEnd(26)} ${"right".padEnd(10)} conf  diff  another defensible  hard to see`);
+  const byFamilyDebrief = group((a) => (a.debrief ? familyOf.get(a.itemId) : undefined));
+  for (const [family, rows] of [...byFamilyDebrief].sort(([a], [b]) => String(a).localeCompare(String(b)))) {
+    const right = `${rows.filter((a) => a.correct).length}/${rows.length}`;
+    const another = rows.filter((a) => a.debrief?.after?.onlyDefensible === false).length;
+    const hard = rows.filter((a) => said(a.debrief?.before?.hardToSee)).length;
+    console.log(`  ${String(family).padEnd(26)} ${right.padEnd(10)} ${mean(rows.map((a) => a.debrief?.before?.confidence)).padStart(4)}  ` +
+      `${mean(rows.map((a) => a.debrief?.before?.difficulty)).padStart(4)}  ${String(another).padStart(18)}  ${String(hard).padStart(11)}`);
+  }
+  const unread = debriefed.filter((a) => a.debrief?.error || !a.debrief?.before || !a.debrief?.after).length;
+  if (unread > 0) console.log(`  (${unread} follow-ups failed or could not be read; their raw replies are in the artifact)`);
+  const flagged = debriefed.filter((a) =>
+    a.debrief?.after?.onlyDefensible === false || said(a.debrief?.before?.hardToSee) || said(a.debrief?.after?.unclear));
+  if (flagged.length > 0) {
+    console.log("\nitems the model flagged:");
+    for (const a of flagged) {
+      const d = a.debrief!;
+      console.log(`  ${a.itemId} · ${familyOf.get(a.itemId) ?? "?"} · answered ${d.answeredLetter ?? "-"}, intended ${d.intendedLetter}` +
+        `${d.after?.onlyDefensible === false ? `, also defensible: ${d.after.otherOption ?? "?"} (${d.after.otherRule ?? "no rule given"})` : ""}` +
+        `${said(d.before?.hardToSee) ? `; hard to see: ${d.before!.hardToSee}` : ""}` +
+        `${said(d.after?.unclear) ? `; unclear: ${d.after!.unclear}` : ""}`);
     }
   }
 }

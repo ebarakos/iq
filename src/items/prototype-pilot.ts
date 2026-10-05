@@ -15,7 +15,7 @@ import {
   validateSceneFamilyCandidate,
   type SceneFamilyId,
 } from "./scene-families";
-import { MAXIMUM_DIFFICULTY, toPublicPuzzle, type PublicPuzzle, type Scene } from "./schema";
+import { MAXIMUM_DIFFICULTY, toPublicPuzzle, type PublicPuzzle } from "./schema";
 
 /**
  * How many items each enabled key contributes to the pilot.
@@ -85,7 +85,7 @@ export interface PrototypePilotKey {
 
 export interface PrototypePilotQuestion extends PrototypePilotKey {
   itemId: string;
-  puzzle: PublicPuzzle<Scene>;
+  puzzle: PublicPuzzle;
 }
 
 export interface PrototypePilotPacket {

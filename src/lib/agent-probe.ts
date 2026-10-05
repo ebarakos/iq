@@ -4,7 +4,7 @@ import {
 } from "@/items/family-promotion";
 import { eligibleFamiliesForBand } from "@/items/expanded-quiz";
 import { requireSceneFamilyBucket, type SceneFamilyId } from "@/items/scene-families";
-import type { GenerationMetadata, Puzzle, Visual } from "@/items/schema";
+import type { GenerationMetadata, Puzzle } from "@/items/schema";
 
 /**
  * Observations per family required by the standard probe.
@@ -63,7 +63,7 @@ export function standardProbeRequirements(
   };
 }
 
-function counts(items: readonly Puzzle<Visual>[], keyOf: (item: Puzzle<Visual>) => string | undefined) {
+function counts(items: readonly Puzzle[], keyOf: (item: Puzzle) => string | undefined) {
   const result = new Map<string, number>();
   for (const item of items) {
     const key = keyOf(item);
@@ -73,7 +73,7 @@ function counts(items: readonly Puzzle<Visual>[], keyOf: (item: Puzzle<Visual>) 
 }
 
 export function probeCoverage(
-  items: readonly Puzzle<Visual>[],
+  items: readonly Puzzle[],
   requirements: ProbeCoverageRequirements,
 ): ProbeCoverageReport {
   const familyCounts = counts(items, (item) => item.generation?.familyId ?? item.familyId);
@@ -99,10 +99,10 @@ export function coverageComplete(report: ProbeCoverageReport): boolean {
  * Input order is seeded by the generated tests, so the same run seed replays.
  */
 export function selectCoverageItems(
-  pool: readonly Puzzle<Visual>[],
+  pool: readonly Puzzle[],
   requirements: ProbeCoverageRequirements,
-): Puzzle<Visual>[] {
-  const selected: Puzzle<Visual>[] = [];
+): Puzzle[] {
+  const selected: Puzzle[] = [];
   const familyCounts = new Map<string, number>();
   const complexityCounts = new Map<string, number>();
 

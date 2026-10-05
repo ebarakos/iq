@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { PuzzleSet, PublicPuzzleSet, Visual } from "@/items/schema";
+import type { PuzzleSet, PublicPuzzleSet } from "@/items/schema";
 import { GenerationMetadataSchema, REASONING_BANDS, toPublicPuzzleSet } from "@/items/schema";
 
 const TOKEN_VERSION = "v1";
@@ -60,7 +60,7 @@ export const QuizTokenPayloadSchema = z.object({
 export type QuizTokenPayload = z.infer<typeof QuizTokenPayloadSchema>;
 
 export type QuizDelivery = {
-  puzzles: PublicPuzzleSet<Visual>;
+  puzzles: PublicPuzzleSet;
   quizToken: string;
   /**
    * The same deadline the token seals, in plain epoch seconds, so the browser
@@ -213,7 +213,7 @@ export function openQuizToken(
 
 /** Build the public response and opaque answer key for a generated quiz. */
 export function createQuizDelivery(
-  puzzles: PuzzleSet<Visual>,
+  puzzles: PuzzleSet,
   options: {
     secret?: string;
     nowSeconds?: number;

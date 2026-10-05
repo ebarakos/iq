@@ -93,8 +93,6 @@ fresh seed → versioned scene generator → rule + uniqueness checks → public
 public puzzle → agent harness → vision model via relay → bucketed attempt artifacts
 ```
 
-- `src/items/rules.ts` — the rule DSL, semantic validator, bounded operator grammar,
-  and full-grammar uniqueness oracle.
 - `src/items/expanded-quiz.ts` — seeded 5- and 30-question assembler over the live scene
   families and difficulty bands.
 - `src/items/blind-options.ts` — the options-only solvers that check no answer can be
@@ -135,7 +133,8 @@ npm run build        # production build
 npm run bank:topup   # rebuild the emergency bank (--replace --per-bucket N --seed S)
 npm run bank:verify  # bank integrity gate (run before committing bank changes)
 npm run agent:smoke  # relay multimodal smoke test (vision models)
-npm run agent:run    # solver harness (--all --channel image --repeat N ...)
+npm run agent:run    # solver harness (--all --channel image --repeat N ...; --debrief asks the model
+                     # for its confidence and rule, then whether another option was defensible)
 npm run report       # calibration report (--write to tag the bank)
 npm run render:item  # PNG fixtures of bank items (data/fixtures/)
 npm run vercel:setup # one-time Vercel secrets + Git deployment bootstrap

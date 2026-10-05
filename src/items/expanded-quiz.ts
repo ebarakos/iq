@@ -14,11 +14,9 @@ import {
   type SceneFamilyId,
 } from "./scene-families";
 import {
-  VisualPuzzleSetSchema,
+  PuzzleSetSchema,
   type Puzzle,
   type PuzzleSet,
-  type Scene,
-  type Visual,
 } from "./schema";
 
 /**
@@ -29,7 +27,7 @@ import {
  * versions are different populations and must never be pooled. What each
  * version changed is in docs/plans/history.md.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v19" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v30" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -79,10 +77,11 @@ export const MINIMUM_DISTINCT_FAMILIES: Readonly<Record<ExpandedProfile, number>
  * are split and ordered. Warmup keeps its complete pool so every test still
  * begins with the full set of introductory mechanisms.
  *
- * Constraint-spatial draws two of its three families (combining-machine was
- * out of the band from 2026-09-29 to 2026-09-30, when the draw of two was the
- * band's whole pool). Induction-transfer draws both of its hard, three-step
- * transformation families after the one-step switch moved to warmup in v17.
+ * Constraint-spatial draws two families, its whole pool since the combining
+ * machine was retired on 2026-10-05 (it had also been out of the band from
+ * 2026-09-29 to 2026-09-30). Induction-transfer draws both of its hard,
+ * three-step transformation families after the one-step switch moved to warmup
+ * in v17.
  */
 export const FAMILY_SUBSAMPLE_SIZES: Readonly<
   Record<ExpandedProfileBand, number | undefined>
@@ -174,23 +173,14 @@ export function isAnalogyLayoutFamily(familyId: string): boolean {
 export const EXPANDED_SLOT_RETRY_BUDGET = 4;
 
 /**
- * Worked-example layouts must show at least two visible scenes, so the rule is
- * read off a sequence rather than guessed from one unexplained panel.
- *
- * `singleScene` boards and the empty-stem outlier layout are exempt because
- * their evidence is not in the stem: an outlier item is read across its four
- * options, and a mosaic, path, or repair board is read as a whole.
- */
-/**
  * Every served item must show at least this many visible panels.
  *
  * This is what makes an item a reasoning question rather than a guess: the
  * panels demonstrate the rule, and the options ask for it applied. A single
  * board with six variations of itself shows nothing to infer from — the solver
- * has to guess which property matters. `singleScene` and empty-stem layouts
- * were exempted here until 2026-08-23, when the user hit them in the pilot and
- * ruled them out; the exemption is gone rather than narrowed, so no future
- * family can reintroduce the shape.
+ * has to guess which property matters. The owner ruled such items out on
+ * 2026-08-23, and the single-board and empty-stem layouts have since left the
+ * schema.
  */
 const MINIMUM_VISIBLE_STEM_PANELS = 2;
 
@@ -778,7 +768,7 @@ export function assertProfilesRemainBuildable(
 
 /** One attempt at filling one slot: the item the assembler would serve, or why not. */
 export type ExpandedSlotDraw =
-  | { accepted: true; puzzle: Puzzle<Scene> }
+  | { accepted: true; puzzle: Puzzle }
   | { accepted: false; rejection: string };
 
 /**
@@ -818,7 +808,7 @@ export function drawExpandedSlot(
   } catch (error) {
     return { accepted: false, rejection: error instanceof Error ? error.message : String(error) };
   }
-  const puzzle: Puzzle<Scene> = {
+  const puzzle: Puzzle = {
     ...generated.puzzle,
     id: runtimePuzzleId(seed, slotIndex),
     band: selected.band,
@@ -867,11 +857,11 @@ export function assembleExpandedQuiz(
   profile: ExpandedProfile,
   registry: FamilyPromotionRegistry,
   withdrawnFamilyIds: ReadonlySet<string> = new Set(),
-): PuzzleSet<Visual> {
+): PuzzleSet {
   if (String(seed).length === 0) throw new Error("seed must not be empty");
   const schedule = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds);
 
-  const puzzles: Puzzle<Scene>[] = [];
+  const puzzles: Puzzle[] = [];
   // A program fingerprint names a family's rule structure, not one instance, so
   // it cannot be unique across a 30-question test that reuses families. What
   // must be unique is the question: no two may ask the same thing.
@@ -879,7 +869,7 @@ export function assembleExpandedQuiz(
 
   for (const [slotIndex, selected] of schedule.entries()) {
     const rejections: string[] = [];
-    let accepted: Puzzle<Scene> | undefined;
+    let accepted: Puzzle | undefined;
     let acceptedQuestion = "";
 
     for (let attempt = 0; attempt < EXPANDED_SLOT_RETRY_BUDGET && !accepted; attempt++) {
@@ -907,5 +897,5 @@ export function assembleExpandedQuiz(
     puzzles.push(accepted);
   }
 
-  return VisualPuzzleSetSchema.parse(puzzles) as PuzzleSet<Visual>;
+  return PuzzleSetSchema.parse(puzzles) as PuzzleSet;
 }

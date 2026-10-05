@@ -23,7 +23,7 @@ import {
 } from "./attempts";
 import { partitionComposedTransformPrograms, sceneFamilyBucketsFor } from "@/items/scene-families";
 import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
-import { VisualPuzzleSchema } from "@/items/schema";
+import { PuzzleSchema } from "@/items/schema";
 import {
   formatMissingHeldOutCoverage,
   heldOutBucketPool,
@@ -173,7 +173,7 @@ describe("held-out source of the agent harness", () => {
   it("passes the same puzzle contract as a public item, in its own bucket and band", () => {
     for (const entry of buckets) {
       for (const item of heldOutBucketPool("held-out-source-contract", entry, 4)) {
-        expect(VisualPuzzleSchema.safeParse(item).success).toBe(true);
+        expect(PuzzleSchema.safeParse(item).success).toBe(true);
         expect(item.familyId).toBe("composed-transform-v2");
         expect(item.generation?.featureBucket).toBe(entry.featureBucket);
         expect(item.band).toBe(entry.band);

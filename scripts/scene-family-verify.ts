@@ -8,6 +8,7 @@ import {
   generateSceneFamilyCandidate,
   validateSceneFamilyCandidate,
   MINIMUM_OBSERVED_TERMS_IN_ANSWERED_STRAND,
+  SCENE_FAMILY_CLUE_MODELS,
   type SceneFamilyId,
 } from "../src/items/scene-families";
 import {
@@ -19,8 +20,10 @@ import { CURRENT_FAMILY_PROMOTION_REGISTRY, EXPANDED_PROFILE_BANDS } from "../sr
 import { eligibleFamiliesForBand } from "../src/items/expanded-quiz";
 import {
   blindStrategyCredits,
+  optionsAloneOnAClue,
 } from "../src/items/blind-options";
 import { toPublicPuzzle, type Scene } from "../src/items/schema";
+import { isReadingCheckedFamily, secondReadings } from "../src/items/worked-row-readings";
 
 const PROGRAM_VARIETY_PROBE_SEEDS = 200;
 const MIN_DISTINCT_PROGRAM_FINGERPRINTS = 8;
@@ -60,7 +63,6 @@ const CONVERTED_FAMILY_IDS = new Set<string>([
   "spatial-transform-v2",
   "transformation-machine-v3",
   "composed-transform-v2",
-  "combining-machine-v1",
 ]);
 
 /**
@@ -81,6 +83,18 @@ const CONVERTED_FAMILY_IDS = new Set<string>([
  * agreement rule that fed one of them (42.9% on `relational-matrix-d4`) stopped
  * being a hard rule. The seeds are fixed, so the gate cannot flake; 200 items
  * put 30% about five standard errors above chance.
+ *
+ * The same items carry the one-clue gate of 2026-10-03: no option may hold a
+ * clue no other option holds (`optionsAloneOnAClue`, under the family's
+ * `SCENE_FAMILY_CLUE_MODELS` entry), so one of the clues a question needs is
+ * never enough. That one has no rate: a single item breaking it fails the
+ * bucket. A `whole-rule` family is reported but not held to it.
+ *
+ * And the one-reading gate of 2026-10-04 (docs/plans/one-reading-per-worked-row.md):
+ * in the machine families and set algebra, no reading every worked row allows
+ * may land on a wrong option (`secondReadings`: flips and turns of the board,
+ * a mirror that turns arrows too, token turns, fill changes, copies of every
+ * shape). Like the clue gate, one item breaking it fails the bucket.
  */
 const BLIND_GATE_ITEMS = 200;
 const BLIND_GATE_LIMIT = 0.30;
@@ -403,6 +417,11 @@ const distanceKeys = enabledKeys.map((entry) => {
 const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${entry.difficultyBucket}`, entry])).values()]
   .map((entry) => {
     const credit: Record<string, number> = {};
+    const clueModel = SCENE_FAMILY_CLUE_MODELS[entry.familyId as SceneFamilyId];
+    let aloneOnAClue = 0;
+    const readingsChecked = isReadingCheckedFamily(entry.familyId);
+    let secondReadingItems = 0;
+    let secondReadingExample: string | null = null;
     for (let item = 0; item < BLIND_GATE_ITEMS; item++) {
       const { puzzle } = generateSceneFamilyCandidate(
         entry.familyId as SceneFamilyId,
@@ -413,11 +432,21 @@ const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${e
       for (const [strategy, earned] of Object.entries(blindStrategyCredits(served, puzzle.answerIndex))) {
         credit[strategy] = (credit[strategy] ?? 0) + earned;
       }
+      if (clueModel !== "whole-rule" && optionsAloneOnAClue(served, clueModel).size > 0) aloneOnAClue += 1;
+      if (readingsChecked) {
+        const found = secondReadings(entry.familyId, puzzle);
+        if (found.length > 0) {
+          secondReadingItems += 1;
+          secondReadingExample ??= `item ${item}: option ${found[0].option + 1} follows from ${found[0].reading}`;
+        }
+      }
     }
     const rates = Object.fromEntries(Object.entries(credit).map(([strategy, earned]) =>
       [strategy, Number((earned / BLIND_GATE_ITEMS).toFixed(3))])) as Record<string, number>;
     const [worstStrategy, worstRate] = Object.entries(rates).reduce((worst, next) => (next[1] > worst[1] ? next : worst));
-    const passed = worstRate <= BLIND_GATE_LIMIT;
+    const cluesShared = aloneOnAClue === 0;
+    const oneReading = secondReadingItems === 0;
+    const passed = worstRate <= BLIND_GATE_LIMIT && cluesShared && oneReading;
     if (!passed) failures++;
     return {
       familyId: entry.familyId,
@@ -426,6 +455,13 @@ const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${e
       worstStrategy,
       worstRate,
       rates,
+      clueModel,
+      aloneOnAClue,
+      cluesShared,
+      readingsChecked,
+      secondReadingItems,
+      secondReadingExample,
+      oneReading,
       passed,
     };
   });
@@ -456,7 +492,7 @@ const aggregateImproved = comparableKeys.length > 0 &&
 if (distanceGateEnforced && !aggregateImproved) failures++;
 
 process.stdout.write(`${JSON.stringify({
-  version: "scene-family-verify-v8",
+  version: "scene-family-verify-v9",
   bucketParity: {
     enabledRegistryKeys: enabledKeys.length,
     declaredBuckets: declaredBucketOwners.size,
@@ -512,12 +548,15 @@ process.stderr.write(
 const percent = (rate: number) => `${(rate * 100).toFixed(1)}%`.padStart(6);
 process.stderr.write(
   `\noptions-only strategies, ${BLIND_GATE_ITEMS} items per bucket (limit ${percent(BLIND_GATE_LIMIT)}, chance 17%)\n` +
-    `${"bucket".padEnd(28)} ${"worst strategy".padEnd(20)} rate  lone-aspect  exclude-lone\n`,
+    `${"bucket".padEnd(28)} ${"worst strategy".padEnd(20)} rate  lone-aspect  exclude-lone  one clue enough  second reading\n`,
 );
 for (const entry of blindKeys) {
   process.stderr.write(
     `${entry.difficultyBucket.padEnd(28)} ${entry.worstStrategy.padEnd(20)}${percent(entry.worstRate)}     ` +
-      `${percent(entry.rates["lone-aspect"])}       ${percent(entry.rates["exclude-lone-aspect"])}${entry.passed ? "" : "  FAILS"}\n`,
+      `${percent(entry.rates["lone-aspect"])}       ${percent(entry.rates["exclude-lone-aspect"])}  ` +
+      `${entry.clueModel === "whole-rule" ? "  (whole rule is one clue)" : `${String(entry.aloneOnAClue).padStart(4)} of ${entry.items}`}` +
+      `${entry.readingsChecked ? `  ${String(entry.secondReadingItems).padStart(7)} of ${entry.items}` : ""}` +
+      `${entry.passed ? "" : "  FAILS"}\n`,
   );
 }
 
@@ -547,8 +586,18 @@ if (failures > 0) {
       `extrapolation gate failed for ${extrapolationOffenders.join(", ")}: a row strand containing the blank must show at least ${MINIMUM_OBSERVED_TERMS_IN_ANSWERED_STRAND} terms, declared as the panels that lead to it`,
     );
   }
-  const blindOffenders = blindKeys.filter((entry) => !entry.passed).map((entry) =>
+  const blindOffenders = blindKeys.filter((entry) => entry.worstRate > BLIND_GATE_LIMIT).map((entry) =>
     `${entry.difficultyBucket} (${entry.worstStrategy} ${percent(entry.worstRate).trim()})`);
+  const clueOffenders = blindKeys.filter((entry) => !entry.cluesShared).map((entry) =>
+    `${entry.difficultyBucket} (${entry.aloneOnAClue} of ${entry.items} items)`);
+  if (clueOffenders.length > 0) {
+    parts.push(`one clue alone narrows the options to one for ${clueOffenders.join("; ")}`);
+  }
+  const readingOffenders = blindKeys.filter((entry) => !entry.oneReading).map((entry) =>
+    `${entry.difficultyBucket} (${entry.secondReadingItems} of ${entry.items} items; ${entry.secondReadingExample})`);
+  if (readingOffenders.length > 0) {
+    parts.push(`a reading every worked row allows lands on a wrong option for ${readingOffenders.join("; ")}`);
+  }
   if (blindOffenders.length > 0) {
     parts.push(
       `an options-only strategy picks the answer above ${percent(BLIND_GATE_LIMIT).trim()} of the time for ` +

@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import type { Puzzle, PublicPuzzle, Visual } from "@/items/schema";
+import type { Puzzle, PublicPuzzle } from "@/items/schema";
 import type { Channel } from "./attempts";
 import { relayModel, relayTimeoutMs } from "./model";
 import { puzzleToSvg } from "@/items/compose-image";
@@ -23,12 +23,19 @@ import { puzzleToSvg } from "@/items/compose-image";
  */
 
 /**
- * Version of the whole reply-to-answer path, not just the prompt text. Reports
- * group by it so runs measured under different rules are never pooled. `v3`
- * keeps `v2`'s prompt but scans the entire reply and prefers the last letter;
- * `v2` read only the first 200 characters and took the first letter.
+ * Version of the whole question-to-answer path, not just the prompt text.
+ * Reports group by it so runs measured under different rules are never pooled.
+ * `v6` (2026-10-04) keeps `v5`'s prompt and reply reading; the image draws stars
+ * with fatter arms (`STAR_INNER_RATIO`, src/items/render.tsx), so grey reads
+ * inside them. `v5` (2026-10-04) keeps `v4`'s prompt and reply reading but changes the
+ * image again: machine gates are jigsaw pieces snapped together instead of
+ * board shapes in a dashed box (src/items/gate-pieces.ts). `v4` (2026-10-03) keeps `v3`'s prompt and reply reading but changes the image:
+ * numbered sequences, "A → B" over "C → ?" analogies and flow arrows in 3 × 3
+ * grids, the same cues a person now sees. `v3` keeps
+ * `v2`'s prompt but scans the entire reply and prefers the last letter; `v2`
+ * read only the first 200 characters and took the first letter.
  */
-export const SOLVER_PROMPT_VERSION = "solver-v3";
+export const SOLVER_PROMPT_VERSION = "solver-v6";
 
 /** Fixed neutral instruction — identical across channels and models. */
 const SOLVER_PROMPT =
@@ -125,7 +132,7 @@ export function parseAnswerLetter(raw: string, optionCount: number): number | nu
  * answerIndex, explanation and rule are stripped so a text model cannot read
  * the answer off the JSON.
  */
-function symbolicPayload(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): string {
+function symbolicPayload(puzzle: Puzzle | PublicPuzzle): string {
   const body = {
     layout: puzzle.layout,
     stem: puzzle.stem,
@@ -136,7 +143,7 @@ function symbolicPayload(puzzle: Puzzle<Visual> | PublicPuzzle<Visual>): string 
 
 /** Render a puzzle's composed SVG to PNG bytes via resvg (lazily imported). */
 async function renderPng(
-  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>,
+  puzzle: Puzzle | PublicPuzzle,
   optionsOnly = false,
 ): Promise<Uint8Array> {
   // Dynamic import keeps the native @resvg/resvg-js module out of the dependency
@@ -154,7 +161,7 @@ async function renderPng(
  * provider reliability; we want one clean attempt per call.
  */
 export async function solveItem(
-  puzzle: Puzzle<Visual> | PublicPuzzle<Visual>,
+  puzzle: Puzzle | PublicPuzzle,
   channel: Channel,
   opts?: SolverOpts,
 ): Promise<SolveOutcome> {
@@ -218,4 +225,187 @@ export async function solveItem(
     latencyMs: Date.now() - started,
     modelUsed,
   };
+}
+
+/**
+ * Version of the follow-up questions `debriefItem` asks after a scored answer
+ * (`agent-run --debrief`). Separate from `SOLVER_PROMPT_VERSION` because the
+ * scored path is untouched: the answer is given and recorded before any of
+ * this is asked, so the score of a debriefed run pools with one that was not.
+ */
+export const DEBRIEF_PROMPT_VERSION = "debrief-v1";
+
+/** Asked before the intended answer is shown, so confidence and rule are the model's own. */
+const DEBRIEF_BEFORE_PROMPT =
+  "Your answer is recorded and will not change. Now report honestly on this puzzle, as a single " +
+  "JSON object and nothing else, with these keys: " +
+  '"confidence": a number from 0 to 100, how sure you are that your answer is the intended one; ' +
+  '"rule": one sentence, the rule you think the puzzle uses; ' +
+  '"difficulty": a whole number from 1 (very easy) to 5 (very hard), for you; ' +
+  '"hard_to_see": anything in the picture that was hard to see or read, or "nothing".';
+
+/** Asked after it, so the model can say whether another option is as defensible. */
+function debriefAfterPrompt(intended: string): string {
+  return `The intended answer is ${intended}. Report honestly, as a single JSON object and nothing else, ` +
+    `with these keys: "only_defensible": true if ${intended} is clearly the only option a careful solver ` +
+    `could defend, false if another option is about as defensible; "other_option": that other option's ` +
+    `letter, or null; "other_rule": one sentence, the rule that would make the other option correct, or ` +
+    `null; "what_misled": if your answer was not ${intended}, what led you to it, otherwise null; ` +
+    `"unclear": anything about how to read the puzzle that was unclear, or "nothing".`;
+}
+
+/** The outermost `{…}` of a reply parsed as a JSON object, or null. */
+export function parseJsonObject(raw: string): Record<string, unknown> | null {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const value: unknown = JSON.parse(raw.slice(start, end + 1));
+    return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+const textField = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() !== "" ? value.trim().slice(0, 500) : null;
+
+const numberField = (value: unknown, low: number, high: number, whole: boolean): number | null => {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < low || parsed > high) return null;
+  return whole && !Number.isInteger(parsed) ? null : parsed;
+};
+
+/** The first follow-up reply, read field by field; a field it left out or mistyped is null. */
+export function readDebriefBefore(raw: string): {
+  confidence: number | null; rule: string | null; difficulty: number | null; hardToSee: string | null;
+} | null {
+  const reply = parseJsonObject(raw);
+  if (!reply) return null;
+  return {
+    confidence: numberField(reply.confidence, 0, 100, false),
+    rule: textField(reply.rule),
+    difficulty: numberField(reply.difficulty, 1, 5, true),
+    hardToSee: textField(reply.hard_to_see),
+  };
+}
+
+/** The second follow-up reply; `otherOption` is a letter on the image the model saw. */
+export function readDebriefAfter(raw: string, optionCount: number): {
+  onlyDefensible: boolean | null; otherOption: string | null; otherRule: string | null;
+  whatMisled: string | null; unclear: string | null;
+} | null {
+  const reply = parseJsonObject(raw);
+  if (!reply) return null;
+  const letter = typeof reply.other_option === "string" ? reply.other_option.trim().toUpperCase() : "";
+  const index = LETTERS.indexOf(letter as (typeof LETTERS)[number]);
+  return {
+    onlyDefensible: typeof reply.only_defensible === "boolean" ? reply.only_defensible : null,
+    otherOption: index >= 0 && index < optionCount ? letter : null,
+    otherRule: textField(reply.other_rule),
+    whatMisled: textField(reply.what_misled),
+    unclear: textField(reply.unclear),
+  };
+}
+
+/** The letter an option index carries on the image. */
+export function optionLetter(index: number): string {
+  return LETTERS[index];
+}
+
+/** One follow-up reply, and the model its response says wrote it. */
+export interface DebriefTurn {
+  raw: string;
+  modelId?: string;
+}
+
+/**
+ * What the follow-up turns produced. Each completed turn is kept on its own, so
+ * a second turn that times out or is rate limited never costs the first one.
+ * `error` says why the follow-up stopped early, if it did.
+ */
+export interface DebriefReplies {
+  before?: DebriefTurn;
+  after?: DebriefTurn;
+  error?: string;
+}
+
+/**
+ * Ask the model about an item it has just answered, in two more turns of the
+ * same conversation: its confidence, rule, difficulty and anything hard to see;
+ * then, with the intended answer shown, whether another option is as
+ * defensible. Image channel only, the same picture and shuffle it answered.
+ *
+ * `answeredBy` is the model the scored reply says answered. The follow-up
+ * client is built from the requested name, and a moving name such as Codex's
+ * `default` can reach a different model between two calls. A reply from any
+ * model other than `answeredBy` is not this model's own report: it is dropped,
+ * nothing after it is asked, and `error` names both models. Returns the raw
+ * replies; reading them is the caller's.
+ */
+export async function debriefItem(
+  puzzle: Puzzle | PublicPuzzle,
+  answerRaw: string,
+  intendedIndex: number,
+  answeredBy: string | undefined,
+  opts?: SolverOpts,
+): Promise<DebriefReplies> {
+  const { model, provider } = relayModel({
+    provider: opts?.provider,
+    model: opts?.model,
+    apiKey: opts?.apiKey,
+    thinkingBudget: opts?.thinkingBudget,
+    effort: opts?.effort,
+  });
+  const timeout = () => AbortSignal.timeout(opts?.timeoutMs ?? relayTimeoutMs(provider, DEFAULT_TIMEOUT_MS));
+  const png = await renderPng(puzzle);
+  const question = {
+    role: "user" as const,
+    content: [
+      { type: "image" as const, image: png, mediaType: "image/png" },
+      { type: "text" as const, text: SOLVER_PROMPT },
+    ],
+  };
+  const answer = { role: "assistant" as const, content: answerRaw.trim() || "(no answer)" };
+  const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+  const otherModel = (turn: string, modelId: string | undefined) =>
+    answeredBy && modelId && modelId !== answeredBy
+      ? `the ${turn} follow-up was answered by ${modelId}, not ${answeredBy}, so it is not that model's own report`
+      : undefined;
+
+  let before: DebriefTurn;
+  try {
+    const reply = await generateText({
+      model,
+      messages: [question, answer, { role: "user", content: DEBRIEF_BEFORE_PROMPT }],
+      maxRetries: 0,
+      abortSignal: timeout(),
+    });
+    before = { raw: reply.text, modelId: reply.response.modelId };
+  } catch (err) {
+    return { error: `the first follow-up failed: ${message(err)}` };
+  }
+  const movedBefore = otherModel("first", before.modelId);
+  if (movedBefore) return { error: movedBefore };
+
+  let after: DebriefTurn;
+  try {
+    const reply = await generateText({
+      model,
+      messages: [
+        question,
+        answer,
+        { role: "user", content: DEBRIEF_BEFORE_PROMPT },
+        { role: "assistant", content: before.raw },
+        { role: "user", content: debriefAfterPrompt(LETTERS[intendedIndex]) },
+      ],
+      maxRetries: 0,
+      abortSignal: timeout(),
+    });
+    after = { raw: reply.text, modelId: reply.response.modelId };
+  } catch (err) {
+    return { before, error: `the second follow-up failed: ${message(err)}` };
+  }
+  const movedAfter = otherModel("second", after.modelId);
+  return movedAfter ? { before, error: movedAfter } : { before, after };
 }

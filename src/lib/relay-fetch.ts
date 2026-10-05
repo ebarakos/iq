@@ -1,4 +1,4 @@
-// @relay-template: relay-fetch@10
+// @relay-template: relay-fetch@11
 
 /**
  * Custom fetch for the OpenAI-compatible / Vercel AI SDK client that talks to llm-relay.
@@ -69,6 +69,19 @@ export interface RelayFetchOptions {
   sessionId?: string;
   customUrl?: string;
   noFallback?: boolean;
+  /** For a harness provider, from a caller that does NOT relay browser requests (a CLI, a batch
+   *  script): the relay's `LOCAL_API_KEY`, which it requires as `X-Harness-Caller-Token` to
+   *  serve `claude-code` / `codex` to a request with no `Origin`. Pass
+   *  `process.env.RELAY_HARNESS_CALLER_TOKEN`. Never set it in an API route that serves browser
+   *  pages: the token would vouch for any page able to reach the route — pass `origin` there.
+   *  Hosted providers never receive it. */
+  callerToken?: string;
+  /** For a harness provider, from an API route that relays a browser request: the page's
+   *  `Origin` (`req.headers.get("origin")`). The server-side hop otherwise reaches the relay
+   *  with no `Origin`, and the relay serves `claude-code` / `codex` only to a loopback page or
+   *  a token holder. Sent for harness calls only: the relay also picks a model tier by `Origin`,
+   *  which hosted calls keep deciding as before. */
+  origin?: string;
   onAttribution?: (info: RelayAttribution) => void;
 }
 
@@ -116,6 +129,8 @@ export function createRelayFetch(opts: RelayFetchOptions): typeof fetch {
       extraHeaders["X-User-Key-Tier"] = "free";
     }
     if (opts.thinkingBudget && !harness) extraHeaders["X-Thinking-Budget"] = String(opts.thinkingBudget);
+    if (harness && opts.callerToken) extraHeaders["X-Harness-Caller-Token"] = opts.callerToken;
+    if (harness && opts.origin) extraHeaders["Origin"] = opts.origin;
     if (opts.customUrl) extraHeaders["X-Custom-Url"] = opts.customUrl;
     if (opts.noFallback) extraHeaders["X-No-Fallback"] = "true";
     const headers = new Headers(options?.headers);

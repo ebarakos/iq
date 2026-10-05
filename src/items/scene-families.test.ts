@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { seededRng, shuffled } from "../lib/rng";
+import { seededRng } from "../lib/rng";
 import {
+  FILL_LOOP,
   OPTIONS_PER_ITEM,
-  VisualPuzzleSchema,
+  PuzzleSchema,
   sceneSignature,
   type Scene,
+  type SceneToken,
 } from "./schema";
 import { puzzleToSvg } from "./compose-image";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "./family-promotion";
 import { sceneEditDistance } from "./scene-distance";
+import { optionsAloneOnAClue } from "./blind-options";
+import {
+  boardKey,
+  machineWorkedRowReadings,
+  secondReadings,
+} from "./worked-row-readings";
 import { createHash } from "node:crypto";
 import {
   declaredGateCounts,
@@ -18,10 +26,7 @@ import {
   canonicalComposedTransformQuery,
   canonicalTransformationMachineQuery,
   checkAnsweredStrand,
-  combiningGateOrderVerdict,
-  combiningMachineCoveringChains,
   composedTransformGrammar,
-  deriveCombiningMachineChains,
   entrySceneFamilyBucket,
   generateHeldOutComposedTransformCandidate,
   generateSceneFamilyCandidate,
@@ -33,10 +38,13 @@ import {
   transformationMachineGates,
   transformationMachineGrammar,
   exhaustedDistractorSearches,
+  RELATIONAL_SEQUENCE_SHOWN_PICTURES,
+  SCENE_FAMILY_CLUE_MODELS,
   validateSceneFamilyCandidate,
   type SceneFamilyId,
 } from "./scene-families";
 import {
+  SCENE_BINARY_OPERATIONS,
   applySceneBinary,
   applySceneComposedProgram,
   applySceneCompositionPrimitive,
@@ -44,6 +52,7 @@ import {
   sceneComposedPrimitives,
   sceneComposedProgramKey,
   sceneComposedProgramSteps,
+  type SceneBinaryOperation,
   type SceneComposedProgram,
 } from "./scene-grammar";
 
@@ -114,7 +123,7 @@ describe("scene family prototypes", () => {
         const replay = generateSceneFamilyCandidate(familyId, seededRng(stream), bucket);
         expect(first.puzzle).toEqual(replay.puzzle);
         expect(first.definition.replayKey?.(first.puzzle)).toBe(replay.definition.replayKey?.(replay.puzzle));
-        expect(VisualPuzzleSchema.safeParse(first.puzzle).success, `${familyId} ${bucket}`).toBe(true);
+        expect(PuzzleSchema.safeParse(first.puzzle).success, `${familyId} ${bucket}`).toBe(true);
         // The bucket is a promise about what comes out, not a label pinned on
         // whatever came out.
         expect(first.puzzle.difficulty, `${familyId} ${bucket}`)
@@ -164,6 +173,20 @@ describe("scene family prototypes", () => {
     }
   });
 
+  it("explains every answer in the taker's words, never in the generator's", () => {
+    // The review screen shows the explanation to the person who just took the
+    // test: what to look at and how to reach the answer. Owner's rule of
+    // 2026-10-04, after an explanation ended "Distractors stop early, run the
+    // gates in another order, misread a gate…" (CLAUDE.md, Hard rules).
+    const generatorWords = /distractor|near.?miss|grammar|program|primitive|bounded|witness|candidate|generator|query|worked|\binputs?\b|\boutputs?\b|token|\bslots?\b|\bgates?\b|anchor|perimeter|\bfails?\b|\bhalf\b(?!-turn)|\bsolid\b|\boutline\b/i;
+    for (const { familyId, bucket } of FAMILY_BUCKETS) {
+      for (let seed = 0; seed < 30; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate(familyId, seededRng(`taker-words:${seed}`, bucket), bucket);
+        expect(puzzle.explanation, `${familyId} ${bucket} seed ${seed}`).not.toMatch(generatorWords);
+      }
+    }
+  });
+
   it("re-solves visible evidence instead of trusting captured generator state", () => {
     for (const { familyId, bucket } of FAMILY_BUCKETS) {
       const candidate = generateSceneFamilyCandidate(familyId, seededRng(`tamper:${familyId}:${bucket}`), bucket);
@@ -207,7 +230,7 @@ describe("scene family prototypes", () => {
           ? "token-turn"
           : spatial.puzzle.explanation.includes("rotates")
             ? "board-rotation"
-            : spatial.puzzle.explanation.includes("reflects")
+            : /mirrors|flips/.test(spatial.puzzle.explanation)
               ? "reflection"
               : "translation",
       );
@@ -220,7 +243,9 @@ describe("scene family prototypes", () => {
   });
 
   it("makes every composition fingerprint change the query answer", () => {
-    // composed-transform-v2's intermediate two-step space has 16 programs, and
+    // composed-transform-v2's intermediate two-step space has 12 servable
+    // programs (16 until 2026-10-04, when the four that fill after carrying the
+    // arrow into the fill square stopped being served), and
     // distinct programs may legitimately land on
     // the same query answer — the worked rows, not the answer alone, identify
     // the program. So for it the gate is breadth (minimumPrograms) plus
@@ -233,7 +258,7 @@ describe("scene family prototypes", () => {
     // a served machine item doing visible work"). rule-switching-v2 left it on
     // 2026-09-29, when the family was retired.
     const families = [
-      { familyId: "composed-transform-v2", queryIndex: 6, expectedPrograms: 16 },
+      { familyId: "composed-transform-v2", queryIndex: 6, expectedPrograms: 12 },
     ] as const;
     for (const family of families) {
       const { familyId, queryIndex } = family;
@@ -311,7 +336,7 @@ describe("scene family prototypes", () => {
     // did — and the shallower bucket had to come through untouched. A stray
     // edit to the shared board builders, grammars, or wording breaks this test
     // rather than quietly reshuffling items people have already answered.
-    // compositional-analogy's keys still date from before that change.
+    // compositional-analogy's keys were re-taken on 2026-10-03 (see below).
     // visual-set-algebra's were re-taken on 2026-08-27 for the reason noted on
     // them: that family was rebuilt on purpose, and this test is what proved
     // the rebuild touched nothing else.
@@ -321,19 +346,33 @@ describe("scene family prototypes", () => {
     // balanced options-only strategies, with the one-inference solver kept in
     // the mix as a cost (docs/plans/blind-answer-leak.md). Stems and answers
     // are unchanged, the options are not.
+    //
+    // REISSUED 2026-10-03 for compositional-analogy-d3 only, deliberately
+    // (scene-families-v20, docs/plans/unambiguous-reading.md): the worked and
+    // question boards now share two randomly drawn fills, so every fill change
+    // the answer needs is shown, where the worked board used to be fixed at
+    // white and gray and the question board at gray and black. Stems, answers
+    // and options all moved; visual-set-algebra-d4 did not, which is what this
+    // test proves about the shared builders.
+    //
+    // REISSUED 2026-10-03, deliberately (scene-families-v21,
+    // docs/plans/blind-answer-leak.md, "One clue is never enough"): every clue
+    // any option shows must now appear on two options, and the one-inference
+    // cost left the option game. Stems and answers are unchanged, checked
+    // against v20 on these very seeds; the options are not.
     const goldens: Record<string, { familyId: SceneFamilyId; bucket: string; keys: string[] }> = {
       "compositional-analogy-d3-golden": {
         familyId: "compositional-analogy-v2",
         bucket: "compositional-analogy-d3",
         keys: [
-          "0707d9975c1f18cdca150758",
-          "88d9493369ceef2c85a2a12b",
-          "409c3b9dfd3325a2bfff944d",
-          "e899b997fd9bec0b9dff5493",
-          "7e6ce529f05f4fca9e7b3152",
-          "a17f4fe72f5ad3d3ccdfdc46",
-          "629df3f3f94f12fcbcd03024",
-          "ce9d4784b977fcf76eff2449",
+          "5af064e78e7acb6af8bd093d",
+          "e436c9750831cac81896adb4",
+          "1c7c2fcf8307f6638ce08f96",
+          "94cfe2bc628bfd03e3746223",
+          "d7e7579e40f9aa3783f374fc",
+          "1b5e1132cbd97b3dbdd737bd",
+          "05a9941fa7f631844055aef7",
+          "bdfe8889966ea96fbc367f19",
         ],
       },
       "visual-set-algebra-d4-golden": {
@@ -353,15 +392,22 @@ describe("scene family prototypes", () => {
         //
         // Anyone who sees this list change again without that kind of note in
         // the commit should treat it as an accident.
+        //
+        // Re-taken on 2026-10-04 (scene-families-v23,
+        // docs/plans/one-reading-per-worked-row.md): the family now redraws when
+        // both worked results stand on the same squares or a step of its rule
+        // never shows, and keeps any board another reading of the rows predicts
+        // out of the options. Two of the eight keys moved; across 200 items, 13
+        // stems and 14 option lists did.
         keys: [
-          "1194eeb1d12a13aee1a7679d",
-          "51c85c5a613a542ceab45416",
-          "e0d31a083f660514e1ae78a8",
-          "105c26067230b9899dcd6c25",
-          "dd53caa602dc08e59dfdb1c5",
-          "3a5f89e6566c71c5036c8fe2",
-          "07c8591d168c9c97de579c26",
-          "fcf918c89bc7b54bafefd732",
+          "a06a30cc6e06eb2db11a3652",
+          "93ed401ad371cb3338c77360",
+          "2e38f158c9020a80cbb0794e",
+          "e46b1709bfdc5d17ccc4434c",
+          "7013978c6e935e526f9e475b",
+          "ea0e24cd6a6361d9da88896c",
+          "532a6b8f1666ea9bc74b7694",
+          "e43e7414704bde135bf5364d",
         ],
       },
     };
@@ -373,67 +419,33 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("rarely lets one inference pick the answer, in the families built on several rules", () => {
-    // The owner's report of 2026-08-27: "the answers are so different from each
-    // other, and using only one first inference you can select the right answer
-    // without looking at the other rules." Measured, every item in four buckets
-    // was solvable from the answer's footprint alone.
+  it("never lets one clue pick out any option, in any bucket a family can generate", () => {
+    // The owner's report of 2026-08-27: "using only one first inference you can
+    // select the right answer without looking at the other rules". From then
+    // until 2026-10-03 this test only asked that one inference pick the answer
+    // in at most half of 40 items, because a hard rule had made the answer the
+    // one option that always shared everything, which gave it away to a solver
+    // who never read the question (docs/plans/blind-answer-leak.md). Measured on
+    // 2026-10-03, one clue still picked the answer in up to 31% of items, and in
+    // up to 66% when the clue was one shape's fill. The owner's rule that day:
+    // "You should never be able to guess this answer through them or with 1 out
+    // of x clues needed to solve a test." So the rule is now absolute, and it
+    // holds for EVERY option, not only the answer: every clue any option shows
+    // appears on at least two, under the clue model of the option's family
+    // (`SCENE_FAMILY_CLUE_MODELS`).
     //
-    // Until 2026-09-30 the property pinned here was absolute: for each aspect a
-    // solver can infer on its own, at least one WRONG option had to share the
-    // answer's value of it. That rule fed a solver of its own — rule out every
-    // option alone on some aspect and guess among the rest, 42.9% on
-    // `relational-matrix-d4` — so by the owner's decision of 2026-09-29 being
-    // alone on an aspect is now one more strategy the option mix balances, held
-    // to 30% over 200 items by `npm run families:verify`. What this pins is the
-    // gross form: over 40 items, one inference picks the answer in at most half.
-    //
-    // It is asserted only for families whose program really has several
-    // independent parts. `second-order-sequence` is excluded on purpose and
-    // not as a concession: every option is the same token at a different place,
-    // so a wrong option sharing the answer's footprint would be the answer. A
-    // family whose whole rule lands in one aspect is correct, not broken. The
-    // way to tell the two apart is whether the option set varies in more than
-    // one aspect at all — these three do not.
-    //
-    // The list below grew on 2026-08-27 by the four buckets that DID vary in
-    // several aspects and still let one of them decide: `relational-matrix-d4`
-    // (88% of items), `spatial-transform-d2` (64%), `rule-switching-d2` (48%)
-    // and `visual-set-algebra-d4` (45%). Each was fixed at the source of its
-    // near misses rather than by loosening anything here.
-    const ms = (values: string[]) => [...values].sort().join("|");
-    const aspects: Record<string, (scene: Scene) => string> = {
-      positions: (scene) => ms(scene.objects.map((p) => `${p.row},${p.column}`)),
-      shapes: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.shape : "-")),
-      fills: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.fill : "-")),
-      rotations: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? String(p.object.rotation) : "-")),
-      count: (scene) => String(scene.objects.length),
-    };
-    const MULTI_RULE: readonly { familyId: SceneFamilyId; bucket: string }[] = [
-      { familyId: "composed-transform-v2", bucket: "composed-transform-d4" },
-      { familyId: "composed-transform-v2", bucket: "composed-transform-d5" },
-      { familyId: "transformation-machine-v3", bucket: "transformation-machine-d5" },
-      { familyId: "compositional-analogy-v2", bucket: "compositional-analogy-d3" },
-      { familyId: "compositional-analogy-v2", bucket: "compositional-analogy-d4" },
-      { familyId: "visual-set-algebra-v2", bucket: "visual-set-algebra-d5" },
-      { familyId: "visual-set-algebra-v2", bucket: "visual-set-algebra-d4" },
-      { familyId: "inverse-analogy-v2", bucket: "inverse-analogy-d4" },
-      { familyId: "relational-matrix-v2", bucket: "relational-matrix-d4" },
-      { familyId: "spatial-transform-v2", bucket: "spatial-transform-d2" },
-    ];
-    for (const { familyId, bucket } of MULTI_RULE) {
-      let isolated = 0;
-      for (let seed = 0; seed < 40; seed++) {
+    // The second-order sequence is the one exception, by the owner's decision
+    // the same day: its whole rule is one clue, where the token lands, so a
+    // wrong option sharing it would be the answer.
+    for (const { familyId, bucket } of FAMILY_BUCKETS) {
+      const model = SCENE_FAMILY_CLUE_MODELS[familyId];
+      if (model === "whole-rule") continue;
+      for (let seed = 0; seed < 30; seed++) {
         const { puzzle } = generateSceneFamilyCandidate(
-          familyId, seededRng("single-inference", `${bucket}:${seed}`), bucket);
-        const answer = puzzle.options[puzzle.answerIndex];
-        if (Object.values(aspects).some((read) => {
-          const target = read(answer);
-          return puzzle.options.filter((option) => read(option) === target).length === 1;
-        })) isolated += 1;
+          familyId, seededRng("one-clue", `${bucket}:${seed}`), bucket);
+        expect([...optionsAloneOnAClue(puzzle.options as Scene[], model)], `${bucket} seed ${seed}: options alone on a clue`)
+          .toEqual([]);
       }
-      expect(isolated, `${bucket}: items where one aspect alone isolates the answer, of 40`)
-        .toBeLessThanOrEqual(20);
     }
   });
 
@@ -457,7 +469,6 @@ describe("scene family prototypes", () => {
     // Guard the guard: a typo in the table names would make the filter vacuous.
     expect(Object.keys(declared).filter((bucket) => drawable.has(bucket)).sort())
       .toEqual([
-        "combining-machine-d4", "combining-machine-d5",
         "composed-transform-d4", "composed-transform-d5", "transformation-machine-d5",
       ]);
   });
@@ -528,28 +539,32 @@ describe("scene family prototypes", () => {
     expect(composedTransformGrammar(3)).toHaveLength(276);
 
     // What survives running end to end, ordering visibly mattering, single-gate
-    // ablation, and having five distinct wrong runs to offer.
-    expect(servableComposedTransformPrograms(2)).toHaveLength(16);
-    expect(servableComposedTransformPrograms(3)).toHaveLength(192);
+    // ablation, having five distinct wrong runs to offer, and, since 2026-10-04,
+    // never asking a fill gate to colour the arrow. That last rule took two
+    // gates from 16 to 12 (a fill after the left-right mirror or the
+    // anticlockwise turn, which both carry the arrow into the upper-left slot)
+    // and three gates from 192 to 152.
+    expect(servableComposedTransformPrograms(2)).toHaveLength(12);
+    expect(servableComposedTransformPrograms(3)).toHaveLength(152);
     for (const gateCount of [2, 3] as const) {
       const { publicPrograms, heldOutPrograms } = partitionComposedTransformPrograms(gateCount);
       expect(publicPrograms.length + heldOutPrograms.length, `${gateCount} gates`)
         .toBe(servableComposedTransformPrograms(gateCount).length);
     }
-    expect(partitionComposedTransformPrograms(2).publicPrograms).toHaveLength(16);
+    expect(partitionComposedTransformPrograms(2).publicPrograms).toHaveLength(12);
     expect(partitionComposedTransformPrograms(2).heldOutPrograms).toHaveLength(0);
-    expect(partitionComposedTransformPrograms(3).publicPrograms).toHaveLength(168);
+    expect(partitionComposedTransformPrograms(3).publicPrograms).toHaveLength(128);
     expect(partitionComposedTransformPrograms(3).heldOutPrograms).toHaveLength(24);
 
     // The headline number from the plan's diagnosis. Before turns existed the
     // three-gate public pool was 56 programs, and 16 of them painted the
     // upper-left slot twice with nothing in between, so the first paint was
     // invisible and the "three-step" item really needed two. Those 16 are
-    // exactly what single-gate ablation removes: the turn-free public pool is
-    // now 40.
+    // exactly what single-gate ablation removes, which left 40. The arrow rule
+    // of 2026-10-04 removes 16 more, leaving 24.
     const turnFree = (program: SceneComposedProgram) =>
       sceneComposedProgramSteps(program).every((step) => step.kind !== "turn");
-    expect(partitionComposedTransformPrograms(3).publicPrograms.filter(turnFree)).toHaveLength(40);
+    expect(partitionComposedTransformPrograms(3).publicPrograms.filter(turnFree)).toHaveLength(24);
   });
 
   it("proves every servable composed program needs every gate it displays", () => {
@@ -670,9 +685,40 @@ describe("scene family prototypes", () => {
     // balanced options-only strategies, with the one-inference solver kept in
     // the mix as a cost (docs/plans/blind-answer-leak.md). Stems and answers
     // are unchanged, the options are not.
+    //
+    // REISSUED 2026-10-03, deliberately (scene-families-v21,
+    // docs/plans/blind-answer-leak.md, "One clue is never enough"): every clue
+    // any option shows must now appear on two options, and the one-inference
+    // cost left the option game. Stems and answers are unchanged, checked
+    // against v20 on these very seeds; the options are not.
+    //
+    // REISSUED 2026-10-04, deliberately (scene-families-v22): gates are drawn
+    // as jigsaw pieces, so the explanations name each gate by its piece ("the
+    // dotted piece") instead of "Gate A" or "the outline triangle". The same day
+    // the fill gate's worked arrow moved off the diagonal, from the lower-right
+    // square to the one left of it (docs/plans/one-reading-per-worked-row.md).
+    // Checked against v21 on 200 items: options, answers and every other panel
+    // are unchanged; only the fill rows' arrow moved. Later that day every
+    // explanation was rewritten for the person reading it (CLAUDE.md, Hard
+    // rules); with explanations left out, 450 items across every bucket are
+    // unchanged.
+    //
+    // REISSUED 2026-10-04, deliberately (scene-families-v23,
+    // docs/plans/one-reading-per-worked-row.md): a program whose fill gate lands
+    // on the arrow is no longer served (two gates went from 16 programs to 12,
+    // public three-gate programs from 168 to 128), so these seeds draw other
+    // programs, and the left-right mirror's worked arrow points sideways. On
+    // these 50 seeds 35 d4 items and all 50 d5 items moved; the other 15 d4
+    // items are unchanged.
+    //
+    // REISSUED 2026-10-04, deliberately (scene-families-v24): the fill gate's
+    // worked row shows its shape twice and colours only the top-left one, so
+    // "colour that kind of shape" no longer fits; both models took that reading
+    // in the v23 re-run. Checked against v23 on 200 items per bucket: only the
+    // fill rows' two panels moved; options, answers and explanations did not.
     const digests: Record<string, string> = {
-      "composed-transform-d4": "18ac7832ecf87e1a784c0ef53cba5b1c8a44f3118927224445c30983849df38d",
-      "composed-transform-d5": "b5a5708de9facd980d490bd58b835612e455f61035031c1e58b98dd941f62475",
+      "composed-transform-d4": "315ddfc6c161f9b3cad1fd8d4c1158a7edb66e6c995687ce346492ed5a53fc96",
+      "composed-transform-d5": "caa6e87c57f9e6be2ce4df7885db0d0c9ba1d2d856b99fddd97b207505f2472b",
     };
     for (const [bucket, digest] of Object.entries(digests)) {
       const rendered = Array.from({ length: 50 }, (_, seed) =>
@@ -1009,10 +1055,31 @@ describe("scene family prototypes", () => {
     // balanced options-only strategies, with the one-inference solver kept in
     // the mix as a cost (docs/plans/blind-answer-leak.md). Stems and answers
     // are unchanged, the options are not.
+    //
+    // REISSUED 2026-10-03, deliberately (scene-families-v21,
+    // docs/plans/blind-answer-leak.md, "One clue is never enough"): every clue
+    // any option shows must now appear on two options, and the one-inference
+    // cost left the option game. Stems and answers are unchanged, checked
+    // against v20 on these very seeds; the options are not. The run that stops
+    // before the duplication gate is no longer a required option.
+    //
+    // REISSUED 2026-10-04, deliberately (scene-families-v22): gates are drawn
+    // as jigsaw pieces, so the explanations name each gate by its piece ("the
+    // dotted piece") instead of "Gate A" or "the outline triangle". With the
+    // explanation left out, every puzzle on these seeds is unchanged against v21.
+    // The explanations were rewritten again the same day, for the person
+    // reading them (CLAUDE.md, Hard rules); nothing else changed.
+    //
+    // REISSUED 2026-10-04, deliberately (scene-families-v23,
+    // docs/plans/one-reading-per-worked-row.md): the copy row shows a second
+    // token the gate leaves alone, so neither "flip the board, then copy" nor
+    // "copy every shape" fits it. Its cell is drawn at random, so the option
+    // lists come from a later point in the stream: on these 50 seeds every copy
+    // row and every option list moved, and no answer did.
     const digests: Record<string, { familyId: SceneFamilyId; digest: string }> = {
       "transformation-machine-d5": {
         familyId: "transformation-machine-v3",
-        digest: "d6763f9e9d5e785de61ddc4b5f8ac005c3ae51f643979bf393b4f6ccf65f7659",
+        digest: "3f87a3b9259fe7fe56ac70ae7ec82793a6f034ac64e114408da0ff6a06143aef",
       },
     };
     for (const [bucket, { familyId, digest }] of Object.entries(digests)) {
@@ -1026,154 +1093,466 @@ describe("scene family prototypes", () => {
     }
   });
 
-  it("rarely lets one inference decide a combining-machine item, at both depths", () => {
-    // The regression gate for the aspect work of 2026-08-27, on fixed seeds so a
-    // change in the family moves this number rather than passing silently.
-    //
-    // The near-miss pool holds the board that sits exactly where the answer sits
-    // (the clash read the wrong way round) and the board that carries exactly
-    // its shapes (the exclusive token kept from the wrong board). Until
-    // 2026-09-28 d5 had a stated residual of up to 6 in 40: the live search for a
-    // covering gate order was capped, and when the cap ran out it served a
-    // merely sound chain. The family now draws only from the covering chains, so
-    // d5 was held to zero like d4. Since 2026-09-30 agreement is a balanced
-    // strategy rather than a hard rule (see "rarely lets one inference pick the
-    // answer" above), so both depths are held to the same gross bound.
-    const ms = (values: string[]) => [...values].sort().join("|");
-    const aspects: Record<string, (scene: Scene) => string> = {
-      positions: (scene) => ms(scene.objects.map((p) => `${p.row},${p.column}`)),
-      shapes: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.shape : "-")),
-      fills: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? p.object.fill : "-")),
-      rotations: (scene) => ms(scene.objects.map((p) => p.object.kind === "token" ? String(p.object.rotation) : "-")),
-      count: (scene) => String(scene.objects.length),
-    };
-    for (const bucket of ["combining-machine-d4", "combining-machine-d5"]) {
-      let leaking = 0;
-      for (let seed = 0; seed < 40; seed++) {
-        const { puzzle } = generateSceneFamilyCandidate(
-          "combining-machine-v1", seededRng("single-inference", `${bucket}:${seed}`), bucket);
-        const answer = puzzle.options[puzzle.answerIndex];
-        const decided = Object.values(aspects).some((read) =>
-          puzzle.options.filter((option) => read(option) === read(answer)).length === 1);
-        if (decided) leaking += 1;
-      }
-      expect(leaking, `${bucket}: ${leaking} of 40 items decided by one aspect`).toBeLessThanOrEqual(20);
-    }
+});
+
+describe("one reading per worked row", () => {
+  // The eight flips and turns of a 3 x 3 board, moving squares only: the
+  // composed grammar moves board slots and never turns a token with them.
+  const SYMMETRIES: Record<string, (row: number, column: number) => [number, number]> = {
+    "quarter turn": (row, column) => [column, 2 - row],
+    "half turn": (row, column) => [2 - row, 2 - column],
+    "three-quarter turn": (row, column) => [2 - column, row],
+    "top-bottom flip": (row, column) => [2 - row, column],
+    "left-right flip": (row, column) => [row, 2 - column],
+    "diagonal flip": (row, column) => [column, row],
+    "anti-diagonal flip": (row, column) => [2 - column, 2 - row],
+  };
+  const move = (board: Scene, name: string): Scene => ({
+    ...board,
+    objects: board.objects.map((placement) => {
+      const [row, column] = SYMMETRIES[name](placement.row, placement.column);
+      return { row, column, object: placement.object };
+    }),
   });
 
-  it("draws the combining machine only from the chains the grammar proves can hide the answer", () => {
-    // The chains are pinned in the source so no item pays for the search; this
-    // re-derives them from every chain the grammar allows. If a change to the
-    // near-miss pool, the aspect rule, or the soundness checks moves the list,
-    // this fails and names the new one.
-    //
-    // The sound counts moved on 2026-09-29, from 26 and 48 to 28 and 53, when
-    // the pool gained near misses with two mistakes in one run: a few more
-    // chains now reach five distinct near misses. The covering chains did not
-    // move — no chain gained a board agreeing with its answer on an aspect it
-    // lacked.
-    for (const [gateCount, sound] of [[2, 28], [3, 53]] as const) {
-      const derived = deriveCombiningMachineChains(gateCount);
-      expect(derived.covers, `${gateCount} gates`).toEqual(combiningMachineCoveringChains(gateCount).map((chain) => [...chain]));
-      expect(derived.sound, `${gateCount} gates`).toHaveLength(sound);
-      expect(derived.covers.length + derived.sound.length + derived.unusable.length)
-        .toBe(gateCount === 2 ? 8 * 7 : 8 * 7 * 6);
-    }
-    // And the family really serves them, in run order, and nothing else.
-    const COMBINING_OPERATIONS = [
-      "union-left", "union-right", "intersection", "overlap-left",
-      "overlap-right", "subtract", "mask-out", "exclusive",
-    ] as const;
-    for (const bucket of ["combining-machine-d4", "combining-machine-d5"]) {
-      const gateCount = declaredGateCounts()[bucket];
-      const chains = new Set(combiningMachineCoveringChains(gateCount).map((chain) => JSON.stringify(chain)));
-      const served = new Set<string>();
+  it("never lets a composed-transform worked row also fit a flip or turn it does not show", () => {
+    // Opus 5.5 flagged it on 2026-10-04 and it was measured the same day: the
+    // fill gate's worked board had both tokens on the diagonal, so "flip across
+    // it, then repaint" fit the row, and in 131 of 200 d4 items a wrong option
+    // followed (docs/plans/one-reading-per-worked-row.md).
+    for (const bucket of ["composed-transform-d4", "composed-transform-d5"]) {
       for (let seed = 0; seed < 60; seed++) {
-        const candidate = generateSceneFamilyCandidate(
-          "combining-machine-v1", seededRng("combining-chains", `${bucket}:${seed}`), bucket);
-        const report = candidate.definition.validate(candidate.puzzle);
-        expect(report.solutionCount, `${bucket} seed ${seed}`).toBe(1);
-        // The chain the query runs is recovered from the visible item: each
-        // worked row's single surviving rule, read in the query strip's order.
-        const panels = candidate.puzzle.stem.map((panel) => "blank" in panel ? null : panel);
-        const rows = Array.from({ length: gateCount }, (_, row) => panels.slice(row * 4, row * 4 + 4) as Scene[]);
-        const byGlyph = new Map(rows.map(([left, glyph, right, output]) => [
-          JSON.stringify(glyph.objects[0].object),
-          COMBINING_OPERATIONS.find((operation) => {
-            const produced = applySceneBinary(left, right, operation);
-            return produced !== null && sceneSignature(produced) === sceneSignature(output);
-          }),
+        const { puzzle } = generateSceneFamilyCandidate(
+          "composed-transform-v2", seededRng("one-reading", `${bucket}:${seed}`), bucket);
+        const stem = puzzle.stem as Scene[];
+        for (let row = 0; row < stem.length / 3 - 1; row++) {
+          const [input, , output] = stem.slice(row * 3, row * 3 + 3);
+          const target = sceneSignature(output);
+          const fits = (board: Scene | null) => board !== null && sceneSignature(board) === target;
+          const shown = sceneComposedPrimitives().filter((step) => fits(applySceneCompositionPrimitive(input, step)));
+          expect(shown, `${bucket} seed ${seed} row ${row + 1}`).toHaveLength(1);
+          for (const name of Object.keys(SYMMETRIES)) {
+            const after = applySceneCompositionPrimitive(input, shown[0]);
+            expect(fits(applySceneCompositionPrimitive(move(input, name), shown[0])), `${bucket} seed ${seed} row ${row + 1}: ${name}, then the gate`)
+              .toBe(false);
+            expect(fits(after && move(after, name)), `${bucket} seed ${seed} row ${row + 1}: the gate, then ${name}`)
+              .toBe(false);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("no second reading lands on a wrong option", () => {
+  // The owner's rule: no hidden convention may decide an answer. The v22 tests
+  // of 2026-10-04 found readings the worked rows allowed that cost answers; the
+  // check in worked-row-readings.ts tries the readings a person reaches for, and
+  // families:verify runs it on 200 items per bucket
+  // (docs/plans/one-reading-per-worked-row.md).
+  const CHECKED: readonly [SceneFamilyId, string][] = [
+    ["composed-transform-v2", "composed-transform-d4"],
+    ["composed-transform-v2", "composed-transform-d5"],
+    ["transformation-machine-v3", "transformation-machine-d5"],
+    ["visual-set-algebra-v2", "visual-set-algebra-d4"],
+    ["visual-set-algebra-v2", "visual-set-algebra-d5"],
+  ];
+
+  it("holds in every checked bucket", () => {
+    for (const [familyId, bucket] of CHECKED) {
+      for (let seed = 0; seed < 60; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate(familyId, seededRng("second-reading", `${bucket}:${seed}`), bucket);
+        expect(secondReadings(familyId, puzzle), `${bucket} seed ${seed}`).toEqual([]);
+      }
+    }
+  });
+
+  // Hand-built questions with the flaws the v22 tests found: the check has to
+  // name each one.
+  const board = (objects: [number, number, SceneToken["shape"], SceneToken["fill"]?, number?][]): Scene => ({
+    kind: "scene",
+    rows: 3,
+    columns: 3,
+    tiles: [],
+    objects: objects.map(([row, column, shape, fill = "outline", rotation = 0]) => ({
+      row,
+      column,
+      object: { kind: "token", shape, rotation, fill, size: "l" },
+    })),
+  });
+  const glyph = (shape: SceneToken["shape"]) => board([[1, 0, shape, "solid"]]);
+  const strip = (...shapes: SceneToken["shape"][]) =>
+    board(shapes.map((shape, column) => [1, column, shape, "solid"] as [number, number, SceneToken["shape"], SceneToken["fill"]]));
+  const filler = [board([[0, 1, "star"]]), board([[2, 2, "star"]]), board([[1, 1, "hexagon"]]), board([[2, 1, "circle"]])];
+
+  it("names a mirror that turns arrows round too, when its row shows only an up arrow", () => {
+    const answer = board([[0, 0, "arrow", "outline", 90], [0, 2, "square"], [2, 2, "circle"]]);
+    const mirrorImage = board([[0, 0, "arrow", "outline", 270], [0, 2, "square"], [2, 2, "circle"]]);
+    const puzzle = {
+      stem: [
+        board([[0, 0, "triangle"], [1, 2, "arrow", "solid"]]), glyph("square"), board([[0, 2, "triangle"], [1, 0, "arrow", "solid"]]),
+        board([[0, 0, "square"], [1, 2, "arrow", "solid"]]), glyph("diamond"), board([[0, 0, "square"], [1, 2, "arrow", "solid", 90]]),
+        board([[0, 0, "square"], [0, 2, "arrow"], [2, 0, "circle"]]), strip("diamond", "square"), { blank: true },
+      ],
+      options: [answer, mirrorImage, ...filler],
+      answerIndex: 0,
+    };
+    const found = secondReadings("composed-transform-v2", puzzle);
+    expect(found.map((reading) => reading.option)).toEqual([1]);
+    expect(found[0].reading).toContain("of the whole picture");
+  });
+
+  it("names a fill that never colours an arrow, when the question carries the arrow into its square", () => {
+    const answer = board([[0, 0, "arrow", "half"], [0, 2, "square"], [2, 2, "diamond"]]);
+    const arrowSkipped = board([[0, 0, "arrow"], [0, 2, "square"], [2, 2, "diamond"]]);
+    const puzzle = {
+      stem: [
+        board([[0, 0, "triangle"], [1, 2, "arrow", "solid", 90]]), glyph("square"), board([[0, 2, "triangle"], [1, 0, "arrow", "solid", 90]]),
+        board([[0, 0, "circle"], [1, 2, "circle"], [2, 1, "arrow"]]), glyph("diamond"),
+        board([[0, 0, "circle", "half"], [1, 2, "circle"], [2, 1, "arrow"]]),
+        board([[0, 0, "square"], [0, 2, "arrow"], [2, 0, "diamond"]]), strip("square", "diamond"), { blank: true },
+      ],
+      options: [answer, arrowSkipped, ...filler],
+      answerIndex: 0,
+    };
+    const found = secondReadings("composed-transform-v2", puzzle);
+    expect(found.map((reading) => reading.option)).toEqual([1]);
+    expect(found[0].reading).toContain("never an arrow");
+  });
+
+  it("names a fill that colours one kind of shape, when the example shows one shape of that kind", () => {
+    // The v23 re-run's Q30: the example coloured a star in the top-left square,
+    // the question started with a star there, and both models coloured the star
+    // after the pieces had moved it.
+    const answer = board([[0, 0, "triangle", "half"], [0, 2, "star"], [2, 2, "arrow"]]);
+    const starColoured = board([[0, 0, "triangle"], [0, 2, "star", "half"], [2, 2, "arrow"]]);
+    const puzzle = {
+      stem: [
+        board([[0, 0, "diamond"], [1, 2, "arrow", "solid"]]), glyph("square"), board([[0, 2, "diamond"], [2, 1, "arrow", "solid"]]),
+        board([[0, 0, "star"], [2, 1, "arrow"]]), glyph("diamond"), board([[0, 0, "star", "half"], [2, 1, "arrow"]]),
+        board([[0, 0, "star"], [0, 2, "arrow"], [2, 0, "triangle"]]), strip("square", "diamond"), { blank: true },
+      ],
+      options: [answer, starColoured, ...filler],
+      answerIndex: 0,
+    };
+    const found = secondReadings("composed-transform-v2", puzzle);
+    expect(found.map((reading) => reading.option)).toEqual([1]);
+    expect(found[0].reading).toContain("every star turning grey");
+  });
+
+  it("names a flip the copy row cannot see, when it shows one token on a diagonal", () => {
+    // The lone token at the bottom-left sits on the top-right diagonal, so a
+    // flip across it changes nothing in the row, then the copy runs.
+    const copyRow = [board([[2, 0, "diamond", "solid"]]), glyph("star"), board([[2, 0, "diamond", "solid"], [1, 1, "diamond", "solid"]])];
+    const query = board([[2, 0, "diamond", "solid"], [0, 1, "triangle", "solid"]]);
+    const answer = board([[2, 0, "diamond", "solid"], [0, 1, "triangle", "solid"], [1, 1, "diamond", "solid"]]);
+    const flippedFirst = board([[2, 0, "diamond", "solid"], [1, 2, "triangle", "solid"], [1, 1, "diamond", "solid"]]);
+    const puzzle = {
+      stem: [
+        board([[0, 0, "circle"], [1, 2, "square", "solid"]]), glyph("square"), board([[0, 0, "circle", "half"], [1, 2, "square", "half"]]),
+        ...copyRow,
+        query, strip("star"), { blank: true },
+      ],
+      options: [answer, flippedFirst, ...filler],
+      answerIndex: 0,
+    };
+    const found = secondReadings("transformation-machine-v3", puzzle);
+    expect(found.map((reading) => reading.option)).toEqual([1]);
+    expect(found[0].reading).toContain("top-right diagonal");
+  });
+
+  it("names a set-algebra move that neither worked row shows", () => {
+    // Intersection keeps one token per row, and the left-right mirror leaves
+    // the centre and the middle column where they were, so "no move" fits both.
+    const unmoved = board([[0, 0, "circle"]]);
+    const puzzle = {
+      stem: [
+        board([[1, 1, "circle"], [0, 0, "square"]]), board([[1, 1, "circle"], [2, 2, "diamond"]]), board([[1, 1, "circle"]]),
+        board([[0, 1, "star"], [2, 0, "square"]]), board([[0, 1, "star"], [1, 2, "diamond"]]), board([[0, 1, "star"]]),
+        board([[0, 0, "circle"], [2, 2, "square"]]), board([[0, 0, "circle"], [1, 0, "diamond"]]), { blank: true },
+      ],
+      options: [board([[0, 2, "circle"]]), unmoved, ...filler],
+      answerIndex: 0,
+    };
+    const found = secondReadings("visual-set-algebra-v2", puzzle);
+    expect(found.map((reading) => reading.option)).toEqual([1]);
+    expect(found[0].reading).toContain("no move");
+  });
+
+  it("reads set algebra with the right board first and a wrapped slide, and never offers that board", () => {
+    // Codex's review of 2026-10-05: on this d5 seed both rows fit "keep the right
+    // board's shapes where the left board is empty, slide them one square left,
+    // wrapping, turn them a quarter clockwise", and the item offered that board.
+    const { puzzle } = generateSceneFamilyCandidate(
+      "visual-set-algebra-v2", seededRng("blind-gate-v2", "visual-set-algebra-d5:107"), "visual-set-algebra-d5");
+    const stem = puzzle.stem as Scene[];
+    const alternative = (left: Scene, right: Scene): Scene => {
+      const onlyRight = applySceneBinary(right, left, "mask-out")!;
+      return {
+        ...onlyRight,
+        objects: onlyRight.objects.map((placement) => ({
+          ...placement,
+          column: (placement.column + 2) % 3,
+          object: placement.object.kind === "token"
+            ? { ...placement.object, rotation: (placement.object.rotation + 90) % 360 }
+            : placement.object,
+        })),
+      };
+    };
+    for (const row of [0, 3]) {
+      expect(boardKey(alternative(stem[row], stem[row + 1])), `row ${row / 3 + 1}`).toBe(boardKey(stem[row + 2]));
+    }
+    const alternativeBoard = alternative(stem[6], stem[7]);
+    const options = puzzle.options as Scene[];
+    expect(options.map(boardKey)).not.toContain(boardKey(alternativeBoard));
+    // Offered anyway, the check names it.
+    const wrong = puzzle.answerIndex === 0 ? 1 : 0;
+    const offering = { ...puzzle, options: options.map((option, index) => (index === wrong ? alternativeBoard : option)) };
+    const found = secondReadings("visual-set-algebra-v2", offering);
+    expect(found.map((reading) => reading.option)).toEqual([wrong]);
+    expect(found[0].reading).toContain("with the right board first");
+  });
+});
+
+describe("worked rows that pin their reading", () => {
+  const machineRows = (puzzle: { stem: readonly unknown[] }) => {
+    const stem = puzzle.stem as Scene[];
+    return Array.from({ length: stem.length / 3 - 1 }, (_, row) => stem.slice(row * 3, row * 3 + 3));
+  };
+
+  it("never asks a composed-transform fill piece to colour the arrow", () => {
+    // Every fill example colours a shape while an arrow stays uncoloured; in
+    // the v22 tests both models lost 5 of 6 answers where the question then
+    // carried the arrow into the fill square.
+    for (const bucket of ["composed-transform-d4", "composed-transform-d5"]) {
+      for (let seed = 0; seed < 100; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate("composed-transform-v2", seededRng("fill-on-arrow", `${bucket}:${seed}`), bucket);
+        const rows = machineRows(puzzle);
+        const steps = new Map(rows.map(([input, gate, output]) => [
+          JSON.stringify(gate.objects[0].object),
+          sceneComposedPrimitives().find((step) => {
+            const shown = applySceneCompositionPrimitive(input, step);
+            return shown !== null && sceneSignature(shown) === sceneSignature(output);
+          })!,
         ]));
-        const strip = panels[gateCount * 4 + 1]!;
-        const chain = [...strip.objects]
-          .sort((left, right) => left.column - right.column)
-          .map((placement) => byGlyph.get(JSON.stringify(placement.object)));
-        expect(chains.has(JSON.stringify(chain)), `${bucket} seed ${seed} runs ${JSON.stringify(chain)}`).toBe(true);
-        served.add(JSON.stringify(chain));
-      }
-      expect(served.size, bucket).toBe(chains.size);
-    }
-  });
-
-  it("judges a combining gate order the same on every draw of roles and shapes", () => {
-    // Why the chains can be settled once instead of searched for per item: every
-    // combining operation acts cell by cell, so moving the four role cells
-    // anywhere moves every board of an item the same way, and renaming shapes
-    // renames every token the same way. Proved here on random draws for every
-    // three-gate chain, and for a run order other than the worked one: a verdict
-    // depends only on the chain the query actually runs.
-    const rng = seededRng("combining-invariance");
-    const cells = [0, 1, 2].flatMap((row) => [0, 1, 2].map((column) => ({ row, column })));
-    const shapes = ["circle", "square", "triangle", "diamond", "star"] as const;
-    const derived = deriveCombiningMachineChains(3);
-    const cases = [
-      ...derived.covers.map((chain) => [chain, "covers"] as const),
-      ...derived.sound.map((chain) => [chain, "sound"] as const),
-      ...derived.unusable.filter((_, index) => index % 8 === 0).map((chain) => [chain, "unusable"] as const),
-    ];
-    for (const [chain, verdict] of cases) {
-      for (let draw = 0; draw < 2; draw++) {
-        const [shared, clash, leftOnly, rightOnly] = shuffled(rng, cells);
-        const runOrder = shuffled(rng, [0, 1, 2]);
-        const gates: typeof chain = [];
-        runOrder.forEach((gateIndex, step) => { gates[gateIndex] = chain[step]; });
-        expect(combiningGateOrderVerdict(gates, runOrder, { shared, clash, leftOnly, rightOnly }, shuffled(rng, shapes)),
-          JSON.stringify(chain)).toBe(verdict);
+        const stem = puzzle.stem as Scene[];
+        let current: Scene | null = stem.at(-3)!;
+        for (const placement of [...stem.at(-2)!.objects].sort((left, right) => left.column - right.column)) {
+          const step = steps.get(JSON.stringify(placement.object))!;
+          if (step.kind === "setFillAt") {
+            const target = current!.objects.find((held) => held.row === step.at.row && held.column === step.at.column);
+            expect(target?.object.kind === "token" && target.object.shape, `${bucket} seed ${seed}`).not.toBe("arrow");
+          }
+          current = current && applySceneCompositionPrimitive(current, step);
+        }
       }
     }
   });
 
-  it("builds the combining machine as gates that take two boards, and proves each gate is readable", () => {
-    // New family, 2026-08-27: the first item in the battery where a named,
-    // reusable gate combines TWO boards. The row shape had to be new for it —
-    // a machine row is (input, gate, output) and cannot show a second operand —
-    // so this test pins the two things that make the row honest: every worked
-    // row leaves exactly ONE combining rule standing, and the answer really is
-    // the chain the query's gate strip spells out.
-    for (const bucket of ["combining-machine-d4", "combining-machine-d5"]) {
-      const gates = declaredGateCounts()[bucket];
-      for (let seed = 0; seed < 25; seed++) {
-        const candidate = generateSceneFamilyCandidate(
-          "combining-machine-v1", seededRng("combining", `${bucket}:${seed}`), bucket);
-        const { puzzle } = candidate;
-        expect(puzzle.layout, bucket).toBe("combineTable");
-        // One quad per worked gate, plus the query quad.
-        expect(puzzle.stem.length, `${bucket} seed ${seed}`).toBe((gates + 1) * 4);
-        expect(gates, "the three-gate ceiling of 2026-08-27").toBeLessThanOrEqual(3);
+  it("shows every fill change an attribute-pairing answer needs", () => {
+    // The question starts in the worked pair's first fill and, when the fill
+    // changes, ends in its second, so every reading of the shown change agrees:
+    // "one step darker", "swap black and white" and "the fill changes" alike.
+    // Before 2026-10-04 the question started in a third fill, and the step and
+    // swap readings kept it, which was an option (both models took the swap in
+    // the v25 re-run).
+    let changes = 0;
+    for (let seed = 0; seed < 300; seed++) {
+      const { puzzle } = generateSceneFamilyCandidate("attribute-pairing-v1", seededRng("pairing-fill", String(seed)), "attribute-pairing-d2");
+      const [worked, workedAfter, question] = (puzzle.stem as Scene[]).map((board) => (board.objects[0].object as SceneToken).fill);
+      const answer = ((puzzle.options[puzzle.answerIndex] as Scene).objects[0].object as SceneToken).fill;
+      expect(question, `seed ${seed}`).toBe(worked);
+      expect(answer, `seed ${seed}`).toBe(workedAfter);
+      if (worked !== workedAfter) changes += 1;
+    }
+    expect(changes).toBeGreaterThan(100);
+  });
 
-        const report = candidate.definition.validate(puzzle);
-        // The oracle re-derives the answer from the finished puzzle alone. If a
-        // worked row left two rules standing it returns nothing, so a single
-        // solution here IS the proof that every gate is readable.
-        expect(report.solutionCount, `${bucket} seed ${seed}`).toBe(1);
-        expect(report.derivedAnswer, `${bucket} seed ${seed}`)
-          .toEqual(puzzle.options[puzzle.answerIndex]);
+  it("shows a composed-transform fill piece on two shapes of one kind, colouring only the top-left one", () => {
+    let fillRows = 0;
+    for (const bucket of ["composed-transform-d4", "composed-transform-d5"]) {
+      for (let seed = 0; seed < 100; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate("composed-transform-v2", seededRng("two-of-a-kind", `${bucket}:${seed}`), bucket);
+        for (const [input, , output] of machineRows(puzzle)) {
+          const changed = output.objects.filter((placement) => !input.objects.some((before) =>
+            before.row === placement.row && before.column === placement.column && JSON.stringify(before.object) === JSON.stringify(placement.object)));
+          if (changed.length !== 1 || changed[0].row !== 0 || changed[0].column !== 0 ||
+            input.objects.length !== output.objects.length) continue;
+          fillRows += 1;
+          const kind = (changed[0].object as SceneToken).shape;
+          const sameKind = input.objects.filter((placement) => (placement.object as SceneToken).shape === kind);
+          expect(sameKind, `${bucket} seed ${seed}`).toHaveLength(2);
+        }
+      }
+    }
+    expect(fillRows).toBeGreaterThan(50);
+  });
 
-        // Every wrong option names the mistake that produces it.
-        const witnessed = new Set(report.distractorWitnesses.map((witness) => witness.optionIndex));
-        for (let option = 0; option < puzzle.options.length; option++) {
-          if (option === puzzle.answerIndex) continue;
-          expect(witnessed.has(option), `${bucket} seed ${seed}: option ${option} has no witness`).toBe(true);
+  it("shows a composed-transform left-right mirror on a sideways arrow", () => {
+    let mirrors = 0;
+    for (const bucket of ["composed-transform-d4", "composed-transform-d5"]) {
+      for (let seed = 0; seed < 100; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate("composed-transform-v2", seededRng("sideways-arrow", `${bucket}:${seed}`), bucket);
+        for (const [input, , output] of machineRows(puzzle)) {
+          const mirrored = applySceneCompositionPrimitive(input, { kind: "spatial", operation: { kind: "reflect", axis: "horizontal" } });
+          if (!mirrored || sceneSignature(mirrored) !== sceneSignature(output)) continue;
+          mirrors += 1;
+          const arrow = input.objects.find((placement) => placement.object.kind === "token" && placement.object.shape === "arrow")!;
+          expect([90, 270], `${bucket} seed ${seed}`).toContain((arrow.object as SceneToken).rotation);
+        }
+      }
+    }
+    expect(mirrors).toBeGreaterThan(20);
+  });
+
+  it("gives the transformation machine's copy row a token that stays put, so the row has one reading", () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const { puzzle } = generateSceneFamilyCandidate(
+        "transformation-machine-v3", seededRng("copy-row", String(seed)), "transformation-machine-d5");
+      const [input, , output] = machineRows(puzzle)[2];
+      expect(input.objects, `seed ${seed}`).toHaveLength(2);
+      expect(output.objects, `seed ${seed}`).toHaveLength(3);
+      // Neither "flip the board, then copy" nor "copy every shape" fits it.
+      expect(machineWorkedRowReadings("transformation-machine-v3", input, output), `seed ${seed}`).toHaveLength(1);
+    }
+  });
+
+  it("never shows set-algebra worked outputs on the same squares, and shows every step", () => {
+    const squares = (scene: Scene) => scene.objects.map((placement) => `${placement.row},${placement.column}`).sort().join(" ");
+    const moves = [
+      { kind: "rotate", quarterTurns: 1 },
+      { kind: "reflect", axis: "horizontal" },
+      { kind: "reflect", axis: "vertical" },
+    ] as const;
+    const run = (left: Scene, right: Scene, operation: SceneBinaryOperation, move: typeof moves[number] | null, turn: 0 | 1 | 3) => {
+      const combined = applySceneBinary(left, right, operation);
+      const moved = combined && (move ? applySceneUnary(combined, move) : combined);
+      return moved && (turn ? applySceneUnary(moved, { kind: "turn", quarterTurns: turn }) : moved);
+    };
+    let checked = 0;
+    for (const [bucket, turns] of [["visual-set-algebra-d4", [0]], ["visual-set-algebra-d5", [1, 3]]] as const) {
+      for (let seed = 0; seed < 100; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate("visual-set-algebra-v2", seededRng("set-algebra-rows", `${bucket}:${seed}`), bucket);
+        const stem = puzzle.stem as Scene[];
+        // Opus 5.5's one miss in the v21 test: both results on one square read
+        // as "the result always stands there".
+        expect(squares(stem[2]), `${bucket} seed ${seed}`).not.toBe(squares(stem[5]));
+        const rows = [[stem[0], stem[1], stem[2]], [stem[3], stem[4], stem[5]]] as const;
+        const reproduces = (operation: SceneBinaryOperation, move: typeof moves[number] | null, turn: 0 | 1 | 3) =>
+          rows.every(([left, right, output]) => {
+            const board = run(left, right, operation, move, turn);
+            return board !== null && sceneSignature(board) === sceneSignature(output);
+          });
+        // Every rule of the family's own grammar that fits both rows shows its
+        // move, and in d5 its turn: dropping either step breaks a row.
+        for (const operation of SCENE_BINARY_OPERATIONS) {
+          for (const move of moves) {
+            for (const turn of turns) {
+              if (!reproduces(operation, move, turn)) continue;
+              checked += 1;
+              expect(reproduces(operation, null, turn), `${bucket} seed ${seed}: the move never shows`).toBe(false);
+              if (turn !== 0) expect(reproduces(operation, move, 0), `${bucket} seed ${seed}: the turn never shows`).toBe(false);
+            }
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(200);
+  });
+
+  it("offers every d5 set-algebra answer's shapes on other squares too", () => {
+    // In 134 of 200 d5 items the answer was the only option with its shapes,
+    // so where the shapes stand never had to be worked out.
+    const shapes = (scene: Scene) => scene.objects.map((placement) => boardKey({ ...scene, objects: [{ ...placement, row: 0, column: 0 }] })).sort().join("|");
+    for (let seed = 0; seed < 100; seed++) {
+      const { puzzle } = generateSceneFamilyCandidate(
+        "visual-set-algebra-v2", seededRng("shapes-elsewhere", String(seed)), "visual-set-algebra-d5");
+      const options = puzzle.options as Scene[];
+      const answer = options[puzzle.answerIndex];
+      expect(options.filter((option, index) => index !== puzzle.answerIndex && shapes(option) === shapes(answer)).length,
+        `seed ${seed}`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("fill changes are shown before they are needed", () => {
+  const fillsOf = (board: Scene) => board.objects.flatMap((placement) =>
+    placement.object.kind === "token" ? [placement.object.fill] : placement.object.contents.map((token) => token.fill));
+  /** Black to white going forward, or white to black going back: the loop's seam. */
+  const crossesSeam = (fill: SceneToken["fill"], delta: 1 | 2) =>
+    (delta === 1 && fill === "solid") || (delta === 2 && fill === "outline");
+
+  it("gives an analogy's worked board every fill its question board has", () => {
+    // Every token on a board steps its fill by the same amount, so a question
+    // token whose fill also sits on the worked board has its change shown.
+    for (const [familyId, bucket] of [
+      ["compositional-analogy-v2", "compositional-analogy-d3"],
+      ["compositional-analogy-v2", "compositional-analogy-d4"],
+      ["inverse-analogy-v2", "inverse-analogy-d4"],
+    ] as const) {
+      let seamQuestions = 0;
+      for (let seed = 0; seed < 200; seed++) {
+        const puzzle = generateSceneFamilyCandidate(familyId, seededRng("fill-shown", `${bucket}:${seed}`), bucket).puzzle;
+        const [worked, workedAfter, question] = puzzle.stem as Scene[];
+        const shown = new Set(fillsOf(worked));
+        for (const fill of fillsOf(question)) expect(shown.has(fill), `${bucket} seed ${seed}`).toBe(true);
+        // The shown step: the one shift that turns the worked board's fills
+        // into the fills after it (two different fills make it unique).
+        const after = [...fillsOf(workedAfter)].sort().join();
+        const delta = ([1, 2] as const).find((step) =>
+          fillsOf(worked).map((fill) => FILL_LOOP[(FILL_LOOP.indexOf(fill) + step) % 3]).sort().join() === after)!;
+        if (fillsOf(question).some((fill) => crossesSeam(fill, delta))) seamQuestions += 1;
+      }
+      // The seam still comes up in most questions; it is shown, not avoided.
+      expect(seamQuestions, bucket).toBeGreaterThan(100);
+    }
+  });
+
+  it("shows a sequence's step into the missing picture before it is needed", () => {
+    // Four pictures make three steps, a full lap of the three fills, so the
+    // step into the missing picture repeats the first one shown — fill and
+    // position alike. With three pictures it was always a step nobody had seen.
+    expect(RELATIONAL_SEQUENCE_SHOWN_PICTURES).toBe(4);
+    let fillsStep = 0;
+    for (let seed = 0; seed < 300; seed++) {
+      const puzzle = generateSceneFamilyCandidate(
+        "relational-sequence-v2", seededRng("fill-shown", `relational-sequence-d2:${seed}`), "relational-sequence-d2",
+      ).puzzle;
+      expect(puzzle.stem).toHaveLength(RELATIONAL_SEQUENCE_SHOWN_PICTURES + 1);
+      // The moving token is the one off the centre; read it picture by picture.
+      const moving = (board: Scene) => board.objects.find((placement) => placement.row !== 1 || placement.column !== 1)!;
+      const pictures = [...(puzzle.stem.slice(0, -1) as Scene[]), puzzle.options[puzzle.answerIndex] as Scene].map(moving);
+      const step = (from: typeof pictures[number], to: typeof pictures[number]) =>
+        `${(from.object as SceneToken).fill}>${(to.object as SceneToken).fill}`;
+      const shownSteps = pictures.slice(1, -1).map((to, index) => step(pictures[index], to));
+      expect(shownSteps, `seed ${seed}`).toContain(step(pictures.at(-2)!, pictures.at(-1)!));
+      if (new Set(pictures.map((picture) => (picture.object as SceneToken).fill)).size > 1) {
+        fillsStep += 1;
+        // A full lap: all three fills appear among the shown pictures.
+        expect(new Set(pictures.slice(0, -1).map((picture) => (picture.object as SceneToken).fill)).size).toBe(3);
+      }
+    }
+    expect(fillsStep).toBeGreaterThan(150);
+  });
+});
+
+describe("grid flow", () => {
+  it("marks every grid with the directions its family's rule runs in", () => {
+    const expected: Partial<Record<SceneFamilyId, string>> = {
+      "relational-matrix-v2": "rowsAndColumns",
+      "visual-set-algebra-v2": "rows",
+    };
+    for (const familyId of SCENE_FAMILY_IDS) {
+      for (const { bucket } of SCENE_FAMILY_BUCKETS[familyId]) {
+        for (let seed = 0; seed < 5; seed++) {
+          let puzzle;
+          try {
+            puzzle = generateSceneFamilyCandidate(familyId, seededRng("grid-flow", `${bucket}:${seed}`), bucket).puzzle;
+          } catch {
+            continue;
+          }
+          // A grid always says where its rule runs; nothing else carries a flow.
+          expect(puzzle.gridFlow, bucket).toBe(puzzle.layout === "grid3x3" ? expected[familyId] : undefined);
         }
       }
     }
@@ -1185,7 +1564,8 @@ describe("answered strand declarations", () => {
   // used to declare a bare count and the build gate had to believe it; these
   // indexes are checked against the puzzle instead.
   const ROW_FAMILIES = [
-    { familyId: "relational-sequence-v2", panelIndexes: [0, 1, 2] },
+    // Four shown pictures since scene-families-v20: a full lap of the fills.
+    { familyId: "relational-sequence-v2", panelIndexes: [0, 1, 2, 3] },
     { familyId: "second-order-sequence-v2", panelIndexes: [0, 1, 2, 3, 4] },
   ] as const;
 

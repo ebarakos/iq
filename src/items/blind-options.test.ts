@@ -5,6 +5,7 @@ import {
   blindCredits,
   blindStrategyCredits,
   bottomCredit,
+  optionsAloneOnAClue,
   rankCredit,
   topCredit,
 } from "./blind-options";
@@ -118,5 +119,58 @@ describe("options-only solvers", () => {
         expect(earned / ITEMS, `${bucket}: ${strategy}`).toBeLessThanOrEqual(LIMIT);
       }
     }
+  });
+});
+
+describe("one clue never narrows the options to one", () => {
+  it("passes a grid of two clues, and names the option a missing twin leaves alone", () => {
+    // Three squares times two fills: every square is on two options and every
+    // fill on three, so knowing one of the two never leaves a single option.
+    const squares: Array<[number, number]> = [[0, 0], [0, 2], [2, 2]];
+    const grid = squares.flatMap(([row, column]) =>
+      (["half", "solid"] as const).map((fill) => board([[row, column, "circle", fill]])));
+    expect([...optionsAloneOnAClue(grid, "features")]).toEqual([]);
+    // Replace the last option with a board on a square nobody else uses: it is
+    // alone on where it stands, and the option it replaced leaves (2,2)-half
+    // without a twin.
+    const broken = [...grid.slice(0, 5), board([[1, 0, "circle", "solid"]])];
+    expect([...optionsAloneOnAClue(broken, "features")].sort()).toEqual([4, 5]);
+  });
+
+  it("follows a shape by its square, fill and turn only when every option holds it once", () => {
+    // Every whole-board aspect pairs up, but only option 0 has a solid
+    // triangle and only option 1 a solid circle: "the triangle ends up solid"
+    // picks out option 0 on its own.
+    const pair = (triangle: SceneToken["fill"], circle: SceneToken["fill"], shape: SceneToken["shape"] = "triangle") =>
+      board([[0, 0, shape, triangle], [2, 2, "circle", circle]]);
+    const options = [
+      pair("solid", "half"),
+      pair("half", "solid"),
+      pair("half", "outline"),
+      pair("outline", "half"),
+      pair("outline", "outline"),
+      pair("outline", "outline"),
+    ];
+    expect([...optionsAloneOnAClue(options, "features")].sort()).toEqual([0, 1]);
+    // When one option has a square where the others have the triangle, the
+    // shape itself is part of what the rule decides: the triangle is no longer
+    // followed, so option 0 stops being alone, and option 5 is alone on shapes.
+    options[5] = pair("outline", "outline", "square");
+    expect([...optionsAloneOnAClue(options, "features")].sort()).toEqual([1, 5]);
+  });
+
+  it("reads square by square under the squares model", () => {
+    const options = [
+      board([[0, 0, "circle", "outline"], [0, 2, "star", "outline"]]),
+      board([[0, 0, "circle", "outline"], [2, 0, "star", "outline"]]),
+      board([[0, 2, "star", "outline"], [2, 0, "star", "outline"]]),
+      board([[0, 2, "star", "outline"], [2, 0, "star", "outline"]]),
+      board([[0, 0, "circle", "outline"], [0, 2, "star", "outline"]]),
+      board([[0, 0, "circle", "outline"], [2, 0, "star", "outline"]]),
+    ];
+    expect([...optionsAloneOnAClue(options, "squares")]).toEqual([]);
+    // Option 0 is the only one with a triangle in the corner.
+    options[0] = board([[0, 0, "triangle", "outline"], [0, 2, "star", "outline"]]);
+    expect([...optionsAloneOnAClue(options, "squares")]).toContain(0);
   });
 });

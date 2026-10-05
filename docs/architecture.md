@@ -8,24 +8,40 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   public contract. `OPTIONS_PER_ITEM` lives here: it is the one place the number
   of answer options is set, and every family, both renderers, and the assembler
   follow it.
-- `src/items/rules.ts` — rule DSL, semantic validator, bounded operator grammar,
-  and full-grammar uniqueness oracle.
 - `src/items/scene-families.ts` — the visual families (`SCENE_FAMILY_IDS`) and their
   acceptance contract; `src/items/family-promotion.ts` — which family may appear in which
   band, and the `WITHDRAWN_FAMILY_IDS` list that pulls one back out.
 - `src/items/blind-options.ts` — the options-only solvers (most typical,
   per-aspect majority, per-cell majority), the 28 options-only strategies built on
   them (every rank of each measure, the middle rank, the ruled-out extremes, and
-  the two lone-aspect ones), and `DISTRACTOR_ASPECTS`. `selectDistractors`
-  balances the answer's rank against them and against the one-inference solver;
-  `npm run families:verify` fails a served bucket where one picks the answer
-  more than 30% of the time over 200 fixed-seed items (chance is 1 in 6). See
+  the two lone-aspect ones), `DISTRACTOR_ASPECTS`, and the clue check
+  `optionsAloneOnAClue`. `selectDistractors` serves only option lists where every
+  clue appears on two options (under the family's `SCENE_FAMILY_CLUE_MODELS`
+  entry) and balances the answer's rank against the strategies;
+  `npm run families:verify` fails a served bucket where one strategy picks the
+  answer more than 30% of the time over 200 fixed-seed items (chance is 1 in 6),
+  or where any item leaves a clue on one option. See
   `docs/plans/blind-answer-leak.md`.
-- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v19`): band
+- `src/items/worked-row-readings.ts` — the readings a person might give a worked row
+  (flips and turns of the board, a mirror that turns arrows too, token turns, fill
+  changes, copies of every shape, set algebra with either board first and one-square
+  slides that wrap) and `secondReadings`, which lists the wrong options one of them
+  reaches in composed transform, the transformation machine and set algebra. `npm run
+  families:verify` fails a bucket where any of its 200 items has one; the
+  transformation machine and set algebra also use it while drawing. See
+  `docs/plans/one-reading-per-worked-row.md`.
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v30`): band
   schedules of 5/10/10/5 and 1/1/2/1, seeded 4/2/2 non-warmup family draws (`FAMILY_SUBSAMPLE_SIZES`), an
   even split over each draw, and an easiest-first order without adjacent repeats.
 - `src/items/render.tsx` / `src/items/compose-image.tsx` — deterministic human
-  and agent renderers over the same visible data.
+  and agent renderers over the same visible data. Machine gates draw as jigsaw
+  pieces (`JigsawPieces`); `src/items/gate-pieces.ts` says which texture each
+  gate glyph gets, and the explanations name gates by the same word.
+- `src/lib/solver.ts` / `scripts/agent-run.ts` `--debrief` — after each scored
+  answer, two more turns ask the model for its confidence, rule and difficulty,
+  then whether another option was also defensible. The scored turn is unchanged.
+  A turn that completes is kept even if a later one fails, and a reply from any
+  model other than the one that answered is dropped, with an error naming both.
 - `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
   token, the answer deadline (separate from the token's own expiry), and
   server-side scoring with a late marker.

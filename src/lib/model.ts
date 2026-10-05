@@ -101,6 +101,10 @@ export function relayModel(overrides?: ModelOverrides) {
     // as headers.
     effort: overrides?.effort,
     customUrl: overrides?.customUrl,
+    // Server-side calls carry no browser Origin, so the relay serves the harness
+    // providers (our RELAY_PROVIDER=codex default) only when the request presents
+    // its LOCAL_API_KEY as X-Harness-Caller-Token. Harmless for hosted providers.
+    callerToken: process.env.RELAY_HARNESS_CALLER_TOKEN,
   });
   let providerUsed = provider;
   const fetchWithAttribution: typeof fetch = async (url, init) => {

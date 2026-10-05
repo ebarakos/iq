@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { parseAnswerLetter, SOLVER_PROMPT_VERSION } from "./solver";
+import { describe, expect, it, vi } from "vitest";
+import { loadBank } from "../items/bank";
+import { toPublicPuzzle } from "../items/schema";
+import {
+  DEBRIEF_PROMPT_VERSION,
+  parseAnswerLetter,
+  readDebriefAfter,
+  readDebriefBefore,
+  SOLVER_PROMPT_VERSION,
+} from "./solver";
 import { AttemptFileSchema } from "./attempts";
 
 describe("parseAnswerLetter", () => {
@@ -45,7 +53,7 @@ describe("parseAnswerLetter", () => {
   });
 
   it("exposes a stable prompt version", () => {
-    expect(SOLVER_PROMPT_VERSION).toBe("solver-v3");
+    expect(SOLVER_PROMPT_VERSION).toBe("solver-v6");
   });
 });
 
@@ -174,5 +182,136 @@ describe("parseAnswerLetter on replies that reason before concluding", () => {
     expect(parseAnswerLetter("  c  ", 6)).toBe(2);
     expect(parseAnswerLetter(analysis, 4)).toBeNull();
     expect(parseAnswerLetter("no letter here at all", 6)).toBeNull();
+  });
+});
+
+describe("the model's own report (--debrief)", () => {
+  it("reads both follow-up replies field by field, nulling what is missing or mistyped", () => {
+    const before = readDebriefBefore(
+      'Sure. {"confidence": 85, "rule": "Each shape moves one square clockwise.", "difficulty": 2, "hard_to_see": "nothing"}');
+    expect(before).toEqual({ confidence: 85, rule: "Each shape moves one square clockwise.", difficulty: 2, hardToSee: "nothing" });
+    // A difficulty outside 1-5 or not whole, and a confidence given as text, are read as far as they can be.
+    expect(readDebriefBefore('{"confidence": "40", "difficulty": 2.5, "rule": ""}'))
+      .toEqual({ confidence: 40, rule: null, difficulty: null, hardToSee: null });
+    expect(readDebriefBefore("I would rather not say.")).toBeNull();
+
+    const after = readDebriefAfter(
+      '{"only_defensible": false, "other_option": "d", "other_rule": "Count the corners.", "what_misled": null, "unclear": "nothing"}', 6);
+    expect(after).toEqual({
+      onlyDefensible: false, otherOption: "D", otherRule: "Count the corners.", whatMisled: null, unclear: "nothing",
+    });
+    // A letter past the last option is not an option.
+    expect(readDebriefAfter('{"only_defensible": true, "other_option": "G"}', 6)?.otherOption).toBeNull();
+  });
+
+  it("is recorded on the attempt without touching its score", () => {
+    const artifact = {
+      runId: "2026-10-04T00-00-00.000Z-claude-opus-5-5-image",
+      startedAt: "2026-10-04T00:00:00.000Z",
+      provider: "claude-code",
+      model: "claude-opus-5-5",
+      channel: "image" as const,
+      promptVersion: SOLVER_PROMPT_VERSION,
+      attempts: [{
+        itemId: "mx-abc123", chosen: 2, correct: true, outcome: "correct" as const, latencyMs: 812, raw: "C",
+        debrief: {
+          promptVersion: DEBRIEF_PROMPT_VERSION,
+          intendedLetter: "C",
+          answeredLetter: "C",
+          before: { confidence: 90, rule: "Union of the two boards.", difficulty: 2, hardToSee: null },
+          after: { onlyDefensible: true, otherOption: null, otherOptionIndex: null, otherRule: null, whatMisled: null, unclear: null },
+          raw: { before: "{}", after: "{}" },
+        },
+        ts: "2026-10-04T00:00:01.000Z",
+      }],
+    };
+    const parsed = AttemptFileSchema.parse(artifact);
+    expect(parsed.attempts[0].debrief?.before?.confidence).toBe(90);
+    expect(AttemptFileSchema.parse(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+    // A follow-up that failed keeps its error and nothing else.
+    const failed = { ...artifact.attempts[0], debrief: { ...artifact.attempts[0].debrief, before: null, after: null, raw: {}, error: "timeout" } };
+    expect(AttemptFileSchema.safeParse({ ...artifact, attempts: [failed] }).success).toBe(true);
+  });
+});
+
+describe("debrief follow-ups that fail or come from another model", () => {
+  type Reply = { text: string; modelId?: string } | Error;
+  const BEFORE = '{"confidence": 90, "rule": "Union of the two boards.", "difficulty": 2, "hard_to_see": "nothing"}';
+  const AFTER = '{"only_defensible": true, "other_option": null, "unclear": "nothing"}';
+
+  /** Run `debriefItem` against scripted replies, one per follow-up turn, with no relay. */
+  async function debriefWith(replies: Reply[]) {
+    const queue = [...replies];
+    const generateText = vi.fn(async () => {
+      const next = queue.shift();
+      if (!next) throw new Error("asked a turn the test did not script");
+      if (next instanceof Error) throw next;
+      return { text: next.text, response: { modelId: next.modelId } };
+    });
+    vi.resetModules();
+    vi.doMock("ai", async () => ({ ...(await vi.importActual<typeof import("ai")>("ai")), generateText }));
+    vi.stubEnv("RELAY_BASE_URL", "http://relay.invalid/v1");
+    vi.stubEnv("RELAY_PROVIDER", "openai");
+    vi.stubEnv("RELAY_MODEL", "requested-model");
+    try {
+      const { debriefItem } = await import("./solver");
+      const result = await debriefItem(toPublicPuzzle(loadBank()[0].puzzle), "A", 0, "answer-model");
+      return { result, turnsAsked: generateText.mock.calls.length };
+    } finally {
+      vi.doUnmock("ai");
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  }
+
+  it("keeps the first reply when the second turn fails", async () => {
+    const { result, turnsAsked } = await debriefWith([
+      { text: BEFORE, modelId: "answer-model" },
+      new Error("timed out"),
+    ]);
+    expect(turnsAsked).toBe(2);
+    expect(result.before).toEqual({ raw: BEFORE, modelId: "answer-model" });
+    expect(result.after).toBeUndefined();
+    expect(result.error).toBe("the second follow-up failed: timed out");
+    // Recorded that way, the attempt still parses.
+    const debrief = {
+      promptVersion: DEBRIEF_PROMPT_VERSION, intendedLetter: "A", answeredLetter: "A",
+      before: readDebriefBefore(BEFORE), after: null, raw: { before: BEFORE }, error: result.error,
+    };
+    const attempt = { itemId: "mx-abc123", chosen: 0, correct: true, outcome: "correct" as const, latencyMs: 1, raw: "A", debrief, ts: "2026-10-04T00:00:01.000Z" };
+    expect(AttemptFileSchema.safeParse({
+      runId: "r", startedAt: "2026-10-04T00:00:00.000Z", provider: "openai", model: "answer-model",
+      channel: "image", promptVersion: SOLVER_PROMPT_VERSION, attempts: [attempt],
+    }).success).toBe(true);
+  });
+
+  it("drops a first reply from another model and asks nothing after it", async () => {
+    const { result, turnsAsked } = await debriefWith([{ text: BEFORE, modelId: "other-model" }]);
+    expect(turnsAsked).toBe(1);
+    expect(result.before).toBeUndefined();
+    expect(result.after).toBeUndefined();
+    expect(result.error).toBe("the first follow-up was answered by other-model, not answer-model, so it is not that model's own report");
+  });
+
+  it("drops only the second reply when it alone comes from another model", async () => {
+    const { result } = await debriefWith([
+      { text: BEFORE, modelId: "answer-model" },
+      { text: AFTER, modelId: "other-model" },
+    ]);
+    expect(result.before?.raw).toBe(BEFORE);
+    expect(result.after).toBeUndefined();
+    expect(result.error).toContain("the second follow-up was answered by other-model");
+  });
+
+  it("returns both replies when the model that answered wrote them", async () => {
+    const { result, turnsAsked } = await debriefWith([
+      { text: BEFORE, modelId: "answer-model" },
+      { text: AFTER, modelId: "answer-model" },
+    ]);
+    expect(turnsAsked).toBe(2);
+    expect(result).toEqual({
+      before: { raw: BEFORE, modelId: "answer-model" },
+      after: { raw: AFTER, modelId: "answer-model" },
+    });
   });
 });

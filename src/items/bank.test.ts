@@ -71,7 +71,7 @@ describe("loadBank", () => {
       });
       // The top-up draws on both public lengths and records which one each item
       // came from, so a key no length reaches is caught rather than silently
-      // left thin. A long test reaches all 15 keys on its own. A
+      // left thin. A long test reaches all 13 keys on its own. A
       // 5-question test asks each band for one or two questions, so it only
       // ever gets a family's entry-point bucket.
       expect(EXPANDED_PROFILES).toContain(item.provenance.profile);
@@ -89,12 +89,12 @@ describe("loadBank", () => {
     expect(coverage.short).toEqual([]);
     expect(coverage.strays).toEqual([]);
     expect([...coverage.countsByKey.values()].every((have) => have === BANK_ITEMS_PER_KEY)).toBe(true);
-    // The battery has 15 enabled keys: parallel-evolution-v1's two were
+    // The battery has 13 enabled keys: parallel-evolution-v1's two were
     // retired on 2026-09-28 and rule-switching-v2's one on 2026-09-29;
-    // combining-machine-v1's two left on 2026-09-29 and came back on
-    // 2026-09-30. Each is stocked for the five times a constraint family can
-    // appear in one long test.
-    expect(coverage.countsByKey.size).toBe(15);
+    // combining-machine-v1's two left on 2026-09-29, came back on 2026-09-30
+    // and were retired on 2026-10-05. Each is stocked for the five times a
+    // constraint family can appear in one long test.
+    expect(coverage.countsByKey.size).toBe(13);
     expect(loadBank()).toHaveLength(coverage.countsByKey.size * BANK_ITEMS_PER_KEY);
   });
 });

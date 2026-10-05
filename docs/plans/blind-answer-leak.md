@@ -1,8 +1,10 @@
 # The answer must not be guessable from the options alone
 
-Status: **built 2026-09-29 as `scene-families-v19`.** The work items are in
-[TODO.md](../../TODO.md) under "the answer must not be guessable from the options alone";
-the decisions, results and what is left are at the end of this file.
+Status: **built 2026-09-29 as `scene-families-v19`;** tightened on 2026-10-03 in
+`scene-families-v21` so that one clue is never enough (see the section of that name). The
+work items are in [TODO.md](../../TODO.md) under "the answer must not be guessable from the
+options alone" and "One clue is never enough"; the decisions, results and what is left are
+at the end of this file.
 
 ## What was measured
 
@@ -183,6 +185,85 @@ got wrong most often when it answered were `second-order-sequence-v2` (9 of 14),
 `combining-machine-v1` answered only 2 of 6 inside 300 s, both right. None of these numbers
 pool with the v10/v11 probes: the model, provider and effort all differ.
 
+## One clue is never enough (2026-10-03, `scene-families-v21`)
+
+The owner's report: "The options to select should be very close to the correct answer. You
+should never be able to guess this answer through them or with 1 out of x clues needed to
+solve a test."
+
+**What was measured under `v20`** (200 items per served bucket). Options alone were near
+chance (worst strategy 25.6%), but one clue alone often finished the item:
+
+| Bucket | One whole-board clue picks the answer | One shape's clue picks it |
+|---|---|---|
+| relational-matrix-d4 | 31% | 55% |
+| relational-sequence-d2 | 22% | 22% |
+| spatial-transform-d2 | 20% | 30% |
+| combining-machine-d4 / d5 | 20% / 19% | 4% / 3% |
+| visual-set-algebra-d4 / d5 | 19% / 18% | 61% / 34% |
+| transformation-machine-d5 | 19% | 0% |
+| compositional-analogy-d3 / d4 | 14% / 17% | 12% / 15% |
+| inverse-analogy-d4 | 16% | 16% |
+| composed-transform-d4 / d5 | 0% / 1% | 66% / 37% |
+| attribute-pairing-d2 | 0% | 50% |
+
+That was the trade-off above: the one-inference solver was only a cost in the option game,
+because a hard agreement rule made the answer the one option that always shared everything.
+
+**The rule.** Every clue any option shows appears on at least two options
+(`optionsAloneOnAClue` in `src/items/blind-options.ts`). It holds for every option, not only
+the answer, which is what keeps it from feeding the options-only strategies: no option is
+ever alone on a clue, so "rule out the options alone on a clue" has nothing to rule out.
+`selectDistractors` serves only lists that meet it and throws `CluesNotSharedError` when none
+exists; a family that draws its inputs can catch that and draw again.
+
+**What one clue is** depends on how the family's rule acts on a board
+(`SCENE_FAMILY_CLUE_MODELS` in `src/items/scene-families.ts`):
+
+- `features`, for rules made of separate changes (moves, fill steps, turns, copies): each
+  whole-board aspect (where the shapes stand, which shapes, which fills, which turns, how
+  many), and the square, fill and turn of every shape each option holds exactly once ("the
+  triangle ends up black"). A shape some option lacks or doubles is itself part of what the
+  rule decides, so it is not followed on its own.
+- `squares`, for the relational matrix and the combining machine, which combine boards square
+  by square: what stands on each square. There one square is the smallest thing a solver works
+  out alone, and every whole-board aspect takes all of them. Measured, no option list in any
+  of 100 combining-machine items could share every aspect, so `features` would have shut the
+  family out for a rule its clues do not have.
+- `whole-rule`, for the second-order sequence: its whole rule is one clue (where the token
+  lands), so knowing it is solving it. Kept as is (owner's decision, 2026-10-03).
+
+**What changed to make every bucket meet it** (owner's decision: rebuild the families that
+could not, rather than withdraw them or redraw blindly):
+
+- With the first `features` definition (every shape followed, whether or not every option
+  held it), attribute pairing could never meet the rule: its shape is one of the three things
+  the rule decides. Following only shapes every option holds once fixed it.
+- The relational matrix and the combining machine moved to `squares` (0% and 31% of items
+  met the rule under `features`; 100% under `squares`).
+- The transformation machine no longer has to offer the run that stops before its
+  duplication gate: with it required, three items in four had no list that shared every
+  clue; without it, every item does. It still competes like any other near miss.
+- Set algebra d4 redraws its inputs when no list shares every clue (about one draw in
+  twelve), after the cheap aspect-cover check, so the draws that already worked keep their
+  stems.
+- The one-inference cost left the option game: under the hard rule it never finishes an
+  item, and under `squares` it read aspects that are not single clues, which pushed
+  relational-matrix-d4's exclude-lone-aspect strategy to 31.8%.
+- The search prunes a partial list once some clue has more lone values than slots left.
+  This skips only lists the rule refuses, so it changes the cost, not the result; without it
+  three searches in the test sweep ran out of budget.
+
+**Result** (`npm run families:verify`, 200 items per bucket): one clue picks out an option in
+0 items of every bucket except the exempt second-order sequence. The worst options-only
+strategy is 22.4% (set-algebra d4) against 25.6% before; most buckets sit at 17–21%. Wrong
+options stay as close as before: on average 0.7–1.9 of the five aspects differ from the
+answer in the `features` buckets, and about 2 of 4 role squares in the `squares` buckets.
+A long test assembles in about 0.56 s at the median. Stems and answers did not change, only
+options, except in the redrawn set-algebra draws; the `v20` and `v21` populations must not be
+pooled.
+
 ## What is left
 
-- Nothing gated.
+- Nothing gated. A fresh agent probe is needed before quoting agent numbers: `solver-v4`
+  changed the image on 2026-10-03 and `v21` changed the options.

@@ -1,0 +1,1449 @@
+{
+  "runId": "2026-10-05T06-03-22.098Z-gpt-6-astra-image",
+  "startedAt": "2026-10-05T06:03:22.098Z",
+  "provider": "codex",
+  "model": "gpt-6-astra",
+  "requestedModel": "default",
+  "channel": "image",
+  "promptVersion": "solver-v6",
+  "source": "generated",
+  "profile": "long-30",
+  "runSeed": "probe-v27-1",
+  "generatorVersion": "scene-families-v27",
+  "withdrawnFamilyIds": [],
+  "thinkingBudget": null,
+  "effort": "high",
+  "repeat": 1,
+  "concurrency": 2,
+  "plannedAttempts": 30,
+  "completedAttempts": 30,
+  "status": "complete",
+  "attempts": [
+    {
+      "itemId": "expanded-f7c66b56af3a91c4-2",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7877,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "88d2f96f1a5fcf42",
+        "featureBucket": "spatial-transform-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 99,
+          "rule": "Move each symbol to the cell opposite it through the grid's center, preserving its orientation and fill.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Move each symbol to the cell opposite it through the grid's center, preserving its orientation and fill.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:03:29.980Z"
+    },
+    {
+      "itemId": "expanded-fc9f66df62bb315d-1",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7144,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "9d2cd2b216dea813",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 99,
+          "rule": "The diamond moves clockwise one cell along the outer edge while cycling through white, gray, and black fills, and the central circle stays fixed.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"The diamond moves clockwise one cell along the outer edge while cycling through white, gray, and black fills, and the central circle stays fixed.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:03:29.247Z"
+    },
+    {
+      "itemId": "expanded-7bf645448de21f1a-3",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5898,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "attribute-pairing-v1",
+        "programFingerprint": "e6cdc708c2388e49",
+        "featureBucket": "attribute-pairing-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 99,
+          "rule": "Move the shape down one grid cell and change it from outlined gray to solid black, retaining its shape and column.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Move the shape down one grid cell and change it from outlined gray to solid black, retaining its shape and column.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:03:53.389Z"
+    },
+    {
+      "itemId": "expanded-c4173a1bf9358123-4",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6191,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "relational-sequence-v2",
+        "programFingerprint": "c37d2e8680768d86",
+        "featureBucket": "relational-sequence-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 99,
+          "rule": "The outlined triangle alternates between the left and right cells of the middle row while the star stays in the center, so the fifth image matches E.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"The outlined triangle alternates between the left and right cells of the middle row while the star stays in the center, so the fifth image matches E.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:03:55.739Z"
+    },
+    {
+      "itemId": "expanded-2f357a82c827df7d-6",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6002,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "d0664a2fa9b4bd6c",
+        "featureBucket": "compositional-analogy-d3",
+        "features": {
+          "difficulty": 3,
+          "ruleComplexity": 3,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": null,
+        "after": null,
+        "raw": {},
+        "error": "the first follow-up failed: Reconnecting... 5/5 (unexpected status 403 Forbidden: Unknown error, url: wss://chatgpt.com/backend-api/codex/responses, cf-ray: a45a3a77d948964f-ATH)"
+      },
+      "ts": "2026-10-05T06:04:14.736Z"
+    },
+    {
+      "itemId": "expanded-9be0d273cafd1329-5",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 8688,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "spatial-transform-v2",
+        "programFingerprint": "88d2f96f1a5fcf42",
+        "featureBucket": "spatial-transform-d2",
+        "features": {
+          "difficulty": 2,
+          "ruleComplexity": 2,
+          "programDepth": 1,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 99,
+          "rule": "Move each symbol to the cell opposite through the grid’s center, preserving its orientation and fill.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Move each symbol to the cell opposite through the grid’s center, preserving its orientation and fill.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:04:13.912Z"
+    },
+    {
+      "itemId": "expanded-80d32189b43ad137-7",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5904,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "6be0c1b98de58500",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 99,
+          "rule": "Rotate the grid 180 degrees, change solid black shapes to hollow outlines, and fill originally hollow shapes gray.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Rotate the grid 180 degrees, change solid black shapes to hollow outlines, and fill originally hollow shapes gray.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:04:36.560Z"
+    },
+    {
+      "itemId": "expanded-6e6778923014708b-8",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7891,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "ad831bf1731865fd",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 99,
+          "rule": "The dark block rotates the symbols’ positions 90 degrees clockwise without changing their orientations, and the dotted block shades the symbol in the top-left cell gray.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"The dark block rotates the symbols’ positions 90 degrees clockwise without changing their orientations, and the dotted block shades the symbol in the top-left cell gray.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:04:38.892Z"
+    },
+    {
+      "itemId": "expanded-bbd845678881266a-10",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6924,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "b62146b05d6d3e8a",
+        "featureBucket": "compositional-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 96,
+          "rule": "Reflect symbol positions vertically, rotate the arrow 90 degrees clockwise, and cycle fills from white to black to gray to white.",
+          "difficulty": 3,
+          "hardToSee": "The small differences between white and gray symbol fills."
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The fill-color cycle must be inferred from a single example, but E consistently applies it."
+        },
+        "raw": {
+          "before": "{\"confidence\":96,\"rule\":\"Reflect symbol positions vertically, rotate the arrow 90 degrees clockwise, and cycle fills from white to black to gray to white.\",\"difficulty\":3,\"hard_to_see\":\"The small differences between white and gray symbol fills.\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"The fill-color cycle must be inferred from a single example, but E consistently applies it.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:05:01.704Z"
+    },
+    {
+      "itemId": "expanded-7106e86d35d6c30b-9",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 15195,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "df9837df1a6a780d",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 88,
+          "rule": "Odd-numbered frames place the triangle at bottom-right, while even-numbered frames alternate between top-middle and bottom-middle.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":88,\"rule\":\"Odd-numbered frames place the triangle at bottom-right, while even-numbered frames alternate between top-middle and bottom-middle.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:05:06.436Z"
+    },
+    {
+      "itemId": "expanded-9c41b69f928ce6f1-11",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7276,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "a91de597ef911adc",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 99,
+          "rule": "Rotate the grid 180 degrees and change outlined shapes to black-filled shapes and black-filled shapes to gray-filled shapes.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Rotate the grid 180 degrees and change outlined shapes to black-filled shapes and black-filled shapes to gray-filled shapes.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:05:30.179Z"
+    },
+    {
+      "itemId": "expanded-da21cf606d48e6fb-12",
+      "chosen": 2,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 10035,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8c67419a61a3055c",
+        "featureBucket": "composed-transform-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 99,
+          "rule": "The dark piece fills the top-left shape, and the dotted piece rotates all shape positions 90 degrees counterclockwise without changing their orientations.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"The dark piece fills the top-left shape, and the dotted piece rotates all shape positions 90 degrees counterclockwise without changing their orientations.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:05:35.836Z"
+    },
+    {
+      "itemId": "expanded-57f81d5fe591dca5-13",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 6470,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "second-order-sequence-v2",
+        "programFingerprint": "8eb02fe7f14309fc",
+        "featureBucket": "second-order-sequence-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "F",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "F",
+        "answeredLetter": "F",
+        "before": {
+          "confidence": 99,
+          "rule": "The triangle moves clockwise around the eight perimeter cells by 2, 3, 4, 5, then 6 positions, landing at middle-right (F).",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"The triangle moves clockwise around the eight perimeter cells by 2, 3, 4, 5, then 6 positions, landing at middle-right (F).\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:05:50.773Z"
+    },
+    {
+      "itemId": "expanded-989aab12416aa83b-14",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 10036,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "compositional-analogy-v2",
+        "programFingerprint": "73c6e06ee01e9d8d",
+        "featureBucket": "compositional-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 97,
+          "rule": "Reflect the shapes’ positions horizontally, rotate the arrow 90 degrees clockwise, and lighten each fill from black to gray or gray to white.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":97,\"rule\":\"Reflect the shapes’ positions horizontally, rotate the arrow 90 degrees clockwise, and lighten each fill from black to gray or gray to white.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:06:08.607Z"
+    },
+    {
+      "itemId": "expanded-7ba35d24e98db6db-15",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 5763,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "inverse-analogy-v2",
+        "programFingerprint": "a14a0578e71d4e39",
+        "featureBucket": "inverse-analogy-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 99,
+          "rule": "Rotate the grid 90 degrees clockwise, changing gray-filled shapes to outlines and outlined shapes to solid black.",
+          "difficulty": 1,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Rotate the grid 90 degrees clockwise, changing gray-filled shapes to outlines and outlined shapes to solid black.\",\"difficulty\":1,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:06:12.883Z"
+    },
+    {
+      "itemId": "expanded-8cf1a1ecc8472d20-17",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 9891,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "90c5da064dac4482",
+        "featureBucket": "visual-set-algebra-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 99,
+          "rule": "Remove shapes from the left grid wherever the right grid has an occupied cell, then rotate the remaining shapes 90 degrees clockwise.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Remove shapes from the left grid wherever the right grid has an occupied cell, then rotate the remaining shapes 90 degrees clockwise.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:06:44.176Z"
+    },
+    {
+      "itemId": "expanded-b14fcb95d94eee43-18",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 31389,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "16c52cc928ebd12b",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 94,
+          "rule": "Apply the connectors left to right: dotted removes identical symbols in matching cells, solid combines the grids with left-hand symbols winning overlaps, and striped retains shared occupied cells with left-hand symbols winning overlaps.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The examples do not explicitly explain how chained connectors are applied; B assumes left-to-right application."
+        },
+        "raw": {
+          "before": "{\"confidence\":94,\"rule\":\"Apply the connectors left to right: dotted removes identical symbols in matching cells, solid combines the grids with left-hand symbols winning overlaps, and striped retains shared occupied cells with left-hand symbols winning overlaps.\",\"difficulty\":4,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"The examples do not explicitly explain how chained connectors are applied; B assumes left-to-right application.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:07:36.669Z"
+    },
+    {
+      "itemId": "expanded-07eee4a0dece24fa-16",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 66024,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "221a7c4ab7d821e3",
+        "featureBucket": "combining-machine-d4",
+        "features": {
+          "difficulty": 4,
+          "ruleComplexity": 4,
+          "programDepth": 2,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "B",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "B",
+        "answeredLetter": "B",
+        "before": {
+          "confidence": 55,
+          "rule": "I think the combined operator removes exact symbol-and-position matches from the right-hand grid, leaving the triangle and circle.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": false,
+          "otherOption": "E",
+          "otherOptionIndex": 2,
+          "otherRule": "The dark operator finds exact symbol-position matches, and the dotted operator removes overlapping occupied cells; combining them to subtract the matches from the left grid yields E.",
+          "whatMisled": null,
+          "unclear": "The examples do not specify whether the combined operators subtract the shared matches from the left grid or the right grid."
+        },
+        "raw": {
+          "before": "{\"confidence\":55,\"rule\":\"I think the combined operator removes exact symbol-and-position matches from the right-hand grid, leaving the triangle and circle.\",\"difficulty\":4,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":false,\"other_option\":\"E\",\"other_rule\":\"The dark operator finds exact symbol-position matches, and the dotted operator removes overlapping occupied cells; combining them to subtract the matches from the left grid yields E.\",\"what_misled\":null,\"unclear\":\"The examples do not specify whether the combined operators subtract the shared matches from the left grid or the right grid.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:07:31.475Z"
+    },
+    {
+      "itemId": "expanded-1462f5bf27639776-19",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 37545,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "4a41a0a0d2d77f69",
+        "featureBucket": "visual-set-algebra-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 83,
+          "rule": "Keep the triangle shared by both grids, rotate its position 90° clockwise around the grid center, and turn its orientation 90° counterclockwise.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":83,\"rule\":\"Keep the triangle shared by both grids, rotate its position 90° clockwise around the grid center, and turn its orientation 90° counterclockwise.\",\"difficulty\":3,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:08:59.842Z"
+    },
+    {
+      "itemId": "expanded-3fd6ce9007107e67-20",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 31731,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "a7389e8973b17ff2",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "D",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "D",
+        "answeredLetter": "D",
+        "before": {
+          "confidence": 96,
+          "rule": "Apply operators left to right against the right-hand grid: stripes retain shared occupied positions using left-hand symbols, solid retains exact symbol-and-position matches, and dots retain positions occupied in only one grid.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The examples do not explicitly specify how chained operators reuse the right-hand grid, though the natural left-to-right interpretation gives D."
+        },
+        "raw": {
+          "before": "{\"confidence\":96,\"rule\":\"Apply operators left to right against the right-hand grid: stripes retain shared occupied positions using left-hand symbols, solid retains exact symbol-and-position matches, and dots retain positions occupied in only one grid.\",\"difficulty\":3,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"The examples do not explicitly specify how chained operators reuse the right-hand grid, though the natural left-to-right interpretation gives D.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:09:31.236Z"
+    },
+    {
+      "itemId": "expanded-e6e38bf58a42939f-21",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 17792,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "c1c28493c5ae3b21",
+        "featureBucket": "visual-set-algebra-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 97,
+          "rule": "Remove symbols at positions occupied in both grids, rotate the remaining positions 90° clockwise, and turn their arrows 90° counterclockwise.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":97,\"rule\":\"Remove symbols at positions occupied in both grids, rotate the remaining positions 90° clockwise, and turn their arrows 90° counterclockwise.\",\"difficulty\":3,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:09:52.374Z"
+    },
+    {
+      "itemId": "expanded-e335bce4c0ee230b-22",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 84860,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "9cf42237d8225b69",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 75,
+          "rule": "Applied left to right, stripes retain identical symbols in matching cells, dots retain shared occupied cells using the right-hand symbol, and solid shading retains cells occupied in only one grid.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": false,
+          "otherOption": "D",
+          "otherOptionIndex": 2,
+          "otherRule": "Applying the operators right to left, each time using the original left grid as the left operand, gives D: solid selects exclusively occupied cells, dots selects shared occupied cells, and stripes selects identical symbols in matching cells.",
+          "whatMisled": null,
+          "unclear": "The examples do not establish the evaluation order or operand reuse for chained operators."
+        },
+        "raw": {
+          "before": "{\"confidence\":75,\"rule\":\"Applied left to right, stripes retain identical symbols in matching cells, dots retain shared occupied cells using the right-hand symbol, and solid shading retains cells occupied in only one grid.\",\"difficulty\":4,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":false,\"other_option\":\"D\",\"other_rule\":\"Applying the operators right to left, each time using the original left grid as the left operand, gives D: solid selects exclusively occupied cells, dots selects shared occupied cells, and stripes selects identical symbols in matching cells.\",\"what_misled\":null,\"unclear\":\"The examples do not establish the evaluation order or operand reuse for chained operators.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:11:34.917Z"
+    },
+    {
+      "itemId": "expanded-33d2f1f21dcc8084-23",
+      "chosen": 0,
+      "correct": false,
+      "outcome": "wrong",
+      "evaluationSet": "public",
+      "latencyMs": 78288,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "35271922ab64426c",
+        "featureBucket": "visual-set-algebra-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 60,
+          "rule": "The output arrow turns 90° counterclockwise from the input symbols, though I am uncertain how the changes determine its grid position.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": false,
+          "otherOption": "E",
+          "otherOptionIndex": 0,
+          "otherRule": "Rotating the input direction 90° counterclockwise gives a right arrow, supporting either C or E unless a separate position rule is established.",
+          "whatMisled": "I identified the direction change but guessed the output position; I did not establish a complete rule.",
+          "unclear": "I could not determine how the input positions specify the output cell."
+        },
+        "raw": {
+          "before": "{\"confidence\":60,\"rule\":\"The output arrow turns 90° counterclockwise from the input symbols, though I am uncertain how the changes determine its grid position.\",\"difficulty\":4,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":false,\"other_option\":\"E\",\"other_rule\":\"Rotating the input direction 90° counterclockwise gives a right arrow, supporting either C or E unless a separate position rule is established.\",\"what_misled\":\"I identified the direction change but guessed the output position; I did not establish a complete rule.\",\"unclear\":\"I could not determine how the input positions specify the output cell.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:11:42.148Z"
+    },
+    {
+      "itemId": "expanded-bf69cf2cca1b16af-25",
+      "chosen": 4,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 29384,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "visual-set-algebra-v2",
+        "programFingerprint": "021c499087cfae8c",
+        "featureBucket": "visual-set-algebra-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "C",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "C",
+        "answeredLetter": "C",
+        "before": {
+          "confidence": 94,
+          "rule": "Superimpose the two grids, remove positions occupied in both, reflect the remaining positions top-to-bottom, and rotate each arrow 90 degrees counterclockwise.",
+          "difficulty": 3,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":94,\"rule\":\"Superimpose the two grids, remove positions occupied in both, reflect the remaining positions top-to-bottom, and rotate each arrow 90 degrees counterclockwise.\",\"difficulty\":3,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:13:29.876Z"
+    },
+    {
+      "itemId": "expanded-81cc597fd5941843-24",
+      "chosen": 3,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 50223,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "combining-machine-v1",
+        "programFingerprint": "80f2d24b65593f61",
+        "featureBucket": "combining-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 20,
+          "rule": "The striped, solid, and dotted pieces appear to represent positional intersection, left-minus-right subtraction, and union, preserving left-grid shapes at overlaps, though the combined sequence is unclear to me.",
+          "difficulty": 4,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "The combined sequence does not explicitly say to apply each operator left to right using the same right-hand grid."
+        },
+        "raw": {
+          "before": "{\"confidence\":20,\"rule\":\"The striped, solid, and dotted pieces appear to represent positional intersection, left-minus-right subtraction, and union, preserving left-grid shapes at overlaps, though the combined sequence is unclear to me.\",\"difficulty\":4,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"The combined sequence does not explicitly say to apply each operator left to right using the same right-hand grid.\"}"
+        }
+      },
+      "ts": "2026-10-05T06:13:25.130Z"
+    },
+    {
+      "itemId": "expanded-3b0a252311835e43-26",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 8694,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "fccc00d53616d3de",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 99,
+          "rule": "The solid block rotates the grid 90° counterclockwise, the dotted block makes the shapes gray, and the striped block adds a triangle one square diagonally up and right of the existing triangle.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"The solid block rotates the grid 90° counterclockwise, the dotted block makes the shapes gray, and the striped block adds a triangle one square diagonally up and right of the existing triangle.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:14:21.153Z"
+    },
+    {
+      "itemId": "expanded-e73976e8d1ae5e23-28",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 10574,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "1d20b832ad06122a",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 98,
+          "rule": "The solid piece flips the grid vertically, the dotted piece makes the shapes gray, and the striped piece adds a copy of the triangle one cell below it.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":98,\"rule\":\"The solid piece flips the grid vertically, the dotted piece makes the shapes gray, and the striped piece adds a copy of the triangle one cell below it.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:14:48.517Z"
+    },
+    {
+      "itemId": "expanded-4fb1566d3410e4d2-27",
+      "chosen": 0,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 8656,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "51888515d6608573",
+        "featureBucket": "composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "E",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "E",
+        "answeredLetter": "E",
+        "before": {
+          "confidence": 96,
+          "rule": "The striped piece shades the upper-left shape gray, the solid piece reflects symbol positions vertically, and the dotted piece turns arrows and triangles 90 degrees counterclockwise.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":96,\"rule\":\"The striped piece shades the upper-left shape gray, the solid piece reflects symbol positions vertically, and the dotted piece turns arrows and triangles 90 degrees counterclockwise.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:14:41.975Z"
+    },
+    {
+      "itemId": "expanded-e6a0da0cf9f3dd3e-29",
+      "chosen": 5,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 10280,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "composed-transform-v2",
+        "programFingerprint": "8cbdad00ae8f1a32",
+        "featureBucket": "composed-transform-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 99,
+          "rule": "Striped blocks reflect positions vertically, dotted blocks turn arrows 90° clockwise, and solid blocks rotate positions 90° counterclockwise without changing symbol orientations.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":99,\"rule\":\"Striped blocks reflect positions vertically, dotted blocks turn arrows 90° clockwise, and solid blocks rotate positions 90° counterclockwise without changing symbol orientations.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:15:17.959Z"
+    },
+    {
+      "itemId": "expanded-d4398bf63243bb99-30",
+      "chosen": 1,
+      "correct": true,
+      "outcome": "correct",
+      "evaluationSet": "public",
+      "latencyMs": 7739,
+      "generation": {
+        "generatorVersion": "scene-families-v27",
+        "familyId": "transformation-machine-v3",
+        "programFingerprint": "f88f456df467aa80",
+        "featureBucket": "transformation-machine-d5",
+        "features": {
+          "difficulty": 5,
+          "ruleComplexity": 5,
+          "programDepth": 3,
+          "activeDimensions": [],
+          "usesWrap": false,
+          "distractorStrategy": "near-miss"
+        }
+      },
+      "attemptBudget": 1,
+      "raw": "A",
+      "debrief": {
+        "promptVersion": "debrief-v1",
+        "intendedLetter": "A",
+        "answeredLetter": "A",
+        "before": {
+          "confidence": 97,
+          "rule": "The solid block reflects the grid vertically, the dotted block fills outlined shapes, and the striped block adds a star in the center cell.",
+          "difficulty": 2,
+          "hardToSee": "nothing"
+        },
+        "after": {
+          "onlyDefensible": true,
+          "otherOption": null,
+          "otherOptionIndex": null,
+          "otherRule": null,
+          "whatMisled": null,
+          "unclear": "nothing"
+        },
+        "raw": {
+          "before": "{\"confidence\":97,\"rule\":\"The solid block reflects the grid vertically, the dotted block fills outlined shapes, and the striped block adds a star in the center cell.\",\"difficulty\":2,\"hard_to_see\":\"nothing\"}",
+          "after": "{\"only_defensible\":true,\"other_option\":null,\"other_rule\":null,\"what_misled\":null,\"unclear\":\"nothing\"}"
+        }
+      },
+      "ts": "2026-10-05T06:15:17.442Z"
+    }
+  ]
+}
