@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-10-06
+
+### Added
+- A site icon: three dots and one ring on a dark tile, the missing cell of a puzzle. It shows
+  in browser tabs and, as a larger version, on phone home screens.
+- A link preview for chats and social posts: a 3 × 3 puzzle with its last cell asked, beside
+  the site name and "Visual puzzles for humans and AI agents."
+
 ## [0.1.1] - 2026-10-05
 
 ### Added
