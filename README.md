@@ -35,7 +35,7 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Local development works without an env file. Production must set a stable
+Local scoring requires the Upstash settings described below. Production must set a stable
 `QUIZ_TOKEN_SECRET` of at least 32 characters for answer-key encryption. The agent harness
 also needs relay settings; copy `.env.example` → `.env.local`:
 
@@ -77,6 +77,46 @@ Vercel provisions HTTPS after DNS verification.
 
 Use `npm run vercel:setup -- --dry-run` to inspect the intended work without contacting Vercel.
 
+### Upstash Redis
+
+Connect the Upstash resource to this Vercel project for Preview and Production.
+The integration supplies `KV_REST_API_URL` and `KV_REST_API_TOKEN`. For local verification,
+copy the REST URL and write token from Upstash into the ignored `.env.local` file alongside
+existing relay settings. Vercel cannot export variables marked Sensitive; a connection
+with sensitive variables cannot target Development.
+
+```bash
+npm run redis:verify
+```
+
+This checks authentication, write/read access, expiry and atomic duplicate protection,
+then removes its unique test key. The connection uses native `fetch`, with no new package.
+Server code can call `redisCommand` in `src/lib/redis.ts`. Every quiz submission now saves
+its first result before revealing answers. Identical retries return that result; changed
+answers are refused. Redis failures leave the test retryable and reveal no answer key.
+These private receipts expire with the two-hour quiz token.
+New Vercel environment settings take effect on the next deployment.
+
+### Leaderboard
+
+Run `npm run dev` and open `/leaderboard` to see the top 20 published attempts. After an
+on-time 30-question test, the result offers an optional nickname and a Publish score button.
+The 5-question sample and late results cannot be published. One test creates at most one
+entry, including simultaneous requests and retries. Entries keep the score, elapsed time,
+submission date and the app version sealed when the test started (for example, `v0.1.2`).
+Older tokens without this version cannot join the leaderboard.
+
+Points are `round(100 × correct × (1 + 0.25 × fraction of time remaining))`. For example,
+28/30 in 20 minutes earns 3,033 points; 30/30 in 30 minutes earns 3,000. Equal points rank
+the faster attempt first. Raw accuracy stays visible; these points are not an IQ score.
+
+The leaderboard is enabled by default only in local development. On deployments, its page
+and both API methods return 404, and quiz results cannot be published. To enable it later,
+set the **server-only** `LEADERBOARD_ENABLED=true` in the desired Vercel environment and
+redeploy. Set it to `false` to disable it locally. No deployment settings were enabled as
+part of this implementation. Redis keys separate local, Preview and Production entries.
+The single-use submission protection applies even while the leaderboard is disabled.
+
 ---
 
 ## Architecture
@@ -109,7 +149,7 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
   channel for text-only models; recorded separately, never pooled with image results).
 - `src/lib/calibrate.ts` + `scripts/report.ts` — keep legacy item diagnostics and aggregate
   fresh attempts by stable generator feature bucket and model.
-- `src/app/api/generate/route.ts` / `src/app/page.tsx` — fresh deterministic quiz generation,
+- `src/app/api/generate/route.ts` / `src/app/quiz.tsx` — fresh deterministic quiz generation,
   solving, server scoring, and review.
 
 All model calls go through [llm-relay](../llm-relay). No provider API keys live in this

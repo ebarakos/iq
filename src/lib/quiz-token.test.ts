@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assembleExpandedQuiz } from "@/items/expanded-quiz";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
+import packageJson from "../../package.json";
 import {
   ACCEPTED_ITEM_COUNTS,
   createQuizDelivery,
@@ -51,6 +52,8 @@ describe("quiz token delivery", () => {
     expect(delivery.answerDeadline).toBe(1_000 + 30 * 60);
 
     const payload = openQuizToken(delivery.quizToken, SECRET, 1_001);
+    expect(payload.appVersion).toBe(`v${packageJson.version}`);
+    expect(delivery.appVersion).toBe(payload.appVersion);
     expect(payload.answerDeadline).toBe(delivery.answerDeadline);
     // The two values answer different questions and must not be the same one.
     expect(payload.expiresAt).toBeGreaterThan(payload.answerDeadline!);

@@ -20,7 +20,8 @@
     "experiment:llm-rules": "node --env-file=.env.local --import tsx scripts/llm-rule-experiment.ts",
     "report": "tsx scripts/report.ts",
     "pilot:report": "tsx scripts/pilot-report.ts",
-    "vercel:setup": "node --import tsx scripts/vercel-setup.ts"
+    "vercel:setup": "node --import tsx scripts/vercel-setup.ts",
+    "redis:verify": "node --env-file=.env.local --import tsx scripts/redis-verify.ts"
   },
   "engines": {
     "node": ">=20"

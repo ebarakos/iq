@@ -28,7 +28,7 @@ import {
  * `react-dom/server`), never by the Next client.
  */
 
-// Local A–F option labels (page.tsx owns its own LETTERS list; we define ours).
+// Local A–F option labels (quiz.tsx owns its own LETTERS list; we define ours).
 const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 
 // Geometry (px). Everything derives from these so the viewBox auto-sizes.

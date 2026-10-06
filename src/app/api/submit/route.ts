@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { openQuizToken, QuizTokenError, submissionTiming } from "@/lib/quiz-token";
+import { openQuizToken, QuizTokenError } from "@/lib/quiz-token";
+import { SubmissionConflictError, submitQuizOnce } from "@/lib/leaderboard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,9 +18,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "Invalid submission." }, { status: 400 });
   }
 
+  const nowSeconds = Math.floor(Date.now() / 1000);
   let quiz;
   try {
-    quiz = openQuizToken(parsed.data.quizToken);
+    quiz = openQuizToken(parsed.data.quizToken, undefined, nowSeconds);
   } catch (error) {
     if (error instanceof QuizTokenError && error.code === "configuration") {
       console.error("submit: quiz token configuration error —", error.message);
@@ -41,41 +43,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "An answer is outside the available options." }, { status: 400 });
   }
 
-  const results = quiz.items.map((item, index) => {
-    const chosen = parsed.data.answers[index];
-    return {
-      id: item.id,
-      chosen,
-      answerIndex: item.answerIndex,
-      correct: chosen === item.answerIndex,
-      explanation: item.explanation,
-      familyId: item.familyId,
-      band: item.band,
-    };
-  });
-  const score = results.filter((result) => result.correct).length;
-  // The server clock decides. A submission inside the grace window is ordinary;
-  // a later one is still scored and shown, but marked and kept out of any
-  // calibration set.
-  const timing = submissionTiming(quiz);
-  const summarize = (field: "familyId" | "band") => {
-    const groups = new Map<string, { correct: number; attempted: number }>();
-    for (const result of results) {
-      const key = result[field];
-      if (!key) continue;
-      const group = groups.get(key) ?? { correct: 0, attempted: 0 };
-      group.attempted++;
-      group.correct += Number(result.correct);
-      groups.set(key, group);
+  try {
+    const result = await submitQuizOnce(parsed.data.quizToken, quiz, parsed.data.answers, nowSeconds);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof SubmissionConflictError) {
+      return NextResponse.json({ message: error.message }, { status: 409 });
     }
-    return [...groups].map(([key, value]) => ({ key, ...value }));
-  };
-  return NextResponse.json({
-    score,
-    total: results.length,
-    results,
-    late: timing.late,
-    secondsLate: timing.secondsLate,
-    breakdown: { bands: summarize("band"), families: summarize("familyId") },
-  });
+    // Fail closed: no answer key leaves the server until the first result is durable.
+    return NextResponse.json({ message: "Scoring is temporarily unavailable. Your answers are kept — try again." }, { status: 503 });
+  }
 }

@@ -2,6 +2,8 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { z } from "zod";
 import type { PuzzleSet, PublicPuzzleSet } from "@/items/schema";
 import { GenerationMetadataSchema, REASONING_BANDS, toPublicPuzzleSet } from "@/items/schema";
+import packageJson from "../../package.json";
+import { leaderboardEnabled, leaderboardNamespace } from "./leaderboard-config";
 
 const TOKEN_VERSION = "v1";
 const TOKEN_AAD = Buffer.from("aiq.quiz-token.v1", "utf8");
@@ -40,6 +42,10 @@ export const ACCEPTED_ITEM_COUNTS = [5, 30] as const;
 
 export const QuizTokenPayloadSchema = z.object({
   version: z.literal(1),
+  /** Sealed at issue time; older tokens cannot acquire a newer version or ranking eligibility. */
+  appVersion: z.string().min(1).max(80).optional(),
+  leaderboardAllowed: z.boolean().optional(),
+  leaderboardScope: z.string().optional(),
   issuedAt: z.number().int().nonnegative(),
   /** When the answer key stops opening at all. Never the same thing as the deadline. */
   expiresAt: z.number().int().positive(),
@@ -62,6 +68,7 @@ export type QuizTokenPayload = z.infer<typeof QuizTokenPayloadSchema>;
 export type QuizDelivery = {
   puzzles: PublicPuzzleSet;
   quizToken: string;
+  appVersion: string;
   /**
    * The same deadline the token seals, in plain epoch seconds, so the browser
    * can run a countdown without reading token contents. The sealed copy is the
@@ -201,6 +208,9 @@ export function openQuizToken(
     decipher.setAuthTag(tag);
     const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     const payload = QuizTokenPayloadSchema.parse(JSON.parse(plaintext.toString("utf8")));
+    if (payload.leaderboardScope !== undefined && payload.leaderboardScope !== leaderboardNamespace()) {
+      throw new QuizTokenError("invalid", "quiz token belongs to another environment");
+    }
     if (payload.expiresAt <= nowSeconds) {
       throw new QuizTokenError("expired", "quiz token has expired");
     }
@@ -233,6 +243,9 @@ export function createQuizDelivery(
   }
   const payload: QuizTokenPayload = {
     version: 1,
+    appVersion: `v${packageJson.version}`,
+    leaderboardAllowed: leaderboardEnabled(),
+    leaderboardScope: leaderboardNamespace(),
     issuedAt: now,
     expiresAt: now + ttl,
     answerDeadline,
@@ -249,6 +262,7 @@ export function createQuizDelivery(
   return {
     puzzles: toPublicPuzzleSet(puzzles),
     quizToken: sealQuizToken(payload, options.secret),
+    appVersion: payload.appVersion!,
     answerDeadline,
   };
 }

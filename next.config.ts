@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // makes Next infer the wrong workspace root.
   outputFileTracingRoot: process.cwd(),
   // The release version, inlined at build so the page header can show it. The
-  // page is a client component: importing package.json there would ship all of
+  // quiz is a client component: importing package.json there would ship all of
   // it to the browser, where only this one string is wanted.
   env: { NEXT_PUBLIC_APP_VERSION: packageJson.version },
 };

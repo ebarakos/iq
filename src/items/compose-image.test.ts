@@ -884,10 +884,10 @@ describe("reading cues: grid arrows and phone budgets", () => {
 
   it("prices the phone budget from the padding the page really uses", () => {
     // 375 − 2×16 page padding − 2×1 card border − 2×12 card padding − 2×8
-    // diagram padding. A padding class edited in page.tsx without the budget
+    // diagram padding. A padding class edited in quiz.tsx without the budget
     // fails here instead of silently overflowing every layout priced above.
     expect(NARROW_VIEWPORT_STEM_WIDTH).toBe(375 - 32 - 2 - 24 - 16);
-    const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+    const page = readFileSync(new URL("../app/quiz.tsx", import.meta.url), "utf8");
     expect(page).toContain('className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8"');
     expect(page).toContain("rounded-2xl border border-gray-200 bg-white p-3 shadow-sm sm:p-6");
     expect(page).toContain('className="mb-6 rounded-xl bg-gray-50 p-2 sm:p-4"');

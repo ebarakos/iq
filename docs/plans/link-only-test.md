@@ -45,10 +45,12 @@ If the version or hash no longer matches, the page says the site changed since t
 test started and links to a new one. The in-page app keeps its own token; nothing
 in it changes.
 
-**Accepted tradeoff (owner, 2026-10-06):** the result URL can be reloaded with
-other answers until it scores full marks. Today's `/api/submit` has the same hole.
-Single-use tokens wait until scores are stored (the 2026-09-28 note in
-`docs/brainstorm.md`); a server store was weighed and declined for now.
+**Updated requirement (owner, 2026-10-06):** the leaderboard implementation now saves the
+first scored submission in Redis before revealing answers. Link results must reuse
+`src/lib/quiz-scoring.ts` and the single-use receipt logic in `src/lib/leaderboard.ts`.
+Identical retries recover the first result; changed answers are refused. Link tokens must
+also seal the app version, leaderboard eligibility and environment when issued. The
+current quiz UI moved to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
 
 ## The puzzle is a picture
 
@@ -68,7 +70,7 @@ puzzle is the image and the answer is one of the links.
 
 Every board's `aria-label` is `describeScene(scene)` (`src/items/render.tsx:311`).
 Every option button's label is `Option A: <the scene description>`
-(`src/app/page.tsx:869`, `:1100`). The accessibility tree therefore spells out each
+(`src/app/quiz.tsx`). The accessibility tree therefore spells out each
 shape, fill, size, rotation and position. A browser agent that reads that tree
 gets the whole puzzle as text and never has to look. Replace these with neutral
 labels ("Question 2 puzzle", "Option A").
@@ -81,10 +83,10 @@ check.
 ## Not changed, with reasons
 
 - **Radio buttons instead of clickable divs** — the in-page options are already
-  `<button aria-pressed>` (`page.tsx:869`). The link pages use links, because an
+  `<button aria-pressed>` (`quiz.tsx`). The link pages use links, because an
   agent that cannot submit forms cannot use radios either.
-- **State as text and ARIA** — already there: "Question N of M" (`page.tsx:800`),
-  a labelled `role="timer"` (`:670`), labelled navigator buttons (`:820`). The link
+- **State as text and ARIA** — already there: "Question N of M" (`quiz.tsx`),
+  a labelled `role="timer"` and labelled navigator buttons. The link
   pages print the same facts as plain text.
 - **No `robots.txt` block on `/sample`, `/test` or `/t/`** — some chat fetchers obey
   it, and blocking them defeats the goal. The link pages carry `noindex` only.

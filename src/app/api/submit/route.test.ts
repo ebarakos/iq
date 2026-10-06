@@ -4,6 +4,20 @@ import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
 import { createQuizDelivery, GRACE_WINDOW_SECONDS } from "@/lib/quiz-token";
 import { POST } from "./route";
 
+const storage = vi.hoisted(() => ({ values: new Map<string, string>() }));
+vi.mock("@/lib/redis", () => ({
+  redisCommand: vi.fn(async (command: (string | number)[]) => {
+    const key = String(command[1]);
+    if (command[0] === "GET") return storage.values.get(key) ?? null;
+    if (command[0] === "SET") {
+      if (storage.values.has(key)) return null;
+      storage.values.set(key, String(command[2]));
+      return "OK";
+    }
+    throw new Error("Unexpected Redis command");
+  }),
+}));
+
 function freshQuiz(seed: string) {
   return assembleExpandedQuiz(seed, "short-5", CURRENT_FAMILY_PROMOTION_REGISTRY);
 }
@@ -19,8 +33,14 @@ function request(body: unknown): Request {
 }
 
 describe("POST /api/submit", () => {
-  beforeEach(() => vi.stubEnv("QUIZ_TOKEN_SECRET", SECRET));
-  afterEach(() => vi.unstubAllEnvs());
+  beforeEach(() => {
+    storage.values.clear();
+    vi.stubEnv("QUIZ_TOKEN_SECRET", SECRET);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
 
   it("marks a submission late only after the grace window, and still scores it", async () => {
     const quiz = freshQuiz("submit-route-late");
@@ -36,7 +56,9 @@ describe("POST /api/submit", () => {
     // Move the clock past the deadline and its grace window.
     vi.useFakeTimers();
     vi.setSystemTime((answerDeadline + GRACE_WINDOW_SECONDS + 30) * 1000);
-    const late = await (await POST(request({ quizToken, answers }))).json();
+    // A fresh token is needed: an identical retry retains its first timing.
+    const lateToken = createQuizDelivery(quiz, { secret: SECRET, nowSeconds: issuedAt }).quizToken;
+    const late = await (await POST(request({ quizToken: lateToken, answers }))).json();
     vi.useRealTimers();
 
     expect(late.late).toBe(true);
@@ -113,5 +135,46 @@ describe("POST /api/submit", () => {
     await expect(response.json()).resolves.toEqual({
       message: "This quiz token is invalid. Start a new test.",
     });
+  });
+
+  it("keeps the first result and timing on an identical retry", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const quiz = freshQuiz("submit-retry");
+    const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
+    const answers = quiz.map((puzzle) => puzzle.answerIndex);
+    vi.setSystemTime(Date.now() + 60_000);
+    const first = await (await POST(request({ quizToken, answers }))).json();
+    vi.setSystemTime(Date.now() + 600_000);
+    const retry = await (await POST(request({ quizToken, answers }))).json();
+    expect(retry).toEqual(first);
+    expect(retry.elapsedSeconds).toBe(60);
+  });
+
+  it("rejects answer-key replay and simultaneous conflicting submissions", async () => {
+    const quiz = freshQuiz("submit-replay");
+    const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
+    const blanks = quiz.map(() => null);
+    const correct = quiz.map((puzzle) => puzzle.answerIndex);
+    const responses = await Promise.all([
+      POST(request({ quizToken, answers: blanks })),
+      POST(request({ quizToken, answers: correct })),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([200, 409]);
+    expect((await responses[0].json()).score).toBe(0);
+    const replay = await POST(request({ quizToken, answers: correct }));
+    expect(replay.status).toBe(409);
+    expect(await replay.json()).not.toHaveProperty("results");
+  });
+
+  it("reveals no answers if storing the first submission fails", async () => {
+    const { redisCommand } = await import("@/lib/redis");
+    vi.mocked(redisCommand).mockRejectedValueOnce(new Error("Redis unavailable"));
+    const quiz = freshQuiz("submit-storage-failure");
+    const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
+    const response = await POST(request({ quizToken, answers: quiz.map(() => null) }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).not.toHaveProperty("results");
+    // The failed attempt did not consume the token.
+    expect((await POST(request({ quizToken, answers: quiz.map(() => null) }))).status).toBe(200);
   });
 });

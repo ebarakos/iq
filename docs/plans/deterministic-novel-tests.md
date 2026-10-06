@@ -388,6 +388,17 @@ the denominator is small, but they are descriptive and must not be presented as
 a standardized IQ subscore. Elapsed time is reported overall and by band; it
 does not change correctness.
 
+Owner-approved leaderboard addition, 2026-10-06: eligible on-time 30-question attempts may
+publish a nickname and `round(100 × correct × (1 + 0.25 × fraction of time remaining))`
+points. Raw accuracy stays visible; leaderboard points are not a standardized IQ scale.
+Each entry records the app version sealed at issue time, elapsed time and submission date.
+Local development enables this by default; deployments require `LEADERBOARD_ENABLED=true`.
+Each environment keeps a separate ranking. First submissions are saved atomically before
+revealing answers, even with the leaderboard disabled; identical retries recover the same
+result and changed answers are refused. Publication is also atomic and cannot duplicate a
+test or rename its first published entry. Private scoring receipts expire with the token;
+published leaderboard entries persist. Older unversioned tokens cannot rank.
+
 Human and agent results remain separate datasets and separate result views:
 
 - human results record correctness, elapsed time, band, family, generator

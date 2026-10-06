@@ -44,7 +44,21 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   model other than the one that answered is dropped, with an error naming both.
 - `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
   token, the answer deadline (separate from the token's own expiry), and
-  server-side scoring with a late marker.
+  server-side scoring with a late marker. The token seals the app release and
+  leaderboard eligibility/environment when issued; legacy tokens cannot rank.
+- `src/lib/quiz-scoring.ts` — pure raw scoring, elapsed time and the bounded speed bonus;
+  `src/lib/leaderboard.ts` — Redis first-submission receipts (atomic `SET NX`, retained
+  until token expiry), identical-retry recovery, changed-answer rejection and atomic
+  publication of one persistent leaderboard entry per test.
+- `src/lib/leaderboard-config.ts` — local development default, explicit deployment opt-in
+  through `LEADERBOARD_ENABLED=true`, and separate local/Preview/Production namespaces.
+  `src/app/api/leaderboard/route.ts` and `src/app/leaderboard/page.tsx` return 404 when
+  disabled. `src/app/page.tsx` supplies the server flag to `src/app/quiz.tsx`, which owns
+  the quiz UI and optional publication form.
+- `src/lib/redis.ts` — server-side Upstash REST commands using the Vercel integration's
+  `KV_REST_API_URL` and `KV_REST_API_TOKEN`; `scripts/redis-verify.ts` checks the connection
+  with a temporary key. All scoring now requires Redis so answers never leave before
+  the first submission is stored, even when the leaderboard is disabled.
 - `src/lib/solver.ts` / `scripts/agent-run.ts` — relay-backed vision-model
   harness using the same answer-free public puzzle.
 - `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by
@@ -60,8 +74,9 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
 
 Only the offline tools call a model: the agent harness (`scripts/agent-run.ts`,
 `scripts/agent-smoke.ts`) and the dormant rule-proposal experiment. The human app
-makes no model call and loads no relay widget; its two requests are plain `fetch`
-calls in `src/app/page.tsx`. The files, from the `/connect-relay` templates:
+makes no model call and loads no relay widget; its start and submission requests are plain
+`fetch` calls in `src/app/quiz.tsx`, with an optional third call to publish a result. The files,
+from the `/connect-relay` templates:
 
 - `src/lib/relay-fetch.ts` — custom fetch: injects provider, intercepts relay 429s,
   and sends effort, thinking budget and session id as body fields for the local

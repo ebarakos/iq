@@ -67,7 +67,7 @@ if (OPTIONS_PER_ITEM < MINIMUM_OPTIONS_PER_ITEM || OPTIONS_PER_ITEM > MAXIMUM_OP
     `OPTIONS_PER_ITEM must be between ${MINIMUM_OPTIONS_PER_ITEM} and ${MAXIMUM_OPTIONS_PER_ITEM}, ` +
       `but it is ${OPTIONS_PER_ITEM}. Raising the ceiling means changing the option letters in ` +
       "src/lib/solver.ts, the option grid in src/items/compose-image.tsx, and the keyboard " +
-      "shortcuts in src/app/page.tsx first.",
+      "shortcuts in src/app/quiz.tsx first.",
   );
 }
 
