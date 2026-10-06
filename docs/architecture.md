@@ -49,6 +49,10 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   harness using the same answer-free public puzzle.
 - `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by
   generator feature bucket; exact-item results remain diagnostics.
+- `src/app/icon.svg`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx` —
+  the favicon, home-screen icon and 1200×630 link preview (Next file conventions,
+  rendered at build). The preview draws its text with the Noto Sans subsets in
+  `src/app/fonts/` (OFL).
 
 ---
 
