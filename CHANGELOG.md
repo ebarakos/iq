@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- A test you can take by following links alone: `/sample` (5 questions) and `/test` (30)
+  start a fresh test, each question is a picture with one link per option plus Skip, and
+  the last link opens the scored result with its review. Same puzzles, same one minute per
+  question, scored on the server. Made for chat agents that fetch pages but run no
+  JavaScript; the home page's start buttons are now these links too.
+
+### Changed
+- Screen-reader labels no longer describe what is on a board ("Option A", "board"), and the
+  layout labels name only what the picture shows. A label that spelled out every shape let a
+  reader solve the puzzle without looking.
+- The agent image draws its arrows as lines rather than text, so it looks the same with any font.
+
 ## [0.1.2] - 2026-10-06
 
 ### Added

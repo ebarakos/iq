@@ -100,8 +100,10 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
   renderer shared by generated and reference items.
 - `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
-- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — answer-free delivery and
-  authenticated, encrypted server-side scoring.
+- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` + `src/lib/scoring.ts` — answer-free
+  delivery and authenticated, encrypted server-side scoring.
+- `src/lib/link-test.ts` + `src/app/sample`, `src/app/test`, `src/app/t/` — the link test: the
+  same test taken by fetching pages and following links, for agents that run no JavaScript.
 - `src/lib/model.ts` — the relay-routed model client for the offline agent harness; nothing in
   the human request path calls a model.
 - `src/items/compose-image.tsx` + `src/lib/solver.ts` + `scripts/agent-run.ts` — agent

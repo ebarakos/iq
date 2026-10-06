@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
   // page is a client component: importing package.json there would ship all of
   // it to the browser, where only this one string is wanted.
   env: { NEXT_PUBLIC_APP_VERSION: packageJson.version },
+  // The link test's puzzle image is rasterized by resvg, a native module that
+  // must be loaded from node_modules rather than bundled, and it draws its text
+  // with the bundled fonts, which are read from disk at request time.
+  serverExternalPackages: ["@resvg/resvg-js"],
+  outputFileTracingIncludes: {
+    "/t/[token]/[n]/puzzle.png": ["./src/app/fonts/*.ttf"],
+  },
 };
 
 export default nextConfig;

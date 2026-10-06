@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SceneGraphic, StemView, describeScene } from "@/items/render";
+import { SceneGraphic, StemView } from "@/items/render";
 import type {
   PrototypePilotItemAggregate,
   PrototypePilotPacket,
@@ -409,7 +409,7 @@ export function PrototypePilot({
               type="button"
               disabled={grade !== null || grading || itemState !== "ready"}
               onClick={() => setSelected(optionIndex)}
-              aria-label={`Option ${LETTERS[optionIndex]}: ${describeScene(option)}${
+              aria-label={`Option ${LETTERS[optionIndex]}${
                 grade === null
                   ? ""
                   : grade.answerIndex === optionIndex

@@ -98,3 +98,42 @@ check.
 - No `aria-label` in the app describes a board's contents.
 - A chat LLM given only `https://iq.ebarakos.com/sample` reaches a result.
   Record below what it could see and how it scored.
+
+## Built (2026-10-06)
+
+Everything above except the chat-LLM check, which waits for a deploy.
+
+- **Token.** `src/lib/link-test.ts` seals the seed (16 random bytes), length, source,
+  generator version, withdrawn-family hash, a bank hash for a fallback test, and the three
+  times, in the quiz token's AES-GCM envelope under its own version tag (`l1`) and AAD, so
+  neither kind of token opens as the other. Sealed, it is about 240 characters, not the 120
+  estimated above: the fields are kept readable rather than packed. That is still a short
+  link. A small in-process cache holds the last 64 built tests, so a question page and its
+  picture do not each rebuild a 30-question test.
+- **Changed site.** A fallback test is drawn from the reference bank, so its token also seals
+  a hash of the bank; a new bank refuses it the same way a new generator version does.
+- **Picture.** `next/og` could not draw the SVG's text: the option letters, the "?" and the
+  arrows came out blank. `@resvg/resvg-js` moved to dependencies and draws with the bundled
+  Noto Sans subsets (`src/items/puzzle-png.ts`). Those subsets have no "→", so the agent
+  image now draws its arrows as lines, which also makes it look the same under any font. The
+  harness and `render:item` use the same function, so all three draw the same pixels.
+- **Time.** A question page past the deadline says the time is up and links to the result
+  with the unanswered questions skipped. The result page marks a late result exactly as
+  `/api/submit` does, with the same scorer (`src/lib/scoring.ts`).
+- **Out-of-order links.** A link whose answers do not match its question number redirects to
+  the question those answers lead to; unreadable answers get a page that says so.
+- **Labels.** Boards are "board", options "Option A". The gate label keeps the piece count
+  and drops the textures and "used in tab order". The 3 × 3 label no longer says "the first
+  two boards make the third" (that is the rule, not the picture): it is "3 by 3 grid with an
+  arrow before the third board of every row". The machine and analogy labels say what is
+  drawn in each row, and the sequence label was already only the picture.
+  `src/items/neutral-labels.test.ts` holds every label to that list.
+- **Checked.** `src/app/t/link-walk.test.ts` walks `/sample` to a scored result by reading
+  each page's HTML and following its links. The same walk with curl against `next start`
+  reached "0 of 5 correct" (always option C) with a PNG for each question and no `<svg>`
+  in any page.
+
+## Chat LLM check
+
+Not yet run: it needs the deploy. Give a chat LLM only `https://iq.ebarakos.com/sample` and
+record here what it saw and how it scored.

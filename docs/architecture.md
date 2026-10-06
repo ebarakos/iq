@@ -44,7 +44,18 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   model other than the one that answered is dropped, with an error naming both.
 - `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
   token, the answer deadline (separate from the token's own expiry), and
-  server-side scoring with a late marker.
+  server-side scoring with a late marker. `src/lib/scoring.ts` (`scoreAnswers`)
+  is the one scorer, called by the submit route and the link test's result page.
+- `src/lib/link-test.ts` — the link test (`docs/plans/link-only-test.md`): a
+  short sealed token holding the seed, length, source, generator version,
+  withdrawn-family hash (and bank hash for a fallback test) and deadline; every
+  page rebuilds the test from it, and refuses it once any of those changed.
+  `src/app/sample` and `src/app/test` mint one and redirect;
+  `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
+  `src/app/t/[token]/result` the scored review. All plain HTML and links.
+- `src/items/puzzle-png.ts` — `puzzleToPng`, the agent channel's SVG rasterized by
+  `@resvg/resvg-js` with the bundled Noto Sans fonts: the harness, `render:item`
+  and the link test's puzzle image all draw the same pixels.
 - `src/lib/solver.ts` / `scripts/agent-run.ts` — relay-backed vision-model
   harness using the same answer-free public puzzle.
 - `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by

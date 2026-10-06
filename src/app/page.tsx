@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Layout, PublicPuzzle } from "@/items/schema";
-import { SceneGraphic, StemView, describeScene } from "@/items/render";
+import type { PublicPuzzle } from "@/items/schema";
+import { SceneGraphic, StemView } from "@/items/render";
+import { SAMPLE_GUIDES } from "@/items/sample-guides";
 import {
   countUnansweredAnswers,
   needsBlankSubmissionConfirmation,
@@ -69,31 +70,6 @@ const QUESTION_TOP_GAP_PX = 12;
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION;
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
-
-/**
- * How to read each kind of question, shown above the diagram on the
- * 5-question sample only. Chosen by layout, which the picture already shows,
- * so a note names what to compare and never what the change is. The sample is
- * practice; the 30-question test stays without instructions while solving
- * (docs/plans/unambiguous-reading.md).
- */
-const SAMPLE_GUIDES: Partial<Record<Layout, string>> = {
-  row:
-    "Read the pictures in number order. Follow each shape on its own from one picture to the " +
-    "next: where it sits and what fill it has. The missing picture is the next step of the same pattern.",
-  analogy:
-    "The top row shows a change: the left board becomes the right board. Compare the two square by " +
-    "square, looking at positions, fills, shapes and which way arrows point. Then make exactly the same " +
-    "change to the board in the bottom row.",
-  grid3x3:
-    "The first two boards of a line make the third. When arrows are shown, only the rows work that " +
-    "way; with no arrows, look across the rows and down the columns. Compare the boards square by " +
-    "square: which squares hold a shape, and which shape.",
-  machineTable:
-    "Each jigsaw piece is a machine that changes a board. The rows above show each piece on its own. " +
-    "The last row snaps several pieces together; the board goes through them one after another, the " +
-    "way their tabs point. Watch positions, fills, shapes and which way arrows point.",
-};
 
 /**
  * Plain POST helper, replacing the llm-relay widget's `apiFetch`. This app
@@ -513,6 +489,15 @@ export default function Page() {
 }
 
 function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
+  // Real links to /test and /sample, so a reader that runs no JavaScript can
+  // still start a test (the link test, docs/plans/link-only-test.md). With
+  // JavaScript, a plain click starts the in-page test instead; a click that
+  // asks for a new tab or window keeps the link's own behaviour.
+  const startInPage = (event: React.MouseEvent<HTMLAnchorElement>, profile: TestProfile) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onStart(profile);
+  };
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
       <h2 className="text-xl font-semibold">Test instructions</h2>
@@ -532,20 +517,20 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => onStart("long-30")}
+        <a
+          href="/test"
+          onClick={(event) => startInPage(event, "long-30")}
           className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
           Start the 30-question test · 30 min
-        </button>
-        <button
-          type="button"
-          onClick={() => onStart("short-5")}
+        </a>
+        <a
+          href="/sample"
+          onClick={(event) => startInPage(event, "short-5")}
           className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
           Try the 5-question sample · 5 min
-        </button>
+        </a>
       </div>
     </section>
   );
@@ -866,7 +851,7 @@ function Solver({
               <button
                 key={i}
                 onClick={() => onChoose(i)}
-                aria-label={`Option ${LETTERS[i]}: ${describeScene(opt)}`}
+                aria-label={`Option ${LETTERS[i]}`}
                 aria-pressed={isSel}
                 className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
                   isSel
@@ -1097,7 +1082,7 @@ function ReviewItem({
           return (
             <div
               key={i}
-              aria-label={`Option ${LETTERS[i]}: ${describeScene(opt)}${status ? ` (${status})` : ""}`}
+              aria-label={`Option ${LETTERS[i]}${status ? ` (${status})` : ""}`}
               className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 ${
                 isCorrect ? "border-green-400 bg-green-50" : isChosen ? "border-red-400 bg-red-50" : "border-gray-200"
               }`}

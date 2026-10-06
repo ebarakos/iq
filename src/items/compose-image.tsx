@@ -35,7 +35,7 @@ const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 const CELL = 110; // drawn cell side
 const GAP = 16; // gap between cells
 const PAD = 40; // outer padding
-const SEP = 36; // width reserved for a "→" or "↓" separator
+const SEP = 36; // width reserved for a "→" separator
 const LABEL_H = 22; // height reserved under each option for its letter
 const SECTION_GAP = 56; // vertical gap between stem and options row
 const STROKE = "#111827"; // gray-900 — matches render.tsx
@@ -93,28 +93,34 @@ function CellBox({ x, y, cell }: { x: number; y: number; cell: Scene | null }) {
   );
 }
 
-/** A separator glyph ("→") centred in a SEP-wide column at (x, y). */
-function Separator({ x, y, text, height }: { x: number; y: number; text: string; height: number }) {
+/**
+ * A "→" centred in a SEP-wide column at (x, y), drawn as strokes like the
+ * browser's `FlowArrow` rather than typed: the server rasterizes this image with
+ * only the bundled Latin font subset, which has no arrow glyph, and a drawn
+ * arrow looks the same under every font.
+ */
+function Separator({ x, y, height }: { x: number; y: number; height: number }) {
+  const cx = x + SEP / 2;
+  const cy = y + height / 2;
   return (
-    <text
-      x={x + SEP / 2}
-      y={y + height / 2}
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={36}
-      fontFamily="sans-serif"
-      fontWeight="600"
-      fill={BORDER}
+    <g
+      data-flow-arrow="right"
+      fill="none"
+      stroke={BORDER}
+      strokeWidth={4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      {text}
-    </text>
+      <line x1={cx - 14} y1={cy} x2={cx + 13} y2={cy} />
+      <polyline points={`${cx + 2},${cy - 11} ${cx + 13},${cy} ${cx + 2},${cy + 11}`} />
+    </g>
   );
 }
 
 type Piece =
   | { kind: "cell"; cell: Scene | null }
   | { kind: "pieces"; textures: GatePieceTexture[] }
-  | { kind: "sep"; text: string };
+  | { kind: "sep" };
 
 function pieceWidth(piece: Piece): number {
   if (piece.kind === "sep") return SEP;
@@ -146,7 +152,7 @@ function drawStemRow(pieces: Piece[], startY: number, keyPrefix: string, elems: 
   pieces.forEach((piece, pieceIndex) => {
     const key = `${keyPrefix}-${pieceIndex}`;
     if (piece.kind === "sep") {
-      elems.push(<Separator key={key} x={x} y={startY} text={piece.text} height={CELL} />);
+      elems.push(<Separator key={key} x={x} y={startY} height={CELL} />);
     } else if (piece.kind === "pieces") {
       elems.push(<GatePieces key={key} x={x} y={startY} textures={piece.textures} />);
     } else {
@@ -190,7 +196,7 @@ function drawSequence(stem: readonly Panel[], startY: number, elems: ReactElemen
     line.forEach((panel, offset) => {
       const index = start + offset;
       if (index > 0) {
-        elems.push(<Separator key={`step-arrow-${index}`} x={x} y={cursorY + STEP_NUMBER_H} text="→" height={CELL} />);
+        elems.push(<Separator key={`step-arrow-${index}`} x={x} y={cursorY + STEP_NUMBER_H} height={CELL} />);
       }
       x += SEP + GAP;
       elems.push(
@@ -252,9 +258,9 @@ export function PuzzleImage({
       cursorY = drawStemRow(
         [
           cellPiece(input),
-          { kind: "sep", text: "→" },
+          { kind: "sep" },
           gatePiece(gate),
-          { kind: "sep", text: "→" },
+          { kind: "sep" },
           cellPiece(output),
         ],
         cursorY,
@@ -281,15 +287,15 @@ export function PuzzleImage({
     }
     if (oneWay) {
       for (let row = 0; row < 3; row++) {
-        elems.push(<Separator key={`grid-arrow-${row}`} x={columnX(1) + CELL + GAP} y={rowY(row)} text="→" height={CELL} />);
+        elems.push(<Separator key={`grid-arrow-${row}`} x={columnX(1) + CELL + GAP} y={rowY(row)} height={CELL} />);
       }
     }
     cursorY = rowY(2) + CELL;
   } else if (puzzle.layout === "analogy") {
     // Two aligned rows, as in the browser: "A → B" over "C → ?".
     const [a, b, c] = puzzle.stem;
-    cursorY = drawStemRow([cellPiece(a), { kind: "sep", text: "→" }, cellPiece(b)], cursorY, "analogy-0", elems);
-    cursorY = drawStemRow([cellPiece(c), { kind: "sep", text: "→" }, { kind: "cell", cell: null }], cursorY, "analogy-1", elems) - GAP;
+    cursorY = drawStemRow([cellPiece(a), { kind: "sep" }, cellPiece(b)], cursorY, "analogy-0", elems);
+    cursorY = drawStemRow([cellPiece(c), { kind: "sep" }, { kind: "cell", cell: null }], cursorY, "analogy-1", elems) - GAP;
   } else {
     // row (sequence): N drawn cells then the trailing blank as "?".
     cursorY = drawSequence(puzzle.stem, cursorY, elems) - GAP;
