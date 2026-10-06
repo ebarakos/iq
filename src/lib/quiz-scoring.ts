@@ -1,4 +1,5 @@
 import { submissionTiming, type QuizTokenPayload } from "./quiz-token";
+import { scoreAnswers } from "./scoring";
 
 /** Accuracy earns the base points; remaining time adds at most 25%. */
 export function leaderboardPoints(correct: number, elapsedSeconds: number, budgetSeconds: number): number {
@@ -8,38 +9,12 @@ export function leaderboardPoints(correct: number, elapsedSeconds: number, budge
 
 /** Pure scoring; callers validate answers and persist the first result before revealing it. */
 export function scoreQuiz(quiz: QuizTokenPayload, answers: readonly (number | null)[], nowSeconds: number) {
-  const results = quiz.items.map((item, index) => ({
-    id: item.id,
-    chosen: answers[index],
-    answerIndex: item.answerIndex,
-    correct: answers[index] === item.answerIndex,
-    explanation: item.explanation,
-    familyId: item.familyId,
-    band: item.band,
-  }));
-  const score = results.filter((result) => result.correct).length;
+  const scored = scoreAnswers(quiz.items, answers, submissionTiming(quiz, nowSeconds));
   const elapsedSeconds = Math.max(0, nowSeconds - quiz.issuedAt);
-  const timing = submissionTiming(quiz, nowSeconds);
-  const summarize = (field: "familyId" | "band") => {
-    const groups = new Map<string, { correct: number; attempted: number }>();
-    for (const result of results) {
-      const key = result[field];
-      if (!key) continue;
-      const group = groups.get(key) ?? { correct: 0, attempted: 0 };
-      group.attempted++;
-      group.correct += Number(result.correct);
-      groups.set(key, group);
-    }
-    return [...groups].map(([key, value]) => ({ key, ...value }));
-  };
   return {
-    score,
-    total: results.length,
-    results,
-    ...timing,
+    ...scored,
     elapsedSeconds,
-    points: leaderboardPoints(score, elapsedSeconds, quiz.answerDeadline - quiz.issuedAt),
+    points: leaderboardPoints(scored.score, elapsedSeconds, quiz.answerDeadline - quiz.issuedAt),
     appVersion: quiz.appVersion ?? null,
-    breakdown: { bands: summarize("band"), families: summarize("familyId") },
   };
 }

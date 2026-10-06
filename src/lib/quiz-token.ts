@@ -6,10 +6,11 @@ import packageJson from "../../package.json";
 import { leaderboardEnabled, leaderboardNamespace } from "./leaderboard-config";
 
 const TOKEN_VERSION = "v1";
-const TOKEN_AAD = Buffer.from("aiq.quiz-token.v1", "utf8");
+const TOKEN_AAD = "aiq.quiz-token.v1";
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
-const DEFAULT_TTL_SECONDS = 2 * 60 * 60;
+/** How long a token opens at all: two hours, well past any test's deadline. */
+export const QUIZ_TOKEN_TTL_SECONDS = 2 * 60 * 60;
 const MIN_SECRET_LENGTH = 32;
 
 /** The flat time budget: one countdown of 60 seconds per question. */
@@ -91,7 +92,7 @@ export interface SubmissionTiming {
  * carries a marker, and a marked result never enters calibration data.
  */
 export function submissionTiming(
-  payload: QuizTokenPayload,
+  payload: Pick<QuizTokenPayload, "answerDeadline">,
   nowSeconds = Math.floor(Date.now() / 1000),
 ): SubmissionTiming {
   const past = nowSeconds - payload.answerDeadline;
@@ -171,18 +172,61 @@ function decode(value: string): Buffer {
   return decoded;
 }
 
-/** Encrypt and authenticate a token payload. The result reveals no answer data. */
-export function sealQuizToken(payload: QuizTokenPayload, secret = resolveQuizTokenSecret()): string {
-  const checked = QuizTokenPayloadSchema.parse(payload);
+/**
+ * Encrypt and authenticate any JSON value as `<version>.<iv>.<ciphertext>.<tag>`.
+ *
+ * The version names the envelope and the AAD binds the ciphertext to one kind
+ * of token, so a token of one kind never opens as another. Shared by the quiz
+ * token here and the link token (`src/lib/link-test.ts`).
+ */
+export function sealTokenJson(
+  value: unknown,
+  envelope: { version: string; aad: string },
+  secret = resolveQuizTokenSecret(),
+): string {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv("aes-256-gcm", encryptionKey(secret), iv);
-  cipher.setAAD(TOKEN_AAD);
+  cipher.setAAD(Buffer.from(envelope.aad, "utf8"));
   const ciphertext = Buffer.concat([
-    cipher.update(JSON.stringify(checked), "utf8"),
+    cipher.update(JSON.stringify(value), "utf8"),
     cipher.final(),
   ]);
   const tag = cipher.getAuthTag();
-  return [TOKEN_VERSION, encode(iv), encode(ciphertext), encode(tag)].join(".");
+  return [envelope.version, encode(iv), encode(ciphertext), encode(tag)].join(".");
+}
+
+/**
+ * Authenticate and decrypt a token sealed by `sealTokenJson`. Throws a plain
+ * error for any malformed or tampered token; the caller validates the value.
+ */
+export function openTokenJson(
+  token: string,
+  envelope: { version: string; aad: string },
+  secret = resolveQuizTokenSecret(),
+): unknown {
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts[0] !== envelope.version) {
+    throw new Error("invalid token envelope");
+  }
+  const iv = decode(parts[1]);
+  const ciphertext = decode(parts[2]);
+  const tag = decode(parts[3]);
+  if (iv.length !== IV_BYTES || ciphertext.length === 0 || tag.length !== TAG_BYTES) {
+    throw new Error("invalid token envelope");
+  }
+
+  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(secret), iv);
+  decipher.setAAD(Buffer.from(envelope.aad, "utf8"));
+  decipher.setAuthTag(tag);
+  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return JSON.parse(plaintext.toString("utf8"));
+}
+
+const QUIZ_TOKEN_ENVELOPE = { version: TOKEN_VERSION, aad: TOKEN_AAD } as const;
+
+/** Encrypt and authenticate a token payload. The result reveals no answer data. */
+export function sealQuizToken(payload: QuizTokenPayload, secret = resolveQuizTokenSecret()): string {
+  return sealTokenJson(QuizTokenPayloadSchema.parse(payload), QUIZ_TOKEN_ENVELOPE, secret);
 }
 
 /** Authenticate, decrypt, validate, and expiry-check an opaque quiz token. */
@@ -192,22 +236,7 @@ export function openQuizToken(
   nowSeconds = Math.floor(Date.now() / 1000),
 ): QuizTokenPayload {
   try {
-    const parts = token.split(".");
-    if (parts.length !== 4 || parts[0] !== TOKEN_VERSION) {
-      throw new Error("invalid token envelope");
-    }
-    const iv = decode(parts[1]);
-    const ciphertext = decode(parts[2]);
-    const tag = decode(parts[3]);
-    if (iv.length !== IV_BYTES || ciphertext.length === 0 || tag.length !== TAG_BYTES) {
-      throw new Error("invalid token envelope");
-    }
-
-    const decipher = createDecipheriv("aes-256-gcm", encryptionKey(secret), iv);
-    decipher.setAAD(TOKEN_AAD);
-    decipher.setAuthTag(tag);
-    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-    const payload = QuizTokenPayloadSchema.parse(JSON.parse(plaintext.toString("utf8")));
+    const payload = QuizTokenPayloadSchema.parse(openTokenJson(token, QUIZ_TOKEN_ENVELOPE, secret));
     if (payload.leaderboardScope !== undefined && payload.leaderboardScope !== leaderboardNamespace()) {
       throw new QuizTokenError("invalid", "quiz token belongs to another environment");
     }
@@ -221,6 +250,19 @@ export function openQuizToken(
   }
 }
 
+/** What a token keeps about each question: the answer, its review, and where it came from. */
+export function answerKeyItems(puzzles: PuzzleSet): QuizTokenPayload["items"] {
+  return puzzles.map((puzzle) => ({
+    id: puzzle.id,
+    answerIndex: puzzle.answerIndex,
+    optionCount: puzzle.options.length,
+    explanation: puzzle.explanation,
+    familyId: puzzle.familyId,
+    band: puzzle.band,
+    generation: puzzle.generation,
+  }));
+}
+
 /** Build the public response and opaque answer key for a generated quiz. */
 export function createQuizDelivery(
   puzzles: PuzzleSet,
@@ -232,7 +274,7 @@ export function createQuizDelivery(
   } = {},
 ): QuizDelivery {
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
-  const ttl = options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
+  const ttl = options.ttlSeconds ?? QUIZ_TOKEN_TTL_SECONDS;
   if (!Number.isInteger(ttl) || ttl <= 0) {
     throw new Error("ttlSeconds must be a positive integer");
   }
@@ -249,15 +291,7 @@ export function createQuizDelivery(
     issuedAt: now,
     expiresAt: now + ttl,
     answerDeadline,
-    items: puzzles.map((puzzle) => ({
-      id: puzzle.id,
-      answerIndex: puzzle.answerIndex,
-      optionCount: puzzle.options.length,
-      explanation: puzzle.explanation,
-      familyId: puzzle.familyId,
-      band: puzzle.band,
-      generation: puzzle.generation,
-    })),
+    items: answerKeyItems(puzzles),
   };
   return {
     puzzles: toPublicPuzzleSet(puzzles),

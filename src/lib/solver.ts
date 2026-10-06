@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import type { Puzzle, PublicPuzzle } from "@/items/schema";
 import type { Channel } from "./attempts";
 import { relayModel, relayTimeoutMs } from "./model";
-import { puzzleToSvg } from "@/items/compose-image";
+import { puzzleToPng } from "@/items/puzzle-png";
 
 /**
  * Agent solver — sends one puzzle through the relay to a vision (or text) model
@@ -141,19 +141,6 @@ function symbolicPayload(puzzle: Puzzle | PublicPuzzle): string {
   return JSON.stringify(body, null, 2);
 }
 
-/** Render a puzzle's composed SVG to PNG bytes via resvg (lazily imported). */
-async function renderPng(
-  puzzle: Puzzle | PublicPuzzle,
-  optionsOnly = false,
-): Promise<Uint8Array> {
-  // Dynamic import keeps the native @resvg/resvg-js module out of the dependency
-  // graph when solver.ts is imported in vitest (symbolic-only / parser tests).
-  const { Resvg } = await import("@resvg/resvg-js");
-  const svg = puzzleToSvg(puzzle, { optionsOnly });
-  const resvg = new Resvg(svg, { font: { loadSystemFonts: true } });
-  return resvg.render().asPng();
-}
-
 /**
  * Solve one puzzle on the given channel. Reuses model.ts's relayModel() factory
  * (provider injection + 429 interception + attribution) and the AI SDK's
@@ -186,7 +173,7 @@ export async function solveItem(
 
   if (channel === "image" || channel === "options-only") {
     const optionsOnly = channel === "options-only";
-    const png = await renderPng(puzzle, optionsOnly);
+    const png = await puzzleToPng(puzzle, { optionsOnly });
     const { text, response } = await generateText({
       model,
       messages: [
@@ -358,7 +345,7 @@ export async function debriefItem(
     effort: opts?.effort,
   });
   const timeout = () => AbortSignal.timeout(opts?.timeoutMs ?? relayTimeoutMs(provider, DEFAULT_TIMEOUT_MS));
-  const png = await renderPng(puzzle);
+  const png = await puzzleToPng(puzzle);
   const question = {
     role: "user" as const,
     content: [

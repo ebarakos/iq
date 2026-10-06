@@ -91,7 +91,7 @@ npm run redis:verify
 
 This checks authentication, write/read access, expiry and atomic duplicate protection,
 then removes its unique test key. The connection uses native `fetch`, with no new package.
-Server code can call `redisCommand` in `src/lib/redis.ts`. Every quiz submission now saves
+Server code can call `redisCommand` in `src/lib/redis.ts`. Both in-page and link-test submissions save
 its first result before revealing answers. Identical retries return that result; changed
 answers are refused. Redis failures leave the test retryable and reveal no answer key.
 These private receipts expire with the two-hour quiz token.
@@ -100,7 +100,7 @@ New Vercel environment settings take effect on the next deployment.
 ### Leaderboard
 
 Run `npm run dev` and open `/leaderboard` to see the top 20 published attempts. After an
-on-time 30-question test, the result offers an optional nickname and a Publish score button.
+on-time 30-question test in the in-page app, the result offers an optional nickname and a Publish score button.
 The 5-question sample and late results cannot be published. One test creates at most one
 entry, including simultaneous requests and retries. Entries keep the score, elapsed time,
 submission date and the app version sealed when the test started (for example, `v0.1.2`).
@@ -140,8 +140,10 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
   renderer shared by generated and reference items.
 - `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
-- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — answer-free delivery and
-  authenticated, encrypted server-side scoring.
+- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` + `src/lib/scoring.ts` — answer-free
+  delivery and authenticated, encrypted server-side scoring.
+- `src/lib/link-test.ts` + `src/app/sample`, `src/app/test`, `src/app/t/` — the link test: the
+  same test taken by fetching pages and following links, for agents that run no JavaScript.
 - `src/lib/model.ts` — the relay-routed model client for the offline agent harness; nothing in
   the human request path calls a model.
 - `src/items/compose-image.tsx` + `src/lib/solver.ts` + `scripts/agent-run.ts` — agent

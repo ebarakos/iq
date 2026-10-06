@@ -26,7 +26,6 @@ import {
   SceneGraphic,
   StemView,
   analogyRowWidth,
-  describeToken,
   gateGlyphs,
   gatePieces,
   gateStripWidth,
@@ -601,18 +600,18 @@ describe("machine gates and wide stem rows", () => {
     // No dashed box and no board shapes standing in for a gate any more.
     expect(browser).not.toContain("border-dashed");
     expect(composed).not.toContain("stroke-dasharray");
-    for (const glyph of gateGlyphs(queryGate)) {
-      expect(browser).not.toContain(`aria-label="${describeToken(glyph as SceneToken)}"`);
-      expect(composed).not.toContain(`aria-label="${describeToken(glyph as SceneToken)}"`);
-    }
     // The page draws each gate twice (a phone strip and a wide one), the
     // image once; both list the query's pieces in the order they run.
     const pieces = (markup: string) => [...markup.matchAll(/data-gate-piece="([a-z-]+)"/g)].map((match) => match[1]);
     expect(pieces(composed)).toEqual(["dark", "dotted", "striped", "dark", "dotted", "striped"]);
     expect(pieces(browser)).toEqual(["dark", "dark", "dotted", "dotted", "striped", "striped",
       "dark", "dotted", "striped", "dark", "dotted", "striped"]);
-    expect(browser).toContain('aria-label="machine: dotted jigsaw piece"');
-    expect(browser).toContain('aria-label="machine: 3 jigsaw pieces snapped together, used in tab order: dark, dotted, striped"');
+    // A gate's label says what it is and how many pieces, never their textures.
+    expect(browser).toContain('aria-label="machine: jigsaw piece"');
+    expect(browser).toContain('aria-label="machine: 3 jigsaw pieces snapped together"');
+    for (const label of [...`${browser}${composed}`.matchAll(/aria-label="([^"]*)"/g)].map((match) => match[1])) {
+      expect(label).not.toMatch(/dark|dotted|striped|solid|outline|circle|square|triangle/);
+    }
     // The pieces carry the order: no arrows between them, only the row's own
     // two around the gate.
     expect((browser.match(/data-flow-arrow="right"/g) ?? []).length).toBe(8);
@@ -724,7 +723,7 @@ describe("machine gates and wide stem rows", () => {
       expect(sequence).toContain(`>${step}</text>`);
     }
     // An arrow before every picture after the first, the fold included.
-    expect((sequence.match(/>→<\/text>/g) ?? []).length).toBeGreaterThanOrEqual(longRowPuzzle.stem.length - 1);
+    expect((sequence.match(/data-flow-arrow="right"/g) ?? []).length).toBeGreaterThanOrEqual(longRowPuzzle.stem.length - 1);
   });
 });
 
@@ -869,11 +868,10 @@ describe("reading cues: grid arrows and phone budgets", () => {
     expect([count(plain, "right"), count(plain, "down")]).toEqual([0, 0]);
 
     // The agent image draws the same arrows.
-    const glyphs = (svg: string, glyph: string) => (svg.match(new RegExp(`>${glyph}</text>`, "g")) ?? []).length;
     const rowsSvg = await puzzleToSvg(grid("rows"));
     const bothSvg = await puzzleToSvg(grid("rowsAndColumns"));
-    expect([glyphs(rowsSvg, "→"), glyphs(rowsSvg, "↓")]).toEqual([3, 0]);
-    expect([glyphs(bothSvg, "→"), glyphs(bothSvg, "↓")]).toEqual([0, 0]);
+    expect([count(rowsSvg, "right"), count(rowsSvg, "down")]).toEqual([3, 0]);
+    expect([count(bothSvg, "right"), count(bothSvg, "down")]).toEqual([0, 0]);
   });
 
   it("fits a flowed grid in the phone stem budget", () => {

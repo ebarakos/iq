@@ -4,37 +4,6 @@ import type { Panel, Puzzle, PublicPuzzle, Scene, SceneToken } from "./schema";
 import { isBlank } from "./schema";
 import { gatePieceTexture, type GatePieceTexture } from "./gate-pieces";
 
-/** Short factual description of one token for screen readers, e.g. "1 solid large triangle, rotated 90°". */
-export function describeToken(token: SceneTokenSpec): string {
-  const rotPart = token.rotation !== 0 ? `, rotated ${token.rotation}°` : "";
-  return `1 ${token.fill} ${token.size === "s" ? "small" : token.size === "l" ? "large" : "medium"} ${token.shape}${rotPart}`;
-}
-
-/** Factual screen-reader description using the same categorical scene data. */
-export function describeScene(scene: Scene): string {
-  const parts: string[] = [`${scene.rows} by ${scene.columns} board`];
-  for (const placement of [...scene.objects].sort((a, b) => a.row - b.row || a.column - b.column)) {
-    const position = `row ${placement.row + 1}, column ${placement.column + 1}`;
-    if (placement.object.kind === "token") {
-      parts.push(`${describeToken(placement.object)} at ${position}`);
-    } else {
-      const contents = placement.object.contents
-        .map((token) => describeToken(token))
-        .join(" and ");
-      parts.push(`${contents} inside an outline ${placement.object.shape} at ${position}`);
-    }
-  }
-  for (const tile of [...scene.tiles].sort((a, b) => a.row - b.row || a.column - b.column)) {
-    parts.push(
-      `${tile.edges.join("-")} connection at row ${tile.row + 1}, column ${tile.column + 1}`,
-    );
-  }
-  for (const guide of scene.guides ?? []) {
-    parts.push(`dashed ${guide.axis} fold crease through the board centre, folding ${guide.direction}`);
-  }
-  return parts.join("; ");
-}
-
 /**
  * Deterministic SVG renderer. Pure functions of the puzzle data — no LLM, no
  * randomness — so a given scene always draws identically. This is what guarantees
@@ -272,11 +241,15 @@ export function JigsawPieces({ textures, direction }: { textures: GatePieceTextu
   );
 }
 
-/** What a screen reader hears for a gate: the piece, or the pieces in order. */
+/**
+ * What a screen reader hears for a gate: that it is jigsaw pieces, and how many.
+ * Never their textures — a label that names them hands the puzzle over as text
+ * (docs/plans/link-only-test.md).
+ */
 export function describeGatePieces(textures: readonly GatePieceTexture[]): string {
   return textures.length === 1
-    ? `machine: ${textures[0]} jigsaw piece`
-    : `machine: ${textures.length} jigsaw pieces snapped together, used in tab order: ${textures.join(", ")}`;
+    ? "machine: jigsaw piece"
+    : `machine: ${textures.length} jigsaw pieces snapped together`;
 }
 
 const SCENE_TOKEN_SCALE: Record<SceneToken["size"], number> = { m: 0.3, l: 0.39 };
@@ -296,7 +269,13 @@ function connectionEndpoint(
   }
 }
 
-/** Render a small board scene with explicit shared geometry in a 100x100 viewBox. */
+/**
+ * Render a small board scene with explicit shared geometry in a 100x100 viewBox.
+ *
+ * Its label is neutral ("board"), never a description of what is on it: the
+ * accessibility tree is text, and a description there lets a reader solve the
+ * puzzle without looking (docs/plans/link-only-test.md).
+ */
 export function SceneGraphic({ scene, className }: { scene: Scene; className?: string }) {
   const boardSize = CELL_VIEWBOX - SCENE_BOARD_INSET * 2;
   const columnWidth = boardSize / scene.columns;
@@ -308,7 +287,7 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
       viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`}
       className={className}
       role="img"
-      aria-label={describeScene(scene)}
+      aria-label="board"
     >
       <rect
         x={SCENE_BOARD_INSET}
@@ -653,7 +632,7 @@ export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
     return (
       <div
         className="mx-auto grid w-full max-w-[300px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.75rem_minmax(0,1fr)] items-center gap-2"
-        aria-label="3 by 3 grid: in every row, the first two boards make the third"
+        aria-label="3 by 3 grid with an arrow before the third board of every row"
       >
         {cells}
       </div>
@@ -670,7 +649,7 @@ export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
     // on a second line, which read as the start of another row. `sm:flex-wrap`
     // is only a safety net for strips wider than any served bucket draws.
     return (
-      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3" aria-label="Worked transformation paths followed by one query path">
+      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3" aria-label="Machine rows: a board, an arrow, jigsaw pieces, an arrow, a board">
         {rows.map(([input, gate, output], index) => (
           <div key={index} className="flex w-full flex-nowrap items-center justify-center gap-1 rounded-lg bg-gray-100/70 py-2 sm:flex-wrap sm:gap-2">
             <div className="w-20 shrink-0">{input && <PanelBox panel={input} />}</div>
@@ -693,7 +672,7 @@ export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
     return (
       <div
         className="mx-auto flex w-max flex-col gap-2"
-        aria-label="Analogy: the top pair shows a change; the bottom pair makes the same change"
+        aria-label="Analogy: two rows, each a board, an arrow and a board; the last board is missing"
       >
         {pairs.map(([left, right], index) => (
           <div key={index} className="flex flex-nowrap items-center gap-1 rounded-lg bg-gray-100/70 px-2 py-2">

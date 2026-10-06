@@ -46,7 +46,7 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   token, the answer deadline (separate from the token's own expiry), and
   server-side scoring with a late marker. The token seals the app release and
   leaderboard eligibility/environment when issued; legacy tokens cannot rank.
-- `src/lib/quiz-scoring.ts` — pure raw scoring, elapsed time and the bounded speed bonus;
+- `src/lib/quiz-scoring.ts` — elapsed time and the bounded speed bonus over shared `src/lib/scoring.ts`;
   `src/lib/leaderboard.ts` — Redis first-submission receipts (atomic `SET NX`, retained
   until token expiry), identical-retry recovery, changed-answer rejection and atomic
   publication of one persistent leaderboard entry per test.
@@ -59,6 +59,17 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   `KV_REST_API_URL` and `KV_REST_API_TOKEN`; `scripts/redis-verify.ts` checks the connection
   with a temporary key. All scoring now requires Redis so answers never leave before
   the first submission is stored, even when the leaderboard is disabled.
+- `src/lib/link-test.ts` — the link test (`docs/plans/link-only-test.md`): a
+  short sealed token holding the seed, length, source, generator version,
+  withdrawn-family hash (and bank hash for a fallback test), app release, leaderboard
+  settings and deadline; every
+  page rebuilds the test from it, and refuses it once any of those changed.
+  `src/app/sample` and `src/app/test` mint one and redirect;
+  `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
+  `src/app/t/[token]/result` the scored review. All plain HTML and links.
+- `src/items/puzzle-png.ts` — `puzzleToPng`, the agent channel's SVG rasterized by
+  `@resvg/resvg-js` with the bundled Noto Sans fonts: the harness, `render:item`
+  and the link test's puzzle image all draw the same pixels.
 - `src/lib/solver.ts` / `scripts/agent-run.ts` — relay-backed vision-model
   harness using the same answer-free public puzzle.
 - `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by

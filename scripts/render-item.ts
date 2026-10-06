@@ -5,14 +5,14 @@
  *   npm run render:item -- --id mx-…     # a specific bank item by id
  *
  * Offline — no relay. Composes each puzzle's standalone SVG (compose-image.tsx)
- * and rasterizes it with @resvg/resvg-js, writing `data/fixtures/<id>.png` and
+ * and rasterizes it with the same `puzzleToPng` the agent harness uses, writing `data/fixtures/<id>.png` and
  * the `.svg` next to it for debugging. Prints the paths.
  */
 import { parseArgs } from "node:util";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { Resvg } from "@resvg/resvg-js";
 import { loadBank, type BankItem } from "../src/items/bank";
 import { puzzleToSvg } from "../src/items/compose-image";
+import { puzzleToPng } from "../src/items/puzzle-png";
 import { PUZZLE_TYPES } from "../src/items/schema";
 
 const FIXTURE_DIR = new URL("../data/fixtures/", import.meta.url).pathname;
@@ -39,10 +39,9 @@ function pickItems(): BankItem[] {
   return picked;
 }
 
-function render(item: BankItem): { svgPath: string; pngPath: string; pngBytes: number } {
+async function render(item: BankItem): Promise<{ svgPath: string; pngPath: string; pngBytes: number }> {
   const svg = puzzleToSvg(item.puzzle);
-  const resvg = new Resvg(svg, { font: { loadSystemFonts: true } });
-  const png = resvg.render().asPng();
+  const png = await puzzleToPng(item.puzzle);
 
   const svgPath = `${FIXTURE_DIR}${item.puzzle.id}.svg`;
   const pngPath = `${FIXTURE_DIR}${item.puzzle.id}.png`;
@@ -51,11 +50,11 @@ function render(item: BankItem): { svgPath: string; pngPath: string; pngBytes: n
   return { svgPath, pngPath, pngBytes: png.length };
 }
 
-function main() {
+async function main() {
   mkdirSync(FIXTURE_DIR, { recursive: true });
   const items = pickItems();
   for (const item of items) {
-    const { svgPath, pngPath, pngBytes } = render(item);
+    const { svgPath, pngPath, pngBytes } = await render(item);
     console.log(`${item.puzzle.id} (${item.puzzle.type}, d${item.puzzle.difficulty})`);
     console.log(`  svg: ${svgPath}`);
     console.log(`  png: ${pngPath} (${pngBytes} bytes)`);
@@ -63,4 +62,4 @@ function main() {
   console.log(`\nwrote ${items.length} fixture${items.length === 1 ? "" : "s"} to ${FIXTURE_DIR}`);
 }
 
-main();
+await main();
