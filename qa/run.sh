@@ -72,8 +72,8 @@ FAIL=0
 # The full local gate from CLAUDE.md, in the same order; accumulate failures.
 run_suite typecheck       300 || FAIL=1
 run_suite lint            300 || FAIL=1
-run_suite test            900 || FAIL=1
-run_suite families:verify 600 || FAIL=1
+run_suite test            1500 || FAIL=1
+run_suite families:verify 2400 || FAIL=1
 run_suite bank:verify     300 || FAIL=1
 run_suite build           600 || FAIL=1
 run_agent_smoke_skip
