@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import packageJson from "../../package.json";
-import { leaderboardEnabled, leaderboardNamespace } from "./leaderboard-config";
+import { quizNamespace } from "./leaderboard-config";
 import { loadBank, sampleExpandedBankQuiz, type BankItem } from "@/items/bank";
 import {
   assembleExpandedQuiz,
@@ -39,9 +39,8 @@ export type LinkTestSource = "generated" | "fallback";
 
 /** What a link token seals. Short keys: every character rides in every link. */
 const LinkTokenSchema = z.object({
-  /** Release and leaderboard settings sealed when the test starts. */
+  /** The release and environment sealed when the test starts. Link results never rank. */
   v: z.string().min(1).max(80).optional(),
-  l: z.boolean().optional(),
   c: z.string().optional(),
   /** The seed. */
   s: z.string().min(1).max(64),
@@ -67,7 +66,6 @@ type LinkTokenWire = z.infer<typeof LinkTokenSchema>;
 /** A link test as the pages use it. */
 export interface LinkTest {
   appVersion?: string;
-  leaderboardAllowed?: boolean;
   leaderboardScope?: string;
   seed: string;
   profile: ExpandedProfile;
@@ -137,7 +135,6 @@ function resolveSecret(secret: string | undefined): string {
 export function sealLinkToken(test: LinkTest, secret?: string): string {
   const wire: LinkTokenWire = LinkTokenSchema.parse({
     v: test.appVersion,
-    l: test.leaderboardAllowed,
     c: test.leaderboardScope,
     s: test.seed,
     p: test.profile,
@@ -171,7 +168,6 @@ export function openLinkToken(token: string, context: LinkTestContext = {}): Lin
   }
   const test: LinkTest = {
     appVersion: wire.v,
-    leaderboardAllowed: wire.l,
     leaderboardScope: wire.c,
     seed: wire.s,
     profile: wire.p,
@@ -183,7 +179,7 @@ export function openLinkToken(token: string, context: LinkTestContext = {}): Lin
     answerDeadline: wire.d,
     expiresAt: wire.e,
   };
-  if (test.leaderboardScope !== undefined && test.leaderboardScope !== leaderboardNamespace()) {
+  if (test.leaderboardScope !== undefined && test.leaderboardScope !== quizNamespace()) {
     throw new LinkTestError("invalid", "This test belongs to another environment.", test.profile);
   }
   const now = context.nowSeconds ?? Math.floor(Date.now() / 1000);
@@ -219,8 +215,8 @@ function buildPuzzles(
 
 /**
  * Recently built tests, by everything that decides their questions. A taker
- * fetches each question page and its image in turn, and rebuilding a 30-question
- * test takes a few hundred milliseconds, so a small cache spares most of that.
+ * fetches each question page and its image in turn. Rebuilding repeats every
+ * question's generation and acceptance checks, so a small cache avoids that work.
  */
 const BUILT_TESTS = new Map<string, PuzzleSet>();
 const BUILT_TESTS_LIMIT = 64;
@@ -267,8 +263,7 @@ export function createLinkTest(
   const issuedAt = context.nowSeconds ?? Math.floor(Date.now() / 1000);
   const test: LinkTest = {
     appVersion: `v${packageJson.version}`,
-    leaderboardAllowed: leaderboardEnabled(),
-    leaderboardScope: leaderboardNamespace(),
+    leaderboardScope: quizNamespace(),
     seed,
     profile,
     source,

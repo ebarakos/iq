@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ESCALATION_MAXIMUM_MEDIAN_HEADROOM_SECONDS,
   ESCALATION_MINIMUM_CLEAN_MISSES,
-  PILOT_ITEMS_PER_KEY,
+  prototypePilotRepresentatives,
   PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION,
   PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET,
   PROTOTYPE_PILOT_MAX_SITTINGS,
@@ -60,7 +60,7 @@ const pilotQuestions = () => (memoisedQuestions ??= buildPrototypePilotQuestions
 const pilotPackets = () => (memoisedPackets ??= buildPrototypePilotPackets());
 
 describe("pilot v3 identity", () => {
-  it("covers every enabled family, band, and bucket key exactly once", () => {
+  it("covers every enabled key, with three representatives for new mechanisms", () => {
     const keys = enabledPrototypePilotKeys();
     // Derived from the registry on both sides, never a written-down count: a
     // family withdrawn by the human gate drops out of both lists together.
@@ -69,16 +69,21 @@ describe("pilot v3 identity", () => {
     expect(keys.length).toBeGreaterThan(0);
 
     const questions = pilotQuestions();
-    expect(questions).toHaveLength(keys.length * PILOT_ITEMS_PER_KEY);
+    expect(questions).toHaveLength(keys.reduce((count, key) => count + prototypePilotRepresentatives(key), 0));
+    for (const key of keys) {
+      expect(questions.filter((question) => question.familyId === key.familyId &&
+        question.band === key.band && question.difficultyBucket === key.difficultyBucket))
+        .toHaveLength(prototypePilotRepresentatives(key));
+    }
     expect(new Set(questions.map((question) => question.itemId)).size).toBe(questions.length);
   });
 
   it("gives every item the full four-part identity and round-trips it", () => {
     for (const question of pilotQuestions()) {
-      expect(question.itemId)
-        .toBe(`${question.familyId}:${question.band}:${question.difficultyBucket}:r1`);
       const parsed = parsePrototypePilotItemId(question.itemId);
-      expect(parsed.representative).toBe(1);
+      expect(question.itemId).toBe(prototypePilotItemId(parsed.key, parsed.representative));
+      expect(parsed.representative).toBeGreaterThanOrEqual(1);
+      expect(parsed.representative).toBeLessThanOrEqual(prototypePilotRepresentatives(parsed.key));
       expect(parsed.key.familyId).toBe(question.familyId);
       expect(parsed.key.band).toBe(question.band);
       expect(parsed.key.difficultyBucket).toBe(question.difficultyBucket);
@@ -117,15 +122,18 @@ describe("pilot v3 identity", () => {
 });
 
 describe("pilot v3 packets", () => {
-  it("fits the whole battery into one capped sitting", () => {
+  it("keeps new mechanisms in a short retention sitting and familiar ones separate", () => {
     const packets = pilotPackets();
     const questions = pilotQuestions();
     expect(PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET).toBe(24);
     expect(PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION).toBe("prototype-pilot-packets-v3");
-    const expectedCount = Math.ceil(questions.length / PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET);
     expect(packets.map((packet) => packet.packetId)).toEqual(
-      Array.from({ length: expectedCount }, (_, index) => `pilot-v3-${String.fromCharCode(97 + index)}`),
+      ["pilot-v3-a", "pilot-v3-b"],
     );
+    expect(packets[0].items).toHaveLength(24);
+    expect(new Set(packets[0].items.map((item) => item.familyId)))
+      .toEqual(new Set(["transformation-machine-v4", "overlapping-figures-v1", "attribute-matrix-v1"]));
+    expect(packets[1].items.every((item) => prototypePilotRepresentatives(item) === 1)).toBe(true);
     expect(packets.flatMap((packet) => packet.items).map((item) => item.itemId).sort())
       .toEqual(questions.map((item) => item.itemId).sort());
     expect(Math.max(...packets.map((packet) => packet.items.length)))
@@ -414,7 +422,8 @@ describe("pilot v3 sittings: server timing, single-use grading, frozen content",
 // ---------------------------------------------------------------------------
 
 const manifest = buildPrototypePilotManifest();
-const packet = manifest.packets[0];
+// Use the familiar audit packet to retain easy/deep mixed report coverage.
+const packet = manifest.packets[1];
 
 type ItemOverride = Partial<PrototypePilotAggregate["items"][number]>;
 

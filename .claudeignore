@@ -20,3 +20,6 @@ data/bank/items.json
 # Agent probe run logs, written by `npm run agent:run` and read only by
 # `scripts/pilot-report.ts`. 756K of JSON across 17 runs; query it with jq.
 data/attempts/
+
+# Frozen evaluation replay, read by tests by path. 800K of JSON; query it with jq.
+data/evaluations/

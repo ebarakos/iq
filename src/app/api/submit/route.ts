@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { openQuizToken, QuizTokenError } from "@/lib/quiz-token";
 import { SubmissionConflictError, submitQuizOnce } from "@/lib/leaderboard";
+import { ScoringError } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,20 +34,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ message }, { status: 400 });
   }
 
-  if (parsed.data.answers.length !== quiz.items.length) {
-    return NextResponse.json({ message: "Submit one answer for every question." }, { status: 400 });
-  }
-  const invalidChoice = parsed.data.answers.some(
-    (answer, index) => answer !== null && answer >= quiz.items[index].optionCount,
-  );
-  if (invalidChoice) {
-    return NextResponse.json({ message: "An answer is outside the available options." }, { status: 400 });
-  }
-
   try {
     const result = await submitQuizOnce(parsed.data.quizToken, quiz, parsed.data.answers, nowSeconds);
     return NextResponse.json(result);
   } catch (error) {
+    // A wrong number of answers, or one outside a question's options.
+    if (error instanceof ScoringError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
     if (error instanceof SubmissionConflictError) {
       return NextResponse.json({ message: error.message }, { status: 409 });
     }

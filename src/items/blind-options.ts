@@ -6,6 +6,9 @@ import {
   type SceneDistance,
 } from "./scene-distance";
 
+/** Maximum solve rate allowed for a strategy that never reads the question. */
+export const MAXIMUM_BLIND_SOLVE_RATE = 0.3;
+
 /**
  * Options-only ("blind") solvers: three ways to pick an answer that never look
  * at the question, only at the six options as served.
@@ -45,15 +48,15 @@ import {
  * 2026-09-29).
  */
 export const DISTRACTOR_ASPECTS: readonly { readonly name: string; readonly of: (scene: Scene) => string }[] = [
-  { name: "positions", of: (scene) => sceneAspectKey(scene, (placement) => `${placement.row},${placement.column}`) },
-  { name: "shapes", of: (scene) => sceneAspectKey(scene, (placement) => tokenOf(placement)?.shape ?? "-") },
-  { name: "fills", of: (scene) => sceneAspectKey(scene, (placement) => tokenOf(placement)?.fill ?? "-") },
+  { name: "positions", of: (scene) => scene.figure ? scene.figure.strokes.join(",") : sceneAspectKey(scene, (placement) => `${placement.row},${placement.column}`) },
+  { name: "shapes", of: (scene) => scene.collection ? scene.objects[0]?.object.shape ?? "-" : sceneAspectKey(scene, (placement) => tokenOf(placement)?.shape ?? "-") },
+  { name: "fills", of: (scene) => scene.collection ? tokenOf(scene.objects[0])?.fill ?? "-" : sceneAspectKey(scene, (placement) => tokenOf(placement)?.fill ?? "-") },
   { name: "rotations", of: (scene) => sceneAspectKey(scene, (placement) => String(tokenOf(placement)?.rotation ?? 0)) },
-  { name: "count", of: (scene) => String(scene.objects.length) },
+  { name: "count", of: (scene) => String(scene.figure?.strokes.length ?? scene.objects.length) },
 ];
 
-function tokenOf(placement: ScenePlacement): SceneToken | null {
-  return placement.object.kind === "token" ? placement.object : null;
+function tokenOf(placement: ScenePlacement | undefined): SceneToken | null {
+  return placement?.object.kind === "token" ? placement.object : null;
 }
 
 /** An order-free fingerprint of one aspect, so two boards agree on it or do not. */
@@ -105,6 +108,8 @@ function cellContents(scene: Scene): Map<string, string> {
     cells.set(key, cells.get(key) === "empty" ? edges : `${cells.get(key)}+${edges}`);
   }
   cells.set("guides", (scene.guides ?? []).map((guide) => `${guide.axis}:${guide.direction}`).sort().join("|"));
+  if (scene.figure) for (let ray = 0; ray < 8; ray++) cells.set(`ray:${ray}`, scene.figure.strokes.includes(ray) ? "stroke" : "empty");
+  if (scene.collection) cells.set("presentation", "collection");
   return cells;
 }
 
@@ -352,7 +357,7 @@ function loneAspectOptions(options: readonly Scene[]): Set<number> {
  *    stands on each square. There a solver works out one square at a time,
  *    and the whole-board aspects need every square at once.
  */
-export const CLUE_MODELS = ["features", "squares"] as const;
+export const CLUE_MODELS = ["features", "squares", "rays", "attributes"] as const;
 export type ClueModel = (typeof CLUE_MODELS)[number];
 
 export interface ClueBoard {
@@ -365,6 +370,13 @@ export interface ClueBoard {
 export const SHAPE_CLUE_PARTS = ["square", "fill", "turn"] as const;
 
 export function clueBoard(scene: Scene, model: ClueModel): ClueBoard {
+  if (model === "rays") return {
+    fixed: Array.from({ length: 8 }, (_, ray) => scene.figure?.strokes.includes(ray) ? "stroke" : "empty"), once: new Map(),
+  };
+  if (model === "attributes") return {
+    fixed: [scene.objects[0]?.object.shape ?? "-", tokenOf(scene.objects[0])?.fill ?? "-", String(scene.objects.length)],
+    once: new Map(),
+  };
   if (model === "squares") {
     const fixed: string[] = [];
     const cells = cellContents(scene);
@@ -412,6 +424,67 @@ export function optionsAloneOnAClue(options: readonly Scene[], model: ClueModel)
     SHAPE_CLUE_PARTS.forEach((_, part) => markAlone((board) => board.once.get(shape)![part]));
   }
   return alone;
+}
+
+/**
+ * One intended, independent clue supplied by the family that knows the rule.
+ * Readers must include meaningful absence and duplication in their values.
+ * Do not combine dependent descriptions of the same fact into one basis.
+ */
+export interface IntendedClue {
+  /** False when this reader combines several visible symbols into a joint outcome. */
+  readonly singleInference?: boolean;
+  readonly id: string;
+  readonly read: (scene: Scene) => string;
+}
+
+export interface IntendedClueCheck {
+  /** Clues whose omission leaves no distinct wrong option consistent with the rest. */
+  dispensableClueIds: string[];
+  /** Wrong options that even the complete intended clue basis cannot rule out. */
+  indistinguishableWrongOptionIndexes: number[];
+}
+
+/**
+ * Check every maximal proper subset of an explicit independent clue basis.
+ * Every clue needs a wrong option differing on that clue alone. Such a witness
+ * also survives any smaller subset that omits it, so no subset enumeration is
+ * needed. A full-tuple match is separately invalid and is not a witness.
+ *
+ * This does not derive intended clues from `clueBoard`: its whole-board and
+ * shape-specific coordinates contain dependent copies of the same facts.
+ */
+export function checkIntendedClues(
+  options: readonly Scene[],
+  answerIndex: number,
+  clues: readonly IntendedClue[],
+): IntendedClueCheck {
+  if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= options.length) {
+    throw new RangeError("Intended clue check needs an answer index within the options");
+  }
+  if (new Set(clues.map((clue) => clue.id)).size !== clues.length) {
+    throw new Error("Intended clue check needs distinct clue ids");
+  }
+  const answerValues = clues.map((clue) => clue.read(options[answerIndex]));
+  const witnessed = new Uint8Array(clues.length);
+  const indistinguishableWrongOptionIndexes: number[] = [];
+  options.forEach((option, index) => {
+    if (index === answerIndex) return;
+    let differences = 0;
+    let changedClue = -1;
+    clues.forEach((clue, clueIndex) => {
+      if (clue.read(option) !== answerValues[clueIndex]) {
+        differences += 1;
+        changedClue = clueIndex;
+      }
+    });
+    if (differences === 0) indistinguishableWrongOptionIndexes.push(index);
+    else if (differences === 1) witnessed[changedClue] = 1;
+  });
+  return {
+    dispensableClueIds: clues.filter((_, index) => witnessed[index] === 0).map((clue) => clue.id),
+    indistinguishableWrongOptionIndexes,
+  };
 }
 
 /** Each solver's credit on one item, read from the options exactly as given. */

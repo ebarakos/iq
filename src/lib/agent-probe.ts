@@ -21,12 +21,25 @@ export const STANDARD_PROBE_MINIMUM = 5;
 export interface ProbeCoverageRequirements {
   families: readonly string[];
   programComplexities: readonly string[];
+  /**
+   * Every served `family:band:bucket`. A family can sit in two bands, and a band
+   * can serve two of its buckets, so family coverage alone can leave one unseen.
+   */
+  keys: readonly string[];
   minimum: number;
 }
 
 export interface ProbeCoverageReport {
   missingFamilies: { key: string; have: number; need: number }[];
   missingProgramComplexities: { key: string; have: number; need: number }[];
+  missingKeys: { key: string; have: number; need: number }[];
+}
+
+/** The served unit a probe reports on: `family:band:bucket`, as the assembler schedules it. */
+export function probeKey(item: Puzzle): string | undefined {
+  const family = item.generation?.familyId ?? item.familyId;
+  const bucket = item.generation?.featureBucket;
+  return family && item.band && bucket ? `${family}:${item.band}:${bucket}` : undefined;
 }
 
 /** Stable stratum used to keep shallow and deep generated programs represented. */
@@ -41,6 +54,7 @@ export function standardProbeRequirements(
 ): ProbeCoverageRequirements {
   const families = new Set<string>();
   const programComplexities = new Set<string>();
+  const keys = new Set<string>();
 
   for (const band of EXPANDED_PROFILE_BANDS) {
     for (const family of eligibleFamiliesForBand(registry, band, withdrawnFamilyIds)) {
@@ -48,17 +62,18 @@ export function standardProbeRequirements(
       // Depth belongs to the family's bucket, not to the band it sits in: a
       // three-gate composition and a one-transform analogy are both
       // "composition" but are not the same program to run.
-      const bucket = requireSceneFamilyBucket(
-        family.familyId as SceneFamilyId,
-        family.difficultyBucket,
-      );
-      programComplexities.add(`complexity-${family.difficulty}-depth-${bucket.programDepth}`);
+      for (const { bucket: served, difficulty } of family.bandBuckets) {
+        const bucket = requireSceneFamilyBucket(family.familyId as SceneFamilyId, served);
+        programComplexities.add(`complexity-${difficulty}-depth-${bucket.programDepth}`);
+        keys.add(`${family.familyId}:${band}:${served}`);
+      }
     }
   }
 
   return {
     families: [...families].sort(),
     programComplexities: [...programComplexities].sort(),
+    keys: [...keys].sort(),
     minimum,
   };
 }
@@ -79,6 +94,7 @@ export function probeCoverage(
   const familyCounts = counts(items, (item) => item.generation?.familyId ?? item.familyId);
   const complexityCounts = counts(items, (item) =>
     item.generation ? programComplexityBucket(item.generation) : undefined);
+  const keyCounts = counts(items, probeKey);
   const missing = (keys: readonly string[], actual: ReadonlyMap<string, number>) => keys.flatMap((key) => {
     const have = actual.get(key) ?? 0;
     return have >= requirements.minimum ? [] : [{ key, have, need: requirements.minimum }];
@@ -87,15 +103,17 @@ export function probeCoverage(
   return {
     missingFamilies: missing(requirements.families, familyCounts),
     missingProgramComplexities: missing(requirements.programComplexities, complexityCounts),
+    missingKeys: missing(requirements.keys, keyCounts),
   };
 }
 
 export function coverageComplete(report: ProbeCoverageReport): boolean {
-  return report.missingFamilies.length === 0 && report.missingProgramComplexities.length === 0;
+  return report.missingFamilies.length === 0 && report.missingProgramComplexities.length === 0 &&
+    report.missingKeys.length === 0;
 }
 
 /**
- * Greedily keep only items that pay down a family or program-stratum deficit.
+ * Greedily keep only items that pay down a family, program-stratum or key deficit.
  * Input order is seeded by the generated tests, so the same run seed replays.
  */
 export function selectCoverageItems(
@@ -105,6 +123,7 @@ export function selectCoverageItems(
   const selected: Puzzle[] = [];
   const familyCounts = new Map<string, number>();
   const complexityCounts = new Map<string, number>();
+  const keyCounts = new Map<string, number>();
 
   for (const item of pool) {
     const family = item.generation?.familyId ?? item.familyId;
@@ -115,11 +134,16 @@ export function selectCoverageItems(
     const needsComplexity = complexity !== undefined &&
       requirements.programComplexities.includes(complexity) &&
       (complexityCounts.get(complexity) ?? 0) < requirements.minimum;
-    if (!needsFamily && !needsComplexity) continue;
+    const key = probeKey(item);
+    const needsKey = key !== undefined &&
+      requirements.keys.includes(key) &&
+      (keyCounts.get(key) ?? 0) < requirements.minimum;
+    if (!needsFamily && !needsComplexity && !needsKey) continue;
 
     selected.push(item);
     if (family) familyCounts.set(family, (familyCounts.get(family) ?? 0) + 1);
     if (complexity) complexityCounts.set(complexity, (complexityCounts.get(complexity) ?? 0) + 1);
+    if (key) keyCounts.set(key, (keyCounts.get(key) ?? 0) + 1);
   }
 
   return selected;
@@ -134,6 +158,10 @@ export function formatMissingCoverage(report: ProbeCoverageReport): string {
   if (report.missingProgramComplexities.length > 0) {
     lines.push("  program-complexity buckets:");
     for (const row of report.missingProgramComplexities) lines.push(`    ${row.key}: ${row.have}/${row.need}`);
+  }
+  if (report.missingKeys.length > 0) {
+    lines.push("  family:band:bucket keys:");
+    for (const row of report.missingKeys) lines.push(`    ${row.key}: ${row.have}/${row.need}`);
   }
   return lines.join("\n");
 }

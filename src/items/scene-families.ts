@@ -5,6 +5,8 @@ import {
   DISTRACTORS_PER_ITEM,
   FILL_LOOP,
   OPTIONS_PER_ITEM,
+  PuzzleSchema,
+  SceneSchema,
   sceneSignature,
   type Puzzle,
   type Scene,
@@ -25,6 +27,7 @@ import {
   enumerateSceneOrderedCompositions,
   enumerateSceneOrderedThreeStepCompositions,
   isSceneComposedProgram,
+  partialSceneExecutions,
   SCENE_BINARY_OPERATIONS,
   sceneComposedPrimitives,
   sceneComposedProgramFromSteps,
@@ -38,28 +41,41 @@ import {
   type SceneUnaryOperation,
 } from "./scene-grammar";
 import { rankByCloseness } from "./scene-distance";
-import { boardKey, machineWorkedRowReadings, setAlgebraPredictions } from "./worked-row-readings";
+import { boardKey, conditionalMovementReadings, machineDistractorsWithoutSecondReadings, machineWorkedRowReadings, machineWorkedRowsAgreeOnQuery, setAlgebraPredictions } from "./worked-row-readings";
 import {
   BLIND_MEASURES,
+  MAXIMUM_BLIND_SOLVE_RATE,
   blindBoard,
   blindPairTerms,
+  checkIntendedClues,
   clueBoard,
   type ClueModel,
+  type IntendedClue,
   DISTRACTOR_ASPECTS,
   optionsAloneOnAClue,
   SHAPE_CLUE_PARTS,
 } from "./blind-options";
 import { gatePieceTexture } from "./gate-pieces";
+import { everyAdjacentSwapMatters, gateOrderOutcome } from "./gate-order";
+import { SCENE_ORIENTABLE_SHAPES } from "./domains";
+import { drawSpatialAssembly, solveSpatialAssembly, spatialAssemblyClues, spatialAssemblyWrongReason } from "./spatial-assembly";
+import { drawOverlappingFigures, overlappingFigureClues, solveOverlappingFigures } from "./overlapping-figures";
+import { attributeMatrixClues, drawAttributeMatrix, solveAttributeMatrix } from "./attribute-matrix";
 
 export const SCENE_FAMILY_IDS = [
   "relational-sequence-v2",
   "attribute-pairing-v1",
   "compositional-analogy-v2",
   "composed-transform-v2",
+  "composed-transform-v3",
   "relational-matrix-v2",
   "visual-set-algebra-v2",
   "spatial-transform-v2",
   "transformation-machine-v3",
+  "transformation-machine-v4",
+  "spatial-assembly-v1",
+  "overlapping-figures-v1",
+  "attribute-matrix-v1",
   "second-order-sequence-v2",
   "inverse-analogy-v2",
 ] as const;
@@ -79,13 +95,163 @@ export const SCENE_FAMILY_CLUE_MODELS = {
   "attribute-pairing-v1": "features",
   "compositional-analogy-v2": "features",
   "composed-transform-v2": "features",
+  "composed-transform-v3": "features",
   "relational-matrix-v2": "squares",
   "visual-set-algebra-v2": "features",
   "spatial-transform-v2": "features",
   "transformation-machine-v3": "features",
+  "transformation-machine-v4": "features",
+  "spatial-assembly-v1": "features",
+  "overlapping-figures-v1": "rays",
+  "attribute-matrix-v1": "attributes",
   "second-order-sequence-v2": "whole-rule",
   "inverse-analogy-v2": "features",
 } as const satisfies Readonly<Record<SceneFamilyId, ClueModel | "whole-rule">>;
+
+/** Meaningful target outcomes, including absent and repeated shapes. */
+export function sceneFamilyClueBases(
+  familyId: SceneFamilyId,
+  answer: Scene,
+  domain: readonly Scene[],
+): readonly (readonly IntendedClue[])[] {
+  if (SCENE_FAMILY_CLUE_MODELS[familyId] === "whole-rule") return [];
+  if (familyId === "spatial-assembly-v1") return [spatialAssemblyClues(answer)];
+  if (familyId === "overlapping-figures-v1") return [overlappingFigureClues(answer)];
+  if (familyId === "attribute-matrix-v1") return [attributeMatrixClues(answer,
+    domain.some((value) => value.objects.length !== answer.objects.length))];
+  if (familyId === "relational-matrix-v2") {
+    return [[...([0, 2] as const).flatMap((row) => ([0, 2] as const).map((column) => ({
+      id: `square:${row},${column}`,
+      read: (value: Scene) => sceneSignature({
+        ...value,
+        objects: value.objects.filter((placement) => placement.row === row && placement.column === column),
+        tiles: value.tiles.filter((tile) => tile.row === row && tile.column === column),
+      }),
+    })))]];
+  }
+  const placements = (value: Scene, shape: string) => value.objects
+    .filter(({ object }) => object.kind === "token" && object.shape === shape)
+    .sort((left, right) => left.row - right.row || left.column - right.column);
+  if (familyId === "attribute-pairing-v1") {
+    return [[
+      { id: "shape", read: (value) => JSON.stringify(value.objects.map(({ object }) => object.shape).sort()) },
+      { id: "position", read: (value) => JSON.stringify(value.objects.map(({ row, column }) => [row, column]).sort()) },
+      { id: "fill", read: (value) => JSON.stringify(value.objects.map(({ object }) => object.kind === "token" ? object.fill : "container").sort()) },
+    ]];
+  }
+  const shapes = [...new Set([answer, ...domain].flatMap((value) => value.objects.flatMap(({ object }) =>
+    object.kind === "token" ? [object.shape] : [])))].sort();
+  const targets = familyId === "relational-sequence-v2"
+    ? shapes.filter((shape) => placements(answer, shape).some(({ row, column }) => row !== 1 || column !== 1))
+    : shapes;
+  const objects: IntendedClue[] = targets.map((shape) => ({
+    id: `shape:${shape}`,
+    singleInference: placements(answer, shape).length <= 1,
+    read: (value) => sceneSignature({ kind: "scene", rows: value.rows, columns: value.columns, tiles: [], objects: placements(value, shape) }),
+  }));
+  const properties: IntendedClue[] = targets.flatMap((shape) => [
+    { id: `${shape}:position`, read: (value: Scene) => JSON.stringify(placements(value, shape).map(({ row, column }) => [row, column])) },
+    { id: `${shape}:fill`, read: (value: Scene) => JSON.stringify(placements(value, shape).map(({ object }) => object.kind === "token" ? object.fill : "container").sort()) },
+    ...((SCENE_ORIENTABLE_SHAPES as readonly string[]).includes(shape) ? [{
+      id: `${shape}:direction`,
+      read: (value: Scene) => JSON.stringify(placements(value, shape).map(({ object }) => object.kind === "token" ? object.rotation : 0).sort()),
+    }] : []),
+  ]);
+  // Separate bases avoid counting a whole shape and its derived properties as
+  // independent facts. Repeated shapes need complete states to retain which
+  // fill belongs at which square; sorted property multisets lose that pairing.
+  const bases: IntendedClue[][] = objects.length > 1 || answer.objects.length > 1 ? [objects] : [];
+  if (targets.every((shape) => placements(answer, shape).length === 1)) bases.push(properties);
+  return bases;
+}
+
+/** Joint states of repeated shapes are several clues; each actual symbol still needs a near miss. */
+function singleSceneFamilyClues(
+  answer: Scene,
+  bases: readonly (readonly IntendedClue[])[],
+): IntendedClue[] {
+  const singles = bases.flatMap((basis) => basis.length > 1
+    ? basis.filter((clue) => clue.singleInference !== false) : []);
+  if (!bases.length || !bases.some((basis) => basis.some((clue) => clue.singleInference === false))) return singles;
+  for (const placement of answer.objects) {
+    if (placement.object.kind !== "token") continue;
+    const signature = sceneSignature({ ...answer, tiles: [], objects: [placement] });
+    singles.push({
+      id: `symbol:${placement.object.shape}:${placement.row},${placement.column}`,
+      read: (value) => value.objects.some((object) =>
+        sceneSignature({ ...value, tiles: [], objects: [object] }) === signature) ? "present" : "absent",
+    });
+  }
+  return singles;
+}
+
+export interface SceneFamilyClueCheck {
+  singleClueAnswerIds: string[];
+  dispensableClueIds: string[];
+  indistinguishableWrongOptionIndexes: number[];
+}
+
+/** Recheck served and bank items without trusting their generation labels. */
+export function sceneFamilyClueCheck(puzzle: Puzzle): SceneFamilyClueCheck {
+  const parsed = PuzzleSchema.safeParse(puzzle);
+  const familyId = puzzle.familyId;
+  if (!parsed.success || !SCENE_FAMILY_IDS.includes(familyId as SceneFamilyId)) {
+    const indistinguishableWrongOptionIndexes: number[] = [];
+    if (Array.isArray(puzzle.options) && Number.isInteger(puzzle.answerIndex)) {
+      const answer = SceneSchema.safeParse(puzzle.options[puzzle.answerIndex]);
+      if (answer.success) puzzle.options.forEach((option, index) => {
+        const value = SceneSchema.safeParse(option);
+        if (index !== puzzle.answerIndex && value.success && sceneSignature(value.data) === sceneSignature(answer.data)) {
+          indistinguishableWrongOptionIndexes.push(index);
+        }
+      });
+    }
+    return { singleClueAnswerIds: ["invalid-puzzle-or-family"], dispensableClueIds: [], indistinguishableWrongOptionIndexes };
+  }
+  const { options, answerIndex } = parsed.data;
+  const value = parsed.data;
+  const sequence = familyId === "relational-sequence-v2" || familyId === "second-order-sequence-v2";
+  const classicMatrix = familyId === "overlapping-figures-v1" || familyId === "attribute-matrix-v1";
+  const grid = familyId === "relational-matrix-v2" || familyId === "visual-set-algebra-v2" || classicMatrix;
+  const machine = familyId === "composed-transform-v2" || familyId === "composed-transform-v3" || familyId === "transformation-machine-v3" ||
+    familyId === "transformation-machine-v4";
+  const assembly = familyId === "spatial-assembly-v1";
+  const expectedLayout = assembly ? "assembly" : sequence ? "row" : grid ? "grid3x3" : machine ? "machineTable" : "analogy";
+  const stemLengthValid = sequence ? value.stem.length === (familyId === "relational-sequence-v2" ? 5 : 6)
+    : assembly ? value.stem.length === 4 : grid ? value.stem.length === 9 : machine ? [9, 12].includes(value.stem.length) : value.stem.length === 3;
+  const answer = options[answerIndex];
+  const targetCountValid = familyId === "attribute-pairing-v1" || familyId === "second-order-sequence-v2"
+    ? answer.objects.length === 1 : assembly ? answer.objects.length === 9 : machine
+      ? answer.objects.length === 3 : familyId === "visual-set-algebra-v2" || familyId === "relational-matrix-v2" || classicMatrix
+        ? true : answer.objects.length === 2;
+  if (value.layout !== expectedLayout || !stemLengthValid || !targetCountValid ||
+      answer.objects.some(({ object }) => object.kind !== "token")) {
+    return { singleClueAnswerIds: ["invalid-family-structure"], dispensableClueIds: [], indistinguishableWrongOptionIndexes: [] };
+  }
+  // Target kinds come from the visible set operands, or the answer for
+  // shape-preserving families. Unused near misses never define the rule.
+  const queryLeft = familyId === "visual-set-algebra-v2" ? scenePanel(value.stem[6]) : null;
+  const queryRight = familyId === "visual-set-algebra-v2" ? scenePanel(value.stem[7]) : null;
+  if (familyId === "visual-set-algebra-v2" && (!queryLeft || !queryRight)) {
+    return { singleClueAnswerIds: ["invalid-family-structure"], dispensableClueIds: [], indistinguishableWrongOptionIndexes: [] };
+  }
+  const domain = familyId === "attribute-matrix-v1" ? [...value.stem.filter((panel): panel is Scene => !("blank" in panel)), answer]
+    : queryLeft && queryRight ? [queryLeft, queryRight] : [answer];
+  const bases = sceneFamilyClueBases(familyId as SceneFamilyId, answer, domain);
+  const singleClueAnswerIds: string[] = [];
+  const dispensableClueIds: string[] = [];
+  const indistinguishable = new Set<number>();
+  for (const clue of singleSceneFamilyClues(options[answerIndex], bases)) {
+    const correct = clue.read(options[answerIndex]);
+    if (options.filter((option) => clue.read(option) === correct).length < 2) singleClueAnswerIds.push(clue.id);
+  }
+  bases.forEach((basis, basisIndex) => {
+    const checked = checkIntendedClues(options, answerIndex, basis);
+    dispensableClueIds.push(...checked.dispensableClueIds.map((id) => `${basisIndex}:${id}`));
+    checked.indistinguishableWrongOptionIndexes.forEach((index) => indistinguishable.add(index));
+  });
+  return { singleClueAnswerIds, dispensableClueIds, indistinguishableWrongOptionIndexes: [...indistinguishable] };
+}
 
 /**
  * One named generation bucket: what a family produces when a schedule asks for
@@ -150,6 +316,9 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "composed-transform-d4", difficulty: 4, programDepth: 2 },
     { bucket: "composed-transform-d5", difficulty: 5, programDepth: 3 },
   ],
+  "composed-transform-v3": [
+    { bucket: "composed-transform-v3-d5", difficulty: 5, programDepth: 3 },
+  ],
   // A row rule and a column rule, both needed for the missing corner.
   "relational-matrix-v2": [{ bucket: "relational-matrix-d4", difficulty: 4, programDepth: 2 }],
   // d4 combines the two boards and then transforms the combined result. d5 adds
@@ -166,6 +335,24 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   // servable.
   "transformation-machine-v3": [
     { bucket: "transformation-machine-d5", difficulty: 5, programDepth: 3 },
+  ],
+  // The prototype redesign of v3: the same three gates' jobs, but the paint and
+  // the copy read one square, so each gate depends on the board the gate before
+  // it made. It keeps its version in the bucket id, like relational-outlier-v3,
+  // so the two can be compared side by side. Not served until registered.
+  "transformation-machine-v4": [
+    { bucket: "transformation-machine-v4-d5", difficulty: 5, programDepth: 3 },
+  ],
+  "spatial-assembly-v1": [{ bucket: "spatial-assembly-d4", difficulty: 4, programDepth: 2 }],
+  "overlapping-figures-v1": [
+    { bucket: "overlapping-figures-d3", difficulty: 3, programDepth: 1 },
+    { bucket: "overlapping-figures-d4", difficulty: 4, programDepth: 2 },
+    { bucket: "overlapping-figures-d5", difficulty: 5, programDepth: 3 },
+  ],
+  "attribute-matrix-v1": [
+    { bucket: "attribute-matrix-d2", difficulty: 2, programDepth: 2 },
+    { bucket: "attribute-matrix-d3", difficulty: 3, programDepth: 3 },
+    { bucket: "attribute-matrix-d4", difficulty: 4, programDepth: 3 },
   ],
   // A step rule plus the rule governing how that step grows.
   "second-order-sequence-v2": [{ bucket: "second-order-sequence-d4", difficulty: 4, programDepth: 2 }],
@@ -219,6 +406,16 @@ export interface SceneFamilyCandidate {
    * Families with other layouts leave it undefined.
    */
   answeredStrandPanelIndexes?: readonly number[];
+  /**
+   * For gate families: the order the question runs its gates in, and the
+   * question's board run through the gates in any order (null when a gate
+   * cannot apply). `gateOrderOutcome` reads it to report how much the order
+   * matters (docs/plans/harden-reasoning.md). Other families leave it undefined.
+   */
+  queryGates?: {
+    order: readonly number[];
+    run(order: readonly number[]): Scene | null;
+  };
 }
 
 /**
@@ -506,7 +703,7 @@ function leastCreditMix(
  * options while two items from one grammar do not always serve the same near
  * misses.
  */
-function selectDistractors(
+export function selectDistractors(
   pool: readonly Scene[],
   rng: Rng,
   familyName: string,
@@ -517,13 +714,98 @@ function selectDistractors(
     required?: readonly Scene[];
     /** What one clue is for this family's rule (`ClueModel`); features unless it combines square by square. */
     clueModel?: ClueModel;
+    /** Family identity is explicit; human-readable error labels never select a contract. */
+    familyId?: SceneFamilyId;
+    /** Alternative independent semantic bases; each is checked separately. */
+    intendedClueBases?: readonly (readonly IntendedClue[])[];
+    /** Each declared relationship must change which option can be chosen. */
+    requireEveryIntendedClue?: boolean;
+    /** At least one wrong choice must survive each missing worked transformation. */
+    requiredWitnessGroups?: readonly GateWitnessGroup[];
+    /** Complete alternate runs that can balance the necessary comparisons. */
+    alternateExecutions?: readonly Scene[];
+    /** Visible operand scenes for rules that can remove shape kinds, such as set algebra. */
+    clueDomain?: readonly Scene[];
   },
 ): Scene[] {
+  const signatures = new WeakMap<Scene, string>();
+  const signatureOf = (value: Scene): string => {
+    let signature = signatures.get(value);
+    if (signature === undefined) {
+      signature = sceneSignature(value);
+      signatures.set(value, signature);
+    }
+    return signature;
+  };
+  const clueValues = new Map<IntendedClue, WeakMap<Scene, string>>();
+  const readClue = (clue: IntendedClue, value: Scene): string => {
+    let cache = clueValues.get(clue);
+    if (!cache) { cache = new WeakMap(); clueValues.set(clue, cache); }
+    let reading = cache.get(value);
+    if (reading === undefined) { reading = clue.read(value); cache.set(value, reading); }
+    return reading;
+  };
   const { answer, required = [], clueModel = "features" } = options;
+  const familyId = options.familyId;
+  const intendedClueBases = options.intendedClueBases ??
+    (familyId ? sceneFamilyClueBases(familyId, answer, options.clueDomain ?? [answer]) : []);
+  const witnessGroups = options.requiredWitnessGroups ?? [];
+  const hasIntendedClues = intendedClueBases.length > 0 || witnessGroups.length > 0;
+  const obligations: { bit: bigint }[] = [];
+  const basisBits = intendedClueBases.map((basis) => {
+    // Validate ids within each basis without deriving or merging its clues.
+    checkIntendedClues([answer], 0, basis);
+    return basis.map(() => {
+      const bit = 1n << BigInt(obligations.length);
+      obligations.push({ bit });
+      return bit;
+    });
+  });
+  let requiredWitnessCoverage = 0n;
+  const witnessBits = witnessGroups.map(({ alternatives }) => {
+    const bit = 1n << BigInt(obligations.length);
+    obligations.push({ bit });
+    requiredWitnessCoverage |= bit;
+    return { bit, keys: new Set(alternatives.map(signatureOf)) };
+  });
+  const everyIntendedClue = (1n << BigInt(obligations.length)) - 1n;
+  const mandatoryCoverage = options.requireEveryIntendedClue ? everyIntendedClue : requiredWitnessCoverage;
+  const singleClues = singleSceneFamilyClues(answer, intendedClueBases);
+  const singleAnswerValues = singleClues.map((clue) => readClue(clue, answer));
+  const singleClueTarget = (1n << BigInt(singleClues.length)) - 1n;
+  const intendedAnswerValues = intendedClueBases.map((basis) => basis.map((clue) => readClue(clue, answer)));
+  const intendedCandidateCache = new Map<Scene, { coverage: bigint; agreement: bigint; indistinguishable: boolean }>();
+  /** A single error can witness omissions in several alternative bases. */
+  const intendedCandidate = (candidate: Scene): { coverage: bigint; agreement: bigint; indistinguishable: boolean } => {
+    const cached = intendedCandidateCache.get(candidate);
+    if (cached) return cached;
+    let coverage = 0n;
+    let agreement = 0n;
+    let indistinguishable = false;
+    intendedClueBases.forEach((basis, basisIndex) => {
+      let differences = 0;
+      let changed = -1;
+      basis.forEach((clue, clueIndex) => {
+        if (readClue(clue, candidate) !== intendedAnswerValues[basisIndex][clueIndex]) {
+          differences += 1;
+          changed = clueIndex;
+        }
+      });
+      if (differences === 0) indistinguishable = true;
+      else if (differences === 1) coverage |= basisBits[basisIndex][changed];
+    });
+    for (const { bit, keys } of witnessBits) if (keys.has(signatureOf(candidate))) coverage |= bit;
+    singleClues.forEach((clue, index) => {
+      if (readClue(clue, candidate) === singleAnswerValues[index]) agreement |= 1n << BigInt(index);
+    });
+    const result = { coverage, agreement, indistinguishable };
+    intendedCandidateCache.set(candidate, result);
+    return result;
+  };
   const requiredKeys = new Set<string>();
   const kept: Scene[] = [];
   for (const contrast of required) {
-    const key = sceneSignature(contrast);
+    const key = signatureOf(contrast);
     if (requiredKeys.has(key)) continue;
     // A required contrast skips the search, so it must clear the legibility
     // floor here or nothing else will: the optional picks below are checked
@@ -534,6 +816,9 @@ function selectDistractors(
       throw new Error(
         `${familyName} requires a near miss that is not categorically distinct from its own answer`,
       );
+    }
+    if (hasIntendedClues && intendedCandidate(contrast).indistinguishable) {
+      throw new CluesNotSharedError(`${familyName}: a required near miss matches a complete intended clue basis`);
     }
     for (const chosen of kept) {
       if (!areScenesCategoricallyDistinct(chosen, contrast)) {
@@ -550,13 +835,29 @@ function selectDistractors(
     if (optionsAloneOnAClue([answer, ...fixed], clueModel).size > 0) {
       throw new CluesNotSharedError(`${familyName}: its required near misses leave a clue on one option`);
     }
+    for (const clue of singleClues) {
+      if (!fixed.some((candidate) => readClue(clue, candidate) === readClue(clue, answer))) {
+        throw new CluesNotSharedError(`${familyName}: its required near misses leave an intended clue on one option`);
+      }
+    }
+    for (const basis of intendedClueBases) {
+      const checked = checkIntendedClues([answer, ...fixed], 0, basis);
+      if (checked.indistinguishableWrongOptionIndexes.length > 0 ||
+          (options.requireEveryIntendedClue && checked.dispensableClueIds.length > 0)) {
+        throw new CluesNotSharedError(`${familyName}: its required near misses match every intended clue`);
+      }
+    }
+    const coverage = fixed.reduce((mask, candidate) => mask | intendedCandidate(candidate).coverage, 0n);
+    if ((coverage & mandatoryCoverage) !== mandatoryCoverage) {
+      throw new CluesNotSharedError(`${familyName}: its required near misses let a worked transformation be skipped`);
+    }
     return fixed;
   }
 
-  const seen = new Set<string>([sceneSignature(answer), ...requiredKeys]);
+  const seen = new Set<string>([signatureOf(answer), ...requiredKeys]);
   const rest: Scene[] = [];
   for (const candidate of pool) {
-    const key = sceneSignature(candidate);
+    const key = signatureOf(candidate);
     if (seen.has(key)) continue;
     seen.add(key);
     rest.push(candidate);
@@ -565,7 +866,28 @@ function selectDistractors(
   // met in a seeded order rather than in the order the grammar lists them.
   const ranked = rankByCloseness(shuffled(rng, rest), answer, (candidate) => candidate)
     .filter((candidate) => areScenesCategoricallyDistinct(answer, candidate) &&
-      kept.every((chosen) => areScenesCategoricallyDistinct(chosen, candidate)));
+      kept.every((chosen) => areScenesCategoricallyDistinct(chosen, candidate)) &&
+      (!hasIntendedClues || !intendedCandidate(candidate).indistinguishable));
+  const keptIntendedCoverage = hasIntendedClues
+    ? kept.reduce((coverage, candidate) => coverage | intendedCandidate(candidate).coverage, 0n)
+    : 0n;
+  const closestWitnesses = new Map<bigint, Scene[]>();
+  if (hasIntendedClues) {
+    for (const candidate of ranked) {
+      const coverage = intendedCandidate(candidate).coverage;
+      for (const { bit } of obligations) {
+        if ((keptIntendedCoverage & bit) === 0n && (coverage & bit) !== 0n) {
+          const witnesses = closestWitnesses.get(bit) ?? [];
+          // A second witness can remain legible when the closest one clashes
+          // with another required omission witness.
+          if (witnesses.length < 2) {
+            witnesses.push(candidate);
+            closestWitnesses.set(bit, witnesses);
+          }
+        }
+      }
+    }
+  }
   // Read once: an imported binding is a getter call in the loops below.
   const optionCount = OPTIONS_PER_ITEM;
   const slots = optionCount - 1 - kept.length;
@@ -590,17 +912,80 @@ function selectDistractors(
   }
   // The nearest few, then the closest agreeing candidate for any aspect they
   // cannot match, then the rest of the wide reach.
-  const reach = ranked.slice(0, DISTRACTOR_REACH);
+  // Conditional movement needs alternative footprints beside its mandatory
+  // pre-movement contrast; the ordinary window mostly contains fill errors.
+  const nearReach = familyId === "attribute-matrix-v1" ? ranked.length
+    : witnessGroups.length > 0 || familyId === "composed-transform-v3" || familyId === "overlapping-figures-v1"
+      ? DISTRACTOR_WIDE_REACH : DISTRACTOR_REACH;
+  const reach = ranked.slice(0, nearReach);
   for (const candidate of closestAgreeing.values()) {
     if (!reach.includes(candidate)) reach.push(candidate);
   }
+  for (const witnesses of closestWitnesses.values()) {
+    for (const candidate of witnesses) if (!reach.includes(candidate)) reach.push(candidate);
+  }
+  // A required comparison can sit far from the answer. Keep its closest
+  // partners too: the ordinary nearest window must not leave a required
+  // footprint or fill value on that option alone.
+  const symmetryValues = (value: Scene): string[] => {
+    const board = clueBoard(value, clueModel);
+    return [
+      ...board.fixed.map((key, index) => `fixed:${index}:${key}`),
+      ...[...board.once].flatMap(([shape, parts]) => parts.map((key, index) => `shape:${shape}:${index}:${key}`)),
+    ];
+  };
+  const unpairedRequiredClues = new Set(kept.flatMap(symmetryValues));
+  if (unpairedRequiredClues.size > 0) {
+    for (const candidate of ranked) {
+      let needed = false;
+      symmetryValues(candidate).forEach((key) => {
+        if (unpairedRequiredClues.delete(key)) needed = true;
+      });
+      if (needed && !reach.includes(candidate)) reach.push(candidate);
+      if (unpairedRequiredClues.size === 0) break;
+    }
+  }
+  const identityLayout = (value: Scene) => JSON.stringify(value.objects.map(({ row, column, object }) =>
+    `${object.shape}:${row},${column}`).sort());
+  for (const required of kept) {
+    const layout = identityLayout(required);
+    const partners = rankByCloseness(ranked.filter((candidate) => identityLayout(candidate) === layout),
+      required, (candidate) => candidate).slice(0, OPTIONS_PER_ITEM);
+    for (const partner of partners) if (!reach.includes(partner)) reach.push(partner);
+  }
+  // Local omission witnesses introduce new footprints. Their closest
+  // same-layout partner can lie beyond the ordinary window when one other
+  // property is also misread; keep it so the witness can actually be selected.
+  const witnessLayouts = new Set([...closestWitnesses.values()].flat().map((value) =>
+    identityLayout(value)));
+  for (const candidate of ranked) {
+    const layout = identityLayout(candidate);
+    if (!witnessLayouts.has(layout)) continue;
+    if (reach.some((value) => signatureOf(value) !== signatureOf(candidate) &&
+        identityLayout(value) === layout)) {
+      witnessLayouts.delete(layout);
+      if (!reach.includes(candidate)) reach.push(candidate);
+    }
+    if (witnessLayouts.size === 0) break;
+  }
+  if (options.alternateExecutions) {
+    // Three isolated mistakes form a star around the answer. Complete wrong
+    // runs can change several outcomes together and balance those comparisons.
+    const keys = new Set(options.alternateExecutions.map(signatureOf));
+    for (const candidate of ranked) {
+      if (keys.has(signatureOf(candidate)) && !reach.includes(candidate)) reach.push(candidate);
+    }
+  }
   const nearCount = reach.length;
-  for (const candidate of ranked.slice(DISTRACTOR_REACH, DISTRACTOR_WIDE_REACH)) {
+  for (const candidate of ranked.slice(nearReach, DISTRACTOR_WIDE_REACH)) {
     if (!reach.includes(candidate)) reach.push(candidate);
   }
   const boards = [answerBoard, ...keptBoards, ...reach.map(blindBoard)];
   const size = boards.length;
   const firstChoice = 1 + keptBoards.length;
+  const intendedCoverage = hasIntendedClues ? reach.map((candidate) => intendedCandidate(candidate).coverage) : [];
+  const intendedAgreement = hasIntendedClues ? reach.map((candidate) => intendedCandidate(candidate).agreement) : [];
+  const keptIntendedAgreement = kept.reduce((mask, candidate) => mask | intendedCandidate(candidate).agreement, 0n);
   const distance = new Float64Array(size * size);
   const aspects = new Float64Array(size * size);
   const cells = new Float64Array(size * size);
@@ -678,13 +1063,16 @@ function selectDistractors(
   const cellScore = new Float64Array(optionCount);
   const solverScores = [typical, aspectScore, cellScore];
   let visits = 0;
+  let intendedVisits = 0;
+  let selectedIntendedCoverage = keptIntendedCoverage;
+  let selectedIntendedAgreement = keptIntendedAgreement;
 
   /**
    * The best list found for each way the answer can look to the options-only
    * strategies (`strategyKey`), by fewest aspects on which the answer stands
    * alone, then closeness to the answer.
    */
-  const catalogue = new Map<number, { uncovered: number; closeness: number; tied: number; chosen: Int32Array }>();
+  const catalogue = new Map<number, { clueCoverage: number; uncovered: number; closeness: number; tied: number; chosen: Int32Array }>();
 
   /** Put the board at `position` into the list (`sign` 1) or take it out (-1). */
   const place = (position: number, sign: 1 | -1) => {
@@ -864,6 +1252,13 @@ function selectDistractors(
     visits += 1;
     legibleLists += 1;
     if (!cluesShared()) return;
+    // A full symbol outcome is also a clue; every correct reading needs a
+    // wrong option sharing it. Agreement is precomputed, including absence.
+    if (selectedIntendedAgreement !== singleClueTarget) return;
+    if ((selectedIntendedCoverage & mandatoryCoverage) !== mandatoryCoverage) return;
+    let clueCoverage = 0;
+    for (const { bit } of obligations) if ((selectedIntendedCoverage & bit) !== 0n) clueCoverage += 1;
+
     let covered = keptAgreement;
     let closeness = 0;
     for (let position = firstChoice; position < optionCount; position++) {
@@ -878,10 +1273,11 @@ function selectDistractors(
     const key = strategyKey();
     const entry = catalogue.get(key);
     if (!entry) {
-      catalogue.set(key, { uncovered, closeness, tied: 1, chosen: Int32Array.from(chosen) });
+      catalogue.set(key, { clueCoverage, uncovered, closeness, tied: 1, chosen: Int32Array.from(chosen) });
       return;
     }
-    const order = uncovered !== entry.uncovered ? uncovered - entry.uncovered : closeness - entry.closeness;
+    const order = clueCoverage !== entry.clueCoverage ? entry.clueCoverage - clueCoverage :
+      uncovered !== entry.uncovered ? uncovered - entry.uncovered : closeness - entry.closeness;
     if (order > 0) return;
     if (order < 0) {
       entry.tied = 1;
@@ -889,6 +1285,7 @@ function selectDistractors(
       entry.tied += 1;
       if (rng() * entry.tied >= 1) return;
     }
+    entry.clueCoverage = clueCoverage;
     entry.uncovered = uncovered;
     entry.closeness = closeness;
     entry.chosen.set(chosen);
@@ -923,14 +1320,97 @@ function selectDistractors(
   };
 
   const search = (windowCount: number) => {
+    // Start with choices that keep each hidden transformation undecided.
+    // This spends the search budget on complete proofs instead of lists that
+    // already allow one of the transformations to be skipped.
+    if (witnessGroups.length > 0) {
+      const grow = (depth: number, from: number) => {
+        if (visits >= DISTRACTOR_SEARCH_BUDGET || intendedVisits >= DISTRACTOR_SEARCH_BUDGET) return;
+        intendedVisits += 1;
+        if (depth === slots) { evaluate(); return; }
+        const missing = mandatoryCoverage & ~selectedIntendedCoverage;
+        const nextBit = missing & -missing;
+        const choices = Array.from({ length: windowCount }, (_, index) => index)
+          .filter((index) => missing !== 0n ? (intendedCoverage[index] & nextBit) !== 0n : index >= from);
+        for (const next of choices) {
+          if (chosen.subarray(0, depth).includes(next)) continue;
+          const position = firstChoice + depth;
+          const board = firstChoice + next;
+          if (Array.from(members.subarray(0, position)).some((earlier) => legible[board * size + earlier] === 0)) continue;
+          chosen[depth] = next;
+          members[position] = board;
+          place(position, 1);
+          const previousCoverage = selectedIntendedCoverage;
+          const previousAgreement = selectedIntendedAgreement;
+          selectedIntendedCoverage |= intendedCoverage[next];
+          selectedIntendedAgreement |= intendedAgreement[next];
+          if (couldStillShare(position + 1)) grow(depth + 1, missing !== 0n ? 0 : next + 1);
+          selectedIntendedCoverage = previousCoverage;
+          selectedIntendedAgreement = previousAgreement;
+          place(position, -1);
+        }
+      };
+      grow(0, 0);
+      return;
+    }
+    // A complete independent basis needs one omission witness per relationship.
+    // Start with those witnesses instead of spending the budget on lists that
+    // cannot require every relationship. The remaining choices still come from
+    // the whole pool and use the same clue and options-only checks.
+    if (options.requireEveryIntendedClue && witnessGroups.length === 0 && kept.length === 0 && basisBits.length === 1 && obligations.length <= slots) {
+      const witnesses = basisBits[0].map((bit) => Array.from({ length: windowCount }, (_, index) => index)
+        .filter((index) => intendedCoverage[index] === bit));
+      const grow = (depth: number, from: number) => {
+        if (visits >= DISTRACTOR_SEARCH_BUDGET) return;
+        if (depth === slots) { evaluate(); return; }
+        const choices = depth < witnesses.length ? witnesses[depth]
+          : Array.from({ length: windowCount - from }, (_, index) => from + index);
+        for (const next of choices) {
+          if (chosen.subarray(0, depth).includes(next)) continue;
+          const position = firstChoice + depth;
+          const board = firstChoice + next;
+          let distinct = true;
+          for (let earlier = 0; earlier < position; earlier++) {
+            if (legible[board * size + members[earlier]] === 0) { distinct = false; break; }
+          }
+          if (!distinct) continue;
+          chosen[depth] = next;
+          members[position] = board;
+          place(position, 1);
+          const previousCoverage = selectedIntendedCoverage;
+          const previousAgreement = selectedIntendedAgreement;
+          selectedIntendedCoverage |= intendedCoverage[next];
+          selectedIntendedAgreement |= intendedAgreement[next];
+          grow(depth + 1, depth < witnesses.length ? 0 : next + 1);
+          selectedIntendedCoverage = previousCoverage;
+          selectedIntendedAgreement = previousAgreement;
+          place(position, -1);
+        }
+      };
+      grow(0, 0);
+      return;
+    }
+    const bitCount = (mask: bigint) => {
+      let count = 0;
+      for (let remaining = mask; remaining; remaining &= remaining - 1n) count++;
+      return count;
+    };
+    const maxCoverage = mandatoryCoverage !== 0n
+      ? Math.max(...Array.from({ length: windowCount }, (_, index) => bitCount(intendedCoverage[index] & mandatoryCoverage))) : 0;
     const grow = (depth: number, from: number) => {
+      if (mandatoryCoverage !== 0n &&
+          bitCount(mandatoryCoverage & ~selectedIntendedCoverage) > (slots - depth) * maxCoverage) return;
+      if (hasIntendedClues) {
+        if (intendedVisits >= DISTRACTOR_SEARCH_BUDGET) return;
+        intendedVisits += 1;
+      }
       if (depth === slots) {
         evaluate();
         return;
       }
       const position = firstChoice + depth;
       for (let next = from; next <= windowCount - (slots - depth); next++) {
-        if (visits >= DISTRACTOR_SEARCH_BUDGET) return;
+        if (visits >= DISTRACTOR_SEARCH_BUDGET || intendedVisits >= DISTRACTOR_SEARCH_BUDGET) return;
         const board = firstChoice + next;
         const row = board * size + firstChoice;
         let admitted = true;
@@ -944,7 +1424,15 @@ function selectDistractors(
         chosen[depth] = next;
         members[position] = board;
         place(position, 1);
+        const previousCoverage = selectedIntendedCoverage;
+        const previousAgreement = selectedIntendedAgreement;
+        if (hasIntendedClues) {
+          selectedIntendedCoverage |= intendedCoverage[next];
+          selectedIntendedAgreement |= intendedAgreement[next];
+        }
         if (couldStillShare(position + 1)) grow(depth + 1, next + 1);
+        selectedIntendedCoverage = previousCoverage;
+        selectedIntendedAgreement = previousAgreement;
         place(position, -1);
       }
     };
@@ -956,12 +1444,14 @@ function selectDistractors(
     // The nearest few hold no legible list: widen.
     measurePairs(firstChoice + nearCount, size);
     visits = 0;
+    intendedVisits = 0;
     search(reach.length);
   }
-  if (visits >= DISTRACTOR_SEARCH_BUDGET) exhaustedSearches += 1;
+  if (visits >= DISTRACTOR_SEARCH_BUDGET || intendedVisits >= DISTRACTOR_SEARCH_BUDGET) exhaustedSearches += 1;
   if (catalogue.size === 0 && (legibleLists > 0 || pruned)) {
     throw new CluesNotSharedError(
-      `${familyName}: no list of ${DISTRACTORS_PER_ITEM} near misses lets every clue appear on two options`,
+      `${familyName}: no list of ${DISTRACTORS_PER_ITEM} near misses lets every clue appear on two options` +
+        (hasIntendedClues ? " and shares every intended clue" : ""),
     );
   }
   if (catalogue.size === 0) {
@@ -987,13 +1477,28 @@ function selectDistractors(
       if (earned[strategy] < floors[strategy]) floors[strategy] = earned[strategy];
     }
   }
+  if (witnessGroups.length > 0 && Math.max(...floors) > MAXIMUM_BLIND_SOLVE_RATE) {
+    throw new CluesNotSharedError(`${familyName}: requiring every transformation leaves an unavoidable options-only shortcut`);
+  }
+  const originalRows = witnessGroups.length > 0
+    ? rows.map(({ index, credit }) => ({ index, credit: Float64Array.from(credit) })) : [];
   for (const { index, credit } of rows) {
     for (let entry = 0; entry < index.length; entry++) {
       const unavoidable = floors[index[entry]] - 1 / optionCount;
-      if (unavoidable > 0) credit[entry] -= unavoidable;
+      if (witnessGroups.length === 0 && unavoidable > 0) credit[entry] -= unavoidable;
     }
   }
   const plays = leastCreditMix(rows, strategyCount);
+  if (witnessGroups.length > 0) {
+    const expected = new Float64Array(strategyCount);
+    for (const play of plays) {
+      const { index, credit } = originalRows[play];
+      for (let entry = 0; entry < index.length; entry++) expected[index[entry]] += credit[entry] / plays.length;
+    }
+    if (Math.max(...expected) > MAXIMUM_BLIND_SOLVE_RATE + 1e-9) {
+      throw new CluesNotSharedError(`${familyName}: no balanced choice mix requires every transformation`);
+    }
+  }
   const best = candidates[plays[Math.floor(rng() * plays.length)]][1];
   return [...kept, ...[...best.chosen].map((index) => reach[index])];
 }
@@ -1177,7 +1682,7 @@ function relationalSequence(rng: Rng): SceneFamilyCandidate {
     .filter((candidateProgram) => JSON.stringify(candidateProgram) !== JSON.stringify(program))
     .map((candidateProgram) => applyRelationalStep(last, candidateProgram)))
     .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  const selectedDistractors = selectDistractors(distractors, rng, "relational sequence", { answer });
+  const selectedDistractors = selectDistractors(distractors, rng, "relational sequence", { answer, familyId: "relational-sequence-v2" });
   const direction = program.positionDelta > 0 ? "clockwise" : "anticlockwise";
   const stepSize = Math.abs(program.positionDelta);
   const puzzle = makePuzzle(
@@ -1315,7 +1820,7 @@ function attributePairing(rng: Rng): SceneFamilyCandidate {
     2,
     [a, b, query],
     answer,
-    selectDistractors(distinctOutputs(competingPartners), rng, "attribute pairing", { answer }),
+    selectDistractors(distinctOutputs(competingPartners), rng, "attribute pairing", { answer, familyId: "attribute-pairing-v1" }),
     rng,
     `From the top-left board to the top-right board, three things happen: the shape ${program.shape === "same" ? "stays the same" : "changes to a different shape"}, its fill ${program.fill === "same" ? "stays the same" : `turns from ${FILL_WORDS[fills[0]]} to ${FILL_WORDS[fills[1]]}`}, and it moves one square ${program.direction === "right" ? "to the right" : "down"}. Make the same three changes to the shape on the bottom-left board. The missing board has ${program.shape === "same" ? "the same shape" : "a different shape"} ${program.fill === "same" ? "in the same fill" : `in ${FILL_WORDS[fills[1]]}`}, one square ${program.direction === "right" ? "to the right of" : "below"} where that shape sits.`,
   );
@@ -1573,15 +2078,26 @@ function compositionalAnalogy(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyC
   const answer = applyAnalogyComposition(c, program)!;
   const nearMissGrammar = analogyNearMissGrammar(turning);
   // Every other program in the grammar, and every run that skips one of the
-  // demonstrated changes; each fails the worked pair.
-  const distractors = distinctOutputs(nearMissGrammar
-    .filter((candidateProgram) => {
-      const worked = applyAnalogyNearMiss(a, candidateProgram);
-      return worked === null || sceneSignature(worked) !== sceneSignature(b);
-    })
-    .map((candidateProgram) => applyAnalogyNearMiss(c, candidateProgram)))
+  // demonstrated changes; each fails the worked pair. Applying a mistake to
+  // only one shape makes checking both shape outcomes necessary.
+  const wrongExecutionsFor = (input: Scene, output: Scene, query: Scene) =>
+    nearMissGrammar.flatMap((candidateProgram) => {
+      const worked = applyAnalogyNearMiss(input, candidateProgram);
+      if (worked !== null && sceneSignature(worked) === sceneSignature(output)) return [];
+      return [{
+        output: applyAnalogyNearMiss(query, candidateProgram),
+        reason: analogyNearMissSkips(candidateProgram, turning)
+          ? "skips one of the changes the worked pair shows"
+          : "this spatial-and-fill program fails the worked pair",
+      }];
+    });
+  const wrongExecutions = wrongExecutionsFor(a, b, c);
+  const distractors = distinctOutputs([
+    ...wrongExecutions,
+    ...partialSceneExecutions(answer, wrongExecutions, "features"),
+  ].map((execution) => execution.output))
     .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  const selectedDistractors = selectDistractors(distractors, rng, "compositional analogy", { answer });
+  const selectedDistractors = selectDistractors(distractors, rng, "compositional analogy", { answer, familyId: "compositional-analogy-v2" });
   const cueIds = turning
     ? ["worked-pair", "board-slots", "fill-states", "token-orientation"]
     : ["worked-pair", "board-slots", "fill-states"];
@@ -1618,16 +2134,11 @@ function compositionalAnalogy(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyC
       const predictions = distinctOutputs(survivors.map((candidateProgram) =>
         applyAnalogyComposition(query, candidateProgram)));
       // Every near-miss program that fails the worked pair, and what it predicts.
-      const reasons = firstReasonFor(nearMissGrammar.flatMap((candidateProgram) => {
-        const workedOutput = applyAnalogyNearMiss(input, candidateProgram);
-        if (workedOutput !== null && sceneSignature(workedOutput) === sceneSignature(output)) return [];
-        return [{
-          output: applyAnalogyNearMiss(query, candidateProgram),
-          reason: analogyNearMissSkips(candidateProgram, turning)
-            ? "skips one of the changes the worked pair shows"
-            : "this spatial-and-fill program fails the worked pair",
-        }];
-      }));
+      const wrongExecutions = wrongExecutionsFor(input, output, query);
+      const reasons = firstReasonFor([
+        ...wrongExecutions,
+        ...(predictions.length === 1 ? partialSceneExecutions(predictions[0], wrongExecutions, "features") : []),
+      ]);
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
@@ -1708,6 +2219,44 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
     scene(corners.flatMap((_, index) =>
       (mask & (1 << index)) === 0 ? [] : [atomAt(index, Math.floor(variants / 3 ** index) % 3)]));
 
+  // The same visible-board executions supply both the pool and its witnesses.
+  // A partial execution makes one corner wrong while keeping the other
+  // corners correct, including a corner whose correct state is empty.
+  const wrongExecutionsFor = (visible: readonly Scene[], answer: Scene) => {
+    const [, , rowA, , , rowB, colA, colB] = visible;
+    const seen = new Set<string>([sceneSignature(answer)]);
+    const correctPairs = new Set([
+      `${sceneSignature(colA)}>${sceneSignature(colB)}`,
+      `${sceneSignature(rowA)}>${sceneSignature(rowB)}`,
+    ]);
+    return [
+      ...SCENE_BINARY_GRAMMAR.flatMap((operation) => [
+        { output: applySceneBinary(colA, colB, operation), reason: `${operation} applied to the bottom pair does not satisfy both grid directions` },
+        { output: applySceneBinary(rowA, rowB, operation), reason: `${operation} applied to the right pair does not satisfy both grid directions` },
+        { output: applySceneBinary(colB, colA, operation), reason: `${operation} applied to the bottom pair in reverse order` },
+        { output: applySceneBinary(rowB, rowA, operation), reason: `${operation} applied to the right pair in reverse order` },
+      ]),
+      ...[colA, colB, rowA, rowB].map((output) => ({
+        output, reason: "copies a board beside the blank instead of combining both boards",
+      })),
+      ...visible.flatMap((left) => visible.flatMap((right) => {
+        if (sceneSignature(left) === sceneSignature(right) ||
+            correctPairs.has(`${sceneSignature(left)}>${sceneSignature(right)}`)) return [];
+        return SCENE_BINARY_GRAMMAR.map((operation) => ({
+          output: applySceneBinary(left, right, operation),
+          reason: `${operation} applied to the wrong two boards of the grid`,
+        }));
+      })),
+      ...visible.map((output) => ({ output, reason: "copies a board from the grid instead of combining the two beside the blank" })),
+    ].filter((execution) => {
+      if (execution.output === null) return false;
+      const key = sceneSignature(execution.output);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   /**
    * Build the whole board from four input masks, or reject the draw.
    *
@@ -1787,26 +2336,10 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
     // it widens the pool enough that the option list can agree with the answer
     // on shapes while still differing on where those shapes sit.
     const visible = [topLeft, topMiddle, topRight, middleLeft, middleMiddle, middleRight, bottomLeft, bottomMiddle];
-    const correctPair = new Set([
-      `${sceneSignature(bottomLeft)}>${sceneSignature(bottomMiddle)}`,
-      `${sceneSignature(topRight)}>${sceneSignature(middleRight)}`,
-    ]);
-    const wrongPairOutputs = visible.flatMap((left) =>
-      visible.flatMap((right) => {
-        if (sceneSignature(left) === sceneSignature(right)) return [];
-        if (correctPair.has(`${sceneSignature(left)}>${sceneSignature(right)}`)) return [];
-        return SCENE_BINARY_GRAMMAR.map((operation) => applySceneBinary(left, right, operation));
-      }));
+    const wrongExecutions = wrongExecutionsFor(visible, answer);
     const distractors = distinctOutputs([
-      ...SCENE_BINARY_GRAMMAR.flatMap((operation) => [
-        applySceneBinary(bottomLeft, bottomMiddle, operation),
-        applySceneBinary(topRight, middleRight, operation),
-        applySceneBinary(bottomMiddle, bottomLeft, operation),
-        applySceneBinary(middleRight, topRight, operation),
-      ]),
-      bottomLeft, bottomMiddle, topRight, middleRight,
-      ...wrongPairOutputs,
-      ...visible,
+      ...wrongExecutions.map((execution) => execution.output),
+      ...partialSceneExecutions(answer, wrongExecutions, "squares").map((execution) => execution.output),
     ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
     if (distractors.length < DISTRACTORS_PER_ITEM) return null;
     // The draw must also be able to hide the answer. A grid whose pool holds no
@@ -1840,6 +2373,7 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
   } = board;
   const selectedDistractors = selectDistractors(board.distractors, rng, "relational matrix", {
     answer,
+    familyId: "relational-matrix-v2",
     clueModel: SCENE_FAMILY_CLUE_MODELS["relational-matrix-v2"],
   });
   const puzzle = makePuzzle(
@@ -1883,6 +2417,10 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
             ? [rowPrediction]
             : [];
         })));
+      const partialReasons = predictions.length === 1
+        ? firstReasonFor(partialSceneExecutions(predictions[0],
+          wrongExecutionsFor([a, b, rowA, c, d, rowB, colA, colB], predictions[0]), "squares"))
+        : new Map<string, string>();
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
@@ -1924,7 +2462,7 @@ function relationalMatrix(rng: Rng): SceneFamilyCandidate {
               if (operation) return `${operation} applied to the wrong two boards of the grid`;
             }
           }
-          return null;
+          return partialReasons.get(sceneSignature(option)) ?? null;
         }),
       };
     },
@@ -2174,6 +2712,22 @@ function setAlgebra(
    * pair, and every run that skips a step — whichever of them fail a worked row.
    */
   const nearMissGrammar = setAlgebraNearMissGrammar(turning);
+  const wrongExecutionsFor = (
+    examples: readonly { left: Scene; right: Scene; output: Scene }[],
+    left: Scene,
+    right: Scene,
+  ) => nearMissGrammar.flatMap((candidateProgram) =>
+    examples.some((example) => {
+      const worked = applySetAlgebraNearMiss(example.left, example.right, candidateProgram);
+      return worked === null || sceneSignature(worked) !== sceneSignature(example.output);
+    })
+      ? [{
+          output: applySetAlgebraNearMiss(left, right, candidateProgram),
+          reason: candidateProgram.spatial === null || (turning && candidateProgram.turn === 0)
+            ? "combines the boards but skips a step the worked rows show"
+            : "this set-and-spatial program fails at least one worked combination",
+        }]
+      : []);
   /**
    * A board some other reading of both worked rows predicts never becomes an
    * option (`setAlgebraPredictions`: any combination with either board first,
@@ -2189,12 +2743,11 @@ function setAlgebra(
     ];
     const otherReadings = new Set(setAlgebraPredictions(examples, rows.queryLeft, rows.queryRight)
       .map((prediction) => boardKey(prediction.board)));
-    return distinctOutputs(nearMissGrammar
-      .filter((candidateProgram) => examples.some((example) => {
-        const worked = applySetAlgebraNearMiss(example.left, example.right, candidateProgram);
-        return worked === null || sceneSignature(worked) !== sceneSignature(example.output);
-      }))
-      .map((candidateProgram) => applySetAlgebraNearMiss(rows.queryLeft, rows.queryRight, candidateProgram)))
+    const wrongExecutions = wrongExecutionsFor(examples, rows.queryLeft, rows.queryRight);
+    return distinctOutputs([
+      ...wrongExecutions.map((execution) => execution.output),
+      ...partialSceneExecutions(rows.answer, wrongExecutions, "features").map((execution) => execution.output),
+    ])
       .filter((candidate) => sceneSignature(candidate) !== sceneSignature(rows.answer) &&
         !otherReadings.has(boardKey(candidate)));
   };
@@ -2252,7 +2805,7 @@ function setAlgebra(
       const required = turning ? setAlgebraShapesElsewhere(answer, pool) : [];
       if (turning && required.length === 0) continue;
       try {
-        return { rows: draw, selected: selectDistractors(pool, rng, "set algebra", { answer, required }) };
+        return { rows: draw, selected: selectDistractors(pool, rng, "set algebra", { answer, required, familyId: "visual-set-algebra-v2", clueDomain: [queryLeft, queryRight] }) };
       } catch (error) {
         if (!(error instanceof CluesNotSharedError)) throw error;
       }
@@ -2270,6 +2823,8 @@ function setAlgebra(
   const fallbackPool = drawn.selected ? [] : poolFor(rows);
   const selectedDistractors = drawn.selected ?? selectDistractors(fallbackPool, rng, "set algebra", {
     answer,
+    familyId: "visual-set-algebra-v2",
+    clueDomain: [queryLeft, queryRight],
     required: turning ? setAlgebraShapesElsewhere(answer, fallbackPool) : [],
   });
   const cueIds = turning
@@ -2310,19 +2865,13 @@ function setAlgebra(
       }));
       const predicted = distinctOutputs(survivors.map((candidateProgram) =>
         applySetAlgebraProgram(left, right, candidateProgram)));
-      // Every near-miss program that fails a worked row, and what it predicts.
-      const reasons = firstReasonFor(nearMissGrammar.flatMap((candidateProgram) =>
-        examples.some((example) => {
-          const worked = applySetAlgebraNearMiss(example.left, example.right, candidateProgram);
-          return worked === null || sceneSignature(worked) !== sceneSignature(example.output);
-        })
-          ? [{
-              output: applySetAlgebraNearMiss(left, right, candidateProgram),
-              reason: candidateProgram.spatial === null || (turning && candidateProgram.turn === 0)
-                ? "combines the boards but skips a step the worked rows show"
-                : "this set-and-spatial program fails at least one worked combination",
-            }]
-          : []));
+      // Whole-board misreadings and the same mistakes applied to only one
+      // shape group or property. Copies and missing shapes remain explicit.
+      const wrongExecutions = wrongExecutionsFor(examples, left, right);
+      const reasons = firstReasonFor([
+        ...wrongExecutions,
+        ...(predicted.length === 1 ? partialSceneExecutions(predicted[0], wrongExecutions, "features") : []),
+      ]);
       return {
         derivedAnswer: predicted.length === 1 ? predicted[0] : null,
         solutionCount: predicted.length,
@@ -2392,16 +2941,64 @@ function spatialTransform(rng: Rng): SceneFamilyCandidate {
   // move with a turn keeps the footprint and changes only the arrow, which is
   // exactly the mix-up this family exists to test — the solver who moved the
   // board correctly but turned the tokens as well.
-  const withExtraTurn = (base: Scene) => ([1, 2, 3] as const)
-    .map((quarterTurns) => applySceneUnary(base, { kind: "turn", quarterTurns }));
-  const distractors = [...new Map(SPATIAL_TRANSFORM_GRAMMAR
-    .flatMap((candidateOperation) => {
+  const wrongExecutionsFor = (input: Scene, output: Scene, query: Scene) => {
+    const singles = SPATIAL_TRANSFORM_GRAMMAR.flatMap((candidateOperation) => {
       const moved = applySceneUnary(query, candidateOperation);
-      return moved ? [moved, ...withExtraTurn(moved)] : [];
-    })
-    .filter((candidate): candidate is Scene => candidate !== null)
-    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer))
-    .map((candidate) => [sceneSignature(candidate), candidate])).values()];
+      const worked = applySceneUnary(input, candidateOperation);
+      return moved && (worked === null || sceneSignature(worked) !== sceneSignature(output))
+        ? [{ output: moved, reason: `${candidateOperation.kind} does not reproduce the worked spatial pair` }]
+        : [];
+    });
+    const movedAndTurned = SPATIAL_TRANSFORM_GRAMMAR.flatMap((candidateOperation) => {
+      const moved = applySceneUnary(query, candidateOperation);
+      return moved ? ([1, 2, 3] as const).map((quarterTurns) => ({
+        output: applySceneUnary(moved, { kind: "turn", quarterTurns }),
+        reason: `${candidateOperation.kind} with an extra token turn the worked pair does not show`,
+      })) : [];
+    });
+    const swappedFills = (() => {
+      const held = query.objects.flatMap((placement) => placement.object.kind === "token"
+        ? [{ shape: placement.object.shape, fill: placement.object.fill }] : []);
+      if (held.length !== 2 || held[0].shape === held[1].shape || held[0].fill === held[1].fill) return [];
+      const otherFill = new Map([[held[0].shape, held[1].fill], [held[1].shape, held[0].fill]]);
+      return SPATIAL_TRANSFORM_GRAMMAR.flatMap((candidateOperation) => {
+        const moved = applySceneUnary(query, candidateOperation);
+        if (!moved) return [];
+        const runs = [
+          { output: moved, extraTurn: false },
+          ...([1, 2, 3] as const).map((quarterTurns) => ({
+            output: applySceneUnary(moved, { kind: "turn", quarterTurns }),
+            extraTurn: true,
+          })),
+        ];
+        return runs.flatMap((run) => run.output ? [{
+          output: {
+            ...run.output,
+            objects: run.output.objects.map((placement) => placement.object.kind === "token" ? {
+              ...placement,
+              object: { ...placement.object, fill: otherFill.get(placement.object.shape) ?? placement.object.fill },
+            } : placement),
+          },
+          reason: `${candidateOperation.kind} swaps the two shapes' fills instead of keeping each shape's fill${run.extraTurn ? ", with an extra token turn" : ""}`,
+        }] : []);
+      });
+    })();
+    // Single-operation mistakes keep their simpler name when both readings
+    // produce the same board. Partial executions preserve either shape's
+    // correct outcome while applying the witnessed mistake to the other.
+    return [
+      { output: query, reason: "omits the demonstrated spatial transformation" },
+      ...singles,
+      ...movedAndTurned,
+      ...swappedFills,
+    ];
+  };
+  const wrongExecutions = wrongExecutionsFor(first, transformed, query);
+  const distractors = distinctOutputs([
+    ...wrongExecutions,
+    ...partialSceneExecutions(answer, wrongExecutions, "features"),
+  ].map((execution) => execution.output))
+    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
   // The confusable counterpart always ships: for a board rotation, the board
   // that results from turning the tokens instead, and the other way round. It
   // is the one wrong answer a solver who mixed the two readings up would give,
@@ -2411,7 +3008,7 @@ function spatialTransform(rng: Rng): SceneFamilyCandidate {
   const required = counterpartOutput && sceneSignature(counterpartOutput) !== sceneSignature(answer)
     ? [counterpartOutput]
     : [];
-  const selectedDistractors = selectDistractors(distractors, rng, "spatial transform", { answer, required });
+  const selectedDistractors = selectDistractors(distractors, rng, "spatial transform", { answer, required, familyId: "spatial-transform-v2" });
   const movesTokens = operation.kind !== "turn";
   const puzzle = makePuzzle(
     "prototype-spatial-transform",
@@ -2441,33 +3038,17 @@ function spatialTransform(rng: Rng): SceneFamilyCandidate {
         return predicted !== null && sceneSignature(predicted) === sceneSignature(output);
       });
       const predictions = distinctOutputs(survivors.map((candidateOperation) => applySceneUnary(query, candidateOperation)));
+      const wrongExecutions = wrongExecutionsFor(input, output, query);
+      const reasons = firstReasonFor([
+        ...wrongExecutions,
+        ...(predictions.length === 1 ? partialSceneExecutions(predictions[0], wrongExecutions, "features") : []),
+      ]);
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
         usedCueIds: ["worked-spatial-pair", "fixed-board-frame"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
-          if (sceneSignature(option) === sceneSignature(query)) return "omits the demonstrated spatial transformation";
-          const failedRule = SPATIAL_TRANSFORM_GRAMMAR.find((candidateOperation) => {
-            const queryOutput = applySceneUnary(query, candidateOperation);
-            const workedOutput = applySceneUnary(input, candidateOperation);
-            return queryOutput !== null && sceneSignature(queryOutput) === sceneSignature(option) &&
-              (workedOutput === null || sceneSignature(workedOutput) !== sceneSignature(output));
-          });
-          if (failedRule) return `${failedRule.kind} does not reproduce the worked spatial pair`;
-          // Checked second, so a board a single operation already explains is
-          // named by that operation rather than by this wider category.
-          const movedAndTurned = SPATIAL_TRANSFORM_GRAMMAR.find((candidateOperation) => {
-            const moved = applySceneUnary(query, candidateOperation);
-            if (!moved) return false;
-            return ([1, 2, 3] as const).some((quarterTurns) => {
-              const turned = applySceneUnary(moved, { kind: "turn", quarterTurns });
-              return turned !== null && sceneSignature(turned) === sceneSignature(option);
-            });
-          });
-          return movedAndTurned
-            ? `${movedAndTurned.kind} with an extra token turn the worked pair does not show`
-            : null;
-        }),
+        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
+          reasons.get(sceneSignature(option)) ?? null),
       };
     },
   );
@@ -2581,6 +3162,7 @@ const MACHINE_PROGRAM_GRAMMAR: readonly MachineProgram[] = MACHINE_SPATIAL_GRAMM
 /** The gate count of the one transformation-machine bucket, which is also its depth. */
 const TRANSFORMATION_MACHINE_BUCKET_GATES: Readonly<Record<string, number>> = {
   "transformation-machine-d5": 3,
+  "transformation-machine-v4-d5": 3,
 };
 
 /** One program's gates, in the order the query strip shows them. */
@@ -2811,18 +3393,64 @@ function transformationMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamily
   const gateIds = COMPOSED_GATE_IDS.slice(0, gateCount) as ComposedGateId[];
   const wrongOrders = composedWrongGateOrders(gateCount);
   const cueIds = [...gateIds.map((gateId) => `gate-${gateId}`), "left-to-right-order"];
+  const wrongExecutionsFor = (input: Scene, survivors: readonly MachineProgram[]) => {
+    const executions = survivors.flatMap((candidateProgram) => {
+      const outputs = runMachine(input, candidateProgram);
+      return outputs ? [{ program: candidateProgram, outputs }] : [];
+    });
+    const survivingKeys = new Set(survivors.map((survivor) => JSON.stringify(survivor)));
+    return [
+      { output: input, reason: "omits all three demonstrated gates" },
+      ...executions.flatMap((execution) => execution.outputs.slice(0, -1).map((stage, index) => ({
+        output: stage, reason: MACHINE_STOP_REASONS[index],
+      }))),
+      ...executions.flatMap((execution) => wrongOrders.map((order) => ({
+        output: runMachineInOrder(input, execution.program, order),
+        reason: "runs the demonstrated gates in another order",
+      }))),
+      ...MACHINE_PROGRAM_GRAMMAR.flatMap((candidateProgram) => survivingKeys.has(JSON.stringify(candidateProgram))
+        ? []
+        : [{ output: machineAnswer(input, candidateProgram), reason: "runs a gate that fails a worked path" }]),
+      ...MACHINE_PROGRAM_GRAMMAR.flatMap((candidateProgram) => survivingKeys.has(JSON.stringify(candidateProgram))
+        ? []
+        : [
+            ...(runMachine(input, candidateProgram)?.slice(0, -1) ?? []).map((stage) => ({
+              output: stage, reason: "runs a gate that fails a worked path, and stops early",
+            })),
+            ...wrongOrders.map((order) => ({
+              output: runMachineInOrder(input, candidateProgram, order),
+              reason: "runs a gate that fails a worked path, in another order",
+            })),
+          ]),
+    ];
+  };
+  const workedRows = [
+    { input: inputA, output: outputA },
+    { input: inputB, output: outputB },
+    { input: inputC, output: outputC },
+  ];
+  const demonstratedPrograms = MACHINE_PROGRAM_GRAMMAR.filter((candidateProgram) =>
+    machineGates(candidateProgram).every((gate, index) =>
+      unaryExampleMatches(workedRows[index].input, workedRows[index].output, gate)));
+  const wrongExecutions = wrongExecutionsFor(query, demonstratedPrograms);
+  const stem = [
+    inputA, gateVisual("a"), outputA,
+    inputB, gateVisual("b"), outputB,
+    inputC, gateVisual("c"), outputC,
+    query, gateVisual(...gateIds), { blank: true as const },
+  ];
+  const nearMissPool = machineDistractorsWithoutSecondReadings("transformation-machine-v3", stem, answer,
+    distinctOutputs([
+      ...wrongExecutions.map((execution) => execution.output),
+      ...partialSceneExecutions(answer, wrongExecutions, "features").map((execution) => execution.output),
+    ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer)));
   const puzzle = makePuzzle(
     "prototype-transformation-machine",
     "matrix",
     "machineTable",
     "Follow the worked gate paths, then apply the query gates from left to right.",
     bucket.difficulty,
-    [
-      inputA, gateVisual("a"), outputA,
-      inputB, gateVisual("b"), outputB,
-      inputC, gateVisual("c"), outputC,
-      query, gateVisual(...gateIds), { blank: true },
-    ],
+    stem,
     answer,
     selectDistractors(
       // Three kinds of mistake: stopping early, running the gates out of order,
@@ -2837,25 +3465,10 @@ function transformationMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamily
       // it in which every clue appears on two options (`optionsAloneOnAClue`);
       // without the requirement every item has one. It still competes like any
       // other near miss.
-      distinctOutputs([
-        query,
-        ...stages.slice(0, -1),
-        ...wrongOrders.map((order) => runMachineInOrder(query, program, order)),
-        ...MACHINE_PROGRAM_GRAMMAR.flatMap((candidateProgram) =>
-          JSON.stringify(candidateProgram) === JSON.stringify(program)
-            ? []
-            : [machineAnswer(query, candidateProgram)]),
-        ...MACHINE_PROGRAM_GRAMMAR.flatMap((candidateProgram) =>
-          JSON.stringify(candidateProgram) === JSON.stringify(program)
-            ? []
-            : [
-                ...(runMachine(query, candidateProgram)?.slice(0, -1) ?? []),
-                ...wrongOrders.map((order) => runMachineInOrder(query, candidateProgram, order)),
-              ]),
-      ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer)),
+      nearMissPool,
       rng,
       "transformation machine",
-      { answer },
+      { answer, familyId: "transformation-machine-v3" },
     ),
     rng,
     `Each example row shows one jigsaw piece changing a board. The ${gatePieceName("a")} ${boardMoveDescription(program.gateA, "does")}. The ${gatePieceName("b")} colours every shape ${FILL_WORDS[program.gateB.fill]} without moving it. The ${gatePieceName("c")} copies the shape in the ${squareName(program.gateC.from)} square into the empty centre square. In the question the board goes through the pieces one after another, the way their tabs point, and the board after the last piece is the missing one.`,
@@ -2900,53 +3513,363 @@ function transformationMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamily
         return outputs ? [{ program: candidateProgram, outputs }] : [];
       });
       const predictions = distinctOutputs(executions.map((execution) => execution.outputs[gateCount - 1]));
-      const wrongExecutions = [
-        { output: queryInput, reason: "omits all three demonstrated gates" },
-        ...executions.flatMap((execution) => execution.outputs.slice(0, -1).map((stage, index) => ({
-          output: stage,
-          reason: MACHINE_STOP_REASONS[index],
-        }))),
-        ...executions.flatMap((execution) => wrongOrders.map((order) => ({
-          output: runMachineInOrder(queryInput, execution.program, order),
-          reason: "runs the demonstrated gates in another order",
-        }))),
-        // Listed after those: a machine whose gates contradict a worked path
-        // loses on the worked paths, so the more specific reasons above win
-        // when both fit.
-        ...MACHINE_PROGRAM_GRAMMAR.flatMap((candidateProgram) =>
-          survivors.some((survivor) => JSON.stringify(survivor) === JSON.stringify(candidateProgram))
-            ? []
-            : [{
-                output: machineAnswer(queryInput, candidateProgram),
-                reason: "runs a gate that fails a worked path",
-              }]),
-        // Last, two mistakes in one run: such a machine, stopped early or run
-        // out of order.
-        ...MACHINE_PROGRAM_GRAMMAR.flatMap((candidateProgram) =>
-          survivors.some((survivor) => JSON.stringify(survivor) === JSON.stringify(candidateProgram))
-            ? []
-            : [
-                ...(runMachine(queryInput, candidateProgram)?.slice(0, -1) ?? []).map((stage) => ({
-                  output: stage,
-                  reason: "runs a gate that fails a worked path, and stops early",
-                })),
-                ...wrongOrders.map((order) => ({
-                  output: runMachineInOrder(queryInput, candidateProgram, order),
-                  reason: "runs a gate that fails a worked path, in another order",
-                })),
-              ]),
-      ];
+      const wrongExecutions = wrongExecutionsFor(queryInput, survivors);
+      const reasons = firstReasonFor([
+        ...wrongExecutions,
+        ...(predictions.length === 1 ? partialSceneExecutions(predictions[0], wrongExecutions, "features") : []),
+      ]);
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
         usedCueIds: cueIds,
         distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
-          wrongExecutions.find((execution) => execution.output &&
-            sceneSignature(execution.output) === sceneSignature(option))?.reason ?? null),
+          reasons.get(sceneSignature(option)) ?? null),
       };
     },
   );
-  return asCandidate(family, puzzle);
+  return {
+    ...asCandidate(family, puzzle),
+    queryGates: { order: composedGateIndexes(gateCount), run: (order) => runMachineInOrder(query, program, order) },
+  };
+}
+
+// ── transformation-machine-v4: gates that read what the gate before them made ──
+
+/**
+ * The interacting machine (docs/plans/harden-reasoning.md, section 2): a
+ * prototype, generated and verified but not served until the promotion
+ * registry lists it.
+ *
+ * v3's fill gate colours every shape, so it commutes with both other gates:
+ * swapping either adjacent pair of v3's gates gives the same board in all 200
+ * verified items. Here the fill gate colours only the shape on ONE square, and
+ * the copy gate copies the shape on that same square. Which shape the paint
+ * reaches depends on the board move before it, and whether the copy comes out
+ * coloured depends on the paint before it, so every adjacent swap changes the
+ * board (`ORDER_DEPENDENT_BUCKETS` in `scripts/scene-family-verify.ts`).
+ */
+interface MachinePaintOperation {
+  kind: "paintAt";
+  at: ScenePosition;
+  fill: "half" | "solid";
+}
+
+interface InteractingMachineProgram {
+  gateA: MachineSpatialOperation;
+  gateB: MachinePaintOperation;
+  gateC: MachineDuplicateOperation;
+}
+
+type InteractingMachineGate = InteractingMachineProgram[keyof InteractingMachineProgram];
+
+/** Colour the shape on one outer square grey or black: 16 gates. */
+const MACHINE_PAINT_GRAMMAR: readonly MachinePaintOperation[] = MACHINE_OUTER_CELLS.flatMap((at) =>
+  (["half", "solid"] as const).map((fill) => ({ kind: "paintAt" as const, at, fill })));
+
+/** The oracle's search space: 4 board moves × 16 paints × 8 copies = 512 machines. */
+const INTERACTING_MACHINE_GRAMMAR: readonly InteractingMachineProgram[] = MACHINE_SPATIAL_GRAMMAR.flatMap((gateA) =>
+  MACHINE_PAINT_GRAMMAR.flatMap((gateB) =>
+    MACHINE_DUPLICATE_GRAMMAR.map((gateC) => ({ gateA, gateB, gateC }))));
+
+function interactingGates(program: InteractingMachineProgram): InteractingMachineGate[] {
+  return [program.gateA, program.gateB, program.gateC];
+}
+
+/** One gate on one board; null when it cannot apply (nothing to paint, or already that colour). */
+function applyInteractingGate(board: Scene, gate: InteractingMachineGate): Scene | null {
+  return gate.kind === "paintAt"
+    ? applySceneCompositionPrimitive(board, { kind: "setFillAt", at: gate.at, fill: gate.fill })
+    : applySceneUnary(board, gate);
+}
+
+function interactingExampleMatches(input: Scene, output: Scene, gate: InteractingMachineGate): boolean {
+  const predicted = applyInteractingGate(input, gate);
+  return predicted !== null && sceneSignature(predicted) === sceneSignature(output);
+}
+
+function runInteractingInOrder(input: Scene, program: InteractingMachineProgram, order: readonly number[]): Scene | null {
+  const gates = interactingGates(program);
+  let value: Scene | null = input;
+  for (const index of order) value = value && applyInteractingGate(value, gates[index]);
+  return value;
+}
+
+/** Every board the machine passes through, or null when some gate cannot apply. */
+function runInteracting(
+  input: Scene,
+  program: InteractingMachineProgram,
+  order: readonly number[],
+): readonly Scene[] | null {
+  const stages: Scene[] = [];
+  const gates = interactingGates(program);
+  let value: Scene | null = input;
+  for (const index of order) {
+    value = applyInteractingGate(value, gates[index]);
+    if (!value) return null;
+    stages.push(value);
+  }
+  return stages;
+}
+
+/**
+ * One way to pose the interacting machine: which machine runs, and the two
+ * squares the query uses — the one the board move carries onto the paint
+ * square, and the paint square itself, each holding a white shape.
+ */
+export interface InteractingMachineDraw {
+  program: InteractingMachineProgram;
+  /** [where the painted shape starts, the square the paint and the copy read]. */
+  queryCells: readonly [ScenePosition, ScenePosition];
+}
+
+function interactingQuery(
+  queryCells: readonly [ScenePosition, ScenePosition],
+  arriving: SceneToken["shape"],
+  staying: SceneToken["shape"],
+): Scene {
+  return scene([
+    { ...queryCells[0], object: token(arriving) },
+    { ...queryCells[1], object: token(staying) },
+  ].sort((left, right) => left.row - right.row || left.column - right.column));
+}
+
+let interactingServableDraws: readonly InteractingMachineDraw[] | null = null;
+
+/**
+ * Every draw the generator may pose. Geometry alone decides servability, as in
+ * v3, so the canonical circle-and-triangle query settles every shape pair. A
+ * draw serves when every gate is needed and when swapping either adjacent pair
+ * of gates reaches a different valid board.
+ */
+export function servableInteractingMachineDraws(): readonly InteractingMachineDraw[] {
+  if (interactingServableDraws) return interactingServableDraws;
+  const draws: InteractingMachineDraw[] = [];
+  for (const gateA of MACHINE_SPATIAL_GRAMMAR) {
+    for (const gateB of MACHINE_PAINT_GRAMMAR) {
+      const arriving = MACHINE_OUTER_CELLS.find((cell) => {
+        const moved = applySceneUnary(one("circle", cell.row, cell.column), gateA)!.objects[0];
+        return moved.row === gateB.at.row && moved.column === gateB.at.column;
+      });
+      if (!arriving || (arriving.row === gateB.at.row && arriving.column === gateB.at.column)) continue;
+      const gateC = MACHINE_DUPLICATE_GRAMMAR.find((gate) =>
+        gate.from.row === gateB.at.row && gate.from.column === gateB.at.column)!;
+      const draw: InteractingMachineDraw = { program: { gateA, gateB, gateC }, queryCells: [arriving, gateB.at] };
+      const query = interactingQuery(draw.queryCells, "circle", "triangle");
+      const outcome = gateOrderOutcome([0, 1, 2], (order) => runInteractingInOrder(query, draw.program, order));
+      if (everyAdjacentSwapMatters(outcome) && !outcome.ablations.includes("same")) draws.push(draw);
+    }
+  }
+  interactingServableDraws = draws;
+  return draws;
+}
+
+/**
+ * A worked row for the paint or copy gate: the shape on the gate's square, and
+ * the same shape on a second square that the gate leaves alone.
+ *
+ * The second shape is what makes the row about a SQUARE. With it white, "colour
+ * every <shape>" and "colour every shape" do not reproduce the paint row. The
+ * copy row shows the selected shape in the same fill as the query receives,
+ * and the matching shape in another fill; a third shape shares the source's
+ * fill, so neither its shape nor its fill alone picks the copy source.
+ * The question then paints and copies a different shape from the one shown
+ * here, so only the square carries over.
+ *
+ * The second square is chosen so that every reading of the row — "copy every
+ * shape one square up and left" fits a copy row whose other shape sits in a
+ * corner — does to `received`, the board the question hands this gate, exactly
+ * what the gate does.
+ */
+function interactingSquareRow(
+  gate: MachinePaintOperation | MachineDuplicateOperation,
+  shape: SceneToken["shape"],
+  otherFill: SceneToken["fill"],
+  received: Scene,
+  rng: Rng,
+  contrastShape?: SceneToken["shape"],
+): { input: Scene; output: Scene } {
+  const square = gate.kind === "paintAt" ? gate.at : gate.from;
+  const source = received.objects.find(({ row, column }) => row === square.row && column === square.column)?.object;
+  const sourceFill = gate.kind === "duplicate" && source?.kind === "token" ? source.fill : "outline";
+  // A copy before painting receives a white shape. Its matching shape elsewhere
+  // must have another fill, or either square would explain the worked copy.
+  const contrastingFill = gate.kind === "duplicate" && sourceFill === otherFill
+    ? sourceFill === "outline" ? "solid" : "outline" : otherFill;
+  const expected = applyInteractingGate(received, gate);
+  if (!expected) throw new Error("an interacting machine gate must apply to the board the question gives it");
+  const rows = MACHINE_OUTER_CELLS
+    .filter((cell) => cell.row !== square.row || cell.column !== square.column)
+    .flatMap((other) => {
+      const contrasts = contrastShape ? MACHINE_OUTER_CELLS.filter((cell) =>
+        (cell.row !== square.row || cell.column !== square.column) &&
+        (cell.row !== other.row || cell.column !== other.column)) : [null];
+      return contrasts.flatMap((contrast) => {
+        const input = scene([
+          { ...square, object: token(shape, sourceFill) },
+          { ...other, object: token(shape, contrastingFill) },
+          ...(contrast && contrastShape ? [{ ...contrast, object: token(contrastShape, sourceFill) }] : []),
+        ].sort((left, right) => left.row - right.row || left.column - right.column));
+        const output = applyInteractingGate(input, gate);
+        if (!output) return [];
+        const pinned = machineWorkedRowReadings("transformation-machine-v4", input, output).every((reading) => {
+          const read = reading.apply(received);
+          return read !== null && boardKey(read) === boardKey(expected);
+        });
+        return pinned ? [{ input, output }] : [];
+      });
+    });
+  if (rows.length === 0) throw new Error("an interacting machine row has no second square that pins its reading");
+  return pick(rng, rows);
+}
+
+function interactingMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
+  const gateCount = 3;
+  const { program, queryCells } = pick(rng, servableInteractingMachineDraws());
+  const [arriving, staying, painted, copied] = shuffled(rng, ["circle", "triangle", "diamond", "star"] as const);
+  // The board move's row is v3's: two shapes off every line a flip or turn keeps.
+  const inputA = scene([
+    { row: 0, column: 0, object: token(arriving) },
+    { row: 1, column: 2, object: token(staying, "solid") },
+  ]);
+  const outputA = applySceneUnary(inputA, program.gateA)!;
+  const query = interactingQuery(queryCells, arriving, staying);
+  const queryOrder = pick(rng, COMPOSED_TRANSFORM_HARD_ORDERS);
+  const stages = runInteracting(query, program, queryOrder);
+  if (!stages) throw new Error("interacting machine program must apply to its query");
+  const received = new Map(queryOrder.map((gate, index) => [gate, index === 0 ? query : stages[index - 1]]));
+  const rowB = interactingSquareRow(program.gateB, painted, "outline", received.get(1)!, rng);
+  const rowC = interactingSquareRow(program.gateC, copied, "outline", received.get(2)!, rng, painted);
+  const answer = stages[gateCount - 1];
+  const gateIds = COMPOSED_GATE_IDS.slice(0, gateCount) as ComposedGateId[];
+  const queryGateIds = queryOrder.map((index) => gateIds[index]);
+  const cueIds = [...gateIds.map((gateId) => `gate-${gateId}`), "left-to-right-order"];
+  const wrongExecutionsFor = (
+    input: Scene, survivors: readonly InteractingMachineProgram[], order: readonly number[],
+  ) => {
+    const wrongOrders = composedWrongGateOrders(gateCount, order);
+    const executions = survivors.flatMap((candidateProgram) => {
+      const outputs = runInteracting(input, candidateProgram, order);
+      return outputs ? [{ program: candidateProgram, outputs }] : [];
+    });
+    const survivingKeys = new Set(survivors.map((survivor) => JSON.stringify(survivor)));
+    const misread = INTERACTING_MACHINE_GRAMMAR.filter((candidateProgram) =>
+      !survivingKeys.has(JSON.stringify(candidateProgram)));
+    return [
+      { output: input, reason: "omits all three demonstrated gates" },
+      ...executions.flatMap((execution) => execution.outputs.slice(0, -1).map((stage, index) => ({
+        output: stage, reason: index === 0 ? "stops after the first gate" : "stops before the last shown gate",
+      }))),
+      ...executions.flatMap((execution) => wrongOrders.map((order) => ({
+        output: runInteractingInOrder(input, execution.program, order),
+        reason: "runs the demonstrated gates in another order",
+      }))),
+      ...misread.map((candidateProgram) => ({
+        output: runInteracting(input, candidateProgram, order)?.at(-1) ?? null,
+        reason: "runs a gate that fails a worked path",
+      })),
+      ...misread.flatMap((candidateProgram) => [
+        ...(runInteracting(input, candidateProgram, order)?.slice(0, -1) ?? []).map((stage) => ({
+          output: stage, reason: "runs a gate that fails a worked path, and stops early",
+        })),
+        ...wrongOrders.map((order) => ({
+          output: runInteractingInOrder(input, candidateProgram, order),
+          reason: "runs a gate that fails a worked path, in another order",
+        })),
+      ]),
+    ];
+  };
+  const workedRows = [{ input: inputA, output: outputA }, rowB, rowC];
+  const demonstratedPrograms = INTERACTING_MACHINE_GRAMMAR.filter((candidateProgram) =>
+    interactingGates(candidateProgram).every((gate, index) =>
+      interactingExampleMatches(workedRows[index].input, workedRows[index].output, gate)));
+  const wrongExecutions = wrongExecutionsFor(query, demonstratedPrograms, queryOrder);
+  const stem = [
+    inputA, gateVisual("a"), outputA,
+    rowB.input, gateVisual("b"), rowB.output,
+    rowC.input, gateVisual("c"), rowC.output,
+    query, gateVisual(...queryGateIds), { blank: true as const },
+  ];
+  const nearMissPool = machineDistractorsWithoutSecondReadings("transformation-machine-v4", stem, answer,
+    distinctOutputs([
+      ...wrongExecutions.map((execution) => execution.output),
+      ...partialSceneExecutions(answer, wrongExecutions, "features").map((execution) => execution.output),
+    ]).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer)));
+  const square = squareName(program.gateB.at);
+  const puzzle = makePuzzle(
+    "prototype-interacting-machine",
+    "matrix",
+    "machineTable",
+    "Follow the worked gate paths, then apply the query gates from left to right.",
+    bucket.difficulty,
+    stem,
+    answer,
+    // No near miss is required: forcing every wrong order into the list would
+    // let the options alone point at the answer (docs/plans/harden-reasoning.md).
+    selectDistractors(nearMissPool, rng, "interacting machine", { answer, familyId: "transformation-machine-v4",
+      requiredWitnessGroups: machineGateWitnessGroups("transformation-machine-v4", stem)?.groups ?? [],
+      alternateExecutions: distinctOutputs(wrongExecutions.map(({ output }) => output)).filter((output) => output.objects.length === answer.objects.length),
+    }),
+    rng,
+    `Each example row shows one jigsaw piece changing a board. The ${gatePieceName("a")} ${boardMoveDescription(program.gateA, "does")}. The ${gatePieceName("b")} colours ${FILL_WORDS[program.gateB.fill]} only the shape in the ${square} square: the same shape elsewhere stays white. The ${gatePieceName("c")} copies the shape in the ${square} square into the empty centre square. In the question the pieces snap together as ${gatePieceRun(queryGateIds)}. Follow them in that order, using the board each piece leaves for the next piece. The board after the last piece is the missing one.`,
+  );
+  const family = definition(
+    "transformation-machine-v4",
+    cueIds,
+    JSON.stringify({ program, queryOrder }),
+    (candidate) => {
+      const empty = { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
+      if (candidate.stem.length !== gateCount * 3 + 3) return empty;
+      const panels = candidate.stem.map(scenePanel);
+      const worked: { input: Scene; output: Scene; gateKey: string }[] = [];
+      for (let row = 0; row < gateCount; row++) {
+        const input = panels[row * 3];
+        const shownGate = panels[row * 3 + 1];
+        const output = panels[row * 3 + 2];
+        const gateKey = shownGate && gateSymbolKey(shownGate);
+        if (!input || !output || !gateKey) return empty;
+        worked.push({ input, output, gateKey });
+      }
+      const queryInput = panels[gateCount * 3];
+      const queryGates = panels[gateCount * 3 + 1];
+      if (!queryInput || !queryGates) return empty;
+      const orderedQueryGates = [...queryGates.objects].sort((left, right) => left.column - right.column);
+      const stripValid = queryGates.tiles.length === 0 &&
+        queryGates.rows === 3 &&
+        queryGates.columns === 3 &&
+        orderedQueryGates.length === gateCount &&
+        orderedQueryGates.every((placement, index) => placement.row === 1 && placement.column === index) &&
+        orderedQueryGates.every((placement) => worked.some((row) => JSON.stringify(placement.object) === row.gateKey)) &&
+        new Set(orderedQueryGates.map((placement) => JSON.stringify(placement.object))).size === gateCount;
+      if (!stripValid) return empty;
+      const shownOrder = orderedQueryGates.map((placement) =>
+        worked.findIndex((row) => row.gateKey === JSON.stringify(placement.object)));
+
+      const survivors = INTERACTING_MACHINE_GRAMMAR.filter((candidateProgram) =>
+        interactingGates(candidateProgram).every((gate, index) =>
+          interactingExampleMatches(worked[index].input, worked[index].output, gate)));
+      const executions = survivors.flatMap((candidateProgram) => {
+        const outputs = runInteracting(queryInput, candidateProgram, shownOrder);
+        return outputs ? [{ program: candidateProgram, outputs }] : [];
+      });
+      const predictions = distinctOutputs(executions.map((execution) => execution.outputs[gateCount - 1]));
+      const wrong = wrongExecutionsFor(queryInput, survivors, shownOrder);
+      const reasons = firstReasonFor([
+        ...wrong,
+        ...(predictions.length === 1 ? partialSceneExecutions(predictions[0], wrong, "features") : []),
+      ]);
+      return {
+        derivedAnswer: predictions.length === 1 ? predictions[0] : null,
+        solutionCount: predictions.length,
+        usedCueIds: cueIds,
+        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
+          reasons.get(sceneSignature(option)) ?? null),
+      };
+    },
+  );
+  return {
+    ...asCandidate(family, puzzle),
+    queryGates: { order: queryOrder, run: (order) => runInteractingInOrder(query, program, order) },
+  };
 }
 
 /** How many worked gates a composed-transform item shows. */
@@ -2964,9 +3887,8 @@ const COMPOSED_TRANSFORM_BUCKET_GATES: Readonly<Record<string, ComposedGateCount
 /** d4 applies its two worked transformations in their demonstrated order. */
 const COMPOSED_TRANSFORM_PAIR_ORDER = [0, 1] as const;
 
-/** d5 always applies all three worked transformations, with varied order. */
+/** The hardest served machine questions always reorder all three worked transforms. */
 const COMPOSED_TRANSFORM_HARD_ORDERS: readonly (readonly [number, number, number])[] = [
-  [0, 1, 2],
   [0, 2, 1],
   [1, 0, 2],
   [1, 2, 0],
@@ -3173,6 +4095,16 @@ function composedCompoundErrors(
       }
     }
   }
+  if (steps.length === 3) {
+    for (const program of composedTransformGrammar(3)) {
+      const replacements = sceneComposedProgramSteps(program);
+      if (replacements.some((step, index) => compositionPrimitiveKey(step) === compositionPrimitiveKey(steps[index]))) continue;
+      executions.push({
+        output: runComposedGates(query, replacements, order, apply),
+        reason: "misreads all three gates",
+      });
+    }
+  }
   return executions;
 }
 
@@ -3197,6 +4129,7 @@ function composedWrongExecutions(
 function compositionPrimitiveDescription(primitive: SceneCompositionPrimitive): string {
   if (primitive.kind === "spatial") return boardMoveDescription(primitive.operation, "does");
   if (primitive.kind === "turn") return `turns every arrow ${quarterTurnsWords(primitive.quarterTurns)} in its own square`;
+  if (primitive.kind === "moveSolid") return `moves every black shape one square ${primitive.direction}, leaving white and grey shapes where they are`;
   return `colours the shape in the ${squareName(primitive.at)} square ${FILL_WORDS[primitive.fill]}`;
 }
 
@@ -3490,7 +4423,96 @@ export function declaredGateCounts(): Readonly<Record<string, number>> {
   return {
     ...COMPOSED_TRANSFORM_BUCKET_GATES,
     ...TRANSFORMATION_MACHINE_BUCKET_GATES,
+    "composed-transform-v3-d5": 3,
   };
+}
+
+interface GateWitnessGroup {
+  id: string;
+  alternatives: readonly Scene[];
+}
+
+interface MachineWitnesses {
+  groups: GateWitnessGroup[];
+  predictions: readonly Scene[];
+  order: readonly number[];
+}
+
+/**
+ * Hide one worked transformation at a time. Re-read the other examples and
+ * run every fitting program in the visible query order. A wrong choice among
+ * those predictions proves that the hidden transformation is needed.
+ * Keeping the other transformations exact is stronger than merely checking
+ * that omitting a step changes the generated answer.
+ */
+function machineGateWitnessGroups(familyId: SceneFamilyId, stem: Puzzle["stem"]): MachineWitnesses | null {
+  const gateCount = (stem.length - 3) / 3;
+  if (gateCount !== 2 && gateCount !== 3) return null;
+  const panels = stem.map(scenePanel);
+  const worked = composedGateIndexes(gateCount).map((index) => ({
+    input: panels[index * 3], output: panels[index * 3 + 2],
+    glyph: panels[index * 3 + 1] && gateSymbolKey(panels[index * 3 + 1]!),
+  }));
+  const query = panels[gateCount * 3];
+  const strip = panels[gateCount * 3 + 1];
+  if (!query || !strip || worked.some((row) => !row.input || !row.output || !row.glyph)) return null;
+  const placements = [...strip.objects].sort((left, right) => left.column - right.column);
+  const order = placements.map((placement) => worked.findIndex((row) => row.glyph === JSON.stringify(placement.object)));
+  if (strip.tiles.length !== 0 || strip.rows !== 3 || strip.columns !== 3 || order.length !== gateCount ||
+      new Set(order).size !== gateCount || order.includes(-1) ||
+      placements.some((placement, index) => placement.row !== 1 || placement.column !== index)) return null;
+
+  if (familyId === "transformation-machine-v4") {
+    if (gateCount !== 3) return null;
+    const pools = [MACHINE_SPATIAL_GRAMMAR, MACHINE_PAINT_GRAMMAR, MACHINE_DUPLICATE_GRAMMAR];
+    const matches = worked.map((row, index) => new Set<InteractingMachineGate>(pools[index]
+      .filter((gate) => interactingExampleMatches(row.input!, row.output!, gate))));
+    const predictions = (omitted: number) => distinctOutputs(INTERACTING_MACHINE_GRAMMAR
+      .filter((program) => interactingGates(program).every((gate, index) => index === omitted || matches[index].has(gate)))
+      .map((program) => runInteractingInOrder(query, program, order)));
+    return { order, predictions: predictions(-1), groups: order.map((omitted) => ({
+      id: `worked-gate-${COMPOSED_GATE_IDS[omitted]}`, alternatives: predictions(omitted),
+    })) };
+  }
+  if (familyId === "composed-transform-v2") {
+    const matches = worked.map((row) => new Set(sceneComposedPrimitives()
+      .filter((gate) => compositionPrimitiveMatches(row.input!, row.output!, gate))
+      .map((gate) => JSON.stringify(gate))));
+    const programs = composedTransformGrammar(gateCount).map(sceneComposedProgramSteps);
+    const predictions = (omitted: number) => distinctOutputs(programs
+      .filter((steps) => steps.every((gate, index) => index === omitted || matches[index].has(JSON.stringify(gate))))
+      .map((steps) => runComposedGates(query, steps, order, applySceneCompositionPrimitive)));
+    return { order, predictions: predictions(-1), groups: order.map((omitted) => ({
+      id: `worked-gate-${COMPOSED_GATE_IDS[omitted]}`, alternatives: predictions(omitted),
+    })) };
+  }
+  return null;
+}
+
+export interface MachineGateNecessity {
+  valid: boolean;
+  queryOrder: readonly number[];
+  dispensableGateIds: string[];
+  /** Option indexes still possible when just this transformation is unknown. */
+  remainingOptions: { gateId: string; optionIndexes: number[] }[];
+}
+
+/** Re-check authored and generated choices from visible examples alone. */
+export function machineGateNecessity(puzzle: Puzzle): MachineGateNecessity | null {
+  if (puzzle.familyId !== "transformation-machine-v4" && puzzle.familyId !== "composed-transform-v2") return null;
+  const witnesses = machineGateWitnessGroups(puzzle.familyId, puzzle.stem);
+  if (!witnesses) return { valid: false, queryOrder: [], dispensableGateIds: ["invalid-machine"], remainingOptions: [] };
+  const { groups, predictions, order } = witnesses;
+  const remainingOptions = groups.map(({ id, alternatives }) => {
+    const possible = new Set(alternatives.map(sceneSignature));
+    return { gateId: id, optionIndexes: puzzle.options.flatMap((option, index) => possible.has(sceneSignature(option)) ? [index] : []) };
+  });
+  const dispensableGateIds = remainingOptions.filter(({ optionIndexes }) =>
+    !optionIndexes.includes(puzzle.answerIndex) || optionIndexes.length < 2).map(({ gateId }) => gateId);
+  if (predictions.length !== 1 || sceneSignature(predictions[0]) !== sceneSignature(puzzle.options[puzzle.answerIndex])) {
+    dispensableGateIds.push("invalid-machine-answer");
+  }
+  return { valid: dispensableGateIds.length === 0, queryOrder: order, dispensableGateIds, remainingOptions };
 }
 
 interface ComposedProgramOrder {
@@ -3602,14 +4624,28 @@ function composedTransformForProgram(
   }
   // One stepper for the whole pool: the runs share most of their prefixes.
   const poolStepper = memoizedComposedStepper();
-  const nearMissPool = distinctOutputs([
+  const wrongExecutions = [
     ...composedWrongExecutions(query, steps, poolStepper, queryOrder),
     ...composedCompoundErrors(query, steps, poolStepper, queryOrder),
-  ].map((execution) => execution.output))
-    .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
-  // Keep the other-direction board because it is the near miss that proves
-  // order matters.
-  const composedDistractors = selectDistractors(nearMissPool, rng, "composed transform", { answer, required: [otherDirection] });
+  ];
+  const stem = [
+    ...worked.flatMap((row, index) => [row.input, gateVisual(gateIds[index]), row.output]),
+    query,
+    gateVisual(...queryGateIds),
+    { blank: true as const },
+  ];
+  const nearMissPool = machineDistractorsWithoutSecondReadings("composed-transform-v2", stem, answer,
+    distinctOutputs([
+      ...wrongExecutions,
+      ...partialSceneExecutions(answer, wrongExecutions, "features"),
+    ].map((execution) => execution.output))
+      .filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer)));
+  // The five wrong choices must keep every worked transformation necessary.
+  // Reversed runs remain in the pool, alongside other plausible mistakes.
+  const composedDistractors = selectDistractors(nearMissPool, rng, "composed transform", { answer, familyId: "composed-transform-v2",
+    requiredWitnessGroups: machineGateWitnessGroups("composed-transform-v2", stem)?.groups ?? [],
+    alternateExecutions: distinctOutputs(wrongExecutions.map(({ output }) => output)).filter((output) => output.objects.length === answer.objects.length),
+  });
   const gateWord = COMPOSED_GATE_COUNT_WORDS[gateCount];
   const cueIds = [
     ...gateIds.map((gateId) => `worked-gate-${gateId}`),
@@ -3631,12 +4667,7 @@ function composedTransformForProgram(
     "machineTable",
     instruction,
     bucket.difficulty,
-    [
-      ...worked.flatMap((row, index) => [row.input, gateVisual(gateIds[index]), row.output]),
-      query,
-      gateVisual(...queryGateIds),
-      { blank: true },
-    ],
+    stem,
     answer,
     composedDistractors,
     rng,
@@ -3707,7 +4738,10 @@ function composedTransformForProgram(
         ...survivors.flatMap((survivor) => composedCompoundErrors(
           queryInput, sceneComposedProgramSteps(survivor), stepper, visibleQueryOrder)),
       ];
-      const reasons = firstReasonFor(wrongExecutions);
+      const reasons = firstReasonFor([
+        ...wrongExecutions,
+        ...(predictions.length === 1 ? partialSceneExecutions(predictions[0], wrongExecutions, "features") : []),
+      ]);
       return {
         derivedAnswer: predictions.length === 1 ? predictions[0] : null,
         solutionCount: predictions.length,
@@ -3717,7 +4751,222 @@ function composedTransformForProgram(
       };
     },
   );
-  return asCandidate(family, puzzle);
+  return {
+    ...asCandidate(family, puzzle),
+    queryGates: {
+      order: queryOrder,
+      run: (order) => runComposedGates(query, steps, order, applySceneCompositionPrimitive),
+    },
+  };
+}
+
+/** Conditional prototype: board move, local repaint, then move current solids. */
+type ConditionalMove = Extract<SceneCompositionPrimitive, { kind: "moveSolid" }>;
+interface ConditionalComposedDraw {
+  steps: readonly SceneCompositionPrimitive[];
+  queryCells: readonly ScenePosition[];
+}
+const CONDITIONAL_DIRECTIONS = ["up", "right", "down", "left"] as const;
+const CONDITIONAL_SQUARES = Array.from({ length: 9 }, (_, index) => ({ row: Math.floor(index / 3), column: index % 3 }));
+const CONDITIONAL_PRIMITIVES: readonly SceneCompositionPrimitive[] = [
+  ...sceneComposedPrimitives().filter((primitive) => primitive.kind === "spatial"),
+  ...CONDITIONAL_SQUARES.map((at): SceneCompositionPrimitive => ({ kind: "setFillAt", at, fill: "solid" })),
+  ...CONDITIONAL_DIRECTIONS.map((direction): ConditionalMove => ({ kind: "moveSolid", direction })),
+];
+const sameSquare = (first: ScenePosition, second: ScenePosition) => first.row === second.row && first.column === second.column;
+function conditionalQuery(cells: readonly ScenePosition[], shapes: readonly SceneToken["shape"][]): Scene {
+  return scene(cells.map((at, index) => ({ ...at, object: token(shapes[index], index === 2 ? "solid" : "outline") })));
+}
+let conditionalComposedDraws: readonly ConditionalComposedDraw[] | undefined;
+
+/** Exhaustive geometric filter, independent of answer options and shape names. */
+export function servableConditionalComposedDraws(): readonly ConditionalComposedDraw[] {
+  if (conditionalComposedDraws) return conditionalComposedDraws;
+  const draws: ConditionalComposedDraw[] = [];
+  for (const spatial of CONDITIONAL_PRIMITIVES.filter((primitive) => primitive.kind === "spatial")) {
+    for (const at of CONDITIONAL_SQUARES) {
+      const arriving = CONDITIONAL_SQUARES.find((cell) => {
+        const moved = applySceneCompositionPrimitive(one("circle", cell.row, cell.column), spatial)!;
+        return sameSquare(moved.objects[0], at);
+      })!;
+      if (sameSquare(arriving, at)) continue;
+      for (const third of CONDITIONAL_SQUARES.filter((cell) => !sameSquare(cell, at) && !sameSquare(cell, arriving))) {
+        for (const direction of CONDITIONAL_DIRECTIONS) {
+          const steps: SceneCompositionPrimitive[] = [spatial, { kind: "setFillAt", at, fill: "solid" }, { kind: "moveSolid", direction }];
+          const queryCells = [arriving, at, third];
+          const query = conditionalQuery(queryCells, ["circle", "square", "diamond"]);
+          const run = (order: readonly number[]) => runComposedGates(query, steps, order, applySceneCompositionPrimitive);
+          if (!run([0, 1, 2])) continue;
+          const outcome = gateOrderOutcome([0, 1, 2], run);
+          if (everyAdjacentSwapMatters(outcome) && outcome.ablations.every((result) => result === "different")) {
+            draws.push({ steps, queryCells });
+          }
+        }
+      }
+    }
+  }
+  conditionalComposedDraws = draws;
+  return draws;
+}
+
+function conditionalPinnedRow(
+  primitive: SceneCompositionPrimitive,
+  received: Scene,
+  inputs: readonly Scene[],
+  rng: Rng,
+): { input: Scene; output: Scene } {
+  const expected = applySceneCompositionPrimitive(received, primitive);
+  if (!expected) throw new Error("a conditional gate must apply to its received query board");
+  const rows = inputs.flatMap((input) => {
+    const output = applySceneCompositionPrimitive(input, primitive);
+    if (!output) return [];
+    const readings = machineWorkedRowReadings("composed-transform-v3", input, output);
+    return readings.length > 0 && readings.every((reading) => {
+      const predicted = reading.apply(received);
+      return predicted !== null && boardKey(predicted) === boardKey(expected);
+    }) ? [{ input, output }] : [];
+  });
+  if (!rows.length) throw new Error(`no contrasting row pins ${primitive.kind} on its query`);
+  return pick(rng, rows);
+}
+
+function conditionalWorkedRows(steps: readonly SceneCompositionPrimitive[], query: Scene, rng: Rng) {
+  // Three different shapes show every query-occupied square. This also rules
+  // out conditional slides wrapped in a symmetry that fit a sparse two-shape row.
+  const moveShapes = ["star", "hexagon", "triangle"] as const;
+  const moveInput = scene(query.objects.map((placement, index) => ({
+    row: placement.row, column: placement.column,
+    object: token(moveShapes[index], (placement.object as SceneToken).fill),
+  })));
+  const move = conditionalPinnedRow(steps[0], query, [moveInput], rng);
+  const afterMove = applySceneCompositionPrimitive(query, steps[0])!;
+  const paint = steps[1] as Extract<SceneCompositionPrimitive, { kind: "setFillAt" }>;
+  const paintInputs = CONDITIONAL_SQUARES.filter((cell) => !sameSquare(cell, paint.at)).flatMap((second) =>
+    CONDITIONAL_SQUARES.filter((cell) => !sameSquare(cell, paint.at) && !sameSquare(cell, second)).map((third) => scene([
+      { ...paint.at, object: token("star") }, { ...second, object: token("star") },
+      { ...third, object: token("hexagon", "half") },
+    ])));
+  const repaint = conditionalPinnedRow(paint, afterMove, paintInputs, rng);
+  const received = applySceneCompositionPrimitive(afterMove, paint)!;
+  const solids = received.objects.filter(({ object }) => object.kind === "token" && object.fill === "solid");
+  const white = received.objects.find(({ object }) => object.kind === "token" && object.fill === "outline")!;
+  // Every query-occupied square appears here with the same moved/stationary status.
+  // Thus even fixed-square readings involving extra empty squares agree on the query.
+  const movementInputs = CONDITIONAL_SQUARES.filter((cell) => !received.objects.some((placement) => sameSquare(cell, placement)))
+    .map((half) => scene([
+      { row: solids[0].row, column: solids[0].column, object: token("star", "solid") },
+      { row: solids[1].row, column: solids[1].column, object: token("hexagon", "solid") },
+      { row: white.row, column: white.column, object: token("star") },
+      { ...half, object: token("hexagon", "half") },
+    ]));
+  const movement = conditionalPinnedRow(steps[2], received, movementInputs, rng);
+  return [move, repaint, movement];
+}
+
+function conditionalWrongExecutions(query: Scene, steps: readonly SceneCompositionPrimitive[], order: readonly number[] = [0, 1, 2]) {
+  const stepper = memoizedComposedStepper();
+  const alternatives = ["spatial", "setFillAt", "moveSolid"].map((kind) =>
+    CONDITIONAL_PRIMITIVES.filter((primitive) => primitive.kind === kind));
+  const compound: { output: Scene | null; reason: string }[] = [];
+  for (const first of alternatives[0]) for (const second of alternatives[1]) for (const third of alternatives[2]) {
+    const mistaken = [first, second, third];
+    const errors = mistaken.filter((step, index) => compositionPrimitiveKey(step) !== compositionPrimitiveKey(steps[index])).length;
+    if (errors === 0 || errors > 2) continue;
+    compound.push({ output: runComposedGates(query, mistaken, order, stepper),
+      reason: "misreads the board move, painted square or movement direction" });
+    if (errors === 1) {
+      const changed = mistaken.findIndex((step, index) => compositionPrimitiveKey(step) !== compositionPrimitiveKey(steps[index]));
+      for (const { kept } of composedGateOmissions(3, order)) {
+        if (!kept.includes(changed)) continue;
+        compound.push({ output: runComposedGates(query, mistaken, kept, stepper),
+          reason: "misreads one gate and skips another demonstrated gate" });
+      }
+      for (const wrongOrder of composedWrongGateOrders(3, order)) {
+        compound.push({ output: runComposedGates(query, mistaken, wrongOrder, stepper),
+          reason: "misreads one gate and applies the gates in another order" });
+      }
+    }
+  }
+  return [
+    ...composedWrongExecutions(query, steps, stepper, order),
+    ...composedCompoundErrors(query, steps, stepper, order),
+    ...compound,
+    ...conditionalMovementReadings().map((reading) => {
+      let output: Scene | null = query;
+      for (const index of order) {
+        output = output && (index === 2 ? reading.apply(output) : stepper(output, steps[index]));
+      }
+      return { output, reason: `misreads the movement gate as ${reading.name}` };
+    }),
+  ];
+}
+
+function conditionalComposedTransform(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
+  const draw = pick(rng, servableConditionalComposedDraws());
+  const shapes = shuffled(rng, ["circle", "square", "diamond"] as const);
+  const query = conditionalQuery(draw.queryCells, shapes);
+  const worked = conditionalWorkedRows(draw.steps, query, rng);
+  const answer = runComposedGates(query, draw.steps, [0, 1, 2], applySceneCompositionPrimitive)!;
+  const stem = [
+    ...worked.flatMap((row, index) => [row.input, gateVisual(COMPOSED_GATE_IDS[index]), row.output]),
+    query, gateVisual("a", "b", "c"), { blank: true as const },
+  ];
+  if (!machineWorkedRowsAgreeOnQuery("composed-transform-v3", stem, answer)) {
+    throw new Error("conditional worked rows allow a different or undefined query answer");
+  }
+  const wrong = conditionalWrongExecutions(query, draw.steps);
+  const fillKey = (value: Scene) => JSON.stringify(value.objects.map(({ object }) =>
+    `${object.shape}:${(object as SceneToken).fill}`).sort());
+  const fillPatterns = new Set([fillKey(answer), fillKey(runComposedGates(query, draw.steps, [0], applySceneCompositionPrimitive)!)]);
+  const pool = distinctOutputs([
+    ...wrong, ...partialSceneExecutions(answer, wrong, "features"),
+  ].map((execution) => execution.output)).filter((output) => boardKey(output) !== boardKey(answer) && fillPatterns.has(fillKey(output)));
+  const cueIds = ["worked-gate-a", "worked-gate-b", "worked-gate-c", "current-fill-selection", "query-gate-order"];
+  const puzzle = makePuzzle("prototype-conditional-composed-transform", "matrix", "machineTable",
+    "Infer each worked gate, then apply the three query gates from left to right.", bucket.difficulty,
+    stem, answer, selectDistractors(pool, rng, "conditional composed transform", {
+      answer, familyId: "composed-transform-v3",
+      // Same fills, different positions: the last movement must be solved to
+      // choose between the answer and a board that stops after repainting.
+      required: [
+        runComposedGates(query, draw.steps, [0, 1], applySceneCompositionPrimitive)!,
+      ],
+    }), rng,
+    `Each example shows one jigsaw piece changing a board. The ${gatePieceName("a")} ${compositionPrimitiveDescription(draw.steps[0])}. The ${gatePieceName("b")} ${compositionPrimitiveDescription(draw.steps[1])}. The ${gatePieceName("c")} ${compositionPrimitiveDescription(draw.steps[2])}. In the question, follow the pieces in order. After the board moves and one shape turns black, both black shapes move together. The white shape stays where it is.`);
+  const definition_ = definition("composed-transform-v3", cueIds, JSON.stringify(draw.steps), (candidate) => {
+    const empty = { derivedAnswer: null, solutionCount: 0, usedCueIds: [], distractorWitnesses: [] };
+    if (candidate.stem.length !== 12 || !candidate.stem[11] || !("blank" in candidate.stem[11])) return empty;
+    const panels = candidate.stem.map(scenePanel);
+    const queryInput = panels[9];
+    const strip = panels[10];
+    if (!queryInput || !strip || strip.rows !== 3 || strip.columns !== 3 || strip.tiles.length) return empty;
+    const rows = [0, 1, 2].map((index) => ({ input: panels[index * 3], gate: panels[index * 3 + 1], output: panels[index * 3 + 2] }));
+    if (rows.some((row) => !row.input || !row.output || !row.gate || !gateSymbolKey(row.gate))) return empty;
+    const stripObjects = [...strip.objects].sort((left, right) => left.column - right.column);
+    if (stripObjects.length !== 3 || stripObjects.some((entry, index) => entry.row !== 1 || entry.column !== index)) return empty;
+    const keys = rows.map((row) => gateSymbolKey(row.gate!));
+    if (new Set(keys).size !== 3) return empty;
+    const order = stripObjects.map(({ object }) => keys.indexOf(JSON.stringify(object)));
+    if (order.some((index) => index < 0) || new Set(order).size !== 3) return empty;
+    // Derive each gate from its visible row; the chosen generation program is not used.
+    const matches = rows.map((row) => CONDITIONAL_PRIMITIVES.filter((primitive) => compositionPrimitiveMatches(row.input!, row.output!, primitive)));
+    const predictions: Scene[] = [];
+    const programs: SceneCompositionPrimitive[][] = [];
+    for (const first of matches[0]) for (const second of matches[1]) for (const third of matches[2]) {
+      const program = [first, second, third];
+      const output = runComposedGates(queryInput, program, order, applySceneCompositionPrimitive);
+      if (!output) return empty;
+      programs.push(program); predictions.push(output);
+    }
+    const outputs = distinctOutputs(predictions);
+    if (outputs.length !== 1 || !machineWorkedRowsAgreeOnQuery("composed-transform-v3", candidate.stem, outputs[0])) return empty;
+    const errors = programs.flatMap((program) => conditionalWrongExecutions(queryInput, program, order));
+    const reasons = firstReasonFor([...errors, ...partialSceneExecutions(outputs[0], errors, "features")]);
+    return { derivedAnswer: outputs[0], solutionCount: 1, usedCueIds: cueIds,
+      distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => reasons.get(sceneSignature(option)) ?? null) };
+  });
+  return { ...asCandidate(definition_, puzzle), queryGates: { order: [0, 1, 2], run: (order) =>
+    runComposedGates(query, draw.steps, order, applySceneCompositionPrimitive) } };
 }
 
 const RING_POSITIONS = [
@@ -3890,18 +5139,28 @@ function inverseAnalogy(rng: Rng): SceneFamilyCandidate {
     turn: 0,
   });
   const nearMissGrammar = analogyNearMissGrammar(false);
-  const distractors = distinctOutputs(nearMissGrammar
-    .filter((candidateProgram) => {
-      const worked = applyAnalogyNearMiss(originalA, candidateProgram);
-      return worked === null || sceneSignature(worked) !== sceneSignature(outputA);
-    })
-    .map((candidateProgram) => applyAnalogyNearMiss(outputB, inverseProgram(candidateProgram))))
+  const wrongExecutionsFor = (workedInput: Scene, workedOutput: Scene, queryOutput: Scene) =>
+    nearMissGrammar.flatMap((candidateProgram) => {
+      const worked = applyAnalogyNearMiss(workedInput, candidateProgram);
+      if (worked !== null && sceneSignature(worked) === sceneSignature(workedOutput)) return [];
+      return [{
+        output: applyAnalogyNearMiss(queryOutput, inverseProgram(candidateProgram)),
+        reason: analogyNearMissSkips(candidateProgram, false)
+          ? "this input undoes only one of the two changes the worked pair shows"
+          : "this input works only under a program that fails the inverse worked pair",
+      }];
+    });
+  const wrongExecutions = wrongExecutionsFor(originalA, outputA, outputB);
+  const distractors = distinctOutputs([
+    ...wrongExecutions,
+    ...partialSceneExecutions(originalB, wrongExecutions, "features"),
+  ].map((execution) => execution.output))
     .filter((candidate) => {
       if (sceneSignature(candidate) === sceneSignature(originalB)) return false;
       const targetOutput = applyAnalogyComposition(candidate, program);
       return targetOutput === null || sceneSignature(targetOutput) !== sceneSignature(outputB);
     });
-  const selectedDistractors = selectDistractors(distractors, rng, "inverse analogy", { answer: originalB });
+  const selectedDistractors = selectDistractors(distractors, rng, "inverse analogy", { answer: originalB, familyId: "inverse-analogy-v2" });
   const puzzle = makePuzzle(
     "prototype-inverse-analogy",
     "analogy",
@@ -3934,36 +5193,84 @@ function inverseAnalogy(rng: Rng): SceneFamilyCandidate {
       const everyProgramSelectsOne = selections.length > 0 && selections.every((matches) => matches.length === 1);
       const predictedIndexes = new Set(selections.flat());
       const unique = everyProgramSelectsOne && predictedIndexes.size === 1;
+      const derivedAnswer = unique ? candidate.options[[...predictedIndexes][0]] : null;
+      const wrongExecutions = wrongExecutionsFor(workedInput, workedOutput, queryOutput);
+      const reasons = firstReasonFor([
+        ...wrongExecutions,
+        ...(derivedAnswer ? partialSceneExecutions(derivedAnswer, wrongExecutions, "features") : []),
+      ]);
       return {
-        derivedAnswer: unique ? candidate.options[[...predictedIndexes][0]] : null,
+        derivedAnswer,
         solutionCount: unique ? 1 : predictedIndexes.size,
         usedCueIds: ["inverse-worked-pair", "ordered-board-slots", "fill-states"],
-        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) => {
-          const failedProgram = nearMissGrammar.find((candidateProgram) => {
-            const optionOutput = applyAnalogyNearMiss(option, candidateProgram);
-            const worked = applyAnalogyNearMiss(workedInput, candidateProgram);
-            return optionOutput !== null && sceneSignature(optionOutput) === sceneSignature(queryOutput) &&
-              (worked === null || sceneSignature(worked) !== sceneSignature(workedOutput));
-          });
-          if (!failedProgram) return null;
-          return analogyNearMissSkips(failedProgram, false)
-            ? "this input undoes only one of the two changes the worked pair shows"
-            : "this input works only under a program that fails the inverse worked pair";
-        }),
+        distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex, (option) =>
+          reasons.get(sceneSignature(option)) ?? null),
       };
     },
   );
   return asCandidate(family, puzzle);
 }
 
-/**
- * Build one candidate for a family at a NAMED difficulty bucket.
- *
- * The bucket is required and is checked before a single random number is drawn,
- * so an undeclared bucket costs nothing and reads as a rejected draw to the
- * assembler. Families with one declared bucket ignore it beyond that check:
- * their output for a given rng is exactly what it was before buckets existed.
- */
+function spatialAssembly(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCandidate {
+  const draw = drawSpatialAssembly(rng);
+  const cueIds = ["placed-piece", "second-piece", "third-piece", "quarter-turns-only"];
+  const puzzle = makePuzzle("prototype-spatial-assembly", "matrix", "assembly",
+    "Fit the pieces into the frame, keeping the placed piece where it is.", bucket.difficulty,
+    draw.stem, draw.answer, selectDistractors(draw.distractors, rng, "spatial assembly", {
+      answer: draw.answer, required: draw.required, familyId: "spatial-assembly-v1",
+    }), rng, draw.explanation);
+  return asCandidate(definition("spatial-assembly-v1", cueIds, draw.program, (candidate) => {
+    const solutions = solveSpatialAssembly(candidate.stem);
+    return {
+      derivedAnswer: solutions.length === 1 ? solutions[0] : null,
+      solutionCount: solutions.length,
+      usedCueIds: cueIds,
+      distractorWitnesses: actualWitnesses(candidate.options, candidate.answerIndex,
+        (option) => spatialAssemblyWrongReason(candidate.stem, option)),
+    };
+  }), puzzle);
+}
+
+function classicMatrixCandidate(
+  familyId: "overlapping-figures-v1" | "attribute-matrix-v1",
+  rng: Rng,
+  bucket: SceneFamilyBucket,
+): SceneFamilyCandidate {
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const draw = familyId === "overlapping-figures-v1"
+      ? drawOverlappingFigures(rng, bucket.difficulty as 3 | 4 | 5)
+      : drawAttributeMatrix(rng, bucket.difficulty as 2 | 3 | 4);
+    let distractors: Scene[];
+    try {
+      distractors = selectDistractors(draw.pool, rng, familyId, {
+        answer: draw.answer, familyId, clueModel: SCENE_FAMILY_CLUE_MODELS[familyId], clueDomain: draw.boards,
+        requireEveryIntendedClue: familyId === "attribute-matrix-v1",
+      });
+    } catch (error) {
+      if (error instanceof CluesNotSharedError) continue;
+      throw error;
+    }
+    const puzzle = makePuzzle(`prototype-${familyId}`, "matrix", "grid3x3", "Complete the pattern.",
+      bucket.difficulty, [...draw.boards.slice(0, 8), { blank: true }], draw.answer, distractors, rng, draw.explanation);
+    puzzle.gridFlow = "rowsAndColumns";
+    const solve = familyId === "overlapping-figures-v1" ? solveOverlappingFigures : solveAttributeMatrix;
+    return asCandidate(definition(familyId, draw.cueIds, draw.ruleKey, solve), puzzle);
+  }
+  throw new Error(`${familyId}: no balanced six-option list after 64 draws`);
+}
+
+/** Retry drawings that cannot require every transform while balancing the six choices. */
+function withNecessaryMachineChoices(draw: () => SceneFamilyCandidate): SceneFamilyCandidate {
+  for (let attempt = 0; attempt < 64; attempt++) {
+    try { return draw(); }
+    catch (error) {
+      if (!(error instanceof CluesNotSharedError)) throw error;
+    }
+  }
+  throw new Error("no balanced six-choice machine requiring every transformation after 64 draws");
+}
+
+/** Build one candidate at a named bucket; refuse undeclared levels before drawing randomness. */
 export function generateSceneFamilyCandidate(
   familyId: SceneFamilyId,
   rng: Rng,
@@ -3974,11 +5281,16 @@ export function generateSceneFamilyCandidate(
     case "relational-sequence-v2": return relationalSequence(rng);
     case "attribute-pairing-v1": return attributePairing(rng);
     case "compositional-analogy-v2": return compositionalAnalogy(rng, bucket);
-    case "composed-transform-v2": return composedTransform(rng, bucket);
+    case "composed-transform-v2": return withNecessaryMachineChoices(() => composedTransform(rng, bucket));
+    case "composed-transform-v3": return conditionalComposedTransform(rng, bucket);
     case "relational-matrix-v2": return relationalMatrix(rng);
     case "visual-set-algebra-v2": return setAlgebra(rng, { bucket });
     case "spatial-transform-v2": return spatialTransform(rng);
     case "transformation-machine-v3": return transformationMachine(rng, bucket);
+    case "transformation-machine-v4": return withNecessaryMachineChoices(() => interactingMachine(rng, bucket));
+    case "spatial-assembly-v1": return spatialAssembly(rng, bucket);
+    case "overlapping-figures-v1":
+    case "attribute-matrix-v1": return classicMatrixCandidate(familyId, rng, bucket);
     case "second-order-sequence-v2": return secondOrderSequence(rng);
     case "inverse-analogy-v2": return inverseAnalogy(rng);
   }
@@ -3988,7 +5300,34 @@ export function validateSceneFamilyCandidate(
   candidate: SceneFamilyCandidate,
   expectedReplayKey?: string,
 ): AcceptanceResult {
-  return acceptFamilyCandidate(candidate.definition, candidate.puzzle, { expectedReplayKey });
+  const acceptance = acceptFamilyCandidate(candidate.definition, candidate.puzzle, { expectedReplayKey });
+  if (!acceptance.puzzle) return acceptance;
+  const clues = sceneFamilyClueCheck(acceptance.puzzle);
+  const issues = [...acceptance.issues];
+  const necessity = machineGateNecessity(acceptance.puzzle);
+  if (necessity && !necessity.valid) {
+    issues.push({ code: "clue-shortcut", message: `worked transformations can be skipped: ${necessity.dispensableGateIds.join(", ")}` });
+  }
+  if (candidate.puzzle.difficulty >= 5 && necessity &&
+      (necessity.queryOrder.length !== 3 || necessity.queryOrder.every((gate, index) => gate === index) ||
+       JSON.stringify(necessity.queryOrder) !== JSON.stringify(candidate.queryGates?.order))) {
+    issues.push({ code: "gate-order", message: "the hardest machine query must reorder its three worked transforms" });
+  }
+  if (candidate.familyId === "transformation-machine-v4" || candidate.familyId === "composed-transform-v3") {
+    const gates = candidate.queryGates;
+    const outcome = gates ? gateOrderOutcome(gates.order, gates.run) : null;
+    if (!outcome || outcome.gateCount !== 3 || !everyAdjacentSwapMatters(outcome) || outcome.ablations.includes("same") ||
+        (candidate.familyId === "composed-transform-v3" && outcome.ablations.some((result) => result !== "different"))) {
+      issues.push({ code: "gate-order", message: "the interacting gates need three necessary steps and two valid different adjacent swaps" });
+    }
+  }
+  if (clues.singleClueAnswerIds.length > 0 || clues.indistinguishableWrongOptionIndexes.length > 0) {
+    issues.push({ code: "clue-shortcut", message: `single-clue answer: ${clues.singleClueAnswerIds.join(", ")}; ambiguous options: ${clues.indistinguishableWrongOptionIndexes.join(", ")}` });
+  }
+  if (candidate.familyId === "attribute-matrix-v1" && clues.dispensableClueIds.length > 0) {
+    issues.push({ code: "clue-shortcut", message: `matrix relationships can be skipped: ${clues.dispensableClueIds.join(", ")}` });
+  }
+  return { ...acceptance, accepted: issues.length === 0, issues };
 }
 
 /**
@@ -4009,10 +5348,12 @@ export function generateHeldOutComposedTransformCandidate(
   if (choices.length === 0) {
     throw new Error(`no held-out composed-transform programs support ${bucketId}`);
   }
-  const choice = pick(rng, choices);
-  return composedTransformForProgram(choice.program, rng, {
-    bucketId,
-    queryOrder: choice.queryOrder,
+  return withNecessaryMachineChoices(() => {
+    const choice = pick(rng, choices);
+    return composedTransformForProgram(choice.program, rng, {
+      bucketId,
+      queryOrder: choice.queryOrder,
+    });
   });
 }
 

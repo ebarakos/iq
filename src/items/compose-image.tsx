@@ -4,6 +4,7 @@ import type { Panel, Puzzle, PublicPuzzle, Scene } from "./schema";
 import { isBlank } from "./schema";
 import type { GatePieceTexture } from "./gate-pieces";
 import {
+  AssemblyLegend,
   CELL_CANVAS_PADDING,
   CELL_VIEWBOX,
   JigsawPieces,
@@ -250,6 +251,13 @@ export function PuzzleImage({
   // ── Stem ──
   if (optionsOnly) {
     cursorY -= SECTION_GAP;
+  } else if (puzzle.layout === "assembly") {
+    elems.push(<svg key="assembly-legend" x={WIDTH / 2 - 140} y={cursorY} width={280} height={86} viewBox="0 0 280 86"><AssemblyLegend /></svg>);
+    cursorY += 100;
+    cursorY = drawStemRow(puzzle.stem.slice(0, 3).map(cellPiece), cursorY, "assembly-pieces", elems);
+    elems.push(<g key="assembly-arrow" transform={`translate(${WIDTH / 2} ${cursorY + 10}) rotate(90)`}><path d="M -10 0 H 10 M 3 -6 L 10 0 L 3 6" fill="none" stroke={BORDER} strokeWidth={3} /></g>);
+    cursorY += 36;
+    cursorY = drawStemRow([cellPiece(puzzle.stem[3])], cursorY, "assembly-frame", elems) - GAP;
   } else if (puzzle.layout === "machineTable") {
     const rows = puzzle.stem.length / 3;
     for (let row = 0; row < rows; row++) {

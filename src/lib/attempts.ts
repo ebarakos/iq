@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GenerationMetadataSchema } from "@/items/schema";
+import { GenerationMetadataSchema, REASONING_BANDS } from "@/items/schema";
 
 /**
  * Agent attempt artifacts — one JSON file per solver run in `data/attempts/`.
@@ -38,13 +38,16 @@ export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = AttemptOutcomeSchema.
  *   held-out — a reserved item no public test can ever contain (the reserved
  *              three-step combinations behind
  *              `generateHeldOutComposedTransformCandidate`).
+ *   prototype — an item from a declared bucket the live assembler does not
+ *              serve, such as a redesign being compared with the family it
+ *              would replace (`--source family`).
  *
- * The two are never pooled. Public accuracy is what people actually face;
+ * The three are never pooled. Public accuracy is what people actually face;
  * held-out accuracy measures whether a model transfers beyond the combinations
- * the public pool practises. Averaging them together would answer neither
- * question.
+ * the public pool practises; prototype accuracy says whether a redesign is
+ * worth serving. Averaging any two together would answer neither question.
  */
-export const EvaluationSetSchema = z.enum(["public", "held-out"]);
+export const EvaluationSetSchema = z.enum(["public", "held-out", "prototype"]);
 export type EvaluationSet = z.infer<typeof EvaluationSetSchema>;
 
 export const EVALUATION_SETS: readonly EvaluationSet[] = EvaluationSetSchema.options;
@@ -101,6 +104,7 @@ export const AttemptSchema = z.object({
   latencyMs: z.number().min(0),
   /** Generator bucket/provenance when the source item carries it. */
   generation: GenerationMetadataSchema.optional(),
+  band: z.enum(REASONING_BANDS).optional(),
   /** Maximum model answer attempts allowed for this item. */
   attemptBudget: z.number().int().positive().optional(),
   /** Actual provider/model cost when supplied by a trustworthy source. */
@@ -159,11 +163,15 @@ export function outcomeOf(attempt: Attempt): AttemptOutcome {
  *   bank      — the fixed reference corpus, which makes two runs months apart
  *               comparable.
  *   held-out  — the reserved composed programs no public test can ever contain.
- *               A whole run is one population or the other; the harness has no
- *               way to write a mixed artifact, which is what keeps public and
- *               held-out accuracy from ever being pooled by accident.
+ *   family    — one declared bucket, drawn through the assembler's own slot
+ *               checks; public when the registry serves the bucket, prototype
+ *               when it does not.
+ *
+ * A whole run is one population; the harness has no way to write a mixed
+ * artifact, which is what keeps the populations from ever being pooled by
+ * accident.
  */
-export const AttemptSourceSchema = z.enum(["generated", "bank", "held-out"]);
+export const AttemptSourceSchema = z.enum(["generated", "bank", "held-out", "family"]);
 export type AttemptSource = z.infer<typeof AttemptSourceSchema>;
 
 /**
@@ -195,6 +203,8 @@ export const AttemptFileSchema = z.object({
   profile: z.string().min(1).nullable().optional(),
   runSeed: z.string().min(1).optional(),
   generatorVersion: z.string().min(1).optional(),
+  itemSetDigest: z.string().regex(/^[a-f0-9]{16}$/).optional(),
+  snapshotArm: z.string().min(1).optional(),
   /**
    * Normalized withdrawal list the generated items were assembled under.
    * Together with source, profile, runSeed, and generatorVersion this is what
@@ -327,9 +337,12 @@ export function generatorVersionOf(file: AttemptFile): string {
  *                      1024, and an unrecorded setting is not evidence of
  *                      either.
  *
- * Channel and model are not in the key because no rollup pools them already:
- * image and symbolic have separate tables throughout, and every per-item and
- * per-bucket rollup carries its own per-model breakdown.
+ * A `--source family` run is also kept apart, because it draws one bucket
+ * rather than a test.
+ *
+ * Source, profile, provider, model, channel, effort and family bucket are also
+ * grouped before aggregation. A per-model breakdown alone cannot prevent the
+ * headline or calibration tables from averaging incompatible settings.
  */
 export interface AttemptPopulation {
   /** Stable grouping key; also the sort order. Not for display — use `label`. */
@@ -341,6 +354,12 @@ export interface AttemptPopulation {
   evaluationSet: EvaluationSet;
   /** Display form of the budget: a number, "off", or "unrecorded". */
   thinkingBudgetLabel: string;
+  effortLabel: string;
+  source: string;
+  channel: Channel;
+  provider: string;
+  model: string;
+  bucketLabel: string;
   files: AttemptFile[];
 }
 
@@ -364,8 +383,8 @@ export function thinkingBudgetLabelOf(file: AttemptFile): string {
 /**
  * The one population a whole artifact belongs to.
  *
- * The harness writes a run that is entirely public or entirely held-out, so a
- * file holding both is corrupt rather than merely awkward: nothing downstream
+ * The harness writes a run that belongs to one evaluation set, so a file
+ * holding two is corrupt rather than merely awkward: nothing downstream
  * could say which of its numbers belonged to which population. This throws
  * instead of picking one, and the caller reports the file by name.
  */
@@ -374,7 +393,7 @@ export function evaluationSetOfFile(file: AttemptFile): EvaluationSet {
   if (sets.length > 1) {
     throw new Error(
       `attempt artifact ${file.runId} mixes ${sets.join(" and ")} attempts in one file; ` +
-        "public and held-out results answer different questions and are never pooled",
+        "different evaluation sets answer different questions and are never pooled",
     );
   }
   // No attempts means nothing to separate; "public" is the same default a
@@ -408,18 +427,29 @@ export function groupAttemptFilesByPopulation(
     const generatorVersion = generatorVersionOf(file);
     const evaluationSet = evaluationSetOfFile(file);
     const thinkingBudgetLabel = thinkingBudgetLabelOf(file);
-    // NUL-joined so no version string containing a display separator can
-    // collide with a genuinely different population.
-    const key = [promptVersion, generatorVersion, evaluationSet, thinkingBudgetLabel].join("\u0000");
+    const effortLabel = file.effort === undefined ? "unrecorded" : file.effort ?? "off";
+    const source = file.source ?? "unrecorded";
+    const bucketLabel = source === "family"
+      ? [...new Set(file.attempts.map((attempt) => `${attempt.generation?.familyId ?? "unrecorded"}:${attempt.band ?? "unrecorded"}:${attempt.generation?.featureBucket ?? "unrecorded"}`))].sort().join(",")
+      : "all";
+    // Keep every measurement setting separate before computing any table.
+    const key = [promptVersion, generatorVersion, evaluationSet, thinkingBudgetLabel,
+      effortLabel, source, file.profile ?? "", file.provider, file.model, file.channel, bucketLabel,
+      file.snapshotArm ?? "", source === "bank" ? file.itemSetDigest ?? "unrecorded" : ""].join("\u0000");
     let population = byKey.get(key);
     if (!population) {
       population = {
         key,
-        label: populationLabel({ promptVersion, generatorVersion, evaluationSet, thinkingBudgetLabel }),
+        label: populationLabel({ promptVersion, generatorVersion, evaluationSet, thinkingBudgetLabel }) +
+          ` · source ${source} · ${file.provider}/${file.model} · ${file.channel} · effort ${effortLabel}` +
+          (file.profile ? ` · profile ${file.profile}` : "") +
+          (bucketLabel !== "all" ? ` · bucket ${bucketLabel}` : "") +
+          (file.snapshotArm ? ` · snapshot ${file.snapshotArm}` : ""),
         promptVersion,
         generatorVersion,
         evaluationSet,
         thinkingBudgetLabel,
+        effortLabel, source, channel: file.channel, provider: file.provider, model: file.model, bucketLabel,
         files: [],
       };
       byKey.set(key, population);

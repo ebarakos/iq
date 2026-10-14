@@ -6,6 +6,24 @@ work items are in [TODO.md](../../TODO.md) under "the answer must not be guessab
 options alone" and "One clue is never enough"; the decisions, results and what is left are
 at the end of this file.
 
+## Every machine transformation is necessary (2026-10-12, v38)
+
+The owner found three-transform questions where the first two already identify the answer among six choices.
+The v37 bank audit finds this shortcut in 14 of 15 machine examples, despite passing the existing symbol checks.
+Necessity now means that hiding any one transform's example leaves at least two offered choices possible.
+The other examples and the visible query order remain known. The complete machine must predict the marked answer uniquely.
+This hard rule covers both served machine families at every level, including emergency fallback data.
+
+The selector keeps a counterexample for each hidden transform, plus complete compound mistakes for balance.
+Three isolated errors would otherwise make the answer the most typical option. The shared 30% options-only limit
+remains unchanged. Unavoidable strategy credit and the expected choice mix must also fit that limit before a machine is served.
+Selection uses raw strategy credits for these questions. Failed drawings are retried within a fixed bound.
+All level-5 questions still apply three transforms in a non-default order; only shuffles satisfying the stricter choice contract serve.
+
+The two composed-transform golden digests are reissued for the new choices. Machine v4's order-coverage test now
+expects its four viable permutations; composed transform still covers all five. Necessity, ambiguity and options-only thresholds are preserved.
+`data/fixtures/machine-gate-shortcut-v37.json` is a regression fixture that passes the previous symbol checks but needs no last transform.
+
 ## What was measured
 
 A solver that never looks at the question, only at the six answer options, picks the right
@@ -267,3 +285,91 @@ pooled.
 
 - Nothing gated. A fresh agent probe is needed before quoting agent numbers: `solver-v4`
   changed the image on 2026-10-03 and `v21` changed the options.
+
+
+## 2026-10-07 — Partial-clue shortcuts and six answers
+
+The owner keeps six answers total: one correct and five plausible near misses. Preserve
+rich puzzles and require as many independent clues as this budget supports; full necessity
+is preferred where attainable, not a reason to remove harder rules. One symbol must not
+identify the answer when the puzzle has multiple independent target outcomes.
+
+The previous single-clue gate intersected shapes present exactly once on every option.
+An omitted or duplicated shape could disable its checks. It also checked position, fill
+and direction separately, allowing a complete symbol outcome or a proper clue subset to
+identify the answer. The new family readers retain absence and duplication. Complete symbol
+states and their independent properties use separate bases so dependent descriptions are
+not falsely counted as independent clues. Repeated-shape groups combine several symbols:
+each actual symbol is checked separately, while the complete group remains an omission
+objective. The four matrix corner predictions are local clues; a whole-rule second-order
+sequence remains the documented exception.
+
+Wrong executions now supply partial mistakes on one symbol, property or square, together
+with compound local mistakes, including independent errors on repeated copies. Machine and
+composed pools discard any board also predicted by another valid reading of the examples.
+Every selected wrong answer retains an execution-derived
+reason that the family validator reconstructs from visible inputs. Clue agreement is a
+hard selection and acceptance rule. Among option lists with the same options-only strategy
+behavior, selection prefers more singleton omission witnesses, then aspect agreement and
+closeness. The existing options-only balance and 30% verification limits stay in place.
+Fallback bank entries pass the same served-item guard. Generator v31 invalidates old replay
+tokens and bank content; the offline emergency bank is rebuilt with fresh validated items.
+
+The full 200-seed family gate passed on 2026-10-07. Every served bucket remains below
+the unchanged 30% limit for all 28 options-only strategies; the worst is set-algebra d5
+at 28.7%. Machine d5 is 21.1%. The checked families have no single-symbol shortcuts or
+wrong-option second readings. Wrong answers remain at least as close as the recorded
+distance baseline. The emergency bank holds five validated items for each of 13 keys.
+Old pilot manifests and recorded aggregates are preserved; the current manifest has a
+separate generator-versioned filename.
+
+
+### 2026-10-08 — Handoff review: stable clue domains and assembly cost
+
+Generation and served-item validation now read the same target domain. Set algebra uses
+its two visible query operands, including kinds absent from the answer; shape-preserving
+families use the answer's kinds. Unused candidates and the final six options cannot add or
+remove rule clues. A repeated-only kind still checks each pictured copy. Regression cases
+cover absent query kinds, irrelevant pool kinds, repeated copies and schema-valid family
+relabeling that would otherwise bypass the whole-rule exception.
+
+The unused strict-all selector mode was removed. Its tests now check the owner's six-option,
+best-effort behavior and report dispensable clues rather than reject those lists. Complete
+clue-basis ambiguity and single-symbol shortcuts remain hard failures. The runtime bank and
+family-structure guards stay: offline bank verification does not protect a live fallback,
+and a forged family label must not skip the served clue contract. A composed-transform draw
+with no acceptable required counterpart now throws the retryable clue error.
+
+Profiling did not justify capping omission witnesses or partner candidates: pair-table work
+was about 1.3% of total CPU, compared with 27.6% in partial executions and 23.2% in selection
+(overlapping inclusive samples). Near reach peaked at 37 and search nodes at 11,414 of the
+unchanged 400,000 budget in six long tests. Per-selection signature and clue-read caches,
+duplicate execution rejection, early occupied-square rejection and avoiding repeated
+normalization reduce work while retaining full schema validation. Candidate populations,
+iteration order and random tie-breaking remain intact.
+
+Measured locally with Node 22.22.0, `node --import tsx`, the same registry and six seeds
+`handoff-assembly:0` through `:5`. Each process assembled six long tests followed by six
+short tests; timings exclude hashing and file writes.
+
+| Long-test assembly | First in a fresh process | Subsequent five median | All six median |
+|---|---:|---:|---:|
+| v30, HEAD `4c1eb54` | 1,198 ms | 419 ms | 422 ms |
+| v31 before review fixes | 2,476 ms | 1,340 ms | 1,356 ms |
+| v31 after review fixes | 1,907 ms | 933 ms | 958 ms |
+
+Warm long assembly is about 30% faster after these fixes, and still about 2.2 times v30.
+The six short tests, already warm after the long tests, had medians of 181 ms before and
+133 ms after; these are not cold short-test measurements. All twelve full-puzzle JSON hashes
+match exactly before and after. The measured remaining cost is accepted to retain near-miss
+quality; the link-test cache comment no longer promises a fixed assembly duration.
+
+The same 200 `blind-gate-v2` set-algebra d5 seeds measured worst composite@1 credit of
+25.9583% in v30 and 28.6667% in v31: an increase of 2.7083 percentage points, with a remaining
+1.3333-point margin below the unchanged 30% gate. This comparison does not pool the two
+populations. The versioned v31 pilot manifest is present and must be included when the owner
+stages the change; no staging or commit was authorized by this review.
+
+Verification on 2026-10-08: `agentrun ./qa/run.sh` passed typecheck, lint, all 473 tests,
+the 200-seed family gate, all 65 bank entries and the production build. The model-calling
+smoke suite stayed skipped. Evidence: [local gate log](../../qa/runs/runner-20261008-0834.log).

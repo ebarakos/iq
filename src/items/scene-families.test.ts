@@ -11,7 +11,7 @@ import {
 import { puzzleToSvg } from "./compose-image";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "./family-promotion";
 import { sceneEditDistance } from "./scene-distance";
-import { optionsAloneOnAClue } from "./blind-options";
+import { checkIntendedClues, optionsAloneOnAClue, type IntendedClue } from "./blind-options";
 import {
   boardKey,
   machineWorkedRowReadings,
@@ -33,6 +33,9 @@ import {
   partitionComposedTransformPrograms,
   requireSceneFamilyBucket,
   resetExhaustedDistractorSearches,
+  selectDistractors,
+  sceneFamilyClueCheck,
+  sceneFamilyClueBases,
   servableComposedTransformPrograms,
   servableTransformationMachineDraws,
   transformationMachineGates,
@@ -69,6 +72,156 @@ const FAMILY_BUCKETS = SCENE_FAMILY_IDS.flatMap((familyId) =>
 /** The easiest bucket a family declares — for checks that are not about depth. */
 const entryBucket = (familyId: (typeof SCENE_FAMILY_IDS)[number]) =>
   entrySceneFamilyBucket(familyId).bucket;
+
+describe("distractor selection with intended clue bases", () => {
+  const arrowScene = (row: number, fill: SceneToken["fill"], rotation: SceneToken["rotation"] = 0): Scene => ({
+    kind: "scene", rows: 3, columns: 3, tiles: [],
+    objects: [{ row, column: 0, object: { kind: "token", shape: "arrow", fill, rotation, size: "l" } }],
+  });
+  const arrowClues: IntendedClue[] = [
+    { id: "position", read: (scene) => `${scene.objects[0].row},${scene.objects[0].column}` },
+    { id: "fill", read: (scene) => {
+      const object = scene.objects[0].object;
+      return object.kind === "token" ? object.fill : "container";
+    } },
+    { id: "turn", read: (scene) => {
+      const object = scene.objects[0].object;
+      return object.kind === "token" ? String(object.rotation) : "container";
+    } },
+  ];
+  const binaryArrow = (mask: number) => arrowScene(
+    mask & 1 ? 2 : 0, mask & 2 ? "solid" : "outline", mask & 4 ? 90 : 0);
+  const product = () => [0, 2].flatMap((row) =>
+    (["outline", "half", "solid"] as const).map((fill) => arrowScene(row, fill)));
+
+  it("retains a balanced six-option pool while reporting a dispensable third clue", () => {
+    const options = [0, 1, 2, 3, 5, 7].map(binaryArrow);
+    expect([...optionsAloneOnAClue(options, "features")]).toEqual([]);
+    const selected = selectDistractors(options.slice(1), seededRng("intended-missing"), "fixture", {
+      answer: options[0], intendedClueBases: [arrowClues],
+    });
+    expect(selected).toHaveLength(OPTIONS_PER_ITEM - 1);
+    expect(checkIntendedClues([options[0], ...selected], 0, arrowClues)).toEqual({
+      dispensableClueIds: ["turn"], indistinguishableWrongOptionIndexes: [],
+    });
+  });
+
+  it("keeps six plausible choices when the budget cannot witness every omission", () => {
+    const options = [0, 1, 2, 3, 5, 7].map(binaryArrow);
+    const selected = selectDistractors([], seededRng("intended-budget"), "fixture", {
+      answer: options[0], required: options.slice(1), intendedClueBases: [arrowClues],
+    });
+    expect(selected).toEqual(options.slice(1));
+    expect(checkIntendedClues([options[0], ...selected], 0, arrowClues).dispensableClueIds).toEqual(["turn"]);
+    for (const clue of arrowClues) {
+      expect(selected.some((option) => clue.read(option) === clue.read(options[0]))).toBe(true);
+    }
+  });
+
+  it("serves a complete two-clue product and checks alternative bases separately", () => {
+    const options = product();
+    const bases = [arrowClues.slice(0, 2), [arrowClues[1], arrowClues[0]]];
+    const select = () => selectDistractors(options.slice(1), seededRng("intended-product"), "fixture", {
+      answer: options[0], intendedClueBases: bases,
+    });
+    const selected = select();
+    expect(selected).toHaveLength(OPTIONS_PER_ITEM - 1);
+    expect(selected).toEqual(select());
+    for (const basis of bases) {
+      expect(checkIntendedClues([options[0], ...selected], 0, basis)).toEqual({
+        dispensableClueIds: [], indistinguishableWrongOptionIndexes: [],
+      });
+    }
+  });
+
+  it("reports omission coverage on the required-options fast path", () => {
+    const valid = product();
+    expect(selectDistractors([], seededRng("intended-required"), "fixture", {
+      answer: valid[0], required: valid.slice(1), intendedClueBases: [arrowClues.slice(0, 2)],
+    })).toEqual(valid.slice(1));
+    const missing = [0, 1, 2, 3, 5, 7].map(binaryArrow);
+    const selected = selectDistractors([], seededRng("intended-required"), "fixture", {
+      answer: missing[0], required: missing.slice(1), intendedClueBases: [arrowClues],
+    });
+    expect(selected).toEqual(missing.slice(1));
+    expect(checkIntendedClues([missing[0], ...selected], 0, arrowClues)).toEqual({
+      dispensableClueIds: ["turn"], indistinguishableWrongOptionIndexes: [],
+    });
+  });
+
+  it("refuses required ambiguity and removes ambiguous optional candidates", () => {
+    const options = product();
+    const ambiguous = arrowScene(0, "outline", 90);
+    const basis = arrowClues.slice(0, 2);
+    expect(() => selectDistractors(options.slice(1), seededRng("intended-ambiguous"), "fixture", {
+      answer: options[0], required: [ambiguous], intendedClueBases: [basis],
+    })).toThrow(/matches a complete intended clue basis/);
+    const selected = selectDistractors([...options.slice(1), ambiguous], seededRng("intended-ambiguous"), "fixture", {
+      answer: options[0], intendedClueBases: [basis],
+    });
+    expect(selected.map(sceneSignature)).not.toContain(sceneSignature(ambiguous));
+    expect(checkIntendedClues([options[0], ...selected], 0, basis).indistinguishableWrongOptionIndexes).toEqual([]);
+  });
+
+  it("reports a declared constant clue instead of silently removing it", () => {
+    const options = product();
+    const selected = selectDistractors(options.slice(1), seededRng("intended-constant"), "fixture", {
+      answer: options[0], intendedClueBases: [arrowClues],
+    });
+    expect(checkIntendedClues([options[0], ...selected], 0, arrowClues)).toEqual({
+      dispensableClueIds: ["turn"], indistinguishableWrongOptionIndexes: [],
+    });
+  });
+
+  it("keeps the only omission witness even when it is beyond the ordinary wide reach", () => {
+    const tokenStates = (["outline", "half", "solid"] as const).flatMap((fill) =>
+      ([0, 90, 180, 270] as const).map((rotation) => ({ fill, rotation })));
+    const pair = (row: number, arrow: typeof tokenStates[number], triangle: typeof tokenStates[number]): Scene => ({
+      kind: "scene", rows: 3, columns: 3, tiles: [],
+      objects: [
+        { row, column: 0, object: { kind: "token", shape: "arrow", size: "l", ...arrow } },
+        { row: 2, column: 2, object: { kind: "token", shape: "triangle", size: "l", ...triangle } },
+      ],
+    });
+    const correctArrow = { fill: "outline", rotation: 0 } as const;
+    const correctTriangle = { fill: "solid", rotation: 0 } as const;
+    const answer = pair(0, correctArrow, correctTriangle);
+    const wrongArrows = tokenStates.filter((state) => JSON.stringify(state) !== JSON.stringify(correctArrow));
+    const wrongTriangles = tokenStates.filter((state) => JSON.stringify(state) !== JSON.stringify(correctTriangle));
+    const near = wrongArrows.flatMap((arrow) => wrongTriangles.map((triangle) => pair(0, arrow, triangle)));
+    const witness = pair(2, correctArrow, correctTriangle);
+    const triangleWitness = pair(0, correctArrow, { fill: "outline", rotation: 0 });
+    const required = pair(2, correctArrow, { fill: "outline", rotation: 0 });
+    const basis: IntendedClue[] = (["arrow", "triangle"] as const).map((shape) => ({
+      id: shape,
+      read: (scene) => JSON.stringify(scene.objects.filter(({ object }) => object.kind === "token" && object.shape === shape)),
+    }));
+    // These 121 compounds change two cells by at most four fields. Moving
+    // the arrow changes two cells too, but costs more fields, so ranks later.
+    expect(near).toHaveLength(121);
+    const witnessDistance = sceneEditDistance(answer, witness);
+    if (witnessDistance === "incomparable") throw new Error("Expected comparable fixture scenes");
+    expect(near.every((scene) => {
+      const distance = sceneEditDistance(answer, scene);
+      return distance !== "incomparable" && (distance.positions < witnessDistance.positions ||
+        (distance.positions === witnessDistance.positions && distance.atoms < witnessDistance.atoms));
+    })).toBe(true);
+    const pool = [...near, triangleWitness, witness];
+    // Required comparisons also retain partners beyond the nearest window.
+    const requiredSelection = selectDistractors(pool, seededRng("intended-reach"), "fixture", {
+      answer, required: [required],
+    });
+    expect(requiredSelection.map(sceneSignature)).toContain(sceneSignature(witness));
+    expect([...optionsAloneOnAClue([answer, ...requiredSelection], "features")]).toEqual([]);
+    const selected = selectDistractors(pool, seededRng("intended-reach"), "fixture", {
+      answer, required: [required], intendedClueBases: [basis],
+    });
+    expect(selected.map(sceneSignature)).toContain(sceneSignature(witness));
+    expect(checkIntendedClues([answer, ...selected], 0, basis)).toEqual({
+      dispensableClueIds: [], indistinguishableWrongOptionIndexes: [],
+    });
+  });
+});
 
 describe("scene family prototypes", () => {
   it("serves a balanced option list in every bucket, found by a search that always finishes", () => {
@@ -143,6 +296,108 @@ describe("scene family prototypes", () => {
         expect(validateSceneFamilyCandidate(candidate, replayKey).accepted).toBe(true);
       }
     }
+  });
+
+  it("requires more than one symbol reading even when an option omits or repeats a shape", () => {
+    for (const { familyId, bucket } of FAMILY_BUCKETS) {
+      for (let seed = 0; seed < 20; seed++) {
+        const { puzzle } = generateSceneFamilyCandidate(familyId, seededRng(`symbol-clues:${familyId}:${bucket}:${seed}`), bucket);
+        const checked = sceneFamilyClueCheck(puzzle);
+        expect(checked.singleClueAnswerIds, `${familyId}:${bucket}:${seed}`).toEqual([]);
+        expect(checked.indistinguishableWrongOptionIndexes, `${familyId}:${bucket}:${seed}`).toEqual([]);
+      }
+    }
+  });
+
+  it("uses visible set operands for both selection and served absence clues", () => {
+    const { puzzle } = generateSceneFamilyCandidate("visual-set-algebra-v2", seededRng("visible-set-domain"), "visual-set-algebra-d5");
+    const options: Scene[] = [0, 1].flatMap((row) =>
+      (["outline", "half", "solid"] as const).map((fill) => ({
+        kind: "scene", rows: 3, columns: 3, tiles: [], objects: [
+          { row, column: 0, object: { kind: "token", shape: "arrow", fill: "outline", rotation: 0, size: "l" } },
+          { row: 2, column: 2, object: { kind: "token", shape: "triangle", fill, rotation: 0, size: "l" } },
+        ],
+      })));
+    const query: Scene = { ...options[0], objects: [...options[0].objects,
+      { row: 1, column: 1, object: { kind: "token", shape: "circle", fill: "solid", rotation: 0, size: "l" } },
+    ] };
+    const stem = [...puzzle.stem];
+    stem[6] = query;
+    stem[7] = options[0];
+    const fixture = { ...puzzle, stem, options, answerIndex: 0 };
+    expect(PuzzleSchema.safeParse(fixture).success).toBe(true);
+    const bases = sceneFamilyClueBases("visual-set-algebra-v2", options[0], [query, options[0]]);
+    expect(bases[0].map(({ id }) => id)).toContain("shape:circle");
+    const unused: Scene = { ...query, objects: [...query.objects,
+      { row: 1, column: 2, object: { kind: "token", shape: "star", fill: "solid", rotation: 0, size: "l" } },
+    ] };
+    const selected = selectDistractors([unused], seededRng("visible-set-domain"), "fixture", {
+      answer: options[0], required: options.slice(1), familyId: "visual-set-algebra-v2",
+      clueDomain: [query, options[0]],
+    });
+    expect(selected).toEqual(options.slice(1));
+    expect(sceneFamilyClueCheck(fixture)).toEqual({
+      singleClueAnswerIds: [], dispensableClueIds: ["0:shape:circle"], indistinguishableWrongOptionIndexes: [],
+    });
+  });
+
+  it("protects individual copies even when every answer symbol has the same shape", () => {
+    const { puzzle } = generateSceneFamilyCandidate("spatial-transform-v2", seededRng("one-kind-copies"), "spatial-transform-d2");
+    const options: Scene[] = (["outline", "half", "solid"] as const).flatMap((fill) =>
+      (["half", "solid"] as const).map((otherFill) => ({
+        kind: "scene", rows: 3, columns: 3, tiles: [], objects: [
+          { row: 0, column: 0, object: { kind: "token", shape: "arrow", fill, rotation: 0, size: "l" } },
+          { row: 2, column: 2, object: { kind: "token", shape: "arrow", fill: otherFill, rotation: 0, size: "l" } },
+        ],
+      })));
+    const uniqueSymbol = options[0].objects[1].object;
+    if (uniqueSymbol.kind !== "token") throw new Error("Expected an arrow token");
+    uniqueSymbol.fill = "outline";
+    const fixture = { ...puzzle, options, answerIndex: 0 };
+    expect(PuzzleSchema.safeParse(fixture).success).toBe(true);
+    expect(sceneFamilyClueCheck(fixture).singleClueAnswerIds).toContain("symbol:arrow:2,2");
+  });
+
+  it("protects each repeated symbol without treating their joint state as one clue", () => {
+    const { puzzle } = generateSceneFamilyCandidate("transformation-machine-v3", seededRng("duplicate-symbol-check"), "transformation-machine-d5");
+    const answer = puzzle.options[puzzle.answerIndex];
+    const shapes = answer.objects.map(({ object }) => object.shape);
+    const repeated = shapes.find((shape, index) => shapes.indexOf(shape) !== index)!;
+    const pair = shapes.flatMap((shape, index) => shape === repeated ? [index] : []);
+    const other = shapes.findIndex((shape) => shape !== repeated);
+    expect(pair).toHaveLength(2);
+    const changed = (indices: number[], second = false): Scene => ({
+      ...answer,
+      objects: answer.objects.map((placement, index) => ({
+        ...placement,
+        object: { ...placement.object, fill: indices.includes(index)
+          ? second ? "half" : "outline" : "solid" },
+      })),
+    });
+    const options = [changed([]), changed([pair[1], other]), changed([pair[0], other]),
+      changed(pair), changed([pair[0], pair[1], other]), changed([pair[0], pair[1], other], true)];
+    const fixture = { ...puzzle, answerIndex: 0, options };
+    expect(PuzzleSchema.safeParse(fixture).success).toBe(true);
+    expect(sceneFamilyClueCheck(fixture).singleClueAnswerIds).toEqual([]);
+    expect(sceneFamilyClueCheck(fixture).indistinguishableWrongOptionIndexes).toEqual([]);
+    options[2] = changed(pair);
+    // Avoid a duplicate option so the failure names the actual missing symbol reading.
+    options[3] = changed(pair, true);
+    expect(sceneFamilyClueCheck(fixture).singleClueAnswerIds)
+      .toContain(`symbol:${repeated}:${answer.objects[pair[1]].row},${answer.objects[pair[1]].column}`);
+  });
+
+  it("refuses an invalid or forged family structure instead of skipping its clue checks", () => {
+    const { puzzle } = generateSceneFamilyCandidate("relational-sequence-v2", seededRng("forged-clues"), "relational-sequence-d2");
+    expect(sceneFamilyClueCheck({ ...puzzle, familyId: "spatial-transform-v2" }).singleClueAnswerIds)
+      .toEqual(["invalid-family-structure"]);
+    const forgedSequence = { ...puzzle, familyId: "second-order-sequence-v2",
+      stem: [...puzzle.stem.slice(0, -1), puzzle.stem[0], puzzle.stem[puzzle.stem.length - 1]],
+    };
+    expect(PuzzleSchema.safeParse(forgedSequence).success).toBe(true);
+    expect(sceneFamilyClueCheck(forgedSequence).singleClueAnswerIds).toEqual(["invalid-family-structure"]);
+    expect(sceneFamilyClueCheck({ ...puzzle, familyId: "unknown" }).singleClueAnswerIds)
+      .toEqual(["invalid-puzzle-or-family"]);
   });
 
   it("offers the configured number of options in every family", () => {
@@ -360,19 +615,23 @@ describe("scene family prototypes", () => {
     // any option shows must now appear on two options, and the one-inference
     // cost left the option game. Stems and answers are unchanged, checked
     // against v20 on these very seeds; the options are not.
+    // REISSUED 2026-10-07, deliberately (scene-families-v31): partial symbol,
+    // property and repeated-copy mistakes close single-symbol shortcuts. Six
+    // answers prefer more necessary clues within balanced option lists.
+    // Machine pools also exclude other valid readings. See blind-answer-leak.md.
     const goldens: Record<string, { familyId: SceneFamilyId; bucket: string; keys: string[] }> = {
       "compositional-analogy-d3-golden": {
         familyId: "compositional-analogy-v2",
         bucket: "compositional-analogy-d3",
         keys: [
-          "5af064e78e7acb6af8bd093d",
-          "e436c9750831cac81896adb4",
-          "1c7c2fcf8307f6638ce08f96",
-          "94cfe2bc628bfd03e3746223",
-          "d7e7579e40f9aa3783f374fc",
-          "1b5e1132cbd97b3dbdd737bd",
-          "05a9941fa7f631844055aef7",
-          "bdfe8889966ea96fbc367f19",
+          "1d71d5511bd9387896e76959",
+          "2660b4074e1f52ac83cf3b66",
+          "a84d09d88455eb7bf7e5c7d2",
+          "77528484d8b12e27f153dbd3",
+          "c163e2ac4b02d74a4ca17c30",
+          "a6a5d9e55d57d30fa6696ed6",
+          "e100c1dce0e8aeb08e8e9e0a",
+          "c09fe836f7c4a8947671c7c0",
         ],
       },
       "visual-set-algebra-d4-golden": {
@@ -400,14 +659,14 @@ describe("scene family prototypes", () => {
         // out of the options. Two of the eight keys moved; across 200 items, 13
         // stems and 14 option lists did.
         keys: [
-          "a06a30cc6e06eb2db11a3652",
-          "93ed401ad371cb3338c77360",
-          "2e38f158c9020a80cbb0794e",
-          "e46b1709bfdc5d17ccc4434c",
-          "7013978c6e935e526f9e475b",
-          "ea0e24cd6a6361d9da88896c",
-          "532a6b8f1666ea9bc74b7694",
-          "e43e7414704bde135bf5364d",
+          "65f78e84222d935fbdeb0d8a",
+          "008070986de5a3f943428a38",
+          "41b4348bef45f22efc411d24",
+          "293376f0ef8baff52d192a84",
+          "cd0a98689ab3ba3f78658f4a",
+          "b68d9835076b4f72970b57b4",
+          "ba44515ee6aed4f911b6bb0c",
+          "15579a6ec34cb789d6299420",
         ],
       },
     };
@@ -469,7 +728,7 @@ describe("scene family prototypes", () => {
     // Guard the guard: a typo in the table names would make the filter vacuous.
     expect(Object.keys(declared).filter((bucket) => drawable.has(bucket)).sort())
       .toEqual([
-        "composed-transform-d4", "composed-transform-d5", "transformation-machine-d5",
+        "composed-transform-d4", "composed-transform-d5", "transformation-machine-v4-d5",
       ]);
   });
 
@@ -716,9 +975,19 @@ describe("scene family prototypes", () => {
     // "colour that kind of shape" no longer fits; both models took that reading
     // in the v23 re-run. Checked against v23 on 200 items per bucket: only the
     // fill rows' two panels moved; options, answers and explanations did not.
+    // REISSUED 2026-10-07, deliberately (scene-families-v31): partial symbol,
+    // property and repeated-copy mistakes close single-symbol shortcuts. Six
+    // answers prefer more necessary clues within balanced option lists.
+    // Machine pools also exclude other valid readings. See blind-answer-leak.md.
+    // REISSUED 2026-10-12, deliberately (scene-families-v37): the owner
+    // requested that d5 always mix its three gates. Its five non-default
+    // orders change the hard items; the d4 digest remains unchanged.
+    // REISSUED again in v38: every worked transformation must distinguish
+    // the six choices. Both d4 and d5 now use necessity witnesses and complete
+    // compound mistakes, while retaining the options-only acceptance limit.
     const digests: Record<string, string> = {
-      "composed-transform-d4": "315ddfc6c161f9b3cad1fd8d4c1158a7edb66e6c995687ce346492ed5a53fc96",
-      "composed-transform-d5": "caa6e87c57f9e6be2ce4df7885db0d0c9ba1d2d856b99fddd97b207505f2472b",
+      "composed-transform-d4": "989fe83232e8b2f2244ffbcf370973eaec90f24134e3ea859c48efbb6c2d5519",
+      "composed-transform-d5": "3ba9187f609d109141daefd5e15e8d8c6aa57761ee1399cd99bcf5a9b17bb73a",
     };
     for (const [bucket, digest] of Object.entries(digests)) {
       const rendered = Array.from({ length: 50 }, (_, seed) =>
@@ -879,15 +1148,18 @@ describe("scene family prototypes", () => {
     expect(tokenTurns).toBeGreaterThan(0);
   });
 
-  it("lays out d5 as three worked gates and uses all three in varied query orders", () => {
-    let inWorkedOrder = 0;
-    let recombined = 0;
+  it.each([
+    ["composed-transform-v2", "composed-transform-d5"],
+    ["transformation-machine-v4", "transformation-machine-v4-d5"],
+  ] as const)("always mixes the three worked gates in %s d5", (familyId, bucket) => {
+    const orders = new Set<string>();
     for (let seed = 0; seed < 40; seed++) {
-      const { puzzle } = generateSceneFamilyCandidate(
-        "composed-transform-v2",
+      const item = generateSceneFamilyCandidate(
+        familyId,
         seededRng("gate-strip", `${seed}`),
-        "composed-transform-d5",
+        bucket,
       );
+      const { puzzle } = item;
       // 12 panels: three worked (input, gate, output) rows and the query row.
       expect(puzzle.stem).toHaveLength(12);
       const panel = (index: number) => {
@@ -906,14 +1178,42 @@ describe("scene family prototypes", () => {
       expect(queryGlyphs.every((glyph) => workedGates.includes(glyph))).toBe(true);
       expect(new Set(queryGlyphs).size).toBe(3);
       expect(new Set(queryGlyphs)).toEqual(new Set(workedGates));
-      if (queryGlyphs.every((glyph, index) => glyph === workedGates[index])) inWorkedOrder++;
-      else recombined++;
+      const shownOrder = queryGlyphs.map((glyph) => workedGates.indexOf(glyph));
+      expect(shownOrder, `seed ${seed}`).not.toEqual([0, 1, 2]);
+      expect(shownOrder).toEqual(item.queryGates!.order);
+      expect(sceneSignature(item.queryGates!.run(shownOrder)!))
+        .toBe(sceneSignature(puzzle.options[puzzle.answerIndex]));
+      orders.add(shownOrder.join(""));
       expect({ rows: queryStrip.rows, columns: queryStrip.columns }).toEqual({ rows: 3, columns: 3 });
       // No option is ever wider than a board: a strip is a control, not an answer.
       expect(puzzle.options.every((option) => option.columns <= 3)).toBe(true);
     }
-    expect(inWorkedOrder).toBeGreaterThan(0);
-    expect(recombined).toBeGreaterThan(0);
+    // The stricter v38 choice contract rejects drawings that cannot require
+    // every transformation without an options-only shortcut. Machine v4's
+    // paint / move / copy permutation fails that combined selection contract.
+    expect([...orders].sort()).toEqual(familyId === "transformation-machine-v4"
+      ? ["021", "120", "201", "210"] : ["021", "102", "120", "201", "210"]);
+  });
+
+  it.each([
+    ["composed-transform-v2", "composed-transform-d5"],
+    ["transformation-machine-v4", "transformation-machine-v4-d5"],
+  ] as const)("rejects a default-order hard query in %s", (familyId, bucket) => {
+    const item = generateSceneFamilyCandidate(familyId, seededRng("default-order-guard", familyId), bucket);
+    const stem = [...item.puzzle.stem];
+    const strip = stem[10] as Scene;
+    stem[10] = { ...strip, objects: [1, 4, 7].map((index, column) => ({
+      ...(stem[index] as Scene).objects[0], row: 1, column,
+    })) };
+    for (const invalid of [
+      { ...item, queryGates: { ...item.queryGates!, order: [0, 1, 2] } },
+      { ...item, puzzle: { ...item.puzzle, stem } },
+      { ...item, puzzle: { ...item.puzzle, stem }, queryGates: { ...item.queryGates!, order: [0, 1, 2] } },
+    ]) {
+      const result = validateSceneFamilyCandidate(invalid);
+      expect(result.accepted).toBe(false);
+      expect(result.issues.some(({ code, message }) => code === "gate-order" && message.includes("reorder"))).toBe(true);
+    }
   });
 
   it("locks the transformation-machine grammar and its servable population", () => {
@@ -1076,10 +1376,14 @@ describe("scene family prototypes", () => {
     // "copy every shape" fits it. Its cell is drawn at random, so the option
     // lists come from a later point in the stream: on these 50 seeds every copy
     // row and every option list moved, and no answer did.
+    // REISSUED 2026-10-07, deliberately (scene-families-v31): partial symbol,
+    // property and repeated-copy mistakes close single-symbol shortcuts. Six
+    // answers prefer more necessary clues within balanced option lists.
+    // Machine pools also exclude other valid readings. See blind-answer-leak.md.
     const digests: Record<string, { familyId: SceneFamilyId; digest: string }> = {
       "transformation-machine-d5": {
         familyId: "transformation-machine-v3",
-        digest: "3f87a3b9259fe7fe56ac70ae7ec82793a6f034ac64e114408da0ff6a06143aef",
+        digest: "a163895da88f9f2662b9325eca9e52c588e6246fc5b9a34fe31111b241b1945f",
       },
     };
     for (const [bucket, { familyId, digest }] of Object.entries(digests)) {
@@ -1541,6 +1845,8 @@ describe("grid flow", () => {
     const expected: Partial<Record<SceneFamilyId, string>> = {
       "relational-matrix-v2": "rowsAndColumns",
       "visual-set-algebra-v2": "rows",
+      "overlapping-figures-v1": "rowsAndColumns",
+      "attribute-matrix-v1": "rowsAndColumns",
     };
     for (const familyId of SCENE_FAMILY_IDS) {
       for (const { bucket } of SCENE_FAMILY_BUCKETS[familyId]) {

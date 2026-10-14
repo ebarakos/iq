@@ -15,7 +15,14 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   per-aspect majority, per-cell majority), the 28 options-only strategies built on
   them (every rank of each measure, the middle rank, the ruled-out extremes, and
   the two lone-aspect ones), `DISTRACTOR_ASPECTS`, and the clue check
-  `optionsAloneOnAClue`. `selectDistractors` serves only option lists where every
+  `optionsAloneOnAClue`. `sceneFamilyClueBases` and `sceneFamilyClueCheck` in
+  `scene-families.ts` additionally track complete symbol outcomes, including missing
+  and repeated shapes, and maximal-subset omission witnesses. Repeated symbols are
+  checked individually; their joint state is an omission objective. `selectDistractors`
+  favors more necessary clues among lists with the same options-only behavior.
+  Generation, acceptance, fallback serving and both verification scripts reject
+  single-clue answers. `scene-grammar.ts` supplies partial mistakes with explicit
+  reasons in both selection pools and family solvers. Selection serves lists where every
   clue appears on two options (under the family's `SCENE_FAMILY_CLUE_MODELS`
   entry) and balances the answer's rank against the strategies;
   `npm run families:verify` fails a served bucket where one strategy picks the
@@ -30,9 +37,41 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   families:verify` fails a bucket where any of its 200 items has one; the
   transformation machine and set algebra also use it while drawing. See
   `docs/plans/one-reading-per-worked-row.md`.
-- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v30`): band
-  schedules of 5/10/10/5 and 1/1/2/1, seeded 4/2/2 non-warmup family draws (`FAMILY_SUBSAMPLE_SIZES`), an
-  even split over each draw, and an easiest-first order without adjacent repeats.
+- `src/items/gate-order.ts` — how much a gate question depends on the order of its gates:
+  distinct boards over every order, adjacent swaps, and single-gate ablation that tells a
+  wrong board from a run that cannot apply. The two gate families expose `queryGates` on
+  their candidates; `npm run families:verify` reports it per bucket and fails only buckets
+  listed in `ORDER_DEPENDENT_BUCKETS`. See `docs/plans/harden-reasoning.md`.
+- `transformation-machine-v4` (in `scene-families.ts`) — the served interacting machine: its
+  paint and copy gates read one square, so every adjacent gate swap changes the board. Declared
+  and verified, including fill-specific competing readings. Replaces served v3 in v32; v3
+  remains available for historical diagnostic comparisons.
+- `composed-transform-v3` (in `scene-families.ts`) — diagnostic conditional prototype: board
+  move, solid repaint, then simultaneous solid-only movement. Contrasting examples make every
+  bounded fitting reading agree on the query before options are selected. A pre-movement option
+  preserves fills but changes positions, making the movement necessary to choose the answer.
+  It is outside the served registry; the legacy composed primitive pool remains separately defined.
+- `src/items/spatial-assembly.ts` — disabled in v33 at the owner's request; retained for
+  diagnostics. 3×3 fragment packing with a fixed two-square anchor,
+  quarter turns and no reflections. An independent exhaustive solver proves one completion.
+  All six options retain piece counts; omission witnesses make all three constraints necessary.
+  Both renderers share categorical piece marks, boundaries and the visual turn/reflection legend.
+- `src/items/overlapping-figures.ts` — v34 line matrices: five combining operations,
+  with zero, one or two necessary turns/reflections. A 320-rule oracle checks both axes.
+- `src/items/attribute-matrix.ts` — v34 shape/shading/count matrices: independent
+  distributions, arithmetic counts, then weighted counts. Both axes constrain the missing tile.
+  Collection placement varies independently; the oracle matches a unique attribute completion.
+  Every intended attribute must have an omission witness among the six choices.
+  The shared renderer draws line figures and uniform collections without internal board grids.
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v38`):
+  `SLOT_DIFFICULTIES` fixes each question number's level. Families are shuffled independently per slot,
+  with one chance per family even when multiple bands offer it. Long tests cover every enabled family;
+  samples use five different families. Backtracking preserves coverage, a five-question family cap,
+  and no adjacent family repeats without changing a slot's difficulty.
+  Both served level-5 machine families use three gates in a non-default order.
+  Their worked rows, visible query, solver and explanations agree on that order.
+  `machineGateNecessity` re-reads the examples and query, then hides each transform in turn.
+  At least two choices must remain possible. Generation, acceptance and fallback enforce this for both served machine families.
 - `src/items/render.tsx` / `src/items/compose-image.tsx` — deterministic human
   and agent renderers over the same visible data. Machine gates draw as jigsaw
   pieces (`JigsawPieces`); `src/items/gate-pieces.ts` says which texture each
@@ -45,13 +84,18 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
 - `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
   token, the answer deadline (separate from the token's own expiry), and
   server-side scoring with a late marker. The token seals the app release and
-  leaderboard eligibility/environment when issued; legacy tokens cannot rank.
+  leaderboard eligibility/deployment when issued; selecting a board does not change its scope. Legacy tokens cannot rank. Link tokens
+  (`src/lib/link-test.ts`) seal the release and environment only: link results never rank.
 - `src/lib/quiz-scoring.ts` — elapsed time and the bounded speed bonus over shared `src/lib/scoring.ts`;
   `src/lib/leaderboard.ts` — Redis first-submission receipts (atomic `SET NX`, retained
-  until token expiry), identical-retry recovery, changed-answer rejection and atomic
-  publication of one persistent leaderboard entry per test.
+  until token expiry) in the deployment namespace, identical-retry recovery, changed-answer rejection and atomic
+  publication of one persistent leaderboard entry per test. The first receipt binds publication
+  to the selected board; older receipts use their original deployment's board.
 - `src/lib/leaderboard-config.ts` — local development default, explicit deployment opt-in
-  through `LEADERBOARD_ENABLED=true`, and separate local/Preview/Production namespaces.
+  through `LEADERBOARD_ENABLED=true`, and two namespaces: shared dev (`aiq:local`) and
+  production (`aiq:production`). Selecting the production board requires both `LEADERBOARD_ENV=production`
+  and `VERCEL_ENV=production`; otherwise the board stays on dev. Token and receipt scope depends
+  only on `VERCEL_ENV`: production uses `aiq:production`, everything else uses `aiq:local`.
   `src/app/api/leaderboard/route.ts` and `src/app/leaderboard/page.tsx` return 404 when
   disabled. `src/app/page.tsx` supplies the server flag to `src/app/quiz.tsx`, which owns
   the quiz UI and optional publication form.
@@ -71,7 +115,15 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   `@resvg/resvg-js` with the bundled Noto Sans fonts: the harness, `render:item`
   and the link test's puzzle image all draw the same pixels.
 - `src/lib/solver.ts` / `scripts/agent-run.ts` — relay-backed vision-model
-  harness using the same answer-free public puzzle.
+  harness using the same answer-free public puzzle. Sources: generated tests, the
+  bank, held-out programs, and `family` (one declared bucket; an unserved one is
+  recorded as the `prototype` evaluation set). `--snapshot FILE --arm NAME` replays frozen
+  selections, including v31 after generator integration. `scripts/report.ts` keeps prompt,
+  generator, source/profile, thinking budget, channel and frozen corpus populations separate;
+  only one public image population from the current bank can write calibration tags.
+- `src/items/prototype-pilot.ts` — v38 prepares three representatives per new matrix key and machine v4,
+  filling packet A with 24 items; packet B holds 12 familiar keys. Versioned manifests
+  preserve item identity; packets contain no answers. Human collection remains separately approved.
 - `src/lib/calibrate.ts` — separate image/symbolic model results aggregated by
   generator feature bucket; exact-item results remain diagnostics.
 - `src/app/icon.svg`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx` —

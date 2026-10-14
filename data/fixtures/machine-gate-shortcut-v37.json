@@ -1,0 +1,614 @@
+{
+  "generatorVersion": "scene-families-v37",
+  "rngNamespace": "interacting-machine-test",
+  "seed": 5,
+  "queryOrder": [
+    1,
+    0,
+    2
+  ],
+  "puzzle": {
+    "id": "prototype-interacting-machine",
+    "type": "matrix",
+    "layout": "machineTable",
+    "instruction": "Follow the worked gate paths, then apply the query gates from left to right.",
+    "difficulty": 5,
+    "stem": [
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 0,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 0,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 2,
+            "column": 0,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 2,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 0,
+            "object": {
+              "kind": "token",
+              "shape": "square",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 2,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "star",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 2,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "star",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 0,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "half",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "star",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "star",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 2,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "star",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 2,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 1,
+            "column": 0,
+            "object": {
+              "kind": "token",
+              "shape": "square",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "triangle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "half",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "blank": true
+      }
+    ],
+    "options": [
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "half",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "half",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      },
+      {
+        "kind": "scene",
+        "rows": 3,
+        "columns": 3,
+        "objects": [
+          {
+            "row": 0,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "diamond",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 1,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "solid",
+              "size": "l"
+            }
+          },
+          {
+            "row": 1,
+            "column": 2,
+            "object": {
+              "kind": "token",
+              "shape": "circle",
+              "rotation": 0,
+              "fill": "outline",
+              "size": "l"
+            }
+          }
+        ],
+        "tiles": []
+      }
+    ],
+    "answerIndex": 3,
+    "explanation": "Each example row shows one jigsaw piece changing a board. The dark piece rotates the board a quarter-turn anticlockwise. The dotted piece colours black only the shape in the middle-right square: the same shape elsewhere stays white. The striped piece copies the shape in the middle-right square into the empty centre square. In the question the pieces snap together as the dotted piece, then the dark piece, then the striped piece. Follow them in that order, using the board each piece leaves for the next piece. The board after the last piece is the missing one.",
+    "familyId": "transformation-machine-v4"
+  }
+}

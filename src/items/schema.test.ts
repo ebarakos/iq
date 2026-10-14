@@ -89,6 +89,25 @@ const validAnalogy: Puzzle = {
 };
 
 describe("SceneSchema", () => {
+  it("accepts matrix figures and collections, while rejecting hidden or overlapping primitives", () => {
+    const figure: Scene = { kind: "scene", rows: 3, columns: 3, objects: [], tiles: [],
+      figure: { kind: "radial", strokes: [1, 3, 5, 7] } };
+    expect(SceneSchema.safeParse(figure).success).toBe(true);
+    for (const strokes of [[], [1, 1], [3, 1], [8]]) {
+      expect(SceneSchema.safeParse({ ...figure, figure: { kind: "radial", strokes } }).success).toBe(false);
+    }
+    expect(SceneSchema.safeParse({ ...figure, objects: board(1, 1).objects }).success).toBe(false);
+    expect(areScenesCategoricallyDistinct(figure, { ...figure, figure: { kind: "radial", strokes: [0, 2, 4, 6] } })).toBe(true);
+    const collection: Scene = { ...board(1, 1), collection: true };
+    expect(SceneSchema.safeParse(collection).success).toBe(true);
+    expect(SceneSchema.safeParse({ ...collection, objects: [...collection.objects,
+      { row: 0, column: 0, object: token("triangle") }] }).success).toBe(false);
+    expect(SceneSchema.safeParse({ ...collection, tiles: [{ row: 0, column: 0, edges: ["north"] }] }).success).toBe(false);
+    const plain = { ...collection, collection: undefined };
+    expect(areScenesCategoricallyDistinct(collection, plain)).toBe(true);
+    expect(sceneSignature(collection)).not.toBe(sceneSignature(plain));
+  });
+
   it("accepts positioned tokens, contained tokens, and categorical edge connections", () => {
     const fixture: Scene = {
       kind: "scene",

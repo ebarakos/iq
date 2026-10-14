@@ -22,11 +22,10 @@ export type PromotionState = (typeof PROMOTION_STATES)[number];
 /**
  * Median solve time a family/band pair may take and still be kept.
  *
- * These fit inside the flat 60-second-per-question budget: no band exceeds 60
- * seconds on its own, and weighted by the 30-question schedule (5 / 10 / 10 / 5)
- * they come to 1300 of the 1800 available seconds, leaving headroom for the
- * slower half of takers. Changing a number here means re-checking both rules —
- * see the human-solvability gate in docs/plans/deterministic-novel-tests.md.
+ * These retention budgets stay below 60 seconds per question. Bands are metadata,
+ * not question quotas: the fixed difficulty profiles need timed human attempts
+ * before their total time or cross-family difficulty can be calibrated. See the
+ * human-solvability gate in docs/plans/deterministic-novel-tests.md.
  */
 export const BAND_TIME_BUDGET_SECONDS: Readonly<Record<ExpandedProfileBand, number>> = {
   warmup: 25,
@@ -115,12 +114,36 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("warmup", ["spatial-transform-d2"])],
   },
   {
-    // d5 demonstrates three gates and applies them along the query path. The
-    // four-gate d6 bucket was withdrawn on 2026-08-27 under the owner's
-    // three-gate rule and its generator deleted on 2026-09-28.
-    familyId: "transformation-machine-v3",
+    // Local repaint and copying depend on the state earlier gates create.
+    // v3 remains available to the evaluation harness as the frozen before arm.
+    familyId: "transformation-machine-v4",
     primaryReasoningFamily: "operator-induction",
-    bands: [codeValidBand("induction-transfer", ["transformation-machine-d5"])],
+    bands: [codeValidBand("induction-transfer", ["transformation-machine-v4-d5"])],
+  },
+  {
+    // Disabled on 2026-10-09 at the owner's request. Keep the generator
+    // available for historical diagnostics, outside tests and pilot packets.
+    familyId: "spatial-assembly-v1",
+    primaryReasoningFamily: "spatial-assembly",
+    bands: [],
+  },
+  {
+    familyId: "overlapping-figures-v1",
+    primaryReasoningFamily: "figure-combination",
+    bands: [
+      codeValidBand("composition", ["overlapping-figures-d3"]),
+      codeValidBand("constraint-spatial", ["overlapping-figures-d4", "overlapping-figures-d5"]),
+      codeValidBand("induction-transfer", ["overlapping-figures-d5"]),
+    ],
+  },
+  {
+    familyId: "attribute-matrix-v1",
+    primaryReasoningFamily: "attribute-distribution",
+    bands: [
+      codeValidBand("warmup", ["attribute-matrix-d2"]),
+      codeValidBand("composition", ["attribute-matrix-d3"]),
+      codeValidBand("constraint-spatial", ["attribute-matrix-d4"]),
+    ],
   },
   {
     familyId: "second-order-sequence-v2",

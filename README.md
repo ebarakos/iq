@@ -14,6 +14,19 @@ The public product offers a 5-question sample and a 30-question test drawn from 
 generated visual-family pool. Answers stay encrypted until server-side submission. Design:
 [docs/plans/deterministic-novel-tests.md](docs/plans/deterministic-novel-tests.md).
 
+### Question order
+
+Each question number has a fixed difficulty. The sample uses `2, 3, 4, 4, 5`.
+The long test uses level 2 for questions 1–5, level 3 for 6–9, level 4 for 10–22,
+and level 5 for 23–30. Each slot randomly selects a family validated at its level.
+The long test covers every enabled family; the sample uses five distinct families.
+Consecutive questions use different families, and the reference fallback preserves the same difficulty curve.
+These levels are structural estimates. Human feedback and timed pilot attempts are needed to check
+that different families at the same level are comparably hard.
+Level-5 machine questions always use all three transforms in a mixed order, excluding the demonstrated order.
+Every demonstrated machine transform is necessary to choose among the six answers. Ignoring any one
+leaves at least two choices consistent with the other examples. Generation and fallback serving enforce this rule.
+
 ### Test generation latency
 
 Measured 2026-09-29 on the development machine on `scene-families-v19`, fresh random seeds:
@@ -109,13 +122,45 @@ Older tokens without this version cannot join the leaderboard.
 Points are `round(100 × correct × (1 + 0.25 × fraction of time remaining))`. For example,
 28/30 in 20 minutes earns 3,033 points; 30/30 in 30 minutes earns 3,000. Equal points rank
 the faster attempt first. Raw accuracy stays visible; these points are not an IQ score.
+Both in-page and link-test results show points for 30-question tests, even when the
+leaderboard is disabled. The scoring explanation appears in the instructions before starting.
 
 The leaderboard is enabled by default only in local development. On deployments, its page
-and both API methods return 404, and quiz results cannot be published. To enable it later,
+and publishing API return 404, and quiz results cannot be published. To enable it later,
 set the **server-only** `LEADERBOARD_ENABLED=true` in the desired Vercel environment and
-redeploy. Set it to `false` to disable it locally. No deployment settings were enabled as
-part of this implementation. Redis keys separate local, Preview and Production entries.
-The single-use submission protection applies even while the leaderboard is disabled.
+redeploy. Set it to `false` to disable it locally. This flag controls leaderboard access and
+publication only. The single-use submission protection applies even while it is disabled.
+
+There are two rankings: **Dev leaderboard** for development, testing, previews and staging,
+and **Leaderboard** for production. `LEADERBOARD_ENV` defaults to `dev`, including on a
+production deployment until launch. The dev board reuses the existing `aiq:local` Redis keys,
+so current local scores remain visible. All dev environments must use the same Upstash database
+(`KV_REST_API_URL` and `KV_REST_API_TOKEN`) to share that board. Production uses separate
+`aiq:production` ranking keys. Token scope and single-use receipts follow the deployment:
+`aiq:production` on Vercel Production, `aiq:local` everywhere else, independently of the board selected.
+Production cannot grade local/preview tokens even while displaying the dev board, including with shared secrets.
+Changing `LEADERBOARD_ENV` leaves active tests and scored retries valid. The first scored submission binds
+publication to the board then selected; that result cannot be published again to the other board.
+Older receipts retain their original deployment's board.
+
+To launch the production leaderboard when ready:
+
+1. In the Vercel **Production** environment, add these server-only settings:
+
+   ```env
+   LEADERBOARD_ENABLED=true
+   LEADERBOARD_ENV=production
+   ```
+
+   Keep the configured Upstash settings and `QUIZ_TOKEN_SECRET`.
+2. Keep `LEADERBOARD_ENV=dev` (or unset) for Development and Preview/staging. Enable those
+   boards separately with `LEADERBOARD_ENABLED=true` if wanted.
+3. Redeploy production. `/leaderboard` reads its production ranking; new tests publish there.
+
+Only a deployment with `VERCEL_ENV=production` can select the production board. A production
+setting on local, preview or staging still uses dev. Switching to `dev` later returns to the
+existing dev ranking without deleting production scores. This code change did not update any
+live environment settings or move stored records.
 
 ---
 
@@ -176,7 +221,10 @@ npm run bank:topup   # rebuild the emergency bank (--replace --per-bucket N --se
 npm run bank:verify  # bank integrity gate (run before committing bank changes)
 npm run agent:smoke  # relay multimodal smoke test (vision models)
 npm run agent:run    # solver harness (--all --channel image --repeat N ...; --debrief asks the model
-                     # for its confidence and rule, then whether another option was defensible)
+                     # for its confidence and rule, then whether another option was defensible;
+                     # --plan prints the items per family:band:bucket and stops before any model call;
+                     # --source family --bucket B draws one bucket, served or prototype, for matched arms;
+                     # --snapshot FILE --arm NAME replays a frozen baseline after generator changes)
 npm run report       # calibration report (--write to tag the bank)
 npm run render:item  # PNG fixtures of bank items (data/fixtures/)
 npm run vercel:setup # one-time Vercel secrets + Git deployment bootstrap

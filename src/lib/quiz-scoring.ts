@@ -7,7 +7,7 @@ export function leaderboardPoints(correct: number, elapsedSeconds: number, budge
   return Math.round(100 * correct * (1 + 0.25 * remaining));
 }
 
-/** Pure scoring; callers validate answers and persist the first result before revealing it. */
+/** Pure scoring that throws `ScoringError` on malformed answers; callers persist the first result before revealing it. */
 export function scoreQuiz(quiz: QuizTokenPayload, answers: readonly (number | null)[], nowSeconds: number) {
   const scored = scoreAnswers(quiz.items, answers, submissionTiming(quiz, nowSeconds));
   const elapsedSeconds = Math.max(0, nowSeconds - quiz.issuedAt);

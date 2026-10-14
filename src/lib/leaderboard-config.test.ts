@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { leaderboardEnabled, leaderboardNamespace } from "./leaderboard-config";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { leaderboardEnabled, leaderboardEnvironment, leaderboardLabel, leaderboardNamespace, quizNamespace } from "./leaderboard-config";
 
+beforeEach(() => vi.stubEnv("LEADERBOARD_ENV", undefined));
 afterEach(() => vi.unstubAllEnvs());
 
 describe("leaderboard deployment gate", () => {
@@ -31,13 +32,45 @@ describe("leaderboard deployment gate", () => {
     }
   });
 
-  it("separates local, preview and production data", () => {
-    vi.stubEnv("VERCEL", undefined);
-    vi.stubEnv("VERCEL_ENV", undefined);
-    expect(leaderboardNamespace()).toBe("aiq:local");
-    vi.stubEnv("VERCEL_ENV", "preview");
-    expect(leaderboardNamespace()).toBe("aiq:preview");
+  it.each([undefined, "development", "preview", "staging", "production"])(
+    "shares the existing dev board in %s until production is explicitly selected", (environment) => {
+      vi.stubEnv("VERCEL_ENV", environment);
+      expect(leaderboardEnvironment()).toBe("dev");
+      expect(leaderboardNamespace()).toBe("aiq:local");
+      expect(leaderboardLabel()).toBe("Dev leaderboard");
+    },
+  );
+
+  it("requires production selection on an actual production deployment", () => {
+    vi.stubEnv("LEADERBOARD_ENV", "production");
+    for (const environment of [undefined, "development", "preview", "staging"]) {
+      vi.stubEnv("VERCEL_ENV", environment);
+      expect(leaderboardEnvironment()).toBe("dev");
+      expect(leaderboardNamespace()).toBe("aiq:local");
+    }
     vi.stubEnv("VERCEL_ENV", "production");
+    expect(leaderboardEnvironment()).toBe("production");
     expect(leaderboardNamespace()).toBe("aiq:production");
+    expect(leaderboardLabel()).toBe("Leaderboard");
+  });
+
+  it("can keep or restore the dev board on a production deployment", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("LEADERBOARD_ENV", "dev");
+    expect(leaderboardNamespace()).toBe("aiq:local");
+    for (const value of ["prod", "PRODUCTION", ""]) {
+      vi.stubEnv("LEADERBOARD_ENV", value);
+      expect(leaderboardNamespace()).toBe("aiq:local");
+    }
+  });
+
+  it("keeps token and receipt scope stable across leaderboard selections", () => {
+    for (const environment of [undefined, "development", "preview", "staging", "production"]) {
+      vi.stubEnv("VERCEL_ENV", environment);
+      for (const board of [undefined, "dev", "production"]) {
+        vi.stubEnv("LEADERBOARD_ENV", board);
+        expect(quizNamespace()).toBe(environment === "production" ? "aiq:production" : "aiq:local");
+      }
+    }
   });
 });

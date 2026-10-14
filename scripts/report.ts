@@ -23,13 +23,13 @@
  *
  *   --version V            solver prompt version, e.g. solver-v3
  *   --generator-version V  e.g. scene-families-v11, or bank-v1 for bank runs
- *   --evaluation-set S     public | held-out
+ *   --evaluation-set S     public | held-out | prototype
  *   --thinking-budget B    the number a run used, or "off" (asked for none),
  *                          or "unrecorded" (artifact predates the field)
  *
  * --write refuses unless exactly one population matches, and always refuses a
- * held-out population: reserved items are generated per run and are not bank
- * items, so there is nothing in the bank for them to calibrate.
+ * diagnostic population: only public image attempts from the bank source can
+ * calibrate the current bank. Source/model/channel/effort filters name one arm.
  *
  * Note: a-priori difficulty is the human-difficulty proxy until a DB with human
  * attempt data exists. This report makes no combined human/agent scoring claims.
@@ -82,6 +82,11 @@ const { values: args } = parseArgs({
     // above, so --write needs the same way to name one of them.
     "evaluation-set": { type: "string" },
     "thinking-budget": { type: "string" },
+    source: { type: "string" },
+    channel: { type: "string" },
+    provider: { type: "string" },
+    model: { type: "string" },
+    effort: { type: "string" },
     "include-partial": { type: "boolean", default: false },
   },
   allowPositionals: true,
@@ -301,6 +306,24 @@ function printBucketTable(rollups: CalibrationReport["imageBucketRollups"]): voi
   }
 }
 
+/** Family, band and bucket counts remain visible after the run, not only in its plan. */
+function printProbeKeyTable(files: AttemptFile[]): void {
+  const rows = new Map<string, { attempts: number; correct: number }>();
+  for (const file of files) for (const attempt of file.attempts) {
+    if (!attempt.generation) continue;
+    const key = `${attempt.generation.familyId}:${attempt.band ?? "unrecorded"}:${attempt.generation.featureBucket}`;
+    const row = rows.get(key) ?? { attempts: 0, correct: 0 };
+    row.attempts++;
+    if (attempt.correct) row.correct++;
+    rows.set(key, row);
+  }
+  if (rows.size === 0) return;
+  printHeader("By family:band:bucket  [strict scored outcomes]");
+  for (const [key, row] of [...rows].sort(([a], [b]) => a.localeCompare(b))) {
+    console.log(`  ${key}: ${row.attempts} attempts · ${pct(row.correct / row.attempts)}`);
+  }
+}
+
 /**
  * Index of every population found, one row each, side by side and never averaged.
  *
@@ -316,6 +339,8 @@ function printPopulationIndex(populations: AttemptPopulation[]): void {
   const header = [
     pad("prompt", 12),
     pad("generator", 20),
+    pad("source/channel", 20),
+    pad("provider/model/effort", 45),
     pad("set", 9),
     pad("thinking", 11),
     pad("files", 6, true),
@@ -337,6 +362,8 @@ function printPopulationIndex(populations: AttemptPopulation[]): void {
     console.log("  " + [
       pad(population.promptVersion, 12),
       pad(population.generatorVersion, 20),
+      pad(`${population.source}/${population.channel}`, 20),
+      pad(`${population.provider}/${population.model}/${population.effortLabel}`, 45),
       pad(population.evaluationSet, 9),
       pad(population.thinkingBudgetLabel, 11),
       pad(population.files.length, 6, true),
@@ -425,6 +452,10 @@ function printReport(population: AttemptPopulation, bank: BankItem[]): void {
     console.log("  release threshold, and the bank-joined tables below (tier, type, divergence) are");
     console.log("  empty for them by design.");
   }
+  if (population.evaluationSet === "prototype") {
+    console.log("\n  Prototype items come from a declared bucket the live test does not serve. Compare");
+    console.log("  them with the served bucket they would replace, never with the public headline.");
+  }
 
   if (report.orphanItemIds.length > 0) {
     console.log(`\n  ⚠  ${report.orphanItemIds.length} orphan itemId(s) found in attempts but not in bank:`);
@@ -436,6 +467,7 @@ function printReport(population: AttemptPopulation, bank: BankItem[]): void {
   printTierTable(report.byTier);
   printTypeTable(report.byType);
   printBucketTable(report.imageBucketRollups);
+  printProbeKeyTable(files);
   printOutcomeTable(report);
   printByModelTable(report.imageRollups);
   printDivergenceSection(report.divergence);
@@ -486,12 +518,12 @@ function printOptionsOnlyTable(files: AttemptFile[]): void {
   printHeader("Options-only arm  [question hidden — chance is 16.7%]");
   console.log("  " + [
     pad("provider/model", 36), pad("attempts", 8, true), pad("failed", 6, true),
-    pad("no letter", 9, true), pad("picked", 6, true), pad("right of picked", 15, true),
+    pad("no letter", 9, true), pad("picked", 6, true), pad("strict accuracy", 15, true), pad("right of picked", 15, true),
   ].join("  "));
   for (const [key, row] of rows) {
     console.log("  " + [
       pad(key, 36), pad(row.attempts, 8, true), pad(row.failed, 6, true), pad(row.noLetter, 9, true),
-      pad(row.picked, 6, true), pad(row.picked > 0 ? pct(row.correct / row.picked) : "—", 15, true),
+      pad(row.picked, 6, true), pad(pct(row.correct / row.attempts), 15, true), pad(row.picked > 0 ? pct(row.correct / row.picked) : "—", 15, true),
     ].join("  "));
   }
 }
@@ -557,36 +589,50 @@ if (DRY_RUN) {
     (!args.version || population.promptVersion === args.version) &&
     (!args["generator-version"] || population.generatorVersion === args["generator-version"]) &&
     (!args["evaluation-set"] || population.evaluationSet === args["evaluation-set"]) &&
-    (!args["thinking-budget"] || population.thinkingBudgetLabel === args["thinking-budget"]));
+    (!args["thinking-budget"] || population.thinkingBudgetLabel === args["thinking-budget"]) &&
+    (!args.source || population.source === args.source) &&
+    (!args.channel || population.channel === args.channel) &&
+    (!args.provider || population.provider === args.provider) &&
+    (!args.model || population.model === args.model) &&
+    (!args.effort || population.effortLabel === args.effort));
   if (candidates.length !== 1) {
     console.error(`\nreport: refusing --write; ${candidates.length} population(s) matched, and exactly one is required.`);
     console.error("        Calibration written from two populations at once is meaningless: a public solve");
     console.error("        rate and a held-out one, or a reasoning run and a reasoning-off one, would be");
     console.error("        averaged into a number that describes neither.");
-    console.error("        Narrow it with --version, --generator-version, --evaluation-set, --thinking-budget.");
+    console.error("        Narrow with --version, --generator-version, --evaluation-set, --thinking-budget, --source, --channel, --provider, --model, --effort.");
     console.error("        Populations found:");
     for (const population of populations) console.error(`          ${population.label}`);
     process.exit(1);
   }
 
   const selectedPopulation = candidates[0];
-  if (selectedPopulation.evaluationSet === "held-out") {
-    // Refused outright, not merely by requiring a flag. Held-out items are
-    // generated per run from the reserved programs and never enter the bank, so
-    // applyCalibration would match no item and the run would report "Bank
-    // written" after changing nothing. The plan also sets no release threshold
-    // on held-out accuracy — it is a transfer diagnostic, not calibration.
-    console.error("\nreport: refusing --write for a held-out population.");
-    console.error("        Held-out items are reserved composed programs generated per run, not bank items,");
-    console.error("        so data/bank/items.json has nothing for them to calibrate. Held-out accuracy is a");
-    console.error("        transfer diagnostic with no release threshold. Select a public population instead:");
+  if (selectedPopulation.evaluationSet !== "public") {
+    // Refused outright, not merely by requiring a flag. Held-out and prototype
+    // items are generated per run and never enter the bank, so applyCalibration
+    // would match no item and the run would report "Bank written" after
+    // changing nothing. The plan also sets no release threshold on either — they
+    // are diagnostics, not calibration.
+    console.error(`\nreport: refusing --write for a ${selectedPopulation.evaluationSet} population.`);
+    console.error("        Held-out and prototype items are generated per run, not bank items, so");
+    console.error("        data/bank/items.json has nothing for them to calibrate. Their accuracy is a");
+    console.error("        diagnostic with no release threshold. Select a public population instead:");
     console.error("        --evaluation-set public");
     process.exit(1);
   }
 
+  if (selectedPopulation.source !== "bank" || selectedPopulation.channel !== "image") {
+    console.error("report: --write requires an image population from the bank source; other runs are diagnostics.");
+    process.exit(1);
+  }
   const now = new Date().toISOString();
   const writeFiles = selectedPopulation.files;
-  const { imageRollups } = buildReport(writeFiles, bank);
+  const { imageRollups } = buildReport(writeFiles, bank, { includePartial: args["include-partial"] });
+  const bankIds = new Set(bank.map((item) => item.puzzle.id));
+  if (!imageRollups.some((rollup) => bankIds.has(rollup.itemId))) {
+    console.error("report: refusing --write because no measured item belongs to the current bank.");
+    process.exit(1);
+  }
   const updated = applyCalibration(bank, imageRollups, now);
 
   // Count changes

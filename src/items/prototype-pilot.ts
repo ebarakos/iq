@@ -32,6 +32,12 @@ import { MAXIMUM_DIFFICULTY, toPublicPuzzle, type PublicPuzzle } from "./schema"
  * plainly — and not difficulty calibration, which needs several items per key.
  */
 export const PILOT_ITEMS_PER_KEY = 1;
+const RETENTION_FAMILY_IDS = new Set(["transformation-machine-v4", "spatial-assembly-v1", "overlapping-figures-v1", "attribute-matrix-v1"]);
+
+/** Only new mechanisms need the retention design's three representative draws. */
+export function prototypePilotRepresentatives(key: Pick<PrototypePilotKey, "familyId">): number {
+  return RETENTION_FAMILY_IDS.has(key.familyId) ? 3 : PILOT_ITEMS_PER_KEY;
+}
 export const PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION = "prototype-pilot-packets-v3";
 export const PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION = "prototype-pilot-aggregate-v2";
 /**
@@ -154,14 +160,14 @@ export function parsePrototypePilotItemId(itemId: string): {
     throw new Error(`unknown pilot band "${band}"`);
   }
   const index = Number(representative);
-  if (index < 1 || index > PILOT_ITEMS_PER_KEY) {
-    throw new Error(`pilot representative must be between 1 and ${PILOT_ITEMS_PER_KEY}`);
-  }
   const key = enabledPrototypePilotKeys().find((candidate) =>
     candidate.familyId === familyId &&
     candidate.band === band &&
     candidate.difficultyBucket === difficultyBucket);
   if (!key) throw new Error(`unknown pilot item "${itemId}": no enabled key matches it`);
+  if (index < 1 || index > prototypePilotRepresentatives(key)) {
+    throw new Error(`pilot representative must be between 1 and ${prototypePilotRepresentatives(key)}`);
+  }
   return { key, representative: index };
 }
 
@@ -172,8 +178,8 @@ export function parsePrototypePilotItemId(itemId: string): {
  * months apart all reconstruct byte-for-byte the same puzzle without storing it.
  */
 export function prototypePilotCandidate(key: PrototypePilotKey, representative: number) {
-  if (!Number.isInteger(representative) || representative < 1 || representative > PILOT_ITEMS_PER_KEY) {
-    throw new Error(`pilot representative must be between 1 and ${PILOT_ITEMS_PER_KEY}`);
+  if (!Number.isInteger(representative) || representative < 1 || representative > prototypePilotRepresentatives(key)) {
+    throw new Error(`pilot representative must be between 1 and ${prototypePilotRepresentatives(key)}`);
   }
   const itemId = prototypePilotItemId(key, representative);
   const candidate = generateSceneFamilyCandidate(
@@ -190,7 +196,7 @@ export function prototypePilotCandidate(key: PrototypePilotKey, representative: 
 
 export function buildPrototypePilotQuestions(): PrototypePilotQuestion[] {
   return enabledPrototypePilotKeys().flatMap((key) =>
-    Array.from({ length: PILOT_ITEMS_PER_KEY }, (_, index) => {
+    Array.from({ length: prototypePilotRepresentatives(key) }, (_, index) => {
       const representative = index + 1;
       const candidate = prototypePilotCandidate(key, representative);
       return {
@@ -202,18 +208,22 @@ export function buildPrototypePilotQuestions(): PrototypePilotQuestion[] {
 }
 
 /**
- * The fewest packets that hold every enabled key once, in key order.
- *
- * With 20 keys and a cap of 24 this is a single sitting, which is what the plan
- * asks for. The split stays general so a future key count above the cap
- * produces two balanced sittings instead of an error.
+ * New mechanisms get their own retention packet, with three draws per key.
+ * Familiar mechanisms remain a separate optional audit; nobody needs to repeat
+ * them to judge the new mechanisms. Every item remains in one packet only.
  */
 export function buildPrototypePilotPackets(): PrototypePilotPacket[] {
   const questions = buildPrototypePilotQuestions();
-  const packetCount = Math.max(1, Math.ceil(questions.length / PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET));
-  const perPacket = Math.ceil(questions.length / packetCount);
-  return Array.from({ length: packetCount }, (_, index) => {
-    const items = questions.slice(index * perPacket, (index + 1) * perPacket);
+  const groups = [
+    questions.filter((question) => RETENTION_FAMILY_IDS.has(question.familyId)),
+    questions.filter((question) => !RETENTION_FAMILY_IDS.has(question.familyId)),
+  ].filter((group) => group.length > 0);
+  const chunks = groups.flatMap((group) => {
+    const count = Math.ceil(group.length / PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET);
+    const perPacket = Math.ceil(group.length / count);
+    return Array.from({ length: count }, (_, index) => group.slice(index * perPacket, (index + 1) * perPacket));
+  });
+  return chunks.map((items, index) => {
     if (items.length > PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET) {
       throw new Error(`pilot packet ${index + 1} exceeds ${PROTOTYPE_PILOT_MAX_ITEMS_PER_PACKET} items`);
     }

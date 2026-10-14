@@ -5,6 +5,10 @@ import { LinkTestError, startPath } from "@/lib/link-test";
  * Shared pieces of the link test's pages. Plain links and text only: these
  * pages are for a reader that fetches pages, follows links, and runs no
  * JavaScript (docs/plans/link-only-test.md).
+ *
+ * Every link deeper into a test is `rel="nofollow"`: each question page links
+ * to seven more, so a crawler that follows them walks thousands of pages per
+ * test, and every result page it reaches costs a Redis call.
  */
 
 export const PROFILE_NAMES: Record<ExpandedProfile, string> = {
@@ -35,6 +39,7 @@ export function StartLink({ profile, children }: { profile?: ExpandedProfile; ch
   return (
     <a
       href={startPath(profile)}
+      rel="nofollow"
       className="inline-block rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
     >
       {children}
@@ -42,7 +47,13 @@ export function StartLink({ profile, children }: { profile?: ExpandedProfile; ch
   );
 }
 
-/** What a reader sees when a test link cannot be used, and where to go instead. */
+/**
+ * What a reader sees when a test link cannot be used, and where to go instead.
+ *
+ * Served with status 200, not 404: Next 15 sends a `notFound()` from a dynamic
+ * page as an empty shell that only JavaScript fills, so a reader without it
+ * would get a blank page. `noindex, nofollow` keeps crawlers off it instead.
+ */
 export function LinkProblem({ error }: { error: unknown }) {
   const linkError = error instanceof LinkTestError ? error : null;
   const profile = linkError?.profile;

@@ -45,6 +45,8 @@ export interface FamilyDefinition {
 
 export type AcceptanceIssueCode =
   | "schema"
+  | "clue-shortcut"
+  | "gate-order"
   | "solution-count"
   | "derived-answer"
   | "option-distinction"

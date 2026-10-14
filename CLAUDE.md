@@ -1,11 +1,11 @@
 # IQ visual reasoning gym (repo `aiq`) — for humans and agents
 
-> A web app that generates visual IQ-style puzzles of increasing difficulty and
-> administers them to **both humans and AI agents**, using a difficulty ladder to
-> separate "human-hard" from "agent-hard" items.
+> Visual IQ-style puzzles for **humans and AI agents**, using a difficulty ladder
+> to separate "human-hard" from "agent-hard" items.
 
 The app serves two test lengths, 5 and 30 questions, both drawn from the same pool of eligible
-visual reasoning families and the same four difficulty bands. Every test is generated from a
+visual reasoning families, with fixed difficulty per question number. Families are randomized
+within each slot's validated level. Every test is generated from a
 fresh seed, validated in pure code, served without answers, and scored server-side against a
 whole-test deadline of 60 seconds per question. Every question offers six answer options, so a
 blind guess is worth 1 in 6. Family/band pairs can be withdrawn through configuration when the
@@ -23,21 +23,28 @@ npm run lint             # ESLint
 npm test                 # vitest run
 npm run families:verify  # scene-family acceptance contract
 npm run bank:verify      # bank integrity gate (run before committing bank changes)
+npm run redis:verify     # Upstash connection check with one temporary key (needs .env.local)
 ./qa/run.sh              # the full local gate below, logged to qa/runs/ (from project root)
-```
-
-Full local gate, before landing generator, family, or assembler changes:
-
-```bash
+# Full local gate before landing generator, family, or assembler changes:
 npm run typecheck && npm run lint && npm test && npm run families:verify && npm run bank:verify && npm run build
 ```
 
 Only the model-calling scripts (`agent:smoke`, `agent:run`, `experiment:llm-rules`) need relay
-env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` run offline. See
+env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` run offline.
+Scoring, local included, needs Upstash `KV_REST_API_URL` and `KV_REST_API_TOKEN` there. See
 `README.md` and `package.json`.
 
 ## Hard rules
 
+- **Clues and near misses:** Offer six options: one right answer and five plausible near misses.
+  Prefer more necessary independent clues among balanced six-option lists, within the five-near-miss budget.
+  A single symbol or clue must not identify the answer when there are multiple independent outcomes,
+  even when another option omits or duplicates a symbol. Whole-rule sequences are the documented exception.
+  See [docs/plans/blind-answer-leak.md](docs/plans/blind-answer-leak.md).
+- **Necessary transformations:** Every transform in a served machine must be needed to choose among all six options.
+  Hiding any one transform's example must leave at least two choices possible from the other examples and shown order.
+  Changing the generated answer when a step is omitted is insufficient. Enforce this in generation, acceptance and fallback.
+  Level 5 uses all three transforms in a mixed order, never the default worked-row order.
 - **Explanations are for the taker:** an item's `explanation` (the review screen) says what to look at
   and how to reach the answer, in the picture's words. Never how the item was made — no distractors,
   near misses, grammars, programs, worked rows, tokens. A test in `scene-families.test.ts` enforces it.
@@ -46,11 +53,11 @@ env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` ru
   so the test is fair across humans and vision-capable agents.
 - `OPTIONS_PER_ITEM` (`src/items/schema.ts`) is the one place the number of answer options
   is set, and every family, both renderers, and the assembler follow it.
-- The served puzzle is answer-free: answers ride in the encrypted quiz token and scoring is
-  server-side (`src/lib/quiz-token.ts`, `src/app/api/submit/route.ts`).
-- Production requires `QUIZ_TOKEN_SECRET` for encrypted answer tokens. Relay env is
-  needed only for the agent harness and offline model experiments; human tests do
-  not make model calls. See `.env.example`.
+- The served puzzle is answer-free: answers ride in the encrypted quiz token (a link-test token
+  seals only a seed) and scoring is server-side. Both flows save the first scored result in Redis
+  before revealing any answer, and reveal none if that fails (`src/lib/leaderboard.ts`).
+- Production requires `QUIZ_TOKEN_SECRET` and the Upstash `KV_REST_API_*` settings; human tests
+  make no model calls, so they never need relay env. See `.env.example`.
 - Nothing is locked except **JS/TS + Vercel + llm-relay** (explicit user requirements).
 - If you improve a general-purpose relay file, append a note to
   `~/.claude/skills/connect-relay/UPSTREAM.md` under `## Pending` (project, date, file,
@@ -58,10 +65,9 @@ env in `.env.local`; `bank:topup`, `report`, `render:item` and `pilot:report` ru
 
 ## LLM Relay
 
-All model calls (agent-side solving and calibration; test items are generated in pure code)
-go through [`llm-relay`](../llm-relay) — a Cloudflare Worker proxy. **No provider
-API keys live in this repo.** The relay manages keys, enforces rate limits, and
-lets us swap providers centrally.
+All model calls go through [`llm-relay`](../llm-relay), a Cloudflare Worker proxy.
+**No provider API keys live in this repo.** The relay manages keys, rate limits and providers.
+Test items are generated in pure code; model calls are for agent solving and calibration.
 
 Configure via env vars only — never hardcode URLs, providers, or model names:
 
@@ -89,8 +95,6 @@ connect and the hosted OpenRouter line in `.env.example` is the fallback.
 
 ## Where things live
 
-- Single source of truth: design → `docs/plans/<slug>.md`, ideas → `docs/brainstorm.md`,
-  status → `TODO.md`, baton → `docs/handoff.md`.
 - `docs/architecture.md` — per-file module map plus the relay integration files. Open it
   before changing item generation, rendering, scoring, or relay code.
 - `docs/reference.md` — the tech-stack table. Open it when the stack itself is in question.

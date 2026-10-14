@@ -17,7 +17,7 @@ describe("family promotion registry", () => {
     // property to check is that none of them is ENABLED, which is the line
     // above.
     expect(
-      CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "transformation-machine-v3")?.bands[0],
+      CURRENT_FAMILY_PROMOTION_REGISTRY.find((family) => family.familyId === "transformation-machine-v4")?.bands[0],
     ).toMatchObject({ state: "code-valid", band: "induction-transfer" });
   });
 });

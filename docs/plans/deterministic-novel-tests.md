@@ -110,7 +110,8 @@ withdrawn as a product target; the 12-slot assembler stays in the code only so
 that tokens already issued and golden-seed replays keep working.
 
 Both lengths are drawn from the same expanded family pool and use the same four
-difficulty bands. The short test is a sample of the long test's curve, not an
+reasoning bands as metadata. Fixed difficulty slots select families across those bands.
+The short test is a sample of the long test's curve, not an
 easier test: someone who only wants a quick look gets the same kinds of question
 in the same rising order.
 
@@ -123,9 +124,10 @@ The 2026-08-16 decisions in full:
   the long one — not a per-question timer. A taker may spend the time unevenly.
 - **A hard deadline with a grace window and a late marker.** The countdown ends
   the test. "The answer deadline" below fixes the exact rule.
-- **Results are a raw score and a reasoning-family breakdown, and nothing else.**
-  No IQ number, no percentile, no normalized scale. [`docs/brainstorm.md`](../brainstorm.md) Q8 records
-  why an IQ figure is not available to us.
+- **Results show a raw score and a reasoning-family breakdown.** The owner's 2026-10-07
+  decision also keeps points on 30-question tests when the leaderboard is disabled.
+  No IQ number, percentile or normalized scale. [`docs/brainstorm.md`](../brainstorm.md) Q8
+  records why an IQ figure is not available to us.
 - **Code-valid families ship publicly.** This reverses the earlier rule that a
   family had to pass the human pilot
   before it could appear in a public test. The pilot becomes a **retention
@@ -140,6 +142,13 @@ to reach real takers is to ship. The risk it accepts is that a confusing family
 is briefly public; the withdrawal list and continuing retention pilot are what
 contain that risk.
 
+Points use the existing calculation: `round(100 × correct × (1 + 0.25 × remaining / duration))`,
+with the remaining-time fraction clamped between zero and one. Each correct answer earns
+100 base points; unused test time adds at most 25%. Wrong and skipped answers earn no base points.
+Both result flows show points for 30-question tests, independently of `LEADERBOARD_ENABLED`.
+That setting controls the leaderboard and publication only. The introduction, results and
+leaderboard explain the same bonus; points remain a game score, not an IQ estimate.
+
 ### Presentation contract
 
 The solving screen shows only the visual evidence and answer options. It must
@@ -153,24 +162,26 @@ stages so the relationship is learned from a sequence rather than inferred from
 one unexplained board. After the full test is submitted, the review shows a rich
 plain-language explanation of the evidence, operations, and answer.
 
-Difficulty must rise across the test. Within a band the questions run from the
-lower to the higher validated difficulty bucket, and no band starts below the
-previous band's floor. The ramp is a property of the assembler, not of a
-hand-written table of one family per slot.
+Question numbers have fixed difficulty levels, independent of the seed and reasoning family.
+Since `scene-families-v36`, each slot draws a seeded random family with a validated bucket at that exact level.
+Families from all reasoning bands compete together. Band tags describe questions; they do not reserve positions.
+The long test covers every enabled family, with at most five questions per family and no adjacent repeats.
+The sample uses five distinct families. An unavailable pool fails clearly; neither generation nor the reference
+fallback changes a slot's level to complete the test.
 
-### Four fixed difficulty bands
+### Fixed difficulty slots
 
-| Band | 30-question positions | 5-question positions | What the band tests |
-|---|---|---|---|
-| Relational warmup | 1–5 | 1 | Notice one clear relation and apply it without hidden notation. |
-| Composition | 6–15 | 2 | Combine, reverse, or interleave two demonstrated relations or transformations. |
-| Constraint or spatial reasoning | 16–25 | 3–4 | Satisfy interacting board, set, geometry, or connectivity constraints. |
-| Induction or transfer | 26–30 | 5 | Infer a demonstrated system or carry the same structure into a changed representation. |
+| Level | 30-question slots | 5-question slots |
+|---|---|---|
+| 2 | 1–5 | 1 |
+| 3 | 6–9 | 2 |
+| 4 | 10–22 | 3–4 |
+| 5 | 23–30 | 5 |
 
-The long schedule is 5 / 10 / 10 / 5; the short schedule is 1 / 1 / 2 / 1. The
-short one is not exactly one sixth of the long one, because 5 questions do not
-divide into those shares evenly. The spare question goes to constraint and
-spatial reasoning, the band that carries the most weight in the long test.
+These are structural estimates, not measured human difficulty. Equal labels constrain which buckets may share
+a slot; they do not prove equal solve rates or times across families. Matched examples are prepared for owner
+feedback, followed by the existing multi-participant pilot before claiming comparable human difficulty.
+The previous 5/10/10/5 and 1/1/2/1 reasoning-band quotas are retired.
 
 The whole-test budget is 60 seconds per question: **5 minutes** for the short
 test and **30 minutes** for the long one. Unlike the earlier 20-minute figure,
@@ -254,9 +265,8 @@ The old modular visual-operator family (`operator-induction-v1`) is not eligible
 in any band. Its hidden shape indexes and parity conditions are implementation
 conventions rather than visibly learned operations. Its replacement,
 `transformation-machine-v2`, shows every gate it applies and is eligible in
-induction/transfer. A band whose eligible families all get withdrawn makes the
-test length unavailable; the assembler must fail visibly rather than fill the
-band with a weaker substitute.
+induction/transfer. A difficulty whose eligible families cannot fill its fixed slots makes
+the test length unavailable; the assembler fails visibly rather than substituting a weaker question.
 
 An eligibility registry is the single assembly input. Each entry contains a
 versioned family id, allowed bands, primary reasoning-family tag, promotion
@@ -269,7 +279,7 @@ semantics requires a new generator version.
 
 `assembleExpandedQuiz(seed, profile, registry)` is a pure function.
 `profile` is `long-30` or `short-5`, and the generator version for both is
-`scene-families-v6`. The same seed, profile, generator version, and withdrawal
+`scene-families-v38`. The same seed, profile, generator version, and withdrawal
 list reproduce the
 same items, the same family order, and the same option order on every machine.
 Assembly uses stable child seeds for the schedule, each slot, candidate retries,
@@ -285,7 +295,8 @@ Assembly happens in this order:
    drop every family id named in the withdrawal list.
 2. Use the schedule child seed to choose every family id for the whole test
    before generating any item.
-3. Enforce the band counts and coverage rules below on that schedule.
+3. Keep every slot's hardcoded difficulty, enforce family coverage and repetition bounds,
+   and backtrack through each slot's seeded family order until the whole test fits.
 4. Generate each slot from its own child seed with a bounded retry budget.
 5. Reject any item that repeats a visible puzzle already in the test, and any
    whose difficulty does not match the bucket it was scheduled from.
@@ -295,62 +306,34 @@ Assembly happens in this order:
 A program fingerprint names a family's *rule structure*, not one instance: most
 families emit a single fingerprint across every seed. Requiring fingerprints to
 be unique across a test would therefore mean "each family at most once", which
-30 questions and 18 families cannot satisfy. Uniqueness is enforced on the
+30 questions and the current family pool cannot satisfy. Uniqueness is enforced on the
 visible puzzle instead, and the fingerprint stays what it always was — the
 calibration bucket key.
 
-#### Band schedule
-
-| Profile | Warmup | Composition | Constraint / spatial | Induction / transfer | Total |
-|---|---:|---:|---:|---:|---:|
-| `long-30` | 5 | 10 | 10 | 5 | 30 |
-| `short-5` | 1 | 1 | 2 | 1 | 5 |
-
-The counts are part of the generator version. A new version may change them; a
-released one may not.
-
 #### Family coverage and repeat caps
 
-Within one band the schedule is **as even as the eligible pool allows**. With `n`
-questions in a band and `k` eligible families, every chosen family appears either
-`floor(n / k)` or `ceil(n / k)` times. That single rule fixes both the repeat cap
-and the distinct-family count, and it keeps working when a withdrawal shrinks the
-pool — nothing has to be re-tuned by hand.
+`SLOT_DIFFICULTIES` is the only question-position schedule. Its values are part of the generator version;
+a released version never changes them. A family competes only through a bucket validated at that exact level.
+Each slot shuffles unique family ids independently. If multiple bands offer the same family at that level,
+the family receives one chance, then a separate child seed chooses its band/bucket record.
 
-What it produces from the 18 currently code-valid families (2 warmup, 6
-composition, 6 constraint/spatial, 4 induction/transfer):
+Every test must satisfy:
 
-| Profile | Band | Questions | Eligible families | Used | Most from one family |
-|---|---|---:|---:|---:|---:|
-| `long-30` | Warmup | 5 | 2 | 2 | 3 |
-| `long-30` | Composition | 10 | 6 | 6 | 2 |
-| `long-30` | Constraint / spatial | 10 | 6 | 6 | 2 |
-| `long-30` | Induction / transfer | 5 | 4 | 4 | 2 |
-| `short-5` | every band | 1 or 2 | 2–6 | 1 or 2 | 1 |
+- no adjacent questions share a family id;
+- a long test uses every currently eligible family, with a floor of ten after withdrawals;
+- a long test asks at most five questions from one family, which also bounds reference-bank use; and
+- a sample uses five distinct families, one per question.
 
-A known thin spot: only two families are currently registered for warmup, so a
-`long-30` test fills five warmup questions from two generators whose rule
-structure does not vary — three of the five will share a rule with a different
-surface. Adding a third warmup family is the fix; until then, the ramp's first
-band is the weakest part of the long test.
-
-On top of the even split, every test must satisfy:
-
-- no two questions next to each other share a family id or a canonical rule
-  structure, inside a band or across a band boundary;
-- a `long-30` test uses at least 12 distinct family ids;
-- a `short-5` test uses 5 distinct family ids, one per question; and
-- no family supplies more than a fifth of any band, or more than a tenth of a
-  `long-30` test.
+Band tags are retained for scoring and diagnostics; their counts can differ between seeds.
+Repeated appearances use the bucket matching their slot, without an occurrence-based family ramp.
 
 #### Minimum eligible pool
 
-Withdrawing families must not quietly produce a thinner test. A `long-30` test
-requires at least **2 warmup, 4 composition, 4 constraint/spatial, and 3
-induction/transfer** families after withdrawals, and at least 12 in total. Below
-any of those, the long test is unavailable and the failure is loud: the server
-refuses the request and logs which band is short, rather than serving a test
-built from three families. A `short-5` test needs one eligible family per band.
+A repeated difficulty tier needs at least two eligible families so its consecutive slots can alternate.
+A single-slot tier needs one. Matching fixed slots to distinct families must reach the profile's coverage floor.
+The planner then checks an actual completion with the repetition cap, family coverage and exact difficulties.
+Its search is exhaustive over seeded family choices, so one feasibility probe is enough to refuse a bad pool
+before serving a test. Withdrawals never lower a slot's level or weaken the coverage floor.
 
 #### Measured cost
 
@@ -393,11 +376,30 @@ publish a nickname and `round(100 × correct × (1 + 0.25 × fraction of time re
 points. Raw accuracy stays visible; leaderboard points are not a standardized IQ scale.
 Each entry records the app version sealed at issue time, elapsed time and submission date.
 Local development enables this by default; deployments require `LEADERBOARD_ENABLED=true`.
-Each environment keeps a separate ranking. First submissions are saved atomically before
+The 2026-10-08 owner decision replaces the per-environment rankings with two: dev for local,
+testing, previews and staging, and production. `LEADERBOARD_ENV` defaults to `dev`, including
+on production deployments until launch; production requires `LEADERBOARD_ENV=production`
+and `VERCEL_ENV=production`. Dev retains the existing `aiq:local` keys, and production uses
+`aiq:production`. Dev environments share a database to share scores. The board title and
+publication links identify dev mode. Tokens and scoring receipts stay bound to their deployment,
+independently of the selected ranking: production uses `aiq:production`, everything else `aiq:local`.
+Sharing quiz secrets cannot let local/preview answer reveals become production submissions,
+even when production displays the dev board. The first receipt records the selected ranking,
+so switching boards cannot invalidate an active test, replace its score, or publish it to both boards.
+Older receipts without that record keep their original deployment's ranking.
+First submissions are saved atomically before
 revealing answers, even with the leaderboard disabled; identical retries recover the same
 result and changed answers are refused. Publication is also atomic and cannot duplicate a
 test or rename its first published entry. Private scoring receipts expire with the token;
 published leaderboard entries persist. Older unversioned tokens cannot rank.
+
+Owner decisions, 2026-10-06 review: the leaderboard stays local for now. Before setting
+`LEADERBOARD_ENABLED=true` on a deployment, settle three things: whether scripts and models may
+rank (the in-page test sends each puzzle as shape data a program can read, and a 30/30 in one
+minute earns about 3,725 points), how to handle abusive nicknames (free text, shown publicly),
+and cut a release first so rows record the right version. Scoring keeps needing Redis while
+the leaderboard is off: every result stays single-use, at the cost of no scoring during an
+Upstash outage and a `.env.local` for local scoring.
 
 Human and agent results remain separate datasets and separate result views:
 

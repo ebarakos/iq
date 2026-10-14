@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/t/[token]/[n]/puzzle.png": ["./src/app/fonts/*.ttf"],
   },
+  // Every link-test URL, pages, images and 404s alike: out of search results and
+  // out of crawlers' link walks (docs/plans/link-only-test.md). One place for all.
+  async headers() {
+    const robots = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return ["/sample", "/test", "/t/:path*"].map((source) => ({ source, headers: robots }));
+  },
 };
 
 export default nextConfig;

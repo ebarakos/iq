@@ -1,10 +1,12 @@
 import type { ExpandedProfile } from "@/items/expanded-quiz";
 import { createLinkTest, LinkTestError, questionPath } from "./link-test";
 
-/** Headers every link-test response carries: never cached, never indexed, still crawlable. */
+/**
+ * Headers every link-test response sets itself: never cached. `next.config.ts`
+ * adds `X-Robots-Tag` to every link-test URL, pages included.
+ */
 export const LINK_TEST_HEADERS = {
   "cache-control": "no-store",
-  "x-robots-tag": "noindex",
 } as const;
 
 /**

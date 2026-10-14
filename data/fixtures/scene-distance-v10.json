@@ -78,6 +78,20 @@
         "positions": 4,
         "atoms": 20
       }
+    },
+    "transformation-machine-v3:induction-transfer:transformation-machine-d5": {
+      "seeds": 200,
+      "servedDistances": 1000,
+      "p50": {
+        "positions": 4,
+        "atoms": 12
+      },
+      "p90": {
+        "positions": 5,
+        "atoms": 21
+      },
+      "withdrawnOn": "2026-10-09",
+      "withdrawnReason": "scene-families-v32 replaces the commuting v3 machine with the interacting v4 machine. These historical v3 measurements stay unchanged and are not a baseline for the new grammar."
     }
   },
   "keys": {
@@ -163,18 +177,6 @@
       "p90": {
         "positions": 4,
         "atoms": 20
-      }
-    },
-    "transformation-machine-v3:induction-transfer:transformation-machine-d5": {
-      "seeds": 200,
-      "servedDistances": 1000,
-      "p50": {
-        "positions": 4,
-        "atoms": 12
-      },
-      "p90": {
-        "positions": 5,
-        "atoms": 21
       }
     }
   }

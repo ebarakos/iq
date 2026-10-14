@@ -62,7 +62,7 @@ BRAINSTORM.md   # free-form ideation + open questions  ← current focus
 TODO.md         # short task/checklist state
 ```
 
-## Generator version history of the expanded quiz (`scene-families-v2` to `v30`)
+## Generator version history of the expanded quiz (`scene-families-v2` to `v31`)
 
 Moved verbatim on 2026-09-28 from the comment above `EXPANDED_GENERATOR_VERSION` in
 `src/items/expanded-quiz.ts`. Background only: each entry records what changed in the
@@ -410,3 +410,78 @@ the two textures only those gates used, the concept and expression grammars, and
 pilot-promotion state machine; the human-solvability gate stays in
 `docs/plans/deterministic-novel-tests.md`, and pilots run through `npm run pilot:report`. No
 item changed: `families:verify` and `bank:verify` read the same as before.
+
+`v31` (2026-10-07) strengthens wrong options without reducing the rules. Every item still
+offers six answers: one correct and five plausible near misses. Near misses now include
+witnessed mistakes affecting one symbol, property, square or repeated copy while other
+outcomes stay correct. Full answer derivation and uniqueness checks remain intact; a
+wrong option still needs a reason tied to the pictured rule.
+
+Selection prefers more necessary independent clues among balanced six-option lists.
+It retains rich rules when five wrong options cannot make every clue indispensable. A single symbol or clue must never identify the
+answer when the puzzle has several independent target outcomes. That check also covers
+options that omit or duplicate symbols. Joint outcomes for repeated shapes remain separate
+from their individual symbols; dependent descriptions do not become extra independent clues.
+Whole-rule second-order sequences keep their documented exception. Existing options-only
+limits and worked-row reading checks remain in force.
+
+The emergency bank was rebuilt with 65 v31 items across the same 13 enabled keys. Runtime
+fallback and verification check the actual puzzle's clues as well as its family identity.
+The new pilot manifest is `data/pilot/pilot-v3-manifest-scene-families-v31.json`; all older
+manifests and recorded results remain unchanged. The filename selects a generator version,
+while content fingerprints still prevent results for different questions from being pooled.
+`v30` and `v31` results are different populations and must never be pooled.
+
+The same day, the owner's points decision was made explicit in both result flows: every
+30-question result shows points even when the leaderboard is disabled. The calculation
+stays `round(100 × correct × (1 + 0.25 × remaining / duration))`, with the time fraction
+clamped between zero and one. Skipped and wrong answers earn no base points. Introduction,
+result and leaderboard wording explain the same bonus. `LEADERBOARD_ENABLED` controls
+leaderboard access and publication, not the points display. Both flows persist the first
+scored result before revealing answers; identical retries recover it and changed answers
+are refused. These points do not claim an IQ score or percentile.
+
+`v32` (2026-10-09) added interacting transformation machine v4 and spatial assembly.
+Constraint-spatial drew three families. The battery held eleven served families,
+fourteen family/band/bucket keys, a 70-item bank and an 18-item pilot manifest.
+The conditional composed-transform v3 prototype stayed outside live tests.
+Design and validation are recorded in `docs/plans/harden-reasoning.md`.
+
+`v33` (2026-10-09) disables spatial assembly at the owner's request. Its registry
+entry has no served bands; its generator remains available for diagnostics.
+Constraint-spatial again draws relational matrix and visual set algebra. Ten
+families and thirteen keys remain, with the same test lengths, schedules,
+deadlines and coverage floors. The rebuilt bank holds 65 items; the new pilot
+manifest holds 15 items. Earlier manifests and evaluations remain unchanged.
+Three replacement designs await the owner's approval before implementation.
+`v32` and `v33` results are different populations and must never be pooled.
+
+`v34` (2026-10-10) added the approved overlapping-figure and shape/count/shading matrices,
+each with three structural difficulty levels. Twelve enabled families and twenty band/bucket keys
+produce a 100-item bank and a 36-item pilot manifest. Spatial assembly remains disabled.
+
+`v35` (2026-10-10) mixes families across reasoning bands by actual question difficulty,
+with no adjacent repeats and a hardest question last. Every long test covers all enabled families;
+the short sample retains five distinct families. Band quotas, deadlines and eligible buckets remain
+the same. Hard matrix questions now interleave with hard transformation questions in the final tier.
+The complete long pool replaces its former 4/3/2 subset draws; the analogy subset preference remains
+for short samples. V34 and v35 are different generated populations and must never be pooled.
+
+
+`v36` (2026-10-12) fixes difficulty by question number and draws a seeded family independently for each slot.
+The sample is 2/3/4/4/5; the long test has 5/4/13/8 questions at levels 2/3/4/5. Band quotas and
+occurrence-based bucket ramps are retired. Long tests still cover every enabled family, with at most five
+questions each and no adjacent repeats; samples keep five distinct families. The reference fallback also
+preserves exact difficulty. Structural levels remain provisional while matched examples await human feedback.
+
+`v37` (2026-10-12) implements the owner's feedback on the matched examples: every served level-5
+machine question mixes its three transforms and excludes the default worked-row order.
+Both interacting machine v4 and composed transform v2 follow this rule. Worked rows, the visible query,
+the oracle and explanations agree on the selected order. Fixed difficulty slots remain unchanged.
+The reference bank and pilot manifest are regenerated; earlier population records are preserved.
+
+`v38` (2026-10-12) requires every served machine transformation to distinguish the six choices.
+Ignoring any one transform must leave at least two choices possible from the remaining examples and query order.
+The rule covers both d4 transforms and all three d5 transforms, including emergency fallback items.
+The old symbol-level checks missed this shortcut in 14 of 15 stored machine examples.
+Selection balances the necessary comparisons with compound errors while retaining the existing options-only limit.

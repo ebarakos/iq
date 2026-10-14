@@ -147,6 +147,7 @@ function canonicalCells(scene: Scene): Map<string, CanonicalCell> {
   for (const tile of scene.tiles) {
     addTileFields(fieldsFor(positionKey(tile), "tile"), tile);
   }
+  for (const stroke of scene.figure?.strokes ?? []) fieldsFor(`ray:${stroke}`, "stroke");
   return cells;
 }
 
@@ -165,6 +166,8 @@ function guideFields(scene: Scene): Map<string, string> {
   const sorted = [...(scene.guides ?? [])].sort((a, b) => a.axis.localeCompare(b.axis));
   const seenPerAxis = new Map<string, number>();
   const fields = new Map<string, string>();
+  if (scene.collection) fields.set("presentation:collection", "true");
+  if (scene.figure) fields.set("presentation:figure", scene.figure.kind);
   for (const guide of sorted) {
     const axisKey = `${guide.kind}:${guide.axis}`;
     const ordinal = seenPerAxis.get(axisKey) ?? 0;

@@ -5,8 +5,22 @@ export function leaderboardEnabled(): boolean {
   return process.env.NODE_ENV === "development" && !process.env.VERCEL && !process.env.VERCEL_ENV;
 }
 
-/** Local attempts never populate a deployed leaderboard. */
+/** Testing stays on dev until production explicitly opts in. Previews always use dev. */
+export function leaderboardEnvironment(): "dev" | "production" {
+  return process.env.LEADERBOARD_ENV === "production" && process.env.VERCEL_ENV === "production"
+    ? "production" : "dev";
+}
+
+export function leaderboardLabel(): string {
+  return leaderboardEnvironment() === "dev" ? "Dev leaderboard" : "Leaderboard";
+}
+
+/** Reuse the existing local board for all dev/testing/staging attempts. */
 export function leaderboardNamespace(): string {
-  const environment = process.env.VERCEL_ENV ?? (process.env.VERCEL ? "deployment" : "local");
-  return `aiq:${environment}`;
+  return leaderboardEnvironment() === "production" ? "aiq:production" : "aiq:local";
+}
+
+/** Tokens and single-use receipts follow the deployment, independently of the selected board. */
+export function quizNamespace(): string {
+  return process.env.VERCEL_ENV === "production" ? "aiq:production" : "aiq:local";
 }

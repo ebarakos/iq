@@ -59,7 +59,9 @@ export interface SecondReading {
 /** The families whose worked rows this check reads. */
 export const READING_CHECKED_FAMILIES = [
   "composed-transform-v2",
+  "composed-transform-v3",
   "transformation-machine-v3",
+  "transformation-machine-v4",
   "visual-set-algebra-v2",
 ] as const;
 export type ReadingCheckedFamily = (typeof READING_CHECKED_FAMILIES)[number];
@@ -324,10 +326,105 @@ const COMPOSED_VOCABULARY: readonly WorkedRowReading[] = sceneComposedPrimitives
   apply: (board: Scene) => applySceneCompositionPrimitive(board, primitive),
 }));
 
+/** Conditional slides move the selected tokens together; selection reads the current board. */
+function slideSelected(
+  board: Scene,
+  rowStep: number,
+  columnStep: number,
+  selected: (placement: ScenePlacement, token: SceneToken) => boolean,
+  wrap: boolean,
+): Scene | null {
+  if (!isSquareBoard(board) || board.objects.some(({ object }) => object.kind !== "token")) return null;
+  const objects = board.objects.map((placement) => {
+    if (!selected(placement, placement.object as SceneToken)) return placement;
+    const row = placement.row + rowStep;
+    const column = placement.column + columnStep;
+    return { ...placement, row: wrap ? (row + 3) % 3 : row, column: wrap ? (column + 3) % 3 : column };
+  });
+  if (objects.some(({ row, column }) => row < 0 || row > 2 || column < 0 || column > 2)) return null;
+  if (new Set(objects.map(({ row, column }) => `${row},${column}`)).size !== objects.length) return null;
+  return { ...board, objects };
+}
+
+/**
+ * Deliberately bounded: single shape kinds, the seven nonempty fill subsets,
+ * and one or two fixed squares. Two moved tokens must not silently teach a
+ * positional rule that disagrees after the earlier gates change their fills.
+ * Wrapping stays a competing reading until it is harmless on the actual query.
+ * None of this vocabulary enters the older composed or machine families.
+ */
+const CONDITIONAL_SELECTORS: readonly {
+  name: string;
+  selected: (placement: ScenePlacement, token: SceneToken) => boolean;
+}[] = [
+  { name: "every shape", selected: () => true },
+  ...SCENE_SHAPES.map((shape) => ({ name: `every ${shape}`, selected: (_: ScenePlacement, token: SceneToken) => token.shape === shape })),
+  ...[
+    ["outline"], ["half"], ["solid"], ["half", "solid"], ["outline", "half"], ["outline", "solid"],
+  ].map((fills) => ({
+    name: fills.join(",") === "half,solid" ? "every coloured shape" : `every ${fills.map((fill) => FILL_WORDS[fill as SceneToken["fill"]]).join(" or ")} shape`,
+    selected: (_: ScenePlacement, token: SceneToken) => fills.includes(token.fill),
+  })),
+  ...SQUARES.flatMap((first, index) => [
+    [first], ...SQUARES.slice(index + 1).map((second) => [first, second]),
+  ]).map((squares) => ({
+    name: `the shapes on ${squares.map(({ row, column }) => `square ${row},${column}`).join(" and ")}`,
+    selected: (placement: ScenePlacement) => squares.some(({ row, column }) => placement.row === row && placement.column === column),
+  })),
+];
+
+const CONDITIONAL_MOVEMENT_READINGS: readonly WorkedRowReading[] =
+  STEP_WORDS.slice(0, 4).flatMap(([rowStep, columnStep, words]) =>
+    CONDITIONAL_SELECTORS.flatMap(({ name, selected }) => [false, true].map((wrap) => ({
+      name: `${name} sliding one square ${words}${wrap ? ", wrapping round the edge" : ""}`,
+      apply: (board: Scene) => slideSelected(board, rowStep, columnStep, selected, wrap),
+    }))));
+
+/** The same bounded selection mistakes supply independently witnessed near misses. */
+export function conditionalMovementReadings(): readonly WorkedRowReading[] {
+  return CONDITIONAL_MOVEMENT_READINGS;
+}
+
+const CONDITIONAL_COMPOSED_VOCABULARY: readonly WorkedRowReading[] = [
+  ...COMPOSED_VOCABULARY,
+  ...SQUARES.map((at) => ({
+    name: `the shown step ${stable({ kind: "setFillAt", at, fill: "solid" })}`,
+    apply: (board: Scene) => applySceneCompositionPrimitive(board, { kind: "setFillAt", at, fill: "solid" }),
+  })),
+  ...CONDITIONAL_MOVEMENT_READINGS,
+];
+
 const MACHINE_VOCABULARY: readonly WorkedRowReading[] = enumerateSceneUnaryOperations(3, 3).map((operation) => ({
   name: `the shown step ${stable(operation)}`,
   apply: (board: Scene) => applySceneUnary(board, operation),
 }));
+
+/** The interacting machine adds colouring the shape on one square. */
+const INTERACTING_MACHINE_VOCABULARY: readonly WorkedRowReading[] = [
+  ...MACHINE_VOCABULARY,
+  ...(["outline", "half", "solid", "coloured"] as const).map((fill) => ({
+    name: `copy the only ${fill === "outline" ? "white" : fill === "half" ? "grey" : fill === "solid" ? "black" : fill} shape into the centre`,
+    apply: (board: Scene): Scene | null => {
+      if (board.objects.some(({ row, column }) => row === 1 && column === 1)) return null;
+      const sources = board.objects.filter(({ object }) => object.kind === "token" &&
+        (fill === "coloured" ? object.fill !== "outline" : object.fill === fill));
+      if (sources.length !== 1) return null;
+      return { ...board, objects: [...board.objects, { row: 1, column: 1, object: sources[0].object }] };
+    },
+  })),
+  ...SQUARES.flatMap((at) => (["half", "solid"] as const).map((fill) => ({
+    name: `the shown step ${stable({ kind: "setFillAt", at, fill })}`,
+    apply: (board: Scene) => applySceneCompositionPrimitive(board, { kind: "setFillAt", at, fill }),
+  }))),
+];
+
+type MachineFamily = "composed-transform-v2" | "composed-transform-v3" | "transformation-machine-v3" | "transformation-machine-v4";
+
+function machineVocabulary(familyId: MachineFamily): readonly WorkedRowReading[] {
+  if (familyId === "composed-transform-v2") return COMPOSED_VOCABULARY;
+  if (familyId === "composed-transform-v3") return CONDITIONAL_COMPOSED_VOCABULARY;
+  return familyId === "transformation-machine-v4" ? INTERACTING_MACHINE_VOCABULARY : MACHINE_VOCABULARY;
+}
 
 /**
  * Every reading of one worked row of a machine family: its own gates, the
@@ -335,11 +432,11 @@ const MACHINE_VOCABULARY: readonly WorkedRowReading[] = enumerateSceneUnaryOpera
  * row has exactly one.
  */
 export function machineWorkedRowReadings(
-  familyId: "composed-transform-v2" | "transformation-machine-v3",
+  familyId: MachineFamily,
   input: Scene,
   output: Scene,
 ): WorkedRowReading[] {
-  return readingsOfWorkedRow(input, output, familyId === "composed-transform-v2" ? COMPOSED_VOCABULARY : MACHINE_VOCABULARY);
+  return readingsOfWorkedRow(input, output, machineVocabulary(familyId));
 }
 
 /** Readings of a whole chain are tried up to this many; a real item has far fewer. */
@@ -349,6 +446,52 @@ function scenesOf(values: readonly unknown[]): Scene[] | null {
   return values.every((value) => value !== null && typeof value === "object" && (value as Scene).kind === "scene")
     ? (values as Scene[])
     : null;
+}
+
+/**
+ * Stronger than excluding wrong options: every fitting reading must run on
+ * the actual query and reach the intended board. An undefined edge/collision,
+ * missing reading, or exhausted search budget fails closed. Equal intermediate
+ * boards are merged, without dropping any reading available at the next gate.
+ */
+export function machineWorkedRowsAgreeOnQuery(
+  familyId: MachineFamily,
+  stem: readonly unknown[],
+  answer: Scene,
+): boolean {
+  if (stem.length < 6 || stem.length % 3 !== 0) return false;
+  const rows = new Map<string, WorkedRowReading[]>();
+  for (let row = 0; row < stem.length / 3 - 1; row++) {
+    const scenes = scenesOf(stem.slice(row * 3, row * 3 + 3));
+    if (!scenes) return false;
+    const [input, gate, output] = scenes;
+    if (gate.objects.length !== 1) return false;
+    const key = stable(gate.objects[0].object);
+    if (rows.has(key)) return false;
+    const readings = machineWorkedRowReadings(familyId, input, output);
+    if (readings.length === 0) return false;
+    rows.set(key, readings);
+  }
+  const query = scenesOf([stem[stem.length - 3], stem[stem.length - 2]]);
+  if (!query || query[1].objects.length === 0) return false;
+  const [queryBoard, strip] = query;
+  let boards = new Map([[boardKey(queryBoard), queryBoard]]);
+  let tried = 0;
+  for (const placement of [...strip.objects].sort((left, right) => left.column - right.column)) {
+    const readings = rows.get(stable(placement.object));
+    if (!readings) return false;
+    const nextBoards = new Map<string, Scene>();
+    for (const board of boards.values()) {
+      for (const reading of readings) {
+        if (++tried > MAX_CHAIN_READINGS) return false;
+        const next = reading.apply(board);
+        if (!next) return false;
+        nextBoards.set(boardKey(next), next);
+      }
+    }
+    boards = nextBoards;
+  }
+  return boards.size === 1 && boards.has(boardKey(answer));
 }
 
 /** Machine tables: worked rows of input, gate, output, then the query, its gate strip and the blank. */
@@ -470,8 +613,27 @@ function setAlgebraSecondReadings(puzzle: ReadablePuzzle): SecondReading[] {
  * reading. Empty for a sound item, and for a family this check does not read.
  */
 export function secondReadings(familyId: string, puzzle: ReadablePuzzle): SecondReading[] {
-  if (familyId === "composed-transform-v2") return machineSecondReadings(puzzle, COMPOSED_VOCABULARY);
-  if (familyId === "transformation-machine-v3") return machineSecondReadings(puzzle, MACHINE_VOCABULARY);
+  if (familyId === "composed-transform-v2" || familyId === "composed-transform-v3" || familyId === "transformation-machine-v3" ||
+    familyId === "transformation-machine-v4") {
+    return machineSecondReadings(puzzle, machineVocabulary(familyId));
+  }
   if (familyId === "visual-set-algebra-v2") return setAlgebraSecondReadings(puzzle);
   return [];
+}
+
+/**
+ * Keep machine near misses only when no reading allowed by every worked row
+ * reaches them. Read the whole pool before selection, using the actual query
+ * strip order. Matching keys remove every visually equal copy of a prediction.
+ */
+export function machineDistractorsWithoutSecondReadings(
+  familyId: MachineFamily,
+  stem: readonly unknown[],
+  answer: Scene,
+  pool: readonly Scene[],
+): Scene[] {
+  const options = [answer, ...pool];
+  const forbidden = new Set(secondReadings(familyId, { stem, options, answerIndex: 0 })
+    .map(({ option }) => boardKey(options[option])));
+  return pool.filter((board) => !forbidden.has(boardKey(board)));
 }

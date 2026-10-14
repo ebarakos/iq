@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { leaderboardEnabled } from "@/lib/leaderboard-config";
-import { LeaderboardEligibilityError, listLeaderboard, publishLeaderboardEntry } from "@/lib/leaderboard";
+import { LeaderboardEligibilityError, publishLeaderboardEntry } from "@/lib/leaderboard";
 import { openQuizToken, QuizTokenError } from "@/lib/quiz-token";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +12,7 @@ const EntrySchema = z.object({
   nickname: z.string().trim().min(1).max(32).refine((value) => !/[\u0000-\u001f\u007f]/.test(value)),
 });
 
-export async function GET() {
-  if (!leaderboardEnabled()) return NextResponse.json({ message: "Not found." }, { status: 404 });
-  try {
-    return NextResponse.json({ entries: await listLeaderboard() });
-  } catch {
-    return NextResponse.json({ message: "The leaderboard is temporarily unavailable. Try again." }, { status: 503 });
-  }
-}
-
+/** POST /api/leaderboard — publish a scored result. `/leaderboard` reads the ranking itself. */
 export async function POST(req: Request) {
   if (!leaderboardEnabled()) return NextResponse.json({ message: "Not found." }, { status: 404 });
   const parsed = EntrySchema.safeParse(await req.json().catch(() => null));

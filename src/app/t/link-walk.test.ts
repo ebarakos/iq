@@ -8,6 +8,7 @@ import { GET as startTest } from "../test/route";
 import QuestionPage from "./[token]/[n]/page";
 import { GET as puzzleImage } from "./[token]/[n]/puzzle.png/route";
 import ResultPage from "./[token]/result/page";
+import { metadata } from "./layout";
 
 const storage = vi.hoisted(() => ({ values: new Map<string, string>() }));
 vi.mock("@/lib/redis", () => ({
@@ -56,21 +57,23 @@ async function fetchPath(path: string): Promise<Fetched> {
     }));
   }
   if (segments[0] === "t" && segments.length === 3 && segments[2] === "result") {
-    const page = await ResultPage({ params: Promise.resolve({ token: segments[1] }), searchParams });
-    return { status: 200, body: renderToStaticMarkup(page) };
+    return renderPage(() => ResultPage({ params: Promise.resolve({ token: segments[1] }), searchParams }));
   }
   if (segments[0] === "t" && segments.length === 3) {
-    try {
-      const page = await QuestionPage({ params: Promise.resolve({ token: segments[1], n: segments[2] }), searchParams });
-      return { status: 200, body: renderToStaticMarkup(page) };
-    } catch (error) {
-      // next/navigation's redirect() throws; its digest carries the target.
-      const digest = String((error as { digest?: unknown }).digest ?? "");
-      if (digest.startsWith("NEXT_REDIRECT;")) return { status: 307, location: digest.split(";")[2], body: "" };
-      throw error;
-    }
+    return renderPage(() => QuestionPage({ params: Promise.resolve({ token: segments[1], n: segments[2] }), searchParams }));
   }
   throw new Error(`no route for ${path}`);
+}
+
+/** Render a page as Next serves it: redirect() throws, and its digest carries the target. */
+async function renderPage(page: () => Promise<React.ReactElement>): Promise<Fetched> {
+  try {
+    return { status: 200, body: renderToStaticMarkup(await page()) };
+  } catch (error) {
+    const digest = String((error as { digest?: unknown }).digest ?? "");
+    if (digest.startsWith("NEXT_REDIRECT;")) return { status: 307, location: digest.split(";")[2], body: "" };
+    throw error;
+  }
 }
 
 function decodeEntities(text: string): string {
@@ -81,6 +84,14 @@ function decodeEntities(text: string): string {
 function links(html: string): [string, string][] {
   return [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g)]
     .map((match) => [match[2].replace(/<[^>]+>/g, "").trim(), decodeEntities(match[1])]);
+}
+
+/** The links a crawler may follow: those without `rel="nofollow"`. */
+function followable(html: string): string[] {
+  return [...html.matchAll(/<a [^>]*>/g)]
+    .map((match) => match[0])
+    .filter((tag) => !/\brel="nofollow"/.test(tag))
+    .map((tag) => decodeEntities(tag.match(/href="([^"]+)"/)?.[1] ?? ""));
 }
 
 function text(html: string): string {
@@ -123,6 +134,8 @@ describe("the link test, followed link by link", () => {
       // The puzzle is a picture, never markup a reader could parse.
       expect(page.body).not.toContain("<svg");
       expect(page.body).toContain(`alt="Question ${index + 1} puzzle"`);
+      // A crawler may leave for the home page, never walk deeper into the test.
+      expect(followable(page.body)).toEqual(["/"]);
       const image = await fetchPath(`/t/${token}/${index + 1}/puzzle.png`);
       expect(image.status).toBe(200);
       expect(image.contentType).toBe("image/png");
@@ -148,6 +161,7 @@ describe("the link test, followed link by link", () => {
     expect(resultText).toContain(`the answer is ${OPTION_LETTERS[puzzles[2].answerIndex]}`);
     for (const puzzle of puzzles) expect(resultText).toContain(puzzle.explanation);
     expect(links(result.body).some(([label, href]) => label.startsWith("Take a new") && href === "/sample")).toBe(true);
+    expect(followable(result.body)).toEqual(["/"]);
   });
 
   it("keeps the first result on retries and rejects changed answers after revealing the review", async () => {
@@ -179,6 +193,23 @@ describe("the link test, followed link by link", () => {
     expect(text((await fetchPath(path)).body)).toContain("0 of 5 correct");
   });
 
+  it.each(["true", "false"])("shows link-result points without ranking when LEADERBOARD_ENABLED=%s", async (flag) => {
+    vi.stubEnv("LEADERBOARD_ENABLED", flag);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const start = await fetchPath("/test");
+    const token = new URL(start.location!).pathname.split("/")[2];
+    const { puzzles } = loadLinkTest(token);
+    const answers = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    vi.setSystemTime((issuedAt + 1200) * 1000);
+    const result = text((await fetchPath(`/t/${token}/result?a=${answers}`)).body);
+    expect(result).toContain("30 of 30 correct");
+    expect(result).toContain("3,250 points");
+    expect(result).toContain("A time bonus of up to 25% is added to your correct-answer points.");
+    const [receipt] = [...storage.values.values()].map((raw) => JSON.parse(raw));
+    expect(receipt.response.leaderboardEligible).toBe(false);
+  });
+
   it("starts a 30-question test at /test", async () => {
     const start = await fetchPath("/test");
     expect(start.status).toBe(303);
@@ -193,7 +224,29 @@ describe("the link test, followed link by link", () => {
     expect((await fetchPath(`/t/${token}/2?a=BCDEA`)).location).toBe(`/t/${token}/result?a=BCDEA`);
     expect(text((await fetchPath(`/t/${token}/2?a=Z`)).body)).toContain("These answers cannot be read");
     expect(text((await fetchPath(`/t/${token}/result?a=BC`)).body)).toContain("This test is not finished");
-    expect(text((await fetchPath("/t/not-a-token/1")).body)).toContain("This test link is not valid");
+  });
+
+  it("tells a reader why a link cannot be used, and offers only a new test to follow", async () => {
+    for (const path of ["/t/not-a-token/1", "/t/not-a-token/result?a=AAAAA"]) {
+      const page = await fetchPath(path);
+      expect(text(page.body)).toContain("This test link is not valid");
+      expect(links(page.body).some(([, href]) => href === "/sample")).toBe(true);
+      expect(followable(page.body)).toEqual(["/"]);
+    }
+  });
+
+  it("says when a test has expired", async () => {
+    const start = await fetchPath("/sample");
+    const token = new URL(start.location!).pathname.split("/")[2];
+    const { test } = loadLinkTest(token);
+    vi.useFakeTimers();
+    vi.setSystemTime(test.expiresAt * 1000);
+    expect(text((await fetchPath(`/t/${token}/1`)).body)).toContain("This test has expired");
+    expect(text((await fetchPath(`/t/${token}/result?a=-----`)).body)).toContain("This test has expired");
+  });
+
+  it("keeps the pages out of search results and crawlers' link walks", () => {
+    expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
   it("ends the test at the deadline and marks a late result", async () => {

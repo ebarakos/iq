@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadBank } from "@/items/bank";
 import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
 import { OPTIONS_PER_ITEM } from "@/items/schema";
@@ -20,6 +20,8 @@ import { createQuizDelivery, SECONDS_PER_QUESTION } from "./quiz-token";
 const SECRET = "test-only-link-test-secret-with-at-least-32-characters";
 const NO_WITHDRAWALS = new Set<string>();
 const context = { secret: SECRET, withdrawnFamilyIds: NO_WITHDRAWALS };
+
+afterEach(() => vi.unstubAllEnvs());
 
 function errorCode(run: () => unknown): string | undefined {
   try {
@@ -53,6 +55,37 @@ describe("link test token", () => {
     expect(openLinkToken(older, context).appVersion).toBe("v0.1.1");
     const foreign = sealLinkToken({ ...created.test, leaderboardScope: "aiq:another-environment" }, SECRET);
     expect(errorCode(() => loadLinkTest(foreign, context))).toBe("invalid");
+  });
+
+  it("shares dev links with preview and staging while refusing them in production", () => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("LEADERBOARD_ENV", "dev");
+    const created = createLinkTest("short-5", { ...context, seed: "link-leaderboard-scope" });
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(openLinkToken(created.token, context)).toEqual(created.test);
+    vi.stubEnv("VERCEL_ENV", "staging");
+    expect(openLinkToken(created.token, context)).toEqual(created.test);
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(errorCode(() => openLinkToken(created.token, context))).toBe("invalid");
+    vi.stubEnv("LEADERBOARD_ENV", "production");
+    expect(errorCode(() => openLinkToken(created.token, context))).toBe("invalid");
+  });
+
+  it("keeps production links valid across leaderboard switches and a cold rebuild", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("LEADERBOARD_ENV", "dev");
+    const created = createLinkTest("short-5", { ...context, seed: "production-link-scope" });
+    expect(created.test.leaderboardScope).toBe("aiq:production");
+    const deployed = sealLinkToken({ ...created.test, leaderboardScope: "aiq:production" }, SECRET);
+    for (const board of [undefined, "production", "dev"]) {
+      vi.stubEnv("LEADERBOARD_ENV", board);
+      expect(openLinkToken(deployed, context)).toEqual(created.test);
+      expect(openLinkToken(created.token, context)).toEqual(created.test);
+    }
+    clearBuiltLinkTests();
+    expect(loadLinkTest(created.token, context).puzzles).toEqual(created.puzzles);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(errorCode(() => openLinkToken(created.token, context))).toBe("invalid");
   });
 
   it("seals nothing a reader could use: no seed, no answer", () => {

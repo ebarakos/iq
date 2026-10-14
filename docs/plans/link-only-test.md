@@ -49,8 +49,9 @@ in it changes.
 first scored submission in Redis before revealing answers. Both flows reuse
 `src/lib/quiz-scoring.ts` and the single-use receipt logic in `src/lib/leaderboard.ts`.
 Identical retries recover the first result; changed answers are refused. Link tokens
-also seal the app version, leaderboard eligibility and environment when issued. The
-quiz UI moved to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
+also seal the app version and deployment when issued, independently of `LEADERBOARD_ENV`; changing
+the selected board does not invalidate a link. Link results never rank, since
+publication opens only the in-page quiz token. The quiz UI moved to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
 
 ## The puzzle is a picture
 
@@ -89,9 +90,26 @@ check.
   a labelled `role="timer"` and labelled navigator buttons. The link
   pages print the same facts as plain text.
 - **No `robots.txt` block on `/sample`, `/test` or `/t/`** — some chat fetchers obey
-  it, and blocking them defeats the goal. The link pages carry `noindex` only.
-  A crawler that follows `/sample` mints a test; starting it stores nothing. Following
-  the result link stores a private receipt until token expiry.
+  it, and blocking them defeats the goal. Crawlers are kept out another way (below).
+
+## Crawlers (2026-10-06 review)
+
+Each question page links to seven more, so a crawler that follows every link walks
+7⁵ ≈ 16,800 result URLs per 5-question test, and each visit to `/sample` makes a new
+one. Every result page costs a Redis call, and scoring needs Redis, so a crawler could
+use up the Upstash quota and stop scoring for everyone. So:
+
+- every link into a test (the home page's start links, options, Skip, result and start
+  links) is `rel="nofollow"`; the pages say `noindex, nofollow`, and `next.config.ts`
+  sends `X-Robots-Tag: noindex, nofollow` on `/sample`, `/test` and every `/t/` URL;
+- an invalid, expired or changed-site link stays a 200 page that says why and links to a
+  new test. A 404 was tried and dropped: Next 15.5 sends `notFound()` from a dynamic page
+  as an empty shell that only JavaScript fills, so a reader without it saw a blank page
+  (checked over HTTP with curl, Googlebot, ClaudeBot and ChatGPT-User agents, 2026-10-06).
+  `noindex, nofollow` keeps crawlers off these pages instead.
+
+`nofollow` is a crawler hint; a chat agent fetching links at a user's request is
+expected to ignore it. The chat-LLM check below confirms that.
 
 ## Done when
 

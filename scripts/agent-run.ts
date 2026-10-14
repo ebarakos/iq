@@ -8,8 +8,13 @@
  *   npm run agent:run -- --all --no-coverage --channel symbolic --repeat 2 --concurrency 3
  *
  *   npm run agent:run -- --source held-out --items 40 --seed probe-escalation-held-out
+ *   npm run agent:run -- --source family --bucket transformation-machine-v4-d5 --band induction-transfer
+ *   node --import tsx scripts/agent-run.ts --plan --seed baseline-v31   # no model call
  *
- *   flags: --source generated|bank|held-out (default generated)
+ *   flags: --source generated|bank|held-out|family (default generated)
+ *          --snapshot FILE --arm NAME (replay a frozen historical selection)
+ *          --bucket B (family source: one declared bucket, served or not)
+ *          --band X (family source: the band an unserved bucket's items sit in)
  *          --profile short-5|long-30 (default long-30; generated source only)
  *          --seed S (default random; makes a generated or held-out run replayable)
  *          --items N (coverage is still required; --all takes one whole generated test)
@@ -21,6 +26,9 @@
  *          --thinking-budget N (forwarded as the relay X-Thinking-Budget header,
  *                              and recorded in the artifact — a probe run under a
  *                              different budget is a different population)
+ *          --plan (select the items exactly as the run would, print the coverage per
+ *                              family:band:bucket, the workload and the item-set digest,
+ *                              and stop before any model call; needs no relay env)
  *          --debrief (image channel: after each scored answer, two more turns ask
  *                              the model for its confidence, rule, difficulty and
  *                              anything hard to see, then — with the intended answer
@@ -45,6 +53,12 @@
  * reserved items to a public run, which put two populations the plan requires
  * to stay separate into one artifact; the separation is now structural.
  *
+ * `--source family` draws `--items N` (default 20) from one declared bucket
+ * through the assembler's single-slot checks. A served bucket is recorded as
+ * public; any other is `evaluationSet: "prototype"`. One seed and count over two
+ * buckets give a matched before/after pair, such as a served family and the
+ * redesign that would replace it (docs/plans/harden-reasoning.md).
+ *
  * Per attempt: options are shuffled (per-attempt position-bias removal) and the
  * chosen SHUFFLED index is mapped back to the canonical option before recording,
  * so artifacts stay comparable across runs. Every non-correct outcome counts
@@ -53,31 +67,43 @@
  * the resulting partial artifact unless explicitly asked to include it.
  */
 import { parseArgs } from "node:util";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createHash, randomBytes } from "node:crypto";
+import { z } from "zod";
 import { loadBank } from "../src/items/bank";
 import {
   assembleExpandedQuiz,
+  drawExpandedSlot,
+  eligibleFamiliesForBand,
   questionCount,
+  questionFingerprint,
   EXPANDED_GENERATOR_VERSION,
   EXPANDED_PROFILES,
+  EXPANDED_SLOT_RETRY_BUDGET,
   type ExpandedProfile,
 } from "../src/items/expanded-quiz";
 import {
   CURRENT_FAMILY_PROMOTION_REGISTRY,
+  EXPANDED_PROFILE_BANDS,
   normalizeWithdrawnFamilyIds,
   readWithdrawnFamilyIds,
+  type ExpandedProfileBand,
+  type FamilyPromotionRegistry,
 } from "../src/items/family-promotion";
 import {
   declaredGateCounts,
   generateHeldOutComposedTransformCandidate,
   partitionComposedTransformPrograms,
+  requireSceneFamilyBucket,
   sceneFamilyBucketsFor,
   validateSceneFamilyCandidate,
+  SCENE_FAMILY_BUCKETS,
+  SCENE_FAMILY_IDS,
   type ComposedGateCount,
   type SceneFamilyBucket,
+  type SceneFamilyId,
 } from "../src/items/scene-families";
 import {
   sceneComposedProgramKey,
@@ -106,6 +132,8 @@ import {
 } from "../src/lib/solver";
 import {
   AttemptFileSchema,
+  AttemptSourceSchema,
+  EvaluationSetSchema,
   ATTEMPT_OUTCOMES,
   ChannelSchema,
   EVALUATION_SETS,
@@ -126,6 +154,7 @@ import {
   coverageComplete,
   formatMissingCoverage,
   probeCoverage,
+  probeKey,
   programComplexityBucket,
   selectCoverageItems,
   standardProbeRequirements,
@@ -146,7 +175,9 @@ function readArgs() {
     options: {
       items: { type: "string" },
       all: { type: "boolean", default: false },
-      source: { type: "string", default: "generated" },
+      source: { type: "string" },
+      snapshot: { type: "string" },
+      arm: { type: "string" },
       // No default: the held-out source has to be able to tell "--profile was
       // given" from "--profile was left alone", and it rejects the former.
       profile: { type: "string" },
@@ -170,6 +201,10 @@ function readArgs() {
       // one without repeating the flag; recorded in the artifact either way.
       effort: { type: "string" },
       debrief: { type: "boolean", default: false },
+      plan: { type: "boolean", default: false },
+      // The family source's one bucket, and the band a prototype bucket sits in.
+      bucket: { type: "string" },
+      band: { type: "string" },
     },
   }).values;
 }
@@ -231,7 +266,7 @@ function generatedPool(profile: ExpandedProfile, seed: string, wanted: number): 
 }
 
 /** Generate enough complete tests for both the target size and fixed coverage. */
-function generatedCoveragePool(
+export function generatedCoveragePool(
   profile: ExpandedProfile,
   seed: string,
   wanted: number | undefined,
@@ -552,6 +587,102 @@ export function formatMissingHeldOutCoverage(report: HeldOutCoverageReport): str
   return lines.join("\n");
 }
 
+/** Items the family source draws when --items is not given. */
+export const FAMILY_SOURCE_ITEMS = 20;
+
+export interface FamilySourceBucket {
+  familyId: SceneFamilyId;
+  bucket: SceneFamilyBucket;
+  band: ExpandedProfileBand;
+  /** Public when the registry serves the bucket, prototype when it does not. */
+  evaluationSet: "public" | "prototype";
+}
+
+/**
+ * The one bucket a `--source family` run draws from, and its population.
+ *
+ * A bucket the registry serves, with no withdrawal removing it, is public and
+ * keeps the band it is served in. Any other declared bucket is a prototype, and
+ * the run names the band it would sit in with `--band`, so its items carry the
+ * same band and probe key as the served bucket they are compared with.
+ */
+export function familySourceBucket(
+  bucketId: string,
+  band: string | undefined,
+  registry: FamilyPromotionRegistry = CURRENT_FAMILY_PROMOTION_REGISTRY,
+  withdrawnFamilyIds: ReadonlySet<string> = readWithdrawnFamilyIds(),
+): FamilySourceBucket {
+  const familyId = SCENE_FAMILY_IDS.find((id) => SCENE_FAMILY_BUCKETS[id].some((entry) => entry.bucket === bucketId));
+  if (!familyId) throw new Error(`--bucket ${bucketId} is not declared by any scene family`);
+  const bucket = requireSceneFamilyBucket(familyId, bucketId);
+  const servedIn = EXPANDED_PROFILE_BANDS.find((candidate) =>
+    eligibleFamiliesForBand(registry, candidate, withdrawnFamilyIds).some((family) =>
+      family.familyId === familyId && family.bandBuckets.some((entry) => entry.bucket === bucketId)));
+  if (servedIn) {
+    if (band !== undefined && band !== servedIn) {
+      throw new Error(`${bucketId} is served in the ${servedIn} band; drop --band or pass --band ${servedIn}`);
+    }
+    return { familyId, bucket, band: servedIn, evaluationSet: "public" };
+  }
+  if (!(EXPANDED_PROFILE_BANDS as readonly string[]).includes(band ?? "")) {
+    throw new Error(
+      `${bucketId} is not served, so --band must name the band its items would sit in: ` +
+        `${EXPANDED_PROFILE_BANDS.join(", ")} (got "${band ?? ""}")`,
+    );
+  }
+  return { familyId, bucket, band: band as ExpandedProfileBand, evaluationSet: "prototype" };
+}
+
+/**
+ * Distinct items from one bucket, each drawn through `drawExpandedSlot`, the
+ * assembler's own single-slot path and checks.
+ *
+ * Draws come off one seeded stream per bucket, so `--seed` replays the run item
+ * for item, and two buckets drawn with one seed and count are a matched pair:
+ * same procedure, same checks, same size.
+ */
+export function familySourcePool(seed: string, entry: FamilySourceBucket, count: number): Puzzle[] {
+  if (!Number.isInteger(count) || count <= 0) {
+    throw new Error(`--source family needs a positive whole item count; got ${count}`);
+  }
+  const selected = {
+    familyId: entry.familyId,
+    primaryReasoningFamily: entry.familyId,
+    band: entry.band,
+    difficultyBucket: entry.bucket.bucket,
+    difficulty: entry.bucket.difficulty,
+    bandBuckets: [{ bucket: entry.bucket.bucket, difficulty: entry.bucket.difficulty }],
+  };
+  const slotSeed = `${seed}:family:${entry.bucket.bucket}`;
+  const asked = new Set<string>();
+  const items: Puzzle[] = [];
+  for (let slotIndex = 0; slotIndex < count; slotIndex++) {
+    const rejections: string[] = [];
+    for (let attempt = 0; attempt < EXPANDED_SLOT_RETRY_BUDGET && items.length === slotIndex; attempt++) {
+      // The profile only labels the slot's random stream; nothing is assembled.
+      const draw = drawExpandedSlot(slotSeed, "long-30", slotIndex, attempt, selected);
+      if (!draw.accepted) {
+        rejections.push(draw.rejection);
+        continue;
+      }
+      const question = questionFingerprint(draw.puzzle);
+      if (asked.has(question)) {
+        rejections.push("repeats a question this run already asks");
+        continue;
+      }
+      asked.add(question);
+      items.push(draw.puzzle);
+    }
+    if (items.length === slotIndex) {
+      throw new Error(
+        `${entry.bucket.bucket} could not fill item ${slotIndex + 1} after ${EXPANDED_SLOT_RETRY_BUDGET} ` +
+          `attempts: ${rejections.join(" | ")}`,
+      );
+    }
+  }
+  return items;
+}
+
 function timeoutError(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; depth < 5 && current; depth++) {
@@ -619,6 +750,66 @@ async function debriefAttempt(
   return record;
 }
 
+/**
+ * A short hash of the selected items in order: their ids and everything a
+ * solver sees. Two runs with the same digest answered the same questions.
+ */
+export function itemSetDigest(items: readonly Puzzle[]): string {
+  const hash = createHash("sha256");
+  for (const item of items) hash.update(JSON.stringify([item.id, item.stem, item.options]));
+  return hash.digest("hex").slice(0, 16);
+}
+
+/** Frozen selections survive later generator, registry and bank changes. */
+const FrozenArmSchema = z.object({
+  name: z.string().min(1),
+  source: AttemptSourceSchema,
+  profile: z.string().optional(),
+  seed: z.string().min(1),
+  generatorVersion: z.string().min(1),
+  evaluationSet: EvaluationSetSchema,
+  withdrawnFamilyIds: z.array(z.string()).optional(),
+  digest: z.string().regex(/^[a-f0-9]{16}$/),
+  items: z.array(PuzzleSchema).nonempty(),
+});
+export function frozenArm(path: string, name: string) {
+  const snapshot = z.object({ version: z.literal(1), arms: z.array(FrozenArmSchema) })
+    .parse(JSON.parse(readFileSync(path, "utf8")));
+  const matches = snapshot.arms.filter((arm) => arm.name === name);
+  if (matches.length !== 1) throw new Error(`snapshot needs exactly one arm named ${name}`);
+  const arm = matches[0];
+  if (itemSetDigest(arm.items) !== arm.digest) throw new Error(`snapshot arm ${name} item-set digest mismatch`);
+  if (arm.source === "held-out" && arm.evaluationSet !== "held-out") {
+    throw new Error("held-out snapshot items must keep their held-out evaluation set");
+  }
+  return arm;
+}
+
+/** What `--plan` prints: the run's settings, its workload, and items per key. */
+export function formatRunPlan(
+  items: readonly Puzzle[],
+  run: {
+    source: string; seed: string; channel: string; model: string; effort: string;
+    thinkingBudget: number | string; repeat: number; concurrency: number; debrief: boolean;
+    calls: number; digest: string; generatorVersion?: string;
+  },
+): string {
+  const perKey = new Map<string, number>();
+  for (const item of items) {
+    const key = probeKey(item) ?? "(no key)";
+    perKey.set(key, (perKey.get(key) ?? 0) + 1);
+  }
+  return [
+    `plan — ${run.generatorVersion ?? EXPANDED_GENERATOR_VERSION} · ${run.source} · seed ${run.seed} · ${run.channel} channel`,
+    `model ${run.model} · effort ${run.effort} · thinking budget ${run.thinkingBudget}`,
+    `prompt ${SOLVER_PROMPT_VERSION} · concurrency ${run.concurrency} · debrief ${run.debrief ? "yes" : "no"}`,
+    `${items.length} items × ${run.repeat} = ${items.length * run.repeat} attempts · ${run.calls} model calls · item set ${run.digest}`,
+    `items per family:band:bucket (${perKey.size} keys):`,
+    ...[...perKey].sort(([a], [b]) => a.localeCompare(b)).map(([key, count]) => `  ${key}: ${count}`),
+    "no model call made",
+  ].join("\n");
+}
+
 async function main() {
   const args = readArgs();
   const channelResult = ChannelSchema.safeParse(args.channel);
@@ -632,16 +823,24 @@ async function main() {
 
   const provider = args.provider ?? process.env.RELAY_PROVIDER;
   const model = args.model ?? process.env.RELAY_MODEL;
-  if (!provider || !model) {
-    throw new Error("provide --provider/--model or set RELAY_PROVIDER/RELAY_MODEL in .env.local");
+
+  const repeat = Number(args.repeat);
+  const concurrency = Number(args.concurrency);
+
+  if ((args.snapshot === undefined) !== (args.arm === undefined)) {
+    throw new Error("--snapshot FILE and --arm NAME must be supplied together");
   }
-
-  const repeat = Math.max(1, Number(args.repeat));
-  const concurrency = Math.max(1, Number(args.concurrency));
-
-  const source = args.source;
-  if (source !== "generated" && source !== "bank" && source !== "held-out") {
-    throw new Error(`--source must be "generated", "bank", or "held-out" (got "${source}")`);
+  if (args.snapshot && (args.source !== undefined || args.seed !== undefined || args.profile !== undefined ||
+      args.bucket !== undefined || args.band !== undefined || args.items !== undefined || args.all || args["no-coverage"])) {
+    throw new Error("snapshot arms already fix source, seed, profile, bucket and item selection; omit selection flags");
+  }
+  const frozen = args.snapshot ? frozenArm(args.snapshot, args.arm!) : undefined;
+  const source = frozen?.source ?? args.source ?? "generated";
+  if (source !== "generated" && source !== "bank" && source !== "held-out" && source !== "family") {
+    throw new Error(`--source must be "generated", "bank", "held-out", or "family" (got "${source}")`);
+  }
+  if (source !== "family" && (args.bucket !== undefined || args.band !== undefined)) {
+    throw new Error("--bucket and --band belong to --source family");
   }
   if (args["held-out"] !== undefined) {
     // Retired on 2026-08-25. The old flag appended reserved items to a public
@@ -663,6 +862,13 @@ async function main() {
       throw new Error("--source held-out always enforces its own reserved-primitive and program-complexity coverage");
     }
   }
+  if (source === "family" && !frozen) {
+    if (args.bucket === undefined) throw new Error("--source family needs --bucket B, one declared difficulty bucket");
+    if (args.profile !== undefined || args.all || args["no-coverage"]) {
+      throw new Error("--source family draws one bucket, not a test: it takes no --profile, --all, or --no-coverage");
+    }
+  }
+  const familyEntry = source === "family" && !frozen ? familySourceBucket(args.bucket!, args.band) : undefined;
   // Only the generated source reads a profile; its default lives here rather
   // than in the parser so the held-out source can tell an explicit flag apart
   // from an absent one.
@@ -675,7 +881,7 @@ async function main() {
   if (requestedItems !== undefined && (!Number.isInteger(requestedItems) || requestedItems < 1)) {
     throw new Error(`--items must be a positive integer (got "${args.items}")`);
   }
-  if (!Number.isInteger(repeat) || !Number.isInteger(concurrency)) {
+  if (!Number.isInteger(repeat) || repeat < 1 || !Number.isInteger(concurrency) || concurrency < 1) {
     throw new Error("--repeat and --concurrency must be positive integers");
   }
 
@@ -689,9 +895,13 @@ async function main() {
     throw new Error("--effort (or RELAY_EFFORT) must be low, medium, or high");
   }
 
-  const seed = args.seed ?? randomBytes(8).toString("hex");
+  const seed = frozen?.seed ?? args.seed ?? randomBytes(8).toString("hex");
   let items: Puzzle[];
-  if (source === "held-out") {
+  if (frozen) {
+    items = frozen.items;
+  } else if (familyEntry) {
+    items = familySourcePool(seed, familyEntry, requestedItems ?? FAMILY_SOURCE_ITEMS);
+  } else if (source === "held-out") {
     const buckets = heldOutBuckets();
     items = heldOutSourcePool(seed, requestedItems ?? buckets.length * HELD_OUT_ITEMS_PER_BUCKET);
     const coverage = heldOutCoverage(items);
@@ -731,27 +941,61 @@ async function main() {
     const requirements = standardProbeRequirements(CURRENT_FAMILY_PROMOTION_REGISTRY, readWithdrawnFamilyIds());
     const coverage = probeCoverage(items, requirements);
     if (!coverageComplete(coverage)) throw new Error(formatMissingCoverage(coverage));
-    console.log(`coverage: ${requirements.minimum} per ${requirements.families.length} eligible families and ${requirements.programComplexities.length} program-complexity buckets`);
+    console.log(
+      `coverage: ${requirements.minimum} per ${requirements.families.length} eligible families, ` +
+        `${requirements.keys.length} family:band:bucket keys and ${requirements.programComplexities.length} program-complexity buckets`,
+    );
   }
 
-  // A run is entirely one population or entirely the other; the two are never
-  // pooled, and no public coverage requirement can be paid with a reserved item.
-  const heldOutItemIds = source === "held-out" ? new Set(items.map((item) => item.id)) : new Set<string>();
+  // The same source, profile and seed select the same items on every channel, so
+  // the digest proves an image run and an options-only run saw one item set.
+  const digest = itemSetDigest(items);
+  if (args.plan) {
+    const callsPerAttempt = args.debrief ? 3 : 1;
+    console.log(formatRunPlan(items, {
+      generatorVersion: frozen?.generatorVersion,
+      source: frozen ? `snapshot ${args.arm} (${frozen.source}, ${frozen.evaluationSet})` : source === "generated"
+        ? `generated ${profile}`
+        : familyEntry ? `family ${familyEntry.bucket.bucket} (${familyEntry.evaluationSet})` : source,
+      seed: source === "bank" ? "(fixed bank)" : seed,
+      channel,
+      model: provider && model ? `${provider}/${model}` : "(not set)",
+      effort: effort ?? "provider default",
+      thinkingBudget: thinkingBudget ?? "off",
+      repeat,
+      concurrency,
+      debrief: args.debrief,
+      calls: items.length * repeat * callsPerAttempt,
+      digest,
+    }));
+    return;
+  }
+  if (!provider || !model) {
+    throw new Error("provide --provider/--model or set RELAY_PROVIDER/RELAY_MODEL in .env.local");
+  }
+
+  // A run is entirely one population; populations are never pooled, and no
+  // public coverage requirement can be paid with a reserved or prototype item.
+  const runEvaluationSet: EvaluationSet = frozen?.evaluationSet ?? (source === "held-out"
+    ? "held-out"
+    : familyEntry?.evaluationSet ?? "public");
 
   // Build the full work list: each sampled item × repeat.
   const work: Puzzle[] = [];
   for (let r = 0; r < repeat; r++) work.push(...items);
 
   const startedAt = new Date().toISOString();
-  const sourceLabel = source === "bank"
+  const sourceLabel = frozen ? `snapshot ${args.arm} (${source}, ${frozen.evaluationSet}) · seed ${seed}` : source === "bank"
     ? "bank"
     : source === "held-out"
       ? `held-out · seed ${seed}`
-      : `generated ${profile} · seed ${seed}`;
+      : familyEntry
+        ? `family ${familyEntry.bucket.bucket} (${familyEntry.evaluationSet}) · seed ${seed}`
+        : `generated ${profile} · seed ${seed}`;
   console.log(
     `agent:run — ${items.length} items × ${repeat} = ${work.length} attempts · ${sourceLabel} · ${channel} channel · ` +
       `${provider}/${model} · concurrency ${concurrency} · thinking budget ${thinkingBudget ?? "off"} · ` +
-      `effort ${effort ?? "provider default"}`,
+      `effort ${effort ?? "provider default"} · item set ${digest}`,
   );
 
   const attempts: Attempt[] = [];
@@ -767,7 +1011,7 @@ async function main() {
       const idx = nextIndex++;
       if (idx >= work.length) return;
       const canonical = work[idx];
-      const evaluationSet: EvaluationSet = heldOutItemIds.has(canonical.id) ? "held-out" : "public";
+      const evaluationSet = runEvaluationSet;
       const shuffled = shuffleOptions(canonical);
       const attemptStarted = Date.now();
       try {
@@ -793,6 +1037,7 @@ async function main() {
           evaluationSet,
           latencyMs: outcome.latencyMs,
           generation: canonical.generation,
+          band: canonical.band,
           attemptBudget: 1,
           raw: outcome.raw.slice(0, RAW_REPLY_CHARS),
           ts: new Date().toISOString(),
@@ -812,6 +1057,7 @@ async function main() {
           evaluationSet,
           latencyMs: Date.now() - attemptStarted,
           generation: canonical.generation,
+          band: canonical.band,
           attemptBudget: 1,
           raw: (err instanceof Error ? err.message : String(err)).slice(0, RAW_REPLY_CHARS),
           ts: new Date().toISOString(),
@@ -843,7 +1089,9 @@ async function main() {
     channel,
     promptVersion: SOLVER_PROMPT_VERSION,
     source,
-    profile: source === "generated" ? profile : null,
+    profile: frozen?.profile ?? (source === "generated" ? profile : null),
+    itemSetDigest: digest,
+    snapshotArm: frozen ? `${args.arm}:${digest}` : undefined,
     runSeed: seed,
     // Protocol the run was executed under. The thinking budget is recorded as
     // an explicit null when the run asked for none, so a reader can tell "this
@@ -859,11 +1107,11 @@ async function main() {
     concurrency,
     // Held-out items come out of the same live generator as public ones, so
     // they carry its version; only the bank ships its own provenance.
-    generatorVersion: source === "bank" ? "bank-v1" : EXPANDED_GENERATOR_VERSION,
-    // The withdrawal list is an assembler input. Held-out items never go
-    // through the assembler, so recording one would imply a dependency the run
-    // does not have.
-    withdrawnFamilyIds: source === "generated"
+    generatorVersion: frozen?.generatorVersion ?? (source === "bank" ? "bank-v1" : EXPANDED_GENERATOR_VERSION),
+    // The withdrawal list is an assembler input, and it decides whether a
+    // family run's bucket is public. Held-out items never go through the
+    // assembler, so recording one would imply a dependency the run does not have.
+    withdrawnFamilyIds: frozen ? frozen.withdrawnFamilyIds : source === "generated" || source === "family"
       ? normalizeWithdrawnFamilyIds(readWithdrawnFamilyIds())
       : undefined,
     plannedAttempts: work.length,
@@ -916,9 +1164,9 @@ function report(attempts: Attempt[], items: Puzzle[]) {
   // Public and held-out are separate populations, never one average: a run
   // carrying both must show which number belongs to the test people take.
   const bySet = group(evaluationSetOf);
-  // Printed whenever the run touched the reserved population at all, not only
-  // when it mixed both: a held-out artifact must name its population out loud.
-  if (bySet.size > 1 || bySet.has("held-out")) {
+  // Printed whenever the run is not plain public, not only when it mixed sets:
+  // a held-out or prototype artifact must name its population out loud.
+  if (bySet.size > 1 || !bySet.has("public")) {
     console.log("\nby evaluation set (never pooled):");
     for (const set of EVALUATION_SETS) {
       const rows = bySet.get(set);

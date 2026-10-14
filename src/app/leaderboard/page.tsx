@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listLeaderboard } from "@/lib/leaderboard";
-import { leaderboardEnabled } from "@/lib/leaderboard-config";
+import { leaderboardEnabled, leaderboardLabel } from "@/lib/leaderboard-config";
 import type { LeaderboardEntry } from "@/lib/leaderboard-types";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default async function LeaderboardPage() {
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-4 py-8">
       <header className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Leaderboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{leaderboardLabel()}</h1>
         <Link
           href="/"
           className="rounded-md text-sm text-gray-600 underline underline-offset-4 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
@@ -38,8 +38,9 @@ export default async function LeaderboardPage() {
         </Link>
       </header>
       <p className="mb-5 text-sm text-gray-600">
-        Top 20 published scores from on-time 30-question tests. Correct answers earn 100 points each,
-        plus up to 25% for time remaining.
+        Top 20 published scores from on-time 30-question tests. Each correct answer earns 100 points.
+        A time bonus of up to 25% is added to your correct-answer points. The earlier you finish,
+        the bigger the bonus.
       </p>
 
       {failed ? (

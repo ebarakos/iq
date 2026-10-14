@@ -24,6 +24,8 @@ import {
   normalizeWithdrawnFamilyIds,
   readWithdrawnFamilyIds,
 } from "../src/items/family-promotion";
+import { SCENE_FAMILY_IDS, machineGateNecessity, sceneFamilyClueCheck } from "../src/items/scene-families";
+import { OPTIONS_PER_ITEM } from "../src/items/schema";
 
 const BANK_PATH = new URL("../data/bank/items.json", import.meta.url).pathname;
 
@@ -35,8 +37,31 @@ if (!parsed.success) {
   const seen = new Set<string>();
   const withdrawn = readWithdrawnFamilyIds();
   const replayCache = new Map<string, ReturnType<typeof assembleExpandedQuiz>>();
+  let dispensableClues = 0;
   for (const item of parsed.data.items) {
     const id = item.puzzle.id;
+    const familyId = item.puzzle.familyId;
+    if (familyId !== item.puzzle.generation?.familyId ||
+        !SCENE_FAMILY_IDS.some((known) => known === familyId)) {
+      errors.push(`${id}: puzzle and generation must identify the same current scene family`);
+    } else {
+      const clues = sceneFamilyClueCheck(item.puzzle);
+      const necessity = machineGateNecessity(item.puzzle);
+      if (necessity && !necessity.valid) {
+        errors.push(`${id}: worked transformations can be skipped: ${necessity.dispensableGateIds.join(", ")}`);
+      }
+      if (clues.singleClueAnswerIds.length > 0) {
+        errors.push(`${id}: one clue identifies the answer: ${clues.singleClueAnswerIds.join(", ")}`);
+      }
+      if (clues.indistinguishableWrongOptionIndexes.length > 0) {
+        errors.push(`${id}: wrong options satisfy every intended clue: ` +
+          clues.indistinguishableWrongOptionIndexes.map((index) => index + 1).join(", "));
+      }
+      dispensableClues += clues.dispensableClueIds.length;
+    }
+    if (item.puzzle.options.length !== OPTIONS_PER_ITEM) {
+      errors.push(`${id}: expected ${OPTIONS_PER_ITEM} answer options`);
+    }
     const { seed, profile, generatorVersion, withdrawnFamilyIds } = item.provenance;
     if (
       typeof seed !== "string" ||
@@ -130,6 +155,7 @@ if (!parsed.success) {
     }
   }
   console.log(`bank: ${parsed.data.items.length} items checked`);
+  console.log(`bank: ${dispensableClues} dispensable intended clues (diagnostic)`);
 }
 
 if (errors.length > 0) {

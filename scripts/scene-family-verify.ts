@@ -9,6 +9,7 @@ import {
   validateSceneFamilyCandidate,
   MINIMUM_OBSERVED_TERMS_IN_ANSWERED_STRAND,
   SCENE_FAMILY_CLUE_MODELS,
+  sceneFamilyClueCheck,
   type SceneFamilyId,
 } from "../src/items/scene-families";
 import {
@@ -20,12 +21,22 @@ import { CURRENT_FAMILY_PROMOTION_REGISTRY, EXPANDED_PROFILE_BANDS } from "../sr
 import { eligibleFamiliesForBand } from "../src/items/expanded-quiz";
 import {
   blindStrategyCredits,
+  MAXIMUM_BLIND_SOLVE_RATE,
   optionsAloneOnAClue,
 } from "../src/items/blind-options";
-import { toPublicPuzzle, type Scene } from "../src/items/schema";
+import { OPTIONS_PER_ITEM, toPublicPuzzle, type Scene } from "../src/items/schema";
 import { isReadingCheckedFamily, secondReadings } from "../src/items/worked-row-readings";
+import { everyAdjacentSwapMatters, gateOrderOutcome, type GateRunChange } from "../src/items/gate-order";
 
 const PROGRAM_VARIETY_PROBE_SEEDS = 200;
+
+/**
+ * Gate buckets built to make the order of their gates matter
+ * (docs/plans/harden-reasoning.md): every item must reach a different valid
+ * board when either adjacent pair of its query gates is swapped. Older gate
+ * buckets are measured, never failed, until replacements exist.
+ */
+const ORDER_DEPENDENT_BUCKETS = new Set<string>(["transformation-machine-v4-d5", "composed-transform-v3-d5"]);
 const MIN_DISTINCT_PROGRAM_FINGERPRINTS = 8;
 
 /**
@@ -62,7 +73,11 @@ const CONVERTED_FAMILY_IDS = new Set<string>([
   "visual-set-algebra-v2",
   "spatial-transform-v2",
   "transformation-machine-v3",
+  "transformation-machine-v4",
   "composed-transform-v2",
+  "composed-transform-v3",
+  "overlapping-figures-v1",
+  "attribute-matrix-v1",
 ]);
 
 /**
@@ -97,7 +112,7 @@ const CONVERTED_FAMILY_IDS = new Set<string>([
  * shape). Like the clue gate, one item breaking it fails the bucket.
  */
 const BLIND_GATE_ITEMS = 200;
-const BLIND_GATE_LIMIT = 0.30;
+const BLIND_GATE_LIMIT = MAXIMUM_BLIND_SOLVE_RATE;
 const BLIND_GATE_SEED = "blind-gate-v2";
 
 const seedsArg = process.argv.find((argument) => argument.startsWith("--seeds="));
@@ -241,6 +256,16 @@ const families = SCENE_FAMILY_IDS.map((familyId) => {
     let missingProgramFingerprints = 0;
     let rejected = 0;
     let difficultyMismatches = 0;
+    let singleClueItems = 0;
+    let indistinguishableWrongItems = 0;
+    let dispensableClues = 0;
+    let wrongOptionCounts = 0;
+    let gateOrderItems = 0;
+    let orderIndependentItems = 0;
+    let unnecessaryGateItems = 0;
+    const distinctOrderOutputs = new Map<number, number>();
+    const swapPatterns = new Map<string, number>();
+    const ablationChanges = new Map<GateRunChange, number>();
     for (let seed = 0; seed < seeds; seed++) {
       const started = performance.now();
       // The seed stream is the bucket-free one this script has always used, so
@@ -263,6 +288,22 @@ const families = SCENE_FAMILY_IDS.map((familyId) => {
         JSON.stringify(first.puzzle) === JSON.stringify(replay.puzzle);
       const acceptance = validateSceneFamilyCandidate(first, replayKey);
       if (!acceptance.accepted || !replayMatches) rejected++;
+      const clues = sceneFamilyClueCheck(first.puzzle);
+      if (clues.singleClueAnswerIds.length > 0) singleClueItems++;
+      if (clues.indistinguishableWrongOptionIndexes.length > 0) indistinguishableWrongItems++;
+      dispensableClues += clues.dispensableClueIds.length;
+      if (first.puzzle.options.length !== OPTIONS_PER_ITEM) wrongOptionCounts++;
+      if (first.queryGates) {
+        const order = gateOrderOutcome(first.queryGates.order, first.queryGates.run);
+        gateOrderItems++;
+        distinctOrderOutputs.set(order.distinctValidOutputs, (distinctOrderOutputs.get(order.distinctValidOutputs) ?? 0) + 1);
+        const pattern = order.adjacentSwaps.join("/");
+        swapPatterns.set(pattern, (swapPatterns.get(pattern) ?? 0) + 1);
+        for (const change of order.ablations) ablationChanges.set(change, (ablationChanges.get(change) ?? 0) + 1);
+        if (!everyAdjacentSwapMatters(order)) orderIndependentItems++;
+        if (order.gateCount !== declared.programDepth || order.ablations.includes("same") ||
+            (familyId === "composed-transform-v3" && order.ablations.some((result) => result !== "different"))) unnecessaryGateItems++;
+      }
       // A bucket that generates a different difficulty than it declares would
       // be rejected by the assembler on every draw, thinning a band silently.
       if (first.puzzle.difficulty !== declared.difficulty) difficultyMismatches++;
@@ -300,6 +341,13 @@ const families = SCENE_FAMILY_IDS.map((familyId) => {
       }
       latencies.push(performance.now() - started);
     }
+    const intendedCluesPassed = singleClueItems === 0 && indistinguishableWrongItems === 0 && wrongOptionCounts === 0;
+    if (!intendedCluesPassed) failures++;
+    const orderEnforced = ORDER_DEPENDENT_BUCKETS.has(declared.bucket);
+    const orderPassed = !orderEnforced ||
+      (gateOrderItems === seeds && orderIndependentItems === 0 && unnecessaryGateItems === 0);
+    if (!orderPassed) failures++;
+    const sorted = <K>(counts: Map<K, number>) => Object.fromEntries([...counts].sort(([a], [b]) => String(a).localeCompare(String(b))));
     return {
       difficultyBucket: declared.bucket,
       difficulty: declared.difficulty,
@@ -312,12 +360,34 @@ const families = SCENE_FAMILY_IDS.map((familyId) => {
       distinctProgramFingerprints: programFingerprints.size,
       distinctProgramFingerprintsInProbe: programFingerprintsInDiversityProbe.size,
       missingProgramFingerprints,
+      intendedClues: {
+        singleClueItems,
+        indistinguishableWrongItems,
+        wrongOptionCounts,
+        dispensableClues,
+        passed: intendedCluesPassed,
+      },
       extrapolation: {
         minObservedTermsInAnsweredStrand: minObservedTerms ?? null,
         failures: extrapolationFailures,
         failureExample: extrapolationFailureExample ?? null,
         passed: extrapolationFailures === 0,
       },
+      ...(gateOrderItems === 0 && !orderEnforced ? {} : {
+        gateOrder: {
+          items: gateOrderItems,
+          /** Items by how many distinct boards their gates reach across every order. */
+          distinctValidOutputs: sorted(distinctOrderOutputs),
+          /** Items by what swapping the first, then the second adjacent pair did. */
+          adjacentSwaps: sorted(swapPatterns),
+          /** Gates left out one at a time: an applicable wrong board, or no board at all. */
+          ablations: sorted(ablationChanges),
+          itemsWithASwapThatDoesNotMatter: orderIndependentItems,
+          itemsWithAnUnnecessaryGateOrWrongDepth: unnecessaryGateItems,
+          enforced: orderEnforced,
+          passed: orderPassed,
+        },
+      }),
       medianMs: Number(percentile(latencies, 0.5).toFixed(3)),
       p95Ms: Number(percentile(latencies, 0.95).toFixed(3)),
       maxMs: Number(Math.max(...latencies).toFixed(3)),
@@ -411,14 +481,26 @@ const distanceKeys = enabledKeys.map((entry) => {
  * `"incomparable"` sorts behind every finite distance.
  */
 /**
- * Options-only solvers, per served bucket. Run in full whatever `--seeds=`
- * says: it is the one check here whose sample size is fixed by the gate itself.
+ * Options-only solvers, per declared bucket: every served one, and every
+ * prototype bucket a family declares before the registry serves it, so a
+ * prototype meets the same limit before it is integrated. Run in full whatever
+ * `--seeds=` says: it is the one check here whose sample size is fixed by the
+ * gate itself.
  */
-const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${entry.difficultyBucket}`, entry])).values()]
+const servedFamilyBuckets = new Set(enabledKeys.map((entry) => `${entry.familyId}:${entry.difficultyBucket}`));
+const blindKeys = SCENE_FAMILY_IDS.flatMap((familyId) => SCENE_FAMILY_BUCKETS[familyId].map((declared) => ({
+  familyId,
+  difficultyBucket: declared.bucket,
+  served: servedFamilyBuckets.has(`${familyId}:${declared.bucket}`),
+})))
   .map((entry) => {
     const credit: Record<string, number> = {};
     const clueModel = SCENE_FAMILY_CLUE_MODELS[entry.familyId as SceneFamilyId];
     let aloneOnAClue = 0;
+    let singleClueItems = 0;
+    let indistinguishableWrongItems = 0;
+    let dispensableClues = 0;
+    let wrongOptionCounts = 0;
     const readingsChecked = isReadingCheckedFamily(entry.familyId);
     let secondReadingItems = 0;
     let secondReadingExample: string | null = null;
@@ -429,6 +511,11 @@ const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${e
         entry.difficultyBucket,
       );
       const served = toPublicPuzzle(puzzle).options as Scene[];
+      const clues = sceneFamilyClueCheck({ ...puzzle, options: served });
+      if (clues.singleClueAnswerIds.length > 0) singleClueItems++;
+      if (clues.indistinguishableWrongOptionIndexes.length > 0) indistinguishableWrongItems++;
+      dispensableClues += clues.dispensableClueIds.length;
+      if (served.length !== OPTIONS_PER_ITEM) wrongOptionCounts++;
       for (const [strategy, earned] of Object.entries(blindStrategyCredits(served, puzzle.answerIndex))) {
         credit[strategy] = (credit[strategy] ?? 0) + earned;
       }
@@ -446,11 +533,13 @@ const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${e
     const [worstStrategy, worstRate] = Object.entries(rates).reduce((worst, next) => (next[1] > worst[1] ? next : worst));
     const cluesShared = aloneOnAClue === 0;
     const oneReading = secondReadingItems === 0;
-    const passed = worstRate <= BLIND_GATE_LIMIT && cluesShared && oneReading;
+    const intendedCluesPassed = singleClueItems === 0 && indistinguishableWrongItems === 0 && wrongOptionCounts === 0;
+    const passed = worstRate <= BLIND_GATE_LIMIT && cluesShared && oneReading && intendedCluesPassed;
     if (!passed) failures++;
     return {
       familyId: entry.familyId,
       difficultyBucket: entry.difficultyBucket,
+      served: entry.served,
       items: BLIND_GATE_ITEMS,
       worstStrategy,
       worstRate,
@@ -458,6 +547,13 @@ const blindKeys = [...new Map(enabledKeys.map((entry) => [`${entry.familyId}:${e
       clueModel,
       aloneOnAClue,
       cluesShared,
+      intendedClues: {
+        singleClueItems,
+        indistinguishableWrongItems,
+        wrongOptionCounts,
+        dispensableClues,
+        passed: intendedCluesPassed,
+      },
       readingsChecked,
       secondReadingItems,
       secondReadingExample,
@@ -492,7 +588,7 @@ const aggregateImproved = comparableKeys.length > 0 &&
 if (distanceGateEnforced && !aggregateImproved) failures++;
 
 process.stdout.write(`${JSON.stringify({
-  version: "scene-family-verify-v9",
+  version: "scene-family-verify-v10",
   bucketParity: {
     enabledRegistryKeys: enabledKeys.length,
     declaredBuckets: declaredBucketOwners.size,
@@ -508,7 +604,7 @@ process.stdout.write(`${JSON.stringify({
     seed: BLIND_GATE_SEED,
     itemsPerBucket: BLIND_GATE_ITEMS,
     limit: BLIND_GATE_LIMIT,
-    chance: 1 / 6,
+    chance: 1 / OPTIONS_PER_ITEM,
     buckets: blindKeys,
     passed: blindKeys.every((entry) => entry.passed),
   },
@@ -552,7 +648,7 @@ process.stderr.write(
 );
 for (const entry of blindKeys) {
   process.stderr.write(
-    `${entry.difficultyBucket.padEnd(28)} ${entry.worstStrategy.padEnd(20)}${percent(entry.worstRate)}     ` +
+    `${`${entry.difficultyBucket}${entry.served ? "" : " (prototype)"}`.padEnd(28)} ${entry.worstStrategy.padEnd(20)}${percent(entry.worstRate)}     ` +
       `${percent(entry.rates["lone-aspect"])}       ${percent(entry.rates["exclude-lone-aspect"])}  ` +
       `${entry.clueModel === "whole-rule" ? "  (whole rule is one clue)" : `${String(entry.aloneOnAClue).padStart(4)} of ${entry.items}`}` +
       `${entry.readingsChecked ? `  ${String(entry.secondReadingItems).padStart(7)} of ${entry.items}` : ""}` +
@@ -579,6 +675,12 @@ if (failures > 0) {
   if (diversityFailures.length > 0) {
     parts.push(`program-fingerprint diversity failed for ${diversityFailures.join(", ")} across ${PROGRAM_VARIETY_PROBE_SEEDS} seeds`);
   }
+  const orderOffenders = families.flatMap((family) => family.buckets
+    .filter((bucket) => bucket.gateOrder?.enforced && !bucket.gateOrder.passed)
+    .map((bucket) => `${bucket.difficultyBucket} (${bucket.gateOrder!.items}/${bucket.seeds} runners, ` +
+      `${bucket.gateOrder!.itemsWithASwapThatDoesNotMatter} ineffective swaps, ` +
+      `${bucket.gateOrder!.itemsWithAnUnnecessaryGateOrWrongDepth} unnecessary gates or wrong depths)`));
+  if (orderOffenders.length > 0) parts.push(`gate-order dependency proof failed for ${orderOffenders.join("; ")}`);
   const extrapolationOffenders = families.filter((family) => !family.extrapolation.passed)
     .map((family) => `${family.familyId} (${family.extrapolation.failureExample})`);
   if (extrapolationOffenders.length > 0) {
@@ -588,6 +690,19 @@ if (failures > 0) {
   }
   const blindOffenders = blindKeys.filter((entry) => entry.worstRate > BLIND_GATE_LIMIT).map((entry) =>
     `${entry.difficultyBucket} (${entry.worstStrategy} ${percent(entry.worstRate).trim()})`);
+  const intendedClueOffenders = [
+    ...families.flatMap((family) => family.buckets.filter((bucket) => !bucket.intendedClues.passed)
+      .map((bucket) => `${bucket.difficultyBucket} (${bucket.intendedClues.singleClueItems} single-clue items, ` +
+        `${bucket.intendedClues.indistinguishableWrongItems} indistinguishable wrong-option items, ` +
+        `${bucket.intendedClues.wrongOptionCounts} wrong option counts)`)),
+    ...blindKeys.filter((entry) => !entry.intendedClues.passed)
+      .map((entry) => `${entry.difficultyBucket} blind probe (${entry.intendedClues.singleClueItems} single-clue items, ` +
+        `${entry.intendedClues.indistinguishableWrongItems} indistinguishable wrong-option items, ` +
+        `${entry.intendedClues.wrongOptionCounts} wrong option counts)`),
+  ];
+  if (intendedClueOffenders.length > 0) {
+    parts.push(`intended clue gate failed for ${intendedClueOffenders.join("; ")}`);
+  }
   const clueOffenders = blindKeys.filter((entry) => !entry.cluesShared).map((entry) =>
     `${entry.difficultyBucket} (${entry.aloneOnAClue} of ${entry.items} items)`);
   if (clueOffenders.length > 0) {

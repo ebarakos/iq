@@ -163,8 +163,35 @@ export const SceneSchema = z.object({
   objects: z.array(ScenePlacementSchema).max(9).default([]),
   tiles: z.array(ConnectionTileSchema).max(9).default([]),
   guides: z.array(SceneGuideSchema).max(2).optional(),
+  /** Connected assembly pieces: loose silhouettes or a bounded target frame. */
+  assembly: z.enum(["fragment", "frame"]).optional(),
+  /** A single line figure: eight possible rays, clockwise from north. */
+  figure: z.object({
+    kind: z.literal("radial"),
+    strokes: z.array(z.number().int().min(0).max(7)).min(1).max(8)
+      .refine((strokes) => strokes.every((stroke, index) => index === 0 || strokes[index - 1] < stroke), {
+        message: "figure strokes must be distinct and ordered clockwise",
+      }),
+  }).strict().optional(),
+  /** Uniform groups of shapes, without the categorical board's internal grid. */
+  collection: z.literal(true).optional(),
 }).strict().superRefine((scene, ctx) => {
-  if (scene.objects.length + scene.tiles.length + (scene.guides?.length ?? 0) === 0) {
+  if (scene.figure && (scene.rows !== 3 || scene.columns !== 3 || scene.objects.length > 0 ||
+      scene.tiles.length > 0 || (scene.guides?.length ?? 0) > 0 || scene.assembly || scene.collection)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["figure"], message: "line figures require a 3x3 canvas containing only strokes" });
+  }
+  if (scene.collection && (scene.rows !== 3 || scene.columns !== 3 || scene.tiles.length > 0 ||
+      (scene.guides?.length ?? 0) > 0 || scene.assembly || scene.objects.some(({ object }) =>
+        object.kind !== "token" || object.rotation !== 0 || object.size !== "l" ||
+        object.shape !== scene.objects[0]?.object.shape ||
+        (scene.objects[0]?.object.kind === "token" && object.fill !== scene.objects[0].object.fill)))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["collection"], message: "collections require uniform large upright shapes on a 3x3 canvas" });
+  }
+  if (scene.assembly && (scene.rows !== 3 || scene.columns !== 3 || scene.tiles.length > 0 ||
+      (scene.guides?.length ?? 0) > 0 || scene.objects.some(({ object }) => object.kind !== "token"))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["assembly"], message: "assembly pictures require a 3x3 board containing only piece marks" });
+  }
+  if (scene.objects.length + scene.tiles.length + (scene.guides?.length ?? 0) + (scene.figure?.strokes.length ?? 0) === 0) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "a scene must contain at least one object or connection tile" });
   }
 
@@ -204,7 +231,7 @@ export const PUZZLE_TYPES = ["matrix", "sequence", "analogy"] as const;
 export type PuzzleType = (typeof PUZZLE_TYPES)[number];
 
 /** How the stem panels are arranged on screen. */
-export const LAYOUTS = ["grid3x3", "row", "analogy", "machineTable"] as const;
+export const LAYOUTS = ["grid3x3", "row", "analogy", "machineTable", "assembly"] as const;
 export type Layout = (typeof LAYOUTS)[number];
 
 /**
@@ -294,8 +321,11 @@ export const PuzzleSchema = z
       const machine = p.layout === "machineTable" &&
         MACHINE_TABLE_PANEL_COUNTS.includes(p.stem.length) && blanks === 1 &&
         isBlank(p.stem[p.stem.length - 1]);
-      if (!grid && !machine) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid or a two- to five-row machine table" });
+      const assembly = p.layout === "assembly" && p.stem.length === 4 && blanks === 0 &&
+        p.stem.every((panel, index) => !isBlank(panel) && panel.assembly === (index < 3 ? "fragment" : "frame")) &&
+        p.options.every((option) => option.assembly === "frame");
+      if (!grid && !machine && !assembly) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "matrix must be a 3x3 grid, a machine table, or an assembly layout" });
       }
     } else if (p.type === "sequence") {
       // 4–8 panels total: 3–7 drawn cells + exactly one trailing blank. Variable
@@ -454,7 +484,9 @@ export function sceneSignature(scene: Scene): string {
   const objects = [...scene.objects].sort((a, b) => a.row - b.row || a.column - b.column);
   const tiles = [...scene.tiles].sort((a, b) => a.row - b.row || a.column - b.column);
   const guides = [...(scene.guides ?? [])].sort((a, b) => a.axis.localeCompare(b.axis));
-  return JSON.stringify({ rows: scene.rows, columns: scene.columns, objects, tiles, guides });
+  return JSON.stringify({ rows: scene.rows, columns: scene.columns, objects, tiles, guides,
+    ...(scene.figure ? { figure: scene.figure } : {}), ...(scene.collection ? { collection: true } : {}),
+  });
 }
 
 function sceneObjectIsDistinct(left: SceneObject, right: SceneObject): boolean {
@@ -477,6 +509,8 @@ function sceneObjectIsDistinct(left: SceneObject, right: SceneObject): boolean {
  */
 export function areScenesCategoricallyDistinct(left: Scene, right: Scene): boolean {
   if (left.rows !== right.rows || left.columns !== right.columns) return true;
+  if (Boolean(left.collection) !== Boolean(right.collection) ||
+      JSON.stringify(left.figure ?? null) !== JSON.stringify(right.figure ?? null)) return true;
 
   const leftObjects = new Map(left.objects.map((entry) => [`${entry.row}:${entry.column}`, entry.object]));
   const rightObjects = new Map(right.objects.map((entry) => [`${entry.row}:${entry.column}`, entry.object]));

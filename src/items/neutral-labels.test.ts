@@ -14,6 +14,7 @@ import { SceneGraphic, StemView } from "./render";
  */
 const NEUTRAL_LABELS = [
   /^board$/,
+  /^diagram$/,
   /^blank: the cell to solve$/,
   /^machine: jigsaw piece$/,
   /^machine: \d+ jigsaw pieces snapped together$/,

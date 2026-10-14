@@ -9,6 +9,7 @@ import {
   enumerateSceneOrderedThreeStepCompositions,
   enumerateSceneUnaryOperations,
   isSceneComposedProgram,
+  partialSceneExecutions,
   sceneComposedPrimitives,
   sceneComposedProgramFromSteps,
   sceneComposedProgramSteps,
@@ -25,6 +26,237 @@ const token = (shape: SceneToken["shape"], fill: SceneToken["fill"] = "outline")
 function scene(objects: Scene["objects"], rows = 3, columns = 3): Scene {
   return { kind: "scene", rows, columns, objects, tiles: [] };
 }
+
+describe("partial scene executions", () => {
+  it("provides either symbol's rotation mistake while the other moves correctly", () => {
+    const input = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 2, column: 1, object: token("arrow") },
+    ]);
+    const answer = applySceneUnary(input, { kind: "rotate", quarterTurns: 1 })!;
+    const executions = [{ output: input, reason: "omits the board rotation" }];
+    const snapshot = JSON.stringify({ answer, executions });
+    const partial = partialSceneExecutions(answer, executions, "features");
+    // Either symbol can be wrong alone, or both can make the witnessed mistake.
+    expect(partial).toHaveLength(3);
+    for (const shape of ["circle", "arrow"]) {
+      const mixed = partial.find(({ reason }) => reason.includes(`${shape} group`))!.output!;
+      expect(mixed.objects.find((entry) => entry.object.shape === shape))
+        .toEqual(input.objects.find((entry) => entry.object.shape === shape));
+      expect(mixed.objects.find((entry) => entry.object.shape !== shape))
+        .toEqual(answer.objects.find((entry) => entry.object.shape !== shape));
+    }
+    expect(partialSceneExecutions(answer, [...executions, ...executions], "features")).toEqual(partial);
+    expect(partialSceneExecutions(answer, [...executions,
+      { output: structuredClone(input), reason: "later explanation for the same mistake" },
+    ], "features")).toEqual(partial);
+    expect(JSON.stringify({ answer, executions })).toBe(snapshot);
+  });
+
+  it("includes all copies of a shape, absent shapes and newly introduced shapes", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 1, column: 1, object: token("circle") },
+      { row: 2, column: 2, object: token("arrow") },
+    ]);
+    const wrong = scene([
+      { row: 0, column: 1, object: token("circle", "solid") },
+      { row: 1, column: 0, object: token("star") },
+    ]);
+    const partial = partialSceneExecutions(answer, [{ output: wrong, reason: "copies the wrong shape" }], "features");
+    const circles = partial.find(({ reason }) => reason.includes("circle group"))!.output!;
+    expect(circles.objects.filter((entry) => entry.object.shape === "circle")).toEqual([wrong.objects[0]]);
+    expect(circles.objects.find((entry) => entry.object.shape === "arrow")).toEqual(answer.objects[2]);
+    expect(partial.some(({ output }) => output!.objects.every((entry) => entry.object.shape !== "arrow"))).toBe(true);
+    expect(partial.some(({ output }) => output!.objects.some((entry) => entry.object.shape === "star"))).toBe(true);
+    expect(partial.some(({ reason }) => /circle (positions|fills|directions)$/.test(reason))).toBe(false);
+  });
+
+  it("isolates fills, directions and positions without copying the other properties", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: token("arrow") },
+      { row: 2, column: 2, object: token("circle") },
+    ]);
+    const wrong = scene([
+      { row: 0, column: 1, object: { ...token("arrow", "solid"), rotation: 90 } },
+      { row: 2, column: 2, object: token("circle") },
+    ]);
+    const partial = partialSceneExecutions(answer, [{ output: wrong, reason: "misreads the arrow change" }], "features");
+    expect(partial).toHaveLength(4);
+    const arrow = (property: string) => partial.find(({ reason }) => reason.endsWith(`arrow ${property}`))!.output!.objects[0];
+    expect(arrow("positions")).toEqual({ ...answer.objects[0], column: 1 });
+    expect(arrow("fills")).toEqual({ ...answer.objects[0], object: token("arrow", "solid") });
+    expect(arrow("directions")).toEqual({ ...answer.objects[0], object: { ...token("arrow"), rotation: 90 } });
+    for (const { output } of partial) {
+      expect(output.objects).toHaveLength(2);
+      expect(output.objects[1]).toEqual(answer.objects[1]);
+    }
+  });
+
+  it("rejects object and tile collisions, invalid boards and mismatched board sizes", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 0, column: 1, object: token("arrow") },
+    ]);
+    const swapped = scene([
+      { ...answer.objects[0], column: 1 },
+      { ...answer.objects[1], column: 0 },
+    ]);
+    const swappedPartial = partialSceneExecutions(answer, [{ output: swapped, reason: "swaps the shapes" }], "features");
+    // Neither colliding single-shape move ships. Together they free both cells.
+    expect(swappedPartial.map(({ output }) => sceneSignature(output))).toEqual([sceneSignature(swapped)]);
+    const tiledAnswer = { ...scene([answer.objects[0]]), tiles: [{ row: 0, column: 1, edges: ["north" as const] }] };
+    const tiledWrong = { ...scene([{ ...answer.objects[0], column: 1 }]), tiles: [{ row: 2, column: 2, edges: ["north" as const] }] };
+    expect(partialSceneExecutions(tiledAnswer, [{ output: tiledWrong, reason: "moves the shape" }], "features")).toEqual([]);
+    expect(partialSceneExecutions(answer, [
+      { output: null, reason: "does not execute" },
+      { output: answer, reason: "   " },
+      { output: scene([{ ...answer.objects[0], row: 3 }]), reason: "leaves the board" },
+      { output: scene([answer.objects[0]], 2, 2), reason: "changes board size" },
+    ], "features")).toEqual([]);
+  });
+
+  it("rejects symmetric rotations and size-only differences that are not readable", () => {
+    const answer = scene([{ row: 0, column: 0, object: token("circle") }]);
+    expect(partialSceneExecutions(answer, [
+      { output: scene([{ ...answer.objects[0], object: { ...token("circle"), rotation: 90 } }]), reason: "turns a circle" },
+      { output: scene([{ ...answer.objects[0], object: { ...token("circle"), size: "m" } }]), reason: "shrinks a circle slightly" },
+    ], "features")).toEqual([]);
+  });
+
+  it("combines two separately witnessed fill mistakes instead of cycling every symbol together", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: token("diamond", "half") },
+      { row: 2, column: 2, object: token("star", "outline") },
+    ]);
+    const oneStep = scene([
+      { ...answer.objects[0], object: token("diamond", "solid") },
+      { ...answer.objects[1], object: token("star", "half") },
+    ]);
+    const twoSteps = scene([
+      { ...answer.objects[0], object: token("diamond", "outline") },
+      { ...answer.objects[1], object: token("star", "solid") },
+    ]);
+    const executions = [
+      { output: oneStep, reason: "takes the fill cycle one step too far" },
+      { output: twoSteps, reason: "takes the fill cycle two steps too far" },
+    ];
+    const snapshot = JSON.stringify({ answer, executions });
+    const partial = partialSceneExecutions(answer, executions, "features");
+    for (const [diamondFill, starFill] of [["outline", "half"], ["solid", "solid"]]) {
+      const combined = partial.find(({ output }) => {
+        const diamond = output.objects.find((entry) => entry.object.shape === "diamond")!.object;
+        const star = output.objects.find((entry) => entry.object.shape === "star")!.object;
+        return diamond.kind === "token" && diamond.fill === diamondFill && star.kind === "token" && star.fill === starFill;
+      });
+      expect(combined).toBeDefined();
+      expect(combined!.reason).toContain(executions[0].reason);
+      expect(combined!.reason).toContain(executions[1].reason);
+    }
+    expect(partial.every(({ reason }) => reason.trim().length > 0)).toBe(true);
+    expect(new Set(partial.map(({ output }) => sceneSignature(output))).size).toBe(partial.length);
+    expect(partialSceneExecutions(answer, [...executions, ...executions], "features")).toEqual(partial);
+    expect(JSON.stringify({ answer, executions })).toBe(snapshot);
+  });
+
+  it("combines at most two shape groups and leaves every other shape correct", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 1, column: 1, object: token("triangle") },
+      { row: 2, column: 2, object: token("arrow") },
+    ]);
+    const wrong = applySceneUnary(answer, { kind: "setFill", fill: "solid" })!;
+    const partial = partialSceneExecutions(answer, [{ output: wrong, reason: "colours the shapes incorrectly" }], "features");
+    expect(partial).toHaveLength(6);
+    for (const { output } of partial) {
+      const changed = output.objects.filter((entry) => entry.object.kind === "token" && entry.object.fill === "solid");
+      expect(changed.length).toBeGreaterThan(0);
+      expect(changed.length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("lets repeated symbols make different fill and direction mistakes while other shapes stay correct", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: token("arrow") },
+      { row: 1, column: 1, object: token("arrow") },
+      { row: 2, column: 2, object: token("star") },
+    ]);
+    const executions = [
+      { output: applySceneUnary(answer, { kind: "setFill", fill: "solid" }), reason: "colours every symbol black" },
+      { output: applySceneUnary(answer, { kind: "setFill", fill: "half" }), reason: "colours every symbol grey" },
+      { output: applySceneUnary(answer, { kind: "turn", quarterTurns: 1 }), reason: "turns the arrows clockwise" },
+      { output: applySceneUnary(answer, { kind: "turn", quarterTurns: 3 }), reason: "turns the arrows anticlockwise" },
+    ];
+    const snapshot = JSON.stringify({ answer, executions });
+    const partial = partialSceneExecutions(answer, executions, "features");
+    const find = (firstFill: string, secondFill: string, firstTurn = 0, secondTurn = 0) => partial.find(({ output }) => {
+      const first = output.objects[0].object;
+      const second = output.objects[1].object;
+      return first.kind === "token" && second.kind === "token" &&
+        first.fill === firstFill && second.fill === secondFill &&
+        first.rotation === firstTurn && second.rotation === secondTurn &&
+        sceneSignature(scene([output.objects[2]])) === sceneSignature(scene([answer.objects[2]]));
+    });
+    expect(find("solid", "outline")).toBeDefined();
+    expect(find("outline", "solid")).toBeDefined();
+    const mixedFills = find("half", "solid")!;
+    expect(mixedFills).toBeDefined();
+    expect(mixedFills.reason).toContain(executions[0].reason);
+    expect(mixedFills.reason).toContain(executions[1].reason);
+    expect(find("solid", "half")).toBeDefined();
+    expect(find("outline", "outline", 90, 270)).toBeDefined();
+    expect(find("outline", "outline", 270, 90)).toBeDefined();
+    expect(new Set(partial.map(({ output }) => sceneSignature(output))).size).toBe(partial.length);
+    expect(JSON.stringify({ answer, executions })).toBe(snapshot);
+  });
+
+  it("keeps an unchanged copy anchored when another copy moves, and can omit a witnessed missing copy", () => {
+    const answer = scene([
+      { row: 0, column: 0, object: { ...token("arrow"), rotation: 90 } },
+      { row: 1, column: 1, object: token("arrow") },
+      { row: 2, column: 2, object: token("star") },
+    ]);
+    const moved = scene([
+      { ...answer.objects[1], object: { ...token("arrow"), rotation: 180 } },
+      { ...answer.objects[0], row: 2 },
+      answer.objects[2],
+    ]);
+    const omitted = scene([answer.objects[0], answer.objects[2]]);
+    const partial = partialSceneExecutions(answer, [
+      { output: moved, reason: "moves the outer arrow to the wrong cell and turns the centre copy" },
+      { output: omitted, reason: "stops before copying the arrow" },
+    ], "features");
+    expect(partial.some(({ output, reason }) => reason.includes("at square (1, 1)") &&
+      output.objects.some((entry) => entry.row === 2 && entry.column === 0 && entry.object.kind === "token" && entry.object.rotation === 90) &&
+      output.objects.some((entry) => entry.row === 1 && entry.column === 1 && entry.object.kind === "token" && entry.object.rotation === 0))).toBe(true);
+    expect(partial.some(({ output }) => sceneSignature(output) === sceneSignature(omitted))).toBe(true);
+  });
+
+  it("changes exactly one square's content, including tiles and empty squares, while preserving guides", () => {
+    const answer: Scene = {
+      ...scene([
+        { row: 0, column: 0, object: token("circle") },
+        { row: 0, column: 1, object: token("arrow") },
+      ]),
+      guides: [{ kind: "crease", axis: "vertical", direction: "leftToRight" }],
+    };
+    const wrong: Scene = {
+      ...scene([{ row: 2, column: 2, object: token("arrow") }]),
+      tiles: [{ row: 0, column: 0, edges: ["west", "north"] }],
+    };
+    const partial = partialSceneExecutions(answer, [{ output: wrong, reason: "combines the wrong squares" }], "squares");
+    expect(partial).toHaveLength(3);
+    expect(partial.map(({ reason }) => reason)).toEqual([
+      "combines the wrong squares; applies that mistake only at square (1, 1)",
+      "combines the wrong squares; applies that mistake only at square (1, 2)",
+      "combines the wrong squares; applies that mistake only at square (3, 3)",
+    ]);
+    expect(partial[0].output!.tiles).toEqual([{ row: 0, column: 0, edges: ["north", "west"] }]);
+    expect(partial[1].output!.objects).toEqual([answer.objects[0]]);
+    expect(partial[2].output!.objects).toHaveLength(3);
+    expect(partial.every(({ output }) => JSON.stringify(output!.guides) === JSON.stringify(answer.guides))).toBe(true);
+  });
+});
 
 describe("scene grammar", () => {
   it("enumerates every bounded unary operation deterministically", () => {
@@ -148,6 +380,125 @@ describe("scene grammar", () => {
     const second = scene([...first.objects].reverse());
     const normalized = applySceneUnary(first, { kind: "setFill", fill: "outline" });
     expect(sceneSignature(normalized!)).toBe(sceneSignature(applySceneUnary(second, { kind: "setFill", fill: "outline" })!));
+  });
+});
+
+describe("conditional solid-token move", () => {
+  it.each([
+    ["up", 0, 1], ["right", 1, 2], ["down", 2, 1], ["left", 1, 0],
+  ] as const)("moves solid tokens one square %s and preserves their appearance", (direction, row, column) => {
+    const solidArrow: SceneToken = { ...token("arrow", "solid"), rotation: 90 };
+    const input: Scene = {
+      ...scene([
+        { row: 1, column: 1, object: solidArrow },
+        { row: 0, column: 0, object: token("circle", "half") },
+        { row: 2, column: 2, object: token("triangle") },
+      ]),
+      guides: [{ kind: "crease", axis: "vertical", direction: "leftToRight" }],
+    };
+    const snapshot = JSON.stringify(input);
+    const output = applySceneCompositionPrimitive(input, { kind: "moveSolid", direction });
+    expect(output?.objects.find(({ object }) => object.shape === "arrow"))
+      .toEqual({ row, column, object: solidArrow });
+    for (const stationary of input.objects.slice(1)) expect(output?.objects).toContainEqual(stationary);
+    expect(output?.guides).toEqual(input.guides);
+    expect(JSON.stringify(input)).toBe(snapshot);
+  });
+
+  it("moves into another solid token's vacated square regardless of object order", () => {
+    const input = scene([
+      { row: 1, column: 0, object: token("circle", "solid") },
+      { row: 1, column: 1, object: token("arrow", "solid") },
+    ]);
+    const expected = scene([
+      { row: 1, column: 1, object: token("circle", "solid") },
+      { row: 1, column: 2, object: token("arrow", "solid") },
+    ]);
+    expect(applySceneCompositionPrimitive(input, { kind: "moveSolid", direction: "right" })).toEqual(expected);
+    expect(applySceneCompositionPrimitive(scene([...input.objects].reverse()), {
+      kind: "moveSolid", direction: "right",
+    })).toEqual(expected);
+  });
+
+  it.each(["outline", "half"] as const)("rejects a collision with a stationary %s token", (fill) => {
+    const input = scene([
+      { row: 1, column: 0, object: token("circle", "solid") },
+      { row: 1, column: 1, object: token("arrow", fill) },
+    ]);
+    const snapshot = JSON.stringify(input);
+    expect(applySceneCompositionPrimitive(input, { kind: "moveSolid", direction: "right" })).toBeNull();
+    expect(JSON.stringify(input)).toBe(snapshot);
+  });
+
+  it.each([
+    ["up", 0, 1], ["right", 1, 2], ["down", 2, 1], ["left", 1, 0],
+  ] as const)("rejects the entire move when a token leaves the board %s", (direction, row, column) => {
+    const input = scene([
+      { row, column, object: token("circle", "solid") },
+      { row: 1, column: 1, object: token("arrow", "solid") },
+    ]);
+    const snapshot = JSON.stringify(input);
+    expect(applySceneCompositionPrimitive(input, { kind: "moveSolid", direction })).toBeNull();
+    expect(JSON.stringify(input)).toBe(snapshot);
+  });
+
+  it("returns a valid no-op when no token is solid, even at the boundary", () => {
+    const input = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 0, column: 1, object: token("arrow", "half") },
+    ]);
+    expect(applySceneCompositionPrimitive(input, { kind: "moveSolid", direction: "up" })).toEqual(input);
+    expect(applySceneCompositionPrimitive(scene([]), { kind: "moveSolid", direction: "up" })).toBeNull();
+    expect(applySceneCompositionPrimitive(scene([{ ...input.objects[0], row: 3 }]), {
+      kind: "moveSolid", direction: "up",
+    })).toBeNull();
+    // A move cannot repair an invalid starting coordinate.
+    expect(applySceneCompositionPrimitive(scene([{
+      row: 3, column: 0, object: token("circle", "solid"),
+    }]), { kind: "moveSolid", direction: "up" })).toBeNull();
+  });
+
+  it("rejects tiles and containers even when no token would move", () => {
+    const tiled: Scene = {
+      ...scene([{ row: 0, column: 0, object: token("circle") }]),
+      tiles: [{ row: 1, column: 1, edges: ["north"] }],
+    };
+    const contained = scene([{
+      row: 1, column: 1,
+      object: { kind: "container", shape: "circle", contents: [token("arrow", "solid")] },
+    }]);
+    for (const input of [tiled, contained]) {
+      expect(applySceneCompositionPrimitive(input, { kind: "moveSolid", direction: "up" })).toBeNull();
+    }
+  });
+
+  it("selects tokens from the current fill state so painting and moving can interact", () => {
+    const input = scene([
+      { row: 0, column: 0, object: token("circle") },
+      { row: 2, column: 1, object: token("arrow", "solid") },
+    ]);
+    const paint = { kind: "setFillAt", at: { row: 0, column: 0 }, fill: "solid" } as const;
+    const move = { kind: "moveSolid", direction: "right" } as const;
+    const paintThenMove = applySceneComposedProgram(input, { first: paint, second: move });
+    const moveThenPaint = applySceneComposedProgram(input, { first: move, second: paint });
+    expect(paintThenMove?.objects).toEqual([
+      { row: 0, column: 1, object: token("circle", "solid") },
+      { row: 2, column: 2, object: token("arrow", "solid") },
+    ]);
+    expect(moveThenPaint?.objects).toEqual([
+      { row: 0, column: 0, object: token("circle", "solid") },
+      { row: 2, column: 2, object: token("arrow", "solid") },
+    ]);
+  });
+
+  it("keeps the conditional gate out of every legacy primitive and program pool", () => {
+    expect(sceneComposedPrimitives().map(({ kind }) => kind)).toEqual([
+      "spatial", "spatial", "spatial", "spatial", "setFillAt", "setFillAt", "turn", "turn",
+    ]);
+    const programs = [...enumerateSceneOrderedCompositions(), ...enumerateSceneOrderedThreeStepCompositions()];
+    expect(programs).toHaveLength(16 + 276);
+    expect(programs.every((program) => sceneComposedProgramSteps(program)
+      .every(({ kind }) => kind !== "moveSolid"))).toBe(true);
   });
 });
 

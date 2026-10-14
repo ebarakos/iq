@@ -11,6 +11,7 @@ import {
   coverageComplete,
   formatMissingCoverage,
   probeCoverage,
+  probeKey,
   selectCoverageItems,
   standardProbeRequirements,
   STANDARD_PROBE_MINIMUM,
@@ -41,7 +42,7 @@ function itemsForSchedules(schedules: readonly EligibleFamily[][]): Puzzle[] {
 }
 
 describe("standard generated probe coverage", () => {
-  it("selects the fixed minimum for every eligible family and complexity bucket", () => {
+  it("selects the fixed minimum for every eligible family, complexity bucket and family:band:bucket key", () => {
     // An empty withdrawal list, not the developer's WITHDRAWN_FAMILY_IDS: the
     // test is about the probe's selection rule over the registry, and it must
     // give the same verdict on every machine.
@@ -54,16 +55,43 @@ describe("standard generated probe coverage", () => {
     const report = probeCoverage(selected, requirements);
 
     const eligible = CURRENT_FAMILY_PROMOTION_REGISTRY.filter((family) => family.bands.some((band) => band.state !== "prototype" && band.validatedDifficultyBuckets.length > 0));
+    const servedKeys = CURRENT_FAMILY_PROMOTION_REGISTRY.flatMap((family) => family.bands
+      .filter((band) => band.state !== "prototype")
+      .flatMap((band) => band.validatedDifficultyBuckets.map((bucket) => `${family.familyId}:${band.band}:${bucket}`)));
     expect(requirements.families).toHaveLength(eligible.length);
+    expect(requirements.keys).toEqual([...servedKeys].sort());
     expect(requirements.minimum).toBe(STANDARD_PROBE_MINIMUM);
     expect(coverageComplete(report)).toBe(true);
-    expect(selected.length).toBeGreaterThanOrEqual(requirements.families.length * requirements.minimum);
+    for (const key of requirements.keys) {
+      expect(selected.filter((item) => probeKey(item) === key).length, key).toBeGreaterThanOrEqual(requirements.minimum);
+    }
+  });
+
+  it("counts a family's second band or bucket as its own key", () => {
+    const requirements = {
+      families: ["family-a"],
+      programComplexities: [],
+      keys: ["family-a:composition:family-a-d4", "family-a:induction-transfer:family-a-d5"],
+      minimum: 1,
+    };
+    const item = (band: "composition" | "induction-transfer", bucket: string) => ({
+      familyId: "family-a",
+      band,
+      generation: { familyId: "family-a", featureBucket: bucket, features: { ruleComplexity: 4, programDepth: 2 } },
+    }) as unknown as Puzzle;
+    const pool = [item("composition", "family-a-d4"), item("composition", "family-a-d4"), item("induction-transfer", "family-a-d5")];
+
+    const selected = selectCoverageItems(pool, requirements);
+    expect(selected.map(probeKey)).toEqual(requirements.keys);
+    expect(probeCoverage(pool.slice(0, 2), requirements).missingKeys)
+      .toEqual([{ key: "family-a:induction-transfer:family-a-d5", have: 0, need: 1 }]);
   });
 
   it("prints each missing family and program-complexity bucket with its count", () => {
     const requirements = {
       families: ["family-a", "family-b"],
       programComplexities: ["complexity-2-depth-1"],
+      keys: ["family-a:warmup:family-a-d2"],
       minimum: 2,
     };
     const message = formatMissingCoverage(probeCoverage([], requirements));
@@ -71,5 +99,6 @@ describe("standard generated probe coverage", () => {
     expect(message).toContain("family-a: 0/2");
     expect(message).toContain("family-b: 0/2");
     expect(message).toContain("complexity-2-depth-1: 0/2");
+    expect(message).toContain("family-a:warmup:family-a-d2: 0/2");
   });
 });

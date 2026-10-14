@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { PublicPuzzle } from "@/items/schema";
 import type { LeaderboardEntry } from "@/lib/leaderboard-types";
 import { SceneGraphic, StemView } from "@/items/render";
-import { SAMPLE_GUIDES } from "@/items/sample-guides";
+import { sampleGuide } from "@/items/sample-guides";
 import {
   countUnansweredAnswers,
   needsBlankSubmissionConfirmation,
@@ -148,7 +148,7 @@ type TestMeta = {
 
 type SavedSession = StoredSession<PublicPuzzle, SubmitResponse, Partial<TestMeta>>;
 
-export default function Quiz({ leaderboardEnabled }: { leaderboardEnabled: boolean }) {
+export default function Quiz({ leaderboardEnabled, leaderboardLabel }: { leaderboardEnabled: boolean; leaderboardLabel: string }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
@@ -443,7 +443,7 @@ export default function Quiz({ leaderboardEnabled }: { leaderboardEnabled: boole
               href="/leaderboard"
               className="rounded-md text-sm text-gray-600 underline underline-offset-4 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
             >
-              Leaderboard
+              {leaderboardLabel}
             </Link>
           )}
           {(phase === "active" || phase === "result") && (
@@ -484,7 +484,7 @@ export default function Quiz({ leaderboardEnabled }: { leaderboardEnabled: boole
           notice={current === 0 && meta?.source === "fallback"
             ? meta?.notice
             : undefined}
-          guide={meta?.profile === "short-5" ? SAMPLE_GUIDES[puzzles[current].layout] : undefined}
+          guide={meta?.profile === "short-5" ? sampleGuide(puzzles[current]) : undefined}
           onChoose={choose}
           onPrev={() => setCurrent((c) => Math.max(0, c - 1))}
           onNext={() => setCurrent((c) => Math.min(puzzles.length - 1, c + 1))}
@@ -499,6 +499,7 @@ export default function Quiz({ leaderboardEnabled }: { leaderboardEnabled: boole
           review={review}
           quizToken={quizToken}
           leaderboardEnabled={leaderboardEnabled}
+          leaderboardLabel={leaderboardLabel}
           onPublished={(entry) => setReview((currentReview) => currentReview
             ? { ...currentReview, leaderboardEntry: entry }
             : currentReview)}
@@ -533,15 +534,18 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
         count as incorrect.
       </p>
       <p className="mt-3 text-gray-600">
-        The 5-question sample adds a short note to each question on how to read it.
+        Each correct answer earns 100 points. A time bonus of up to
+        25% is added to your correct-answer points. The earlier you finish, the bigger the bonus.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
+        {/* nofollow: a crawler that followed these would start a new link test on every visit. */}
         <a
           href="/test"
+          rel="nofollow"
           onClick={(event) => startInPage(event, "long-30")}
           className="rounded-lg bg-gray-900 px-5 py-2.5 font-medium text-white transition hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
@@ -549,6 +553,7 @@ function Intro({ onStart }: { onStart: (profile: TestProfile) => void }) {
         </a>
         <a
           href="/sample"
+          rel="nofollow"
           onClick={(event) => startInPage(event, "short-5")}
           className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
         >
@@ -943,6 +948,7 @@ function Result({
   review,
   quizToken,
   leaderboardEnabled,
+  leaderboardLabel,
   onPublished,
   meta,
   automatic,
@@ -952,6 +958,7 @@ function Result({
   review: SubmitResponse;
   quizToken: string;
   leaderboardEnabled: boolean;
+  leaderboardLabel: string;
   onPublished: (entry: LeaderboardEntry) => void;
   meta: {
     profile: TestProfile;
@@ -983,11 +990,12 @@ function Result({
           <span className="text-2xl font-normal text-gray-400"> / {puzzles.length}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
-        {leaderboardEnabled && review.total === 30 && typeof review.points === "number" && (
+        {review.total === 30 && typeof review.points === "number" && (
           <div className="mt-4 border-t border-gray-100 pt-4">
             <p className="text-2xl font-semibold">{review.points.toLocaleString("en-US")} points</p>
             <p className="mt-1 text-xs text-gray-500">
-              Correct answers earn 100 points each, plus up to 25% for time remaining.
+              Each correct answer earns 100 points. A time bonus of up to 25% is added to
+              your correct-answer points. The earlier you finish, the bigger the bonus.
             </p>
           </div>
         )}
@@ -1029,6 +1037,7 @@ function Result({
       {leaderboardEnabled && review.total === 30 && !review.late && review.leaderboardEligible === true && (
         <LeaderboardPublication
           quizToken={quizToken}
+          leaderboardLabel={leaderboardLabel}
           entry={review.leaderboardEntry}
           onPublished={onPublished}
         />
@@ -1058,10 +1067,12 @@ function Result({
 }
 
 function LeaderboardPublication({
+  leaderboardLabel,
   quizToken,
   entry,
   onPublished,
 }: {
+  leaderboardLabel: string;
   quizToken: string;
   entry?: LeaderboardEntry;
   onPublished: (entry: LeaderboardEntry) => void;
@@ -1112,14 +1123,14 @@ function LeaderboardPublication({
             href="/leaderboard"
             className="mt-2 inline-block rounded-md text-sm text-gray-700 underline underline-offset-4 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
           >
-            View leaderboard
+            View {leaderboardLabel.toLowerCase()}
           </Link>
         </div>
       ) : (
         <form onSubmit={publish}>
           <h3 className="text-lg font-semibold">Publish your score</h3>
           <p id="nickname-help" className="mt-2 text-sm text-gray-600">
-            Your nickname, score, time and app version will appear on the leaderboard. Publishing is optional.
+            Your nickname, score, time and app version will appear on the {leaderboardLabel.toLowerCase()}. Publishing is optional.
           </p>
           <label htmlFor="leaderboard-nickname" className="mt-4 block text-sm font-medium text-gray-700">
             Nickname

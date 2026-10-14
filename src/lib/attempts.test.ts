@@ -22,9 +22,14 @@ import {
   type AttemptFile,
 } from "./attempts";
 import { partitionComposedTransformPrograms, sceneFamilyBucketsFor } from "@/items/scene-families";
+import { type FamilyPromotionRegistry } from "@/items/family-promotion";
 import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
 import { PuzzleSchema } from "@/items/schema";
 import {
+  frozenArm,
+  itemSetDigest,
+  familySourceBucket,
+  familySourcePool,
   formatMissingHeldOutCoverage,
   heldOutBucketPool,
   heldOutBuckets,
@@ -48,8 +53,8 @@ const BASE_ATTEMPT = {
 } as const;
 
 describe("evaluation set label", () => {
-  it("offers exactly the two populations the harness can produce", () => {
-    expect([...EVALUATION_SETS]).toEqual(["public", "held-out"]);
+  it("offers exactly the three populations the harness can produce", () => {
+    expect([...EVALUATION_SETS]).toEqual(["public", "held-out", "prototype"]);
   });
 
   it("round-trips a held-out attempt through the schema and JSON", () => {
@@ -272,6 +277,77 @@ describe("held-out source of the agent harness", () => {
   });
 });
 
+describe("family source of the agent harness", () => {
+  // This fixture tests baseline versus prototype classification independently
+  // of a later rollout replacing the current registry's v3 with v4.
+  const registry: FamilyPromotionRegistry = [{
+    familyId: "transformation-machine-v3", primaryReasoningFamily: "operator-induction",
+    bands: [{ band: "induction-transfer", state: "code-valid", validatedDifficultyBuckets: ["transformation-machine-d5"] }],
+  }];
+  it("records a served bucket as public, in the band the registry serves it in", () => {
+    expect(familySourceBucket("transformation-machine-d5", undefined, registry, new Set())).toMatchObject({
+      familyId: "transformation-machine-v3", band: "induction-transfer", evaluationSet: "public",
+    });
+    expect(() => familySourceBucket("transformation-machine-d5", "warmup", registry, new Set())).toThrow(/served in the induction-transfer band/);
+  });
+
+  it("records an unserved bucket as a prototype, in the band the run names", () => {
+    expect(familySourceBucket("transformation-machine-v4-d5", "induction-transfer", registry, new Set())).toMatchObject({
+      familyId: "transformation-machine-v4", band: "induction-transfer", evaluationSet: "prototype",
+    });
+    expect(() => familySourceBucket("transformation-machine-v4-d5", undefined, registry, new Set())).toThrow(/--band must name/);
+    // A withdrawn family is not served either, so it cannot pass as public.
+    expect(familySourceBucket("transformation-machine-d5", "induction-transfer", registry,
+      new Set(["transformation-machine-v3"])).evaluationSet).toBe("prototype");
+    expect(() => familySourceBucket("no-such-bucket-d5", "warmup")).toThrow(/not declared/);
+  });
+
+  it("draws distinct, valid items of that bucket, and replays them from the seed", () => {
+    const entry = familySourceBucket("transformation-machine-v4-d5", "induction-transfer", registry, new Set());
+    const items = familySourcePool("family-source-seed", entry, 4);
+    expect(items).toHaveLength(4);
+    for (const item of items) {
+      expect(PuzzleSchema.safeParse(item).success).toBe(true);
+      expect(item.band).toBe("induction-transfer");
+      expect(item.generation?.featureBucket).toBe("transformation-machine-v4-d5");
+    }
+    expect(new Set(items.map((item) => item.id)).size).toBe(4);
+    expect(familySourcePool("family-source-seed", entry, 4)).toEqual(items);
+    expect(() => familySourcePool("family-source-seed", entry, 0)).toThrow(/positive whole/);
+  });
+});
+
+describe("frozen v31 baseline", () => {
+  const path = new URL("../../data/evaluations/harden-reasoning-v31.json", import.meta.url).pathname;
+  it("replays every pre-integration arm with its original scoring and provenance", () => {
+    for (const [name, count, digest, set, version] of [
+      ["generated", 65, "9f8ebd8e3f9fe11c", "public", "scene-families-v31"],
+      ["bank", 65, "054f29a420a37dc9", "public", "bank-v1"],
+      ["held-out", 20, "7a330da2e56ad4a8", "held-out", "scene-families-v31"],
+      ["machine-before", 20, "fba52eb9d2b831a1", "public", "scene-families-v31"],
+    ] as const) {
+      const arm = frozenArm(path, name);
+      expect(arm.items).toHaveLength(count);
+      expect(itemSetDigest(arm.items)).toBe(digest);
+      expect(arm.evaluationSet).toBe(set);
+      expect(arm.generatorVersion).toBe(version);
+    }
+  });
+  it("plans historical items without relay credentials or any model call", () => {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    for (const key of Object.keys(env)) if (key.startsWith("RELAY_")) delete env[key];
+    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/agent-run.ts", "--plan",
+      "--snapshot", path, "--arm", "generated"], {
+      cwd: new URL("../../", import.meta.url).pathname, encoding: "utf8",
+      env,
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("scene-families-v31");
+    expect(result.stdout).toContain("9f8ebd8e3f9fe11c");
+    expect(result.stdout).toContain("no model call made");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Populations
 // ---------------------------------------------------------------------------
@@ -321,13 +397,26 @@ describe("populations a report may not pool", () => {
     expect(groupAttemptFilesByPopulation([heldOutRun, publicRun])).toHaveLength(2);
   });
 
+  it("keeps a public family run apart from a public test run", () => {
+    // Both are public items of one generator, but a family run is one bucket's
+    // rate: pooled, it would weight that bucket into the test's headline.
+    const testRun = fileWith({ runId: "test-run", source: "generated" });
+    const familyRun = fileWith({ runId: "family-run", source: "family", profile: null });
+    const populations = groupAttemptFilesByPopulation([testRun, familyRun]);
+    expect(populations).toHaveLength(2);
+    expect(populations.map((population) => population.label).sort()).toEqual([
+      "prompt solver-v3 · generator scene-families-v11 · set public · thinking-budget unrecorded · source family · openrouter/model-a · image · effort unrecorded · bucket unrecorded:unrecorded:unrecorded",
+      "prompt solver-v3 · generator scene-families-v11 · set public · thinking-budget unrecorded · source generated · openrouter/model-a · image · effort unrecorded",
+    ]);
+  });
+
   it("names the evaluation set and the thinking budget in the label", () => {
     const [population] = groupAttemptFilesByPopulation([fileWith({
       thinkingBudget: 1024,
       attempts: [{ ...BASE_ATTEMPT, evaluationSet: "public" }],
     })]);
     expect(population.label).toBe(
-      "prompt solver-v3 · generator scene-families-v11 · set public · thinking-budget 1024",
+      "prompt solver-v3 · generator scene-families-v11 · set public · thinking-budget 1024 · source unrecorded · openrouter/model-a · image · effort unrecorded",
     );
   });
 
@@ -353,14 +442,37 @@ describe("populations a report may not pool", () => {
     expect(thinkingBudgetLabelOf(fileWith({ thinkingBudget: 1024 }))).toBe("1024");
   });
 
-  it("pools two runs that agree on all four population fields", () => {
+  it("pools two runs that agree on all measurement settings", () => {
     const first = fileWith({ runId: "first", thinkingBudget: 1024 });
-    const second = fileWith({ runId: "second", thinkingBudget: 1024, model: "model-b" });
-    // Two models in one population is fine: every rollup carries its own
-    // per-model breakdown, so models are never silently averaged.
+    const second = fileWith({ runId: "second", thinkingBudget: 1024 });
     const populations = groupAttemptFilesByPopulation([first, second]);
     expect(populations).toHaveLength(1);
     expect(populations[0].files).toHaveLength(2);
+  });
+
+  it("separates model, provider, effort, source, channel, profile and frozen corpus", () => {
+    const first = fileWith({ source: "generated", effort: "high" });
+    for (const change of [
+      { model: "model-b" }, { provider: "other" }, { effort: "low" }, { effort: null },
+      { effort: undefined }, { source: "bank" }, { channel: "options-only" },
+      { profile: "short-5" }, { snapshotArm: "baseline:1234567890abcdef" },
+    ]) {
+      const other = fileWith({ source: "generated", effort: "high", ...change });
+      expect(groupAttemptFilesByPopulation([first, other]), JSON.stringify(change)).toHaveLength(2);
+    }
+  });
+
+  it("keeps two public family buckets and different bands separate", () => {
+    const generation = frozenArm(new URL("../../data/evaluations/harden-reasoning-v31.json", import.meta.url).pathname,
+      "machine-before").items[0].generation!;
+    const first = fileWith({ source: "family", attempts: [{ ...BASE_ATTEMPT, generation, band: "induction-transfer" }] });
+    for (const attempt of [
+      { ...BASE_ATTEMPT, generation: { ...generation, featureBucket: "other-d5" }, band: "induction-transfer" },
+      { ...BASE_ATTEMPT, generation, band: "composition" },
+      { ...BASE_ATTEMPT, generation, band: "induction-transfer", evaluationSet: "prototype" },
+    ]) {
+      expect(groupAttemptFilesByPopulation([first, fileWith({ source: "family", attempts: [attempt] })])).toHaveLength(2);
+    }
   });
 
   it("refuses to give one population to an artifact that mixes sets", () => {
@@ -457,7 +569,7 @@ describe("report --write population gate", () => {
       population.promptVersion === "solver-v3" &&
       population.generatorVersion === "scene-families-v11");
     expect(ambiguous.map((population) => population.evaluationSet).sort())
-      .toEqual(["held-out", "public"]);
+      .toEqual(["held-out", "held-out", "public", "public"]);
 
     const before = readFileSync(BANK_PATH, "utf8");
     const result = runReport([
@@ -475,9 +587,18 @@ describe("report --write population gate", () => {
     // Named by generator too since 2026-09-30, when the v19 probe added a
     // second held-out population beside v11's: without it two match, and the
     // report refuses for that reason before reaching this one.
-    const result = runReport(["--write", "--evaluation-set", "held-out", "--generator-version", "scene-families-v11"]);
+    const result = runReport(["--write", "--evaluation-set", "held-out", "--generator-version", "scene-families-v11", "--model", "google/gemini-3.5-flash"]);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("refusing --write for a held-out population");
+    expect(readFileSync(BANK_PATH, "utf8")).toBe(before);
+  });
+
+  it("refuses public generated diagnostics instead of reporting a bank write", { timeout: 60_000 }, () => {
+    const before = readFileSync(BANK_PATH, "utf8");
+    const result = runReport(["--write", "--evaluation-set", "public", "--generator-version", "scene-families-v11",
+      "--model", "google/gemini-3.5-flash"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--write requires an image population from the bank source");
     expect(readFileSync(BANK_PATH, "utf8")).toBe(before);
   });
 

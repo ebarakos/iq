@@ -62,6 +62,11 @@ const catalogue: Record<string, Scene> = {
     ],
   }),
   biggerBoard: { kind: "scene", rows: 3, columns: 3, objects: [{ row: 0, column: 0, object: token() }], tiles: [] },
+  radialCross: { kind: "scene", rows: 3, columns: 3, objects: [], tiles: [], figure: { kind: "radial", strokes: [0, 2, 4, 6] } },
+  radialCrossClone: { kind: "scene", rows: 3, columns: 3, objects: [], tiles: [], figure: { kind: "radial", strokes: [0, 2, 4, 6] } },
+  radialDiagonal: { kind: "scene", rows: 3, columns: 3, objects: [], tiles: [], figure: { kind: "radial", strokes: [1, 3, 5, 7] } },
+  collection: { kind: "scene", rows: 3, columns: 3, objects: [{ row: 0, column: 0, object: token({ size: "l" }) }], tiles: [], collection: true },
+  collectionOnBoard: { kind: "scene", rows: 3, columns: 3, objects: [{ row: 0, column: 0, object: token({ size: "l" }) }], tiles: [] },
 };
 
 const catalogueEntries = Object.entries(catalogue);

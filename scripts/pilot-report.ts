@@ -33,6 +33,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { EXPANDED_GENERATOR_VERSION } from "../src/items/expanded-quiz";
 import {
   PROTOTYPE_PILOT_AGGREGATE_SCHEMA_VERSION,
   PROTOTYPE_PILOT_PACKET_SCHEMA_VERSION,
@@ -45,7 +46,10 @@ import {
 } from "../src/items/prototype-pilot";
 
 const ROOT = new URL("../", import.meta.url).pathname;
-export const PILOT_MANIFEST_PATH = join(ROOT, "data", "pilot", "pilot-v3-manifest.json");
+/** Preserve older packet manifests when the live generator population changes. */
+export const PILOT_MANIFEST_PATH = join(
+  ROOT, "data", "pilot", `pilot-v3-manifest-${EXPANDED_GENERATOR_VERSION}.json`,
+);
 
 function readJson(path: string, label: string): unknown {
   let raw: string;

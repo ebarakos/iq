@@ -10,6 +10,7 @@ import {
   QuizTokenError,
   QuizTokenPayloadSchema,
   resolveQuizTokenSecret,
+  sealQuizToken,
   SECONDS_PER_QUESTION,
   submissionTiming,
 } from "./quiz-token";
@@ -143,6 +144,31 @@ describe("quiz token delivery", () => {
       expect(error).toBeInstanceOf(QuizTokenError);
       expect((error as QuizTokenError).code).toBe("expired");
     }
+  });
+});
+
+describe("quiz token deployment scope", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("opens deployed production tokens with either leaderboard selected", () => {
+    const payload = { ...payloadWith(5), leaderboardScope: "aiq:production" };
+    const token = sealQuizToken(payload, SECRET);
+    vi.stubEnv("VERCEL_ENV", "production");
+    for (const board of [undefined, "dev", "production", "dev"]) {
+      vi.stubEnv("LEADERBOARD_ENV", board);
+      expect(openQuizToken(token, SECRET, 1_001)).toEqual(payload);
+    }
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(() => openQuizToken(token, SECRET, 1_001)).toThrow("another environment");
+  });
+
+  it("issues production tokens with stable scope even while showing the dev board", () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("LEADERBOARD_ENV", "dev");
+    const delivery = createQuizDelivery(quiz(), { secret: SECRET, nowSeconds: 1_000 });
+    expect(openQuizToken(delivery.quizToken, SECRET, 1_001).leaderboardScope).toBe("aiq:production");
+    vi.stubEnv("LEADERBOARD_ENV", "production");
+    expect(openQuizToken(delivery.quizToken, SECRET, 1_001).leaderboardScope).toBe("aiq:production");
   });
 });
 

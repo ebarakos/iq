@@ -3,6 +3,7 @@ import { z } from "zod";
 import bankFile from "../../data/bank/items.json";
 import {
   PuzzleSchema,
+  OPTIONS_PER_ITEM,
   isBlank,
   sceneSignature,
   type Puzzle,
@@ -12,6 +13,7 @@ import {
 import {
   eligibleFamiliesForBand,
   EXPANDED_GENERATOR_VERSION,
+  MAXIMUM_FAMILY_QUESTIONS,
   planExpandedSchedule,
   type ExpandedProfile,
 } from "./expanded-quiz";
@@ -21,6 +23,8 @@ import {
   readWithdrawnFamilyIds,
   type FamilyPromotionRegistry,
 } from "./family-promotion";
+import { SCENE_FAMILY_IDS, machineGateNecessity, sceneFamilyClueCheck } from "./scene-families";
+import { solveAttributeMatrix } from "./attribute-matrix";
 import { seededRng, shuffled, type Seed } from "../lib/rng";
 
 /**
@@ -114,11 +118,10 @@ export interface SampledQuiz {
 /**
  * How many banked items every enabled family/band/bucket key holds.
  *
- * Five, because constraint-spatial now splits ten questions over its two
- * retained families. The emergency bank has to answer every slot from the
- * exact bucket the schedule asks for.
+ * Five, matching the long test's maximum questions from any one family.
+ * The emergency bank can therefore answer every slot from its exact bucket.
  */
-export const BANK_ITEMS_PER_KEY = 5;
+export const BANK_ITEMS_PER_KEY = MAXIMUM_FAMILY_QUESTIONS["long-30"];
 
 /**
  * What a bank item is stocked against: one family, in one band, at one bucket.
@@ -220,45 +223,43 @@ export function sampleExpandedBankQuiz(
   withdrawnFamilyIds: ReadonlySet<string> = readWithdrawnFamilyIds(),
 ): SampledQuiz {
   const schedule = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds);
-  const usable = items.filter((item) =>
-    item.provenance.generatorVersion === EXPANDED_GENERATOR_VERSION &&
-    item.puzzle.generation?.generatorVersion === EXPANDED_GENERATOR_VERSION &&
-    item.puzzle.familyId !== undefined &&
-    !withdrawnFamilyIds.has(item.puzzle.familyId));
+  const usable = items.filter((item) => {
+    const puzzle = item.puzzle;
+    if (item.provenance.generatorVersion !== EXPANDED_GENERATOR_VERSION ||
+        puzzle.generation?.generatorVersion !== EXPANDED_GENERATOR_VERSION ||
+        puzzle.familyId === undefined || puzzle.familyId !== puzzle.generation.familyId ||
+        !SCENE_FAMILY_IDS.some((familyId) => familyId === puzzle.familyId) ||
+        withdrawnFamilyIds.has(puzzle.familyId) || puzzle.options.length !== OPTIONS_PER_ITEM) return false;
+    // Version labels alone cannot certify authored bank data. Re-read the
+    // visible clues before any entry enters the fallback's candidate pool.
+    const clues = sceneFamilyClueCheck(puzzle);
+    const necessity = machineGateNecessity(puzzle);
+    if (necessity && !necessity.valid) return false;
+    if (necessity && puzzle.difficulty >= 5 && necessity.queryOrder.every((gate, index) => gate === index)) return false;
+    if (puzzle.familyId === "attribute-matrix-v1") {
+      const report = solveAttributeMatrix(puzzle);
+      if (clues.dispensableClueIds.length > 0 || report.solutionCount !== 1 || !report.derivedAnswer ||
+          sceneSignature(report.derivedAnswer) !== sceneSignature(puzzle.options[puzzle.answerIndex])) return false;
+    }
+    return clues.singleClueAnswerIds.length === 0 &&
+      clues.indistinguishableWrongOptionIndexes.length === 0;
+  });
   const used = new Set<string>();
   const chosen = schedule.map((slot, slotIndex) => {
     const inSlotFamily = usable.filter((item) =>
-      !used.has(item.fingerprint) && item.puzzle.familyId === slot.familyId);
+      !used.has(item.fingerprint) && item.puzzle.familyId === slot.familyId &&
+      item.puzzle.difficulty === slot.difficulty);
     const inSlotBand = inSlotFamily.filter((item) => item.puzzle.band === slot.band);
     const key = expandedBankKey(slot.familyId, slot.band, slot.difficultyBucket);
     const exactKey = inSlotBand.filter((item) => expandedBankKeyOf(item.puzzle) === key);
     const sameDifficulty = inSlotBand.filter((item) => item.puzzle.difficulty === slot.difficulty);
-    // Four rungs, each used only when the one above it is empty: the slot's
-    // exact family/band/bucket key, then the same family and band at the same
-    // difficulty, then the same family anywhere in that band, then the same
-    // family from whichever band the bank does hold it in.
-    //
-    // Only the first rung should ever run. A bank built by
-    // `npm run bank:topup -- --replace --per-bucket 5` holds
-    // five items for every key the registry can schedule, and no key comes up
-    // more than five times in one test, so the exact bucket is always in stock
-    // — `expandedBankCoverage` above proves that from the built file rather
-    // than leaving it to a lucky sampling run.
-    //
-    // The lower rungs stay as a guard for the one case that is not a bug: a
-    // registry that has moved ahead of the committed bank. That has happened
-    // repeatedly as the family registry evolved, and an emergency fallback
-    // that refuses to serve a test is worse than one that serves the same
-    // family a step shallower.
-    // `npm run bank:verify` reports the gap rather than leaving a taker to
-    // find it.
+    // An incomplete bank may substitute the same family at the same difficulty,
+    // but must never change the question number's fixed level.
     const candidates = exactKey.length > 0
       ? exactKey
       : sameDifficulty.length > 0
         ? sameDifficulty
-        : inSlotBand.length > 0
-          ? inSlotBand
-          : inSlotFamily;
+        : inSlotFamily;
     const item = shuffled(
       seededRng(seed, `expanded-bank-item:${slotIndex}:${slot.familyId}`),
       candidates,
@@ -266,7 +267,7 @@ export function sampleExpandedBankQuiz(
     if (!item) {
       throw new Error(
         `expanded emergency bank cannot fill ${profile} slot ${slotIndex + 1}: ` +
-          `${slot.familyId} in ${slot.band} needs another current-version item`,
+          `${slot.familyId} at d${slot.difficulty} needs another current-version item`,
       );
     }
     used.add(item.fingerprint);

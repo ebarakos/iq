@@ -21,24 +21,59 @@ item set the packet held at the time. Packets change whenever a family is
 withdrawn, so two results with the same `packetId` and different fingerprints
 did not answer the same questions.
 
-## `pilot-v3-manifest.json` — what the v3 packets held
+## 2026-10-09 — new mechanisms, prepared for retention
+
+Spatial assembly was disabled at the owner's request on 2026-10-09.
+`pilot-v3-manifest-scene-families-v33.json` records 15 items across two packets.
+Packet **A has three new items**: interacting machines in induction-transfer.
+Packet B holds 12 familiar keys for diagnostics;
+the owner need not repeat it. No participant results or invitations have been created.
+
+Each new item needs at least eight independent attempts without the answer or hidden rule.
+Collect the intended relationship and unclear visual distinctions before revealing the rule.
+Include phone and desktop attempts because both layouts change with viewport size.
+Apply the existing [retention thresholds](../../docs/plans/deterministic-novel-tests.md#human-solvability-promotion-gate):
+at least 75% describe the intended relationship; at most 20% report unclear notation;
+no repeated defensible alternative answer. Median time must fit 55 seconds for machines.
+No band median may exceed 60 seconds; the 30-question
+weighted medians must average at most 45 seconds. Difficulty remains unmeasured until
+that evidence exists. Invitations require separate approval. The v32 manifest remains
+unchanged as the record of its earlier 18-item packet population.
+
+## 2026-10-10 — approved matrix families, prepared for retention
+
+`pilot-v3-manifest-scene-families-v34.json` records 36 items across two packets.
+Packet A holds 24 items: three per overlapping-figure and shape/count/shading key,
+plus the three interacting-machine items. Packet B retains 12 familiar keys.
+The new matrices use six rule levels across seven served band/bucket keys;
+overlapping d5 appears in both the constraint-spatial ramp and induction-transfer.
+The same retention thresholds apply. Band medians must fit 25/40/50/55 seconds,
+respectively. No new human results have been collected.
+
+## Pilot v3 manifests — what each generator population held
+
+`pilot-v3-manifest-scene-families-v38.json` is the current 36-item record, requiring every machine transformation to distinguish six choices.
+Its packets retain the same 24 new-mechanism and 12 familiar-item design. Earlier manifests remain
+the records of their original populations; no timed human results have been collected for v38.
 
 The answer-free record of every pilot-v3 packet: item identity, difficulty, and
 band time budget, plus each packet's content fingerprint. No puzzle, no answer,
-no explanation. It is generated from the code by
-`buildPrototypePilotManifest()` and a test asserts the committed file still
-matches, so it can never drift from what the app would build.
+no explanation. `buildPrototypePilotManifest()` generates the current record.
+A test compares it with the committed manifest for the current generator.
 
-It exists because a packet is derived from the live promotion registry, which
-means the packet a person answered stops existing the moment its content
-changes. `npm run pilot:report -- <aggregate.json>` checks a result against the
-currently saved manifest rather than rebuilding the live registry. The manifest
-is replaced when a new generator population ships, so older aggregates remain
-historical evidence but are no longer replayable unless their matching manifest
-was preserved separately. A mismatched packet id, fingerprint, item set, or
-schema version is a hard error naming exactly what disagreed. Both v3 aggregates
-below predate the current manifest, last regenerated for `scene-families-v30` on
-2026-10-05, and fail that fingerprint check.
+`npm run pilot:report -- <aggregate.json>` reads
+`pilot-v3-manifest-<generatorVersion>.json`, for example
+`pilot-v3-manifest-scene-families-v31.json`. Each generator version gets its own
+file. Preserve all older manifests and recorded results unchanged. A versioned
+filename selects the manifest; the content fingerprint still proves which
+questions were answered. A mismatched packet id, fingerprint, item set, or
+schema version remains a hard error.
+
+`pilot-v3-manifest.json` is the preserved `scene-families-v30` record from
+2026-10-05. Both recorded v3 aggregates below predate it and fail its fingerprint
+check. Historical reports require a manifest with the aggregate's exact packet
+fingerprint; `runPilotReport(aggregatePath, manifestPath)` accepts an explicit
+historical manifest. Never recreate a missing manifest from the aggregate.
 
 Aggregate exports from the pilot screen are schema
 `prototype-pilot-aggregate-v2`: one row of counts per item, five-second solve

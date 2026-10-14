@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PuzzleSet, PublicPuzzleSet } from "@/items/schema";
 import { GenerationMetadataSchema, REASONING_BANDS, toPublicPuzzleSet } from "@/items/schema";
 import packageJson from "../../package.json";
-import { leaderboardEnabled, leaderboardNamespace } from "./leaderboard-config";
+import { leaderboardEnabled, quizNamespace } from "./leaderboard-config";
 
 const TOKEN_VERSION = "v1";
 const TOKEN_AAD = "aiq.quiz-token.v1";
@@ -46,6 +46,7 @@ export const QuizTokenPayloadSchema = z.object({
   /** Sealed at issue time; older tokens cannot acquire a newer version or ranking eligibility. */
   appVersion: z.string().min(1).max(80).optional(),
   leaderboardAllowed: z.boolean().optional(),
+  /** Deployment scope for opening and scoring, independent of the selected leaderboard. */
   leaderboardScope: z.string().optional(),
   issuedAt: z.number().int().nonnegative(),
   /** When the answer key stops opening at all. Never the same thing as the deadline. */
@@ -237,7 +238,7 @@ export function openQuizToken(
 ): QuizTokenPayload {
   try {
     const payload = QuizTokenPayloadSchema.parse(openTokenJson(token, QUIZ_TOKEN_ENVELOPE, secret));
-    if (payload.leaderboardScope !== undefined && payload.leaderboardScope !== leaderboardNamespace()) {
+    if (payload.leaderboardScope !== undefined && payload.leaderboardScope !== quizNamespace()) {
       throw new QuizTokenError("invalid", "quiz token belongs to another environment");
     }
     if (payload.expiresAt <= nowSeconds) {
@@ -287,7 +288,7 @@ export function createQuizDelivery(
     version: 1,
     appVersion: `v${packageJson.version}`,
     leaderboardAllowed: leaderboardEnabled(),
-    leaderboardScope: leaderboardNamespace(),
+    leaderboardScope: quizNamespace(),
     issuedAt: now,
     expiresAt: now + ttl,
     answerDeadline,

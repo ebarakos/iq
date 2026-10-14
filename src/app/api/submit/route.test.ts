@@ -90,16 +90,46 @@ describe("POST /api/submit", () => {
     expect(JSON.stringify(body)).not.toContain('"rule"');
   });
 
+  it("keeps accuracy and time-bonus points when the leaderboard is disabled", async () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "false");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const quiz = assembleExpandedQuiz("submit-points-without-leaderboard", "long-30", CURRENT_FAMILY_PROMOTION_REGISTRY);
+    const { quizToken } = createQuizDelivery(quiz, { secret: SECRET, nowSeconds: issuedAt });
+    const answers = quiz.map((puzzle, index) => index < 29 ? puzzle.answerIndex : null);
+    vi.setSystemTime((issuedAt + 1200) * 1000);
+
+    const response = await POST(request({ quizToken, answers }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      score: 29, total: 30, points: 3142, elapsedSeconds: 1200, leaderboardEligible: false,
+    });
+  });
+
   it("rejects malformed, incomplete, and out-of-range submissions", async () => {
     const quiz = freshQuiz("submit-route-validation");
     const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
 
     expect((await POST(request({ answers: [] }))).status).toBe(400);
     expect((await POST(request({ quizToken, answers: [null] }))).status).toBe(400);
-    expect((await POST(request({
+    const outOfRange = await POST(request({
       quizToken,
       answers: quiz.map((_, index) => index === 2 ? 99 : null),
-    }))).status).toBe(400);
+    }));
+    expect(outOfRange.status).toBe(400);
+    await expect(outOfRange.json()).resolves.toEqual({ message: "An answer is outside the available options." });
+  });
+
+  it("checks answers before storage, so a malformed retry is a 400, not a conflict or outage", async () => {
+    const { redisCommand } = await import("@/lib/redis");
+    vi.mocked(redisCommand).mockClear();
+    const quiz = freshQuiz("submit-route-validation-order");
+    const { quizToken } = createQuizDelivery(quiz, { secret: SECRET });
+
+    expect((await POST(request({ quizToken, answers: [null] }))).status).toBe(400);
+    expect(redisCommand).not.toHaveBeenCalled();
+    expect((await POST(request({ quizToken, answers: quiz.map(() => null) }))).status).toBe(200);
+    expect((await POST(request({ quizToken, answers: [null] }))).status).toBe(400);
   });
 
   it("reports separate family and band subtotals when the profile supplies them", async () => {

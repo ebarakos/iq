@@ -43,7 +43,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
         <h1 className="mt-4 text-2xl font-semibold">This test is not finished</h1>
         <p className="mt-3 text-gray-700">
           A result needs one answer or skip for each of the {puzzles.length} questions.{" "}
-          <a className="underline" href={resume}>Continue the test</a>.
+          <a className="underline" rel="nofollow" href={resume}>Continue the test</a>.
         </p>
       </LinkPage>
     );
@@ -57,7 +57,8 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
       expiresAt: test.expiresAt,
       answerDeadline: test.answerDeadline,
       appVersion: test.appVersion,
-      leaderboardAllowed: test.leaderboardAllowed,
+      // Link results never rank: publication opens only the in-page quiz token.
+      leaderboardAllowed: false,
       leaderboardScope: test.leaderboardScope,
       items: answerKeyItems(puzzles),
     }, answers, Math.floor(Date.now() / 1000));
@@ -69,7 +70,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
         <p className="mt-3 text-gray-700">
           {conflict ? error.message : "Your answers are kept in this link. Try again to recover your result."}
         </p>
-        {!conflict && <p className="mt-4"><a className="underline" href={resultPath(token, answers)}>Retry submission</a></p>}
+        {!conflict && <p className="mt-4"><a className="underline" rel="nofollow" href={resultPath(token, answers)}>Retry submission</a></p>}
         <p className="mt-6"><StartLink profile={test.profile}>Start a new {PROFILE_NAMES[test.profile]}</StartLink></p>
       </LinkPage>
     );
@@ -80,6 +81,15 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
       <p className="mt-3 text-3xl font-semibold">
         {`${scored.score} of ${scored.total} correct`}
       </p>
+      {scored.total === 30 && (
+        <div className="mt-4">
+          <p className="text-2xl font-semibold">{scored.points.toLocaleString("en-US")} points</p>
+          <p className="mt-1 text-sm text-gray-600">
+            Each correct answer earns 100 points. A time bonus of up to 25% is added to
+            your correct-answer points. The earlier you finish, the bigger the bonus.
+          </p>
+        </div>
+      )}
       {scored.late && (
         <p className="mt-2 text-amber-800">
           {`Marked late: these answers arrived ${scored.secondsLate} seconds after the deadline ` +

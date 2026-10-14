@@ -5,9 +5,11 @@ import {
   blindCredits,
   blindStrategyCredits,
   bottomCredit,
+  checkIntendedClues,
   optionsAloneOnAClue,
   rankCredit,
   topCredit,
+  type IntendedClue,
 } from "./blind-options";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY, EXPANDED_PROFILE_BANDS } from "./family-promotion";
 import { eligibleFamiliesForBand } from "./expanded-quiz";
@@ -119,6 +121,130 @@ describe("options-only solvers", () => {
         expect(earned / ITEMS, `${bucket}: ${strategy}`).toBeLessThanOrEqual(LIMIT);
       }
     }
+  });
+});
+
+describe("every intended clue remains necessary", () => {
+  const shapePositions = (shape: SceneToken["shape"]): IntendedClue => ({
+    id: `${shape}-positions`,
+    // Empty and repeated shapes remain explicit values, rather than making
+    // the reader disappear when one wrong option changes membership.
+    read: (scene) => JSON.stringify(scene.objects
+      .filter(({ object }) => object.kind === "token" && object.shape === shape)
+      .map(({ row, column }) => [row, column]).sort()),
+  });
+  const arrow = (row: number, fill: SceneToken["fill"], rotation: SceneToken["rotation"] = 0): Scene => {
+    const scene = board([[row, 0, "arrow", fill]]);
+    const object = scene.objects[0].object;
+    if (object.kind !== "token") throw new Error("Expected an arrow token");
+    object.rotation = rotation;
+    return scene;
+  };
+  const arrowClues: IntendedClue[] = [
+    shapePositions("arrow"),
+    { id: "fill", read: (scene) => {
+      const object = scene.objects[0].object;
+      return object.kind === "token" ? object.fill : "container";
+    } },
+    { id: "turn", read: (scene) => {
+      const object = scene.objects[0].object;
+      return object.kind === "token" ? String(object.rotation) : "container";
+    } },
+  ];
+  const binaryArrow = (mask: number) => arrow(
+    mask & 1 ? 2 : 0, mask & 2 ? "solid" : "outline", mask & 4 ? 90 : 0);
+
+  it("finds a two-of-three shortcut even when every individual clue value is shared", () => {
+    const options = [0, 1, 2, 3, 5, 7].map(binaryArrow);
+    expect([...optionsAloneOnAClue(options, "features")]).toEqual([]);
+    // Position plus fill singles out option 0. There is no option with its
+    // correct position and fill but the wrong turn (binary mask 4).
+    expect(checkIntendedClues(options, 0, arrowClues)).toEqual({
+      dispensableClueIds: ["turn"],
+      indistinguishableWrongOptionIndexes: [],
+    });
+  });
+
+  it("detects when one symbol's position alone selects the answer", () => {
+    const options = [[0, 0], [0, 1], [0, 2], [1, 1], [1, 2], [2, 1]]
+      .map(([circleColumn, squareColumn]) => board([
+        [0, circleColumn, "circle", "solid"], [2, squareColumn, "square", "outline"],
+      ]));
+    expect(checkIntendedClues(options, 0, [shapePositions("circle"), shapePositions("square")])).toEqual({
+      dispensableClueIds: ["circle-positions"],
+      indistinguishableWrongOptionIndexes: [],
+    });
+  });
+
+  it("keeps both clues essential for every answer in a two-by-three product", () => {
+    const options = [0, 2].flatMap((row) =>
+      (["outline", "half", "solid"] as const).map((fill) => arrow(row, fill)));
+    for (let answer = 0; answer < options.length; answer++) {
+      expect(checkIntendedClues(options, answer, arrowClues.slice(0, 2))).toEqual({
+        dispensableClueIds: [], indistinguishableWrongOptionIndexes: [],
+      });
+    }
+  });
+
+  it("covers every proper subset with single-clue witnesses in a three-clue product", () => {
+    const options = Array.from({ length: 8 }, (_, mask) => binaryArrow(mask));
+    for (let answer = 0; answer < options.length; answer++) {
+      expect(checkIntendedClues(options, answer, arrowClues)).toEqual({
+        dispensableClueIds: [], indistinguishableWrongOptionIndexes: [],
+      });
+      // Verify the promised consequence independently, including the empty
+      // subset and each one-clue subset, rather than only maximal subsets.
+      for (let mask = 0; mask < 7; mask++) {
+        const retained = arrowClues.filter((_, clue) => (mask & (1 << clue)) !== 0);
+        expect(options.some((option, index) => index !== answer && retained.every((clue) =>
+          clue.read(option) === clue.read(options[answer]))), `answer ${answer}, subset ${mask}`).toBe(true);
+      }
+    }
+  });
+
+  it("does not silently drop clues for missing or duplicated symbols", () => {
+    const circle: [number, number, SceneToken["shape"], SceneToken["fill"]] = [0, 0, "circle", "solid"];
+    const square: [number, number, SceneToken["shape"], SceneToken["fill"]] = [2, 2, "square", "outline"];
+    const options = [
+      board([circle, square]),
+      board([square]),
+      board([circle, [0, 2, "circle", "solid"], square]),
+      board([circle]),
+      board([circle, square, [2, 0, "square", "outline"]]),
+    ];
+    const clues = [shapePositions("circle"), shapePositions("square")];
+    expect(checkIntendedClues(options, 0, clues)).toEqual({
+      dispensableClueIds: [], indistinguishableWrongOptionIndexes: [],
+    });
+    // Removing both circle-error options makes the circle dispensable, even
+    // though the square's missing and duplicate values are still represented.
+    expect(checkIntendedClues([options[0], options[3], options[4]], 0, clues).dispensableClueIds)
+      .toEqual(["circle-positions"]);
+  });
+
+  it("rejects full-tuple matches as omission witnesses and reports the ambiguity", () => {
+    const options = [binaryArrow(0), binaryArrow(1), binaryArrow(2), binaryArrow(0)];
+    expect(checkIntendedClues(options, 0, arrowClues)).toEqual({
+      dispensableClueIds: ["turn"], indistinguishableWrongOptionIndexes: [3],
+    });
+  });
+
+  it("reports a constant clue as dispensable and an empty basis as ambiguous", () => {
+    const options = [binaryArrow(0), binaryArrow(1)];
+    expect(checkIntendedClues(options, 0, arrowClues.slice(0, 2))).toEqual({
+      dispensableClueIds: ["fill"], indistinguishableWrongOptionIndexes: [],
+    });
+    expect(checkIntendedClues(options, 0, [])).toEqual({
+      dispensableClueIds: [], indistinguishableWrongOptionIndexes: [1],
+    });
+  });
+
+  it("requires an existing answer and distinct clue ids", () => {
+    const options = [binaryArrow(0), binaryArrow(1)];
+    for (const answer of [-1, 2, 0.5]) {
+      expect(() => checkIntendedClues(options, answer, arrowClues)).toThrow(/answer index/);
+    }
+    expect(() => checkIntendedClues(options, 0, [arrowClues[0], arrowClues[0]])).toThrow(/distinct clue ids/);
   });
 });
 

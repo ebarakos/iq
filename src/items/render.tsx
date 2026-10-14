@@ -276,7 +276,66 @@ function connectionEndpoint(
  * accessibility tree is text, and a description there lets a reader solve the
  * puzzle without looking (docs/plans/link-only-test.md).
  */
+/** Piece boundaries share the same geometry in the browser and exported image. */
+function AssemblyGraphic({ scene, className }: { scene: Scene; className?: string }) {
+  const side = 28;
+  const inset = 8;
+  const markAt = (row: number, column: number) => scene.objects.find((entry) => entry.row === row && entry.column === column)?.object.shape;
+  return <svg viewBox="0 0 100 100" className={className} role="img" aria-label="board" data-scene-kind="assembly" data-assembly-kind={scene.assembly}>
+    {scene.assembly === "frame" && <rect x={inset} y={inset} width={84} height={84} fill="#fff" stroke={STROKE} strokeWidth={2} />}
+    {scene.assembly === "frame" && Array.from({ length: 9 }, (_, index) => {
+      const row = Math.floor(index / 3), column = index % 3;
+      return !markAt(row, column) ? <rect key={`empty-${index}`} x={inset + column * side} y={inset + row * side} width={side} height={side} fill="#fff" stroke="#9ca3af" strokeWidth={1} strokeDasharray="3 3" /> : null;
+    })}
+    {scene.objects.map(({ row, column, object }) => <rect key={`fill-${row}-${column}`} x={inset + column * side} y={inset + row * side} width={side} height={side} fill="#f3f4f6" data-piece-mark={object.shape} />)}
+    {scene.objects.map(({ row, column, object }) => {
+      const x = inset + column * side, y = inset + row * side;
+      const edges = [
+        [row - 1, column, x, y, x + side, y],
+        [row, column + 1, x + side, y, x + side, y + side],
+        [row + 1, column, x, y + side, x + side, y + side],
+        [row, column - 1, x, y, x, y + side],
+      ];
+      return <g key={`piece-${row}-${column}`}>
+        {edges.map(([r, c, x1, y1, x2, y2], index) => markAt(r, c) !== object.shape &&
+          <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke={STROKE} strokeWidth={2.6} strokeLinejoin="round" />)}
+        {object.kind === "token" && <Shape token={object} at={{ x: x + side / 2, y: y + side / 2 }} r={7.2} />}
+      </g>;
+    })}
+  </svg>;
+}
+
+/** Four allowed orientations and a crossed-out reflection, expressed without words. */
+export function AssemblyLegend() {
+  const piece = "M -9 -12 H -1 V 4 H 7 V 12 H -9 Z";
+  return <svg viewBox="0 0 280 86" className="block h-auto w-full" role="img" aria-label="diagram" data-assembly-legend="true">
+    {[0, 90, 180, 270].map((angle, index) => <g key={angle} transform={`translate(${25 + index * 62} 20)`}>
+      <path d={piece} transform={`rotate(${angle})`} fill="#e5e7eb" stroke={STROKE} strokeWidth={2} />
+      {index < 3 && <path d="M 21 -5 Q 32 -14 40 -4 M 35 -5 L 41 -3 L 40 -10" fill="none" stroke={STROKE} strokeWidth={1.8} />}
+    </g>)}
+    <path d="M 244 19 L 251 26 L 265 10" fill="none" stroke={STROKE} strokeWidth={3} />
+    <g transform="translate(89 64)"><path d={piece} fill="#e5e7eb" stroke={STROKE} strokeWidth={2} /></g>
+    <path d="M 112 64 H 147 M 141 58 L 147 64 L 141 70" fill="none" stroke={STROKE} strokeWidth={2} />
+    <path d="M 157 47 V 81" stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="3 3" />
+    <g transform="translate(178 64) scale(-1 1)"><path d={piece} fill="#e5e7eb" stroke={STROKE} strokeWidth={2} /></g>
+    <path d="M 204 55 L 222 73 M 222 55 L 204 73" fill="none" stroke={STROKE} strokeWidth={3} />
+  </svg>;
+}
+
 export function SceneGraphic({ scene, className }: { scene: Scene; className?: string }) {
+  if (scene.assembly) return <AssemblyGraphic scene={scene} className={className} />;
+  if (scene.figure) {
+    const center = CELL_VIEWBOX / 2;
+    const radius = CELL_VIEWBOX * 0.34;
+    return <svg viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`} className={className} role="img" aria-label="board">
+      {scene.figure.strokes.map((stroke) => {
+        const angle = stroke * Math.PI / 4 - Math.PI / 2;
+        return <line key={stroke} data-scene-stroke={stroke} x1={center} y1={center}
+          x2={center + radius * Math.cos(angle)} y2={center + radius * Math.sin(angle)}
+          stroke={STROKE} strokeWidth={3} strokeLinecap="round" />;
+      })}
+    </svg>;
+  }
   const boardSize = CELL_VIEWBOX - SCENE_BOARD_INSET * 2;
   const columnWidth = boardSize / scene.columns;
   const rowHeight = boardSize / scene.rows;
@@ -289,7 +348,7 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
       role="img"
       aria-label="board"
     >
-      <rect
+      {!scene.collection && <rect
         x={SCENE_BOARD_INSET}
         y={SCENE_BOARD_INSET}
         width={boardSize}
@@ -298,7 +357,7 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
         fill="#ffffff"
         stroke={STROKE}
         strokeWidth={SCENE_GRID_STROKE}
-      />
+      />}
       {(scene.guides ?? []).map((guide) => {
         const arrow = guide.direction === "leftToRight" ? "→" : guide.direction === "rightToLeft" ? "←" :
           guide.direction === "topToBottom" ? "↓" : "↑";
@@ -324,11 +383,11 @@ export function SceneGraphic({ scene, className }: { scene: Scene; className?: s
           </g>
         );
       })}
-      {Array.from({ length: scene.columns - 1 }, (_, index) => {
+      {!scene.collection && Array.from({ length: scene.columns - 1 }, (_, index) => {
         const x = SCENE_BOARD_INSET + (index + 1) * columnWidth;
         return <line key={`column-${index}`} x1={x} y1={SCENE_BOARD_INSET} x2={x} y2={CELL_VIEWBOX - SCENE_BOARD_INSET} stroke={HALF_FILL} strokeWidth={SCENE_GRID_STROKE} />;
       })}
-      {Array.from({ length: scene.rows - 1 }, (_, index) => {
+      {!scene.collection && Array.from({ length: scene.rows - 1 }, (_, index) => {
         const y = SCENE_BOARD_INSET + (index + 1) * rowHeight;
         return <line key={`row-${index}`} x1={SCENE_BOARD_INSET} y1={y} x2={CELL_VIEWBOX - SCENE_BOARD_INSET} y2={y} stroke={HALF_FILL} strokeWidth={SCENE_GRID_STROKE} />;
       })}
@@ -605,6 +664,16 @@ function FlowArrow({ direction = "right", className = "" }: { direction?: "right
 
 /** Render a puzzle's stem (the question) according to its layout. */
 export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
+  if (puzzle.layout === "assembly") return (
+    <div className="flex flex-col items-center gap-3" data-layout="assembly">
+      <div className="w-full max-w-[280px]"><AssemblyLegend /></div>
+      <div className="grid w-full max-w-[320px] grid-cols-3 gap-3">
+        {puzzle.stem.slice(0, 3).map((panel, index) => <div key={index}>{!isBlank(panel) && <SceneGraphic scene={panel} />}</div>)}
+      </div>
+      <FlowArrow direction="down" className="h-6 w-6 shrink-0" />
+      <div className="w-[116px]">{!isBlank(puzzle.stem[3]) && <SceneGraphic scene={puzzle.stem[3]} className="h-auto w-full" />}</div>
+    </div>
+  );
   if (puzzle.layout === "grid3x3") {
     // Arrows only when the rule runs one way: an arrow column before the third
     // board of every row says "these two make this one, across". A grid whose

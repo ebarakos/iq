@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { SAMPLE_GUIDES } from "@/items/sample-guides";
+import { sampleGuide } from "@/items/sample-guides";
 import {
   loadLinkTest,
   OPTION_LETTERS,
@@ -45,7 +45,7 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
         <h1 className="mt-4 text-2xl font-semibold">These answers cannot be read</h1>
         <p className="mt-3 text-gray-700">
           The link&apos;s answers are not in the form this test writes them.{" "}
-          <a className="underline" href={questionPath(token, 1, [])}>Start this test again from question 1</a>.
+          <a className="underline" rel="nofollow" href={questionPath(token, 1, [])}>Start this test again from question 1</a>.
         </p>
       </LinkPage>
     );
@@ -72,14 +72,14 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
           answered by then count as incorrect.
         </p>
         <p className="mt-6">
-          <a className="underline" href={resultPath(token, padded)}>See your result</a>
+          <a className="underline" rel="nofollow" href={resultPath(token, padded)}>See your result</a>
         </p>
       </LinkPage>
     );
   }
 
   const letters = OPTION_LETTERS.slice(0, puzzle.options.length);
-  const guide = test.profile === "short-5" ? SAMPLE_GUIDES[puzzle.layout] : undefined;
+  const guide = test.profile === "short-5" ? sampleGuide(puzzle) : undefined;
   return (
     <LinkPage profile={test.profile}>
       <h1 className="mt-4 text-2xl font-semibold">{`Question ${number} of ${total}`}</h1>
@@ -117,6 +117,7 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
             <li key={letter}>
               <a
                 href={next(index)}
+                rel="nofollow"
                 className="inline-block rounded-lg border-2 border-gray-300 bg-white px-4 py-2 font-semibold hover:border-gray-900"
               >
                 {`Option ${letter}`}
@@ -126,6 +127,7 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
           <li>
             <a
               href={next(null)}
+              rel="nofollow"
               className="inline-block rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 hover:border-gray-900"
             >
               Skip
