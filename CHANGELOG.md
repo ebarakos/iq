@@ -5,24 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-14
 
 ### Added
-- A local leaderboard for on-time 30-question tests, with an optional nickname, speed points,
-  accuracy, elapsed time and the app release used. Deployments require `LEADERBOARD_ENABLED=true`.
+- Two matrix families, each with three difficulty levels: overlapping line figures that
+  combine across rows and down columns, and a grid where every row and column holds each
+  shape and each shading once.
+- Interacting transformation machines: move a board, repaint one square, then copy its
+  current symbol. Contrasting examples distinguish shape and fill readings.
+- Points on every 30-question result, even with the leaderboard disabled: 100 per correct
+  answer, plus a time bonus of up to 25%. Skipped and wrong answers earn no base points.
+  The introduction, results and leaderboard explain the same calculation.
+- A leaderboard for on-time 30-question tests, with an optional nickname, speed points,
+  accuracy, elapsed time and the app release used. It is on in production from this release;
+  previews show none.
 - A test you can take by following links alone: `/sample` (5 questions) and `/test` (30)
   start a fresh test, each question is a picture with one link per option plus Skip, and
   the last link opens the scored result with its review. Same puzzles, same one minute per
   question, scored on the server. Made for chat agents that fetch pages but run no
   JavaScript; the home page's start buttons are now these links too.
+- Frozen evaluation replay and separate report populations for reliable before/after probes.
+- Two prototypes that are built but not served: a conditional composed transform, where
+  repainting changes which shapes move, and spatial assembly, which fits pieces into a frame.
 
 ### Changed
+- Difficulty is fixed by question number: the sample runs at levels 2/3/4/4/5, and the
+  30-question test has 5/4/13/8 questions at levels 2/3/4/5. Each question's family is drawn
+  from the families valid at its level. A long test covers all twelve families, at most five
+  questions each, never the same family twice in a row.
+- Every transform in a machine question is needed: ignoring any one leaves at least two
+  choices open. Level 5 machine questions use all three transforms in a mixed order.
+- Six options still mean one right answer and five plausible near misses. Wrong options now
+  include mistakes affecting one symbol, property, square or repeated copy. Checking one
+  symbol cannot finish a puzzle with several independent outcomes, even when options omit
+  or duplicate symbols. Balanced option lists prefer more indispensable clues while keeping rich rules.
+- The sample's "How to read this" note for a 3 × 3 grid describes only that grid: the rows
+  for a grid with arrows, the rows and columns for one without.
+- Two leaderboard rankings: Dev, shared by development, testing, previews and staging, and
+  Production, which needs `LEADERBOARD_ENV=production` on a production deployment. Stored
+  scores stay separate.
+- Quiz tokens and first-submission receipts keep their deployment scope when the selected
+  leaderboard changes, preserving active tests and retries. A scored result stays bound to
+  its first selected board and cannot be republished to another; existing receipts keep their original board.
 - Submissions in both test flows save their first result in Upstash Redis before revealing
   answers. Identical retries recover it; changed answers are refused, preventing score replay.
 - Screen-reader labels no longer describe what is on a board ("Option A", "board"), and the
   layout labels name only what the picture shows. A label that spelled out every shape let a
   reader solve the puzzle without looking.
 - The agent image draws its arrows as lines rather than text, so it looks the same with any font.
+- Search crawlers are asked not to follow links into a test, so they cannot wander through
+  thousands of answer pages.
 
 ## [0.1.2] - 2026-10-06
 
