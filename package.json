@@ -1,6 +1,6 @@
 {
   "name": "aiq",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "A visual reasoning gym for humans and agents (MVP prototype)",
   "type": "module",
