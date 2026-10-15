@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { Puzzle, PublicPuzzle } from "./schema";
-import { puzzleToSvg } from "./compose-image";
+import { pictureToSvg, puzzleToSvg } from "./compose-image";
+import type { PicturePart } from "./picture-puzzle";
 
 /**
  * The bundled Latin subsets of Noto Sans (`src/app/fonts`, OFL). The image's
@@ -14,19 +15,9 @@ const FONT_FILES = [
   "src/app/fonts/NotoSans-ExtraBold-latin.ttf",
 ].map((file) => join(process.cwd(), file));
 
-/**
- * Rasterize the agent channel's standalone puzzle SVG (stem plus options
- * lettered A–F) to PNG bytes.
- *
- * `@resvg/resvg-js` is imported lazily: it is a native module, and this keeps
- * it out of the graph of anything that only imports the module.
- */
-export async function puzzleToPng(
-  puzzle: Puzzle | PublicPuzzle,
-  options: { optionsOnly?: boolean } = {},
-): Promise<Uint8Array> {
+async function rasterize(svg: string): Promise<Uint8Array> {
+  // A native module, imported lazily to keep it out of anything that only imports this one.
   const { Resvg } = await import("@resvg/resvg-js");
-  const svg = puzzleToSvg(puzzle, options);
   const resvg = new Resvg(svg, {
     font: {
       loadSystemFonts: false,
@@ -36,4 +27,21 @@ export async function puzzleToPng(
     },
   });
   return resvg.render().asPng();
+}
+
+/**
+ * Rasterize the agent channel's standalone puzzle SVG (stem plus options
+ * lettered A–F) to PNG bytes.
+ */
+export async function puzzleToPng(
+  puzzle: Puzzle | PublicPuzzle,
+  options: { optionsOnly?: boolean } = {},
+): Promise<Uint8Array> {
+  return rasterize(puzzleToSvg(puzzle, options));
+}
+
+/** One served picture of a question as PNG bytes, or null when it has no such part. */
+export async function pictureToPng(puzzle: Puzzle, part: PicturePart): Promise<Uint8Array | null> {
+  const svg = pictureToSvg(puzzle, part);
+  return svg === null ? null : rasterize(svg);
 }

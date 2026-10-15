@@ -1,11 +1,40 @@
+/** Who took a published test, as the publisher declared it. It cannot be verified. */
+export const TAKER_KINDS = ["person", "agent"] as const;
+export type TakerKind = (typeof TAKER_KINDS)[number];
+
 /** Public rows contain no quiz tokens, answers or internal puzzle data. */
 export interface LeaderboardEntry {
   id: string;
   nickname: string;
+  /** Absent on rows published before the tag existed. */
+  kind?: TakerKind;
   points: number;
   correct: number;
   total: 30;
   elapsedSeconds: number;
   appVersion: string;
   submittedAt: number;
+}
+
+/**
+ * The names a link-only agent can publish under: one publish link each on the
+ * link test's result page, because such an agent cannot type into a form
+ * (docs/plans/leaderboard-integrity.md). The key is the link's path segment.
+ */
+export const AGENT_NAMES = {
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  gemini: "Gemini",
+  grok: "Grok",
+  copilot: "Copilot",
+  perplexity: "Perplexity",
+  deepseek: "DeepSeek",
+  "meta-ai": "Meta AI",
+  mistral: "Mistral",
+  other: "Other AI agent",
+} as const satisfies Record<string, string>;
+export type AgentSlug = keyof typeof AGENT_NAMES;
+
+export function agentName(slug: string): string | null {
+  return Object.hasOwn(AGENT_NAMES, slug) ? AGENT_NAMES[slug as AgentSlug] : null;
 }

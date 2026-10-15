@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadBank } from "@/items/bank";
-import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
+import { drawExpandedSlot, EXPANDED_GENERATOR_VERSION, planExpandedSchedule } from "@/items/expanded-quiz";
+import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
 import { OPTIONS_PER_ITEM } from "@/items/schema";
 import {
   clearBuiltLinkTests,
   createLinkTest,
   formatLinkAnswers,
   LinkTestError,
+  linkTestQuestion,
   loadLinkTest,
   OPTION_LETTERS,
   openLinkToken,
@@ -15,7 +17,7 @@ import {
   withdrawnFamilyHash,
 } from "./link-test";
 import packageJson from "../../package.json";
-import { createQuizDelivery, SECONDS_PER_QUESTION } from "./quiz-token";
+import { SECONDS_PER_QUESTION, sealTokenJson } from "./quiz-token";
 
 const SECRET = "test-only-link-test-secret-with-at-least-32-characters";
 const NO_WITHDRAWALS = new Set<string>();
@@ -47,6 +49,35 @@ describe("link test token", () => {
     expect(rebuilt.test).toEqual(created.test);
     expect(rebuilt.puzzles).toEqual(created.puzzles);
   });
+
+  it("builds one question alone on a server that does not hold the test", () => {
+    const created = createLinkTest("short-5", { ...context, seed: "link-one-question" });
+    expect(created.test.attempts).toEqual([0, 0, 0, 0, 0]);
+    clearBuiltLinkTests();
+    const test = openLinkToken(created.token, context);
+    created.puzzles.forEach((puzzle, index) => {
+      expect(linkTestQuestion(test, index + 1, context)).toEqual(puzzle);
+    });
+    for (const outside of [0, 6, 1.5]) expect(linkTestQuestion(test, outside, context)).toBeUndefined();
+
+    // The token's kept attempt decides what is built alone; the whole test is
+    // never consulted. Claim a later attempt that also passes, and that draw comes back.
+    const schedule = planExpandedSchedule(created.test.seed, "short-5", CURRENT_FAMILY_PROMOTION_REGISTRY, NO_WITHDRAWALS);
+    const slot = schedule.findIndex((selected, index) =>
+      drawExpandedSlot(created.test.seed, "short-5", index, 1, selected).accepted);
+    expect(slot).toBeGreaterThanOrEqual(0);
+    const claimed = created.test.attempts!.map((attempt, index) => index === slot ? 1 : attempt);
+    const later = openLinkToken(sealLinkToken({ ...created.test, attempts: claimed }, SECRET), context);
+    expect(later.attempts).toEqual(claimed);
+    clearBuiltLinkTests();
+    expect(linkTestQuestion(later, slot + 1, context)).not.toEqual(created.puzzles[slot]);
+
+    // A token made before kept attempts were sealed rebuilds the whole test instead.
+    const legacy = openLinkToken(sealLinkToken({ ...created.test, attempts: undefined }, SECRET), context);
+    expect(legacy.attempts).toBeUndefined();
+    clearBuiltLinkTests();
+    expect(linkTestQuestion(legacy, 3, context)).toEqual(created.puzzles[2]);
+  }, 30_000);
 
   it("seals the starting app version and refuses cross-environment replay", () => {
     const created = createLinkTest("short-5", { ...context, seed: "link-scope" });
@@ -124,8 +155,13 @@ describe("link test token", () => {
     expect(created.test.source).toBe("fallback");
     expect(created.test.bankHash).toBeDefined();
 
+    expect(created.test.attempts).toBeUndefined();
+
     clearBuiltLinkTests();
     expect(loadLinkTest(created.token, { ...context, bank }).puzzles).toEqual(created.puzzles);
+    clearBuiltLinkTests();
+    expect(linkTestQuestion(openLinkToken(created.token, { ...context, bank }), 2, { ...context, bank }))
+      .toEqual(created.puzzles[1]);
     // A different reference bank would draw other questions from the same seed.
     expect(errorCode(() => openLinkToken(created.token, { ...context, bank: [...bank].reverse() }))).toBe("changed");
   });
@@ -141,9 +177,27 @@ describe("link test token", () => {
     expect(errorCode(() => openLinkToken(created.token, { ...context, secret: `${SECRET}-other` }))).toBe("invalid");
     expect(errorCode(() => openLinkToken("not-a-token", context))).toBe("invalid");
 
-    // An in-page quiz token never opens as a link token.
-    const { quizToken } = createQuizDelivery(created.puzzles, { secret: SECRET });
-    expect(errorCode(() => openLinkToken(quizToken, context))).toBe("invalid");
+    // A token sealed for another kind never opens as a test token, even under the same secret.
+    const other = sealTokenJson(openLinkToken(created.token, context), { version: "v1", aad: "aiq.quiz-token.v1" }, SECRET);
+    expect(errorCode(() => openLinkToken(other, context))).toBe("invalid");
+  });
+
+  it("uses a fresh nonce, so the same test never gives the same token twice", () => {
+    const created = createLinkTest("short-5", { ...context, seed: "link-nonce" });
+    expect(sealLinkToken(created.test, SECRET)).not.toBe(sealLinkToken(created.test, SECRET));
+  });
+
+  it("seals whether ranking was on when the test started, and nothing else turns it on", () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    const ranked = createLinkTest("short-5", { ...context, seed: "link-rank" });
+    expect(openLinkToken(ranked.token, context).rankAllowed).toBe(true);
+    vi.stubEnv("LEADERBOARD_ENABLED", "false");
+    const unranked = createLinkTest("short-5", { ...context, seed: "link-rank" });
+    expect(openLinkToken(unranked.token, context).rankAllowed).toBe(false);
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    expect(openLinkToken(unranked.token, context).rankAllowed).toBe(false);
+    const legacy = { ...ranked.test, rankAllowed: undefined };
+    expect(openLinkToken(sealLinkToken(legacy, SECRET), context).rankAllowed).toBeUndefined();
   });
 });
 

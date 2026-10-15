@@ -21,7 +21,8 @@
     "report": "tsx scripts/report.ts",
     "pilot:report": "tsx scripts/pilot-report.ts",
     "vercel:setup": "node --import tsx scripts/vercel-setup.ts",
-    "redis:verify": "node --env-file=.env.local --import tsx scripts/redis-verify.ts"
+    "redis:verify": "node --env-file=.env.local --import tsx scripts/redis-verify.ts",
+    "leaderboard:remove": "node --env-file=.env.local --import tsx scripts/leaderboard-remove.ts"
   },
   "engines": {
     "node": ">=20"
@@ -31,6 +32,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "ai": "^6.0.0",
     "next": "^15.5.0",
+    "obscenity": "^0.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^4.3.6"

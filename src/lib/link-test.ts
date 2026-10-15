@@ -1,12 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import packageJson from "../../package.json";
-import { quizNamespace } from "./leaderboard-config";
+import { leaderboardEnabled, quizNamespace } from "./leaderboard-config";
 import { loadBank, sampleExpandedBankQuiz, type BankItem } from "@/items/bank";
 import {
-  assembleExpandedQuiz,
+  assembleExpandedTest,
+  buildExpandedQuestion,
   EXPANDED_GENERATOR_VERSION,
   EXPANDED_PROFILES,
+  questionCount,
   type ExpandedProfile,
 } from "@/items/expanded-quiz";
 import {
@@ -14,23 +16,27 @@ import {
   normalizeWithdrawnFamilyIds,
   readWithdrawnFamilyIds,
 } from "@/items/family-promotion";
-import { OPTIONS_PER_ITEM, type PuzzleSet } from "@/items/schema";
+import { OPTIONS_PER_ITEM, type Puzzle, type PuzzleSet } from "@/items/schema";
 import {
+  answerKeyItems,
   openTokenJson,
   QUIZ_TOKEN_TTL_SECONDS,
   QuizTokenError,
   resolveQuizTokenSecret,
   SECONDS_PER_QUESTION,
   sealTokenJson,
+  type QuizTokenPayload,
 } from "./quiz-token";
 
 /**
- * The link test: a test an agent takes by fetching pages and following links,
- * with no JavaScript and no forms (docs/plans/link-only-test.md).
+ * The test token, for both flows: the link test an agent takes by fetching
+ * pages and following links (docs/plans/link-only-test.md), and the in-page
+ * test, which shows the same questions as pictures
+ * (docs/plans/leaderboard-integrity.md).
  *
- * Its token seals a seed, not the test. Every page rebuilds the same test from
- * the seed, so the token stays short enough to sit in a link, and the answers
- * never leave the server.
+ * It seals a seed, not the test. Every page and picture rebuilds the same test
+ * from the seed, so the token stays short enough to sit in a link, and the
+ * answers never leave the server. One token per test means one scoring receipt.
  */
 
 const LINK_TOKEN_ENVELOPE = { version: "l1", aad: "aiq.link-token.v1" } as const;
@@ -39,27 +45,39 @@ export type LinkTestSource = "generated" | "fallback";
 
 /** What a link token seals. Short keys: every character rides in every link. */
 const LinkTokenSchema = z.object({
-  /** The release and environment sealed when the test starts. Link results never rank. */
+  /** The release and environment sealed when the test starts. */
   v: z.string().min(1).max(80).optional(),
   c: z.string().optional(),
+  /** Whether ranking was on when the test started; a token without it never ranks. */
+  r: z.boolean().optional(),
   /** The seed. */
   s: z.string().min(1).max(64),
   /** The length. */
   p: z.enum(EXPANDED_PROFILES),
-  /** Generated fresh, or drawn from the reference bank after generation failed. */
-  o: z.enum(["generated", "fallback"]),
+  /**
+   * Generated fresh, or drawn from the reference bank after generation failed.
+   * A generated test carries `a` instead, which says the same in fewer characters.
+   */
+  o: z.enum(["generated", "fallback"]).optional(),
   /** `EXPANDED_GENERATOR_VERSION` when the test was made. */
   g: z.string().min(1),
   /** `withdrawnFamilyHash` when the test was made. */
   w: z.string().min(1),
   /** `bankHash` when the test was made; a fallback test only. */
   b: z.string().min(1).optional(),
+  /**
+   * The attempt each question's slot kept, one digit per question with trailing
+   * zeros dropped; a generated test only. Lets a server rebuild one question.
+   */
+  a: z.string().regex(/^\d{0,30}$/).optional(),
   /** issuedAt, answerDeadline, expiresAt: epoch seconds, as in the quiz token. */
   i: z.number().int().nonnegative(),
   d: z.number().int().positive(),
   e: z.number().int().positive(),
 }).refine((token) => token.i < token.d && token.d <= token.e, {
   message: "the deadline must fall between issue and expiry",
+}).refine((token) => (token.o === undefined) !== (token.a === undefined), {
+  message: "a token names its source or its kept attempts, not both",
 });
 type LinkTokenWire = z.infer<typeof LinkTokenSchema>;
 
@@ -67,12 +85,19 @@ type LinkTokenWire = z.infer<typeof LinkTokenSchema>;
 export interface LinkTest {
   appVersion?: string;
   leaderboardScope?: string;
+  rankAllowed?: boolean;
   seed: string;
   profile: ExpandedProfile;
   source: LinkTestSource;
   generatorVersion: string;
   withdrawnHash: string;
   bankHash?: string;
+  /**
+   * The attempt each question's slot kept (`assembleExpandedTest`), so one
+   * question can be rebuilt without the rest. Absent on a fallback test and on
+   * tokens made before it existed: those rebuild the whole test.
+   */
+  attempts?: number[];
   issuedAt: number;
   answerDeadline: number;
   expiresAt: number;
@@ -133,12 +158,18 @@ function resolveSecret(secret: string | undefined): string {
 }
 
 export function sealLinkToken(test: LinkTest, secret?: string): string {
+  if (test.attempts?.some((attempt) => !Number.isInteger(attempt) || attempt < 0 || attempt > 9)) {
+    throw new Error("a kept attempt must be one digit");
+  }
   const wire: LinkTokenWire = LinkTokenSchema.parse({
     v: test.appVersion,
     c: test.leaderboardScope,
+    ...(test.rankAllowed !== undefined ? { r: test.rankAllowed } : {}),
     s: test.seed,
     p: test.profile,
-    o: test.source,
+    ...(test.source === "generated" && test.attempts
+      ? { a: test.attempts.join("").replace(/0+$/, "") }
+      : { o: test.source }),
     g: test.generatorVersion,
     w: test.withdrawnHash,
     ...(test.bankHash ? { b: test.bankHash } : {}),
@@ -169,12 +200,16 @@ export function openLinkToken(token: string, context: LinkTestContext = {}): Lin
   const test: LinkTest = {
     appVersion: wire.v,
     leaderboardScope: wire.c,
+    rankAllowed: wire.r,
     seed: wire.s,
     profile: wire.p,
-    source: wire.o,
+    source: wire.o ?? "generated",
     generatorVersion: wire.g,
     withdrawnHash: wire.w,
     bankHash: wire.b,
+    ...(wire.a !== undefined
+      ? { attempts: Array.from({ length: questionCount(wire.p) }, (_, index) => Number(wire.a![index] ?? 0)) }
+      : {}),
     issuedAt: wire.i,
     answerDeadline: wire.d,
     expiresAt: wire.e,
@@ -206,7 +241,7 @@ function buildPuzzles(
   bank: () => readonly BankItem[],
 ): PuzzleSet {
   if (source === "generated") {
-    return assembleExpandedQuiz(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn);
+    return assembleExpandedTest(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn).puzzles;
   }
   const usable = bank().filter((item) =>
     !(item.puzzle.familyId && withdrawn.has(item.puzzle.familyId)));
@@ -214,20 +249,25 @@ function buildPuzzles(
 }
 
 /**
- * Recently built tests, by everything that decides their questions. A taker
- * fetches each question page and its image in turn. Rebuilding repeats every
- * question's generation and acceptance checks, so a small cache avoids that work.
+ * Recently built tests, by everything that decides their questions: the whole
+ * test, or the questions built so far one at a time. Building a 30-question
+ * test takes seconds, so a server that did not start the test builds only the
+ * question a page or picture asks for (`linkTestQuestion`).
  */
-const BUILT_TESTS = new Map<string, PuzzleSet>();
+interface BuiltTest {
+  complete: boolean;
+  puzzles: (Puzzle | undefined)[];
+}
+const BUILT_TESTS = new Map<string, BuiltTest>();
 const BUILT_TESTS_LIMIT = 64;
 
 function buildKey(test: Pick<LinkTest, "seed" | "profile" | "source" | "generatorVersion" | "withdrawnHash" | "bankHash">): string {
   return [test.seed, test.profile, test.source, test.generatorVersion, test.withdrawnHash, test.bankHash ?? ""].join("|");
 }
 
-function remember(key: string, puzzles: PuzzleSet): void {
+function remember(key: string, built: BuiltTest): void {
   BUILT_TESTS.delete(key);
-  BUILT_TESTS.set(key, puzzles);
+  BUILT_TESTS.set(key, built);
   while (BUILT_TESTS.size > BUILT_TESTS_LIMIT) {
     BUILT_TESTS.delete(BUILT_TESTS.keys().next().value as string);
   }
@@ -240,18 +280,19 @@ function remember(key: string, puzzles: PuzzleSet): void {
  */
 export function createLinkTest(
   profile: ExpandedProfile,
-  context: LinkTestContext & { seed?: string; assemble?: typeof assembleExpandedQuiz } = {},
+  context: LinkTestContext & { seed?: string; assemble?: typeof assembleExpandedTest } = {},
 ): { token: string; test: LinkTest; puzzles: PuzzleSet } {
   const secret = resolveSecret(context.secret);
   const seed = context.seed ?? randomBytes(16).toString("base64url");
   const withdrawn = context.withdrawnFamilyIds ?? readWithdrawnFamilyIds();
   const bank = () => context.bank ?? loadBank();
-  const assemble = context.assemble ?? assembleExpandedQuiz;
+  const assemble = context.assemble ?? assembleExpandedTest;
 
   let source: LinkTestSource = "generated";
   let puzzles: PuzzleSet;
+  let attempts: number[] | undefined;
   try {
-    puzzles = assemble(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn);
+    ({ puzzles, attempts } = assemble(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn));
   } catch (error) {
     console.error(`link-test: ${profile} assembly failed —`, error);
     source = "fallback";
@@ -264,18 +305,32 @@ export function createLinkTest(
   const test: LinkTest = {
     appVersion: `v${packageJson.version}`,
     leaderboardScope: quizNamespace(),
+    rankAllowed: leaderboardEnabled(),
     seed,
     profile,
     source,
     generatorVersion: EXPANDED_GENERATOR_VERSION,
     withdrawnHash: withdrawnFamilyHash(withdrawn),
-    ...(source === "fallback" ? { bankHash: bankHash(bank()) } : {}),
+    ...(source === "fallback" ? { bankHash: bankHash(bank()) } : { attempts }),
     issuedAt,
     answerDeadline: issuedAt + SECONDS_PER_QUESTION * puzzles.length,
     expiresAt: issuedAt + QUIZ_TOKEN_TTL_SECONDS,
   };
-  remember(buildKey(test), puzzles);
+  remember(buildKey(test), { complete: true, puzzles });
   return { token: sealLinkToken(test, secret), test, puzzles };
+}
+
+function wholeTest(test: LinkTest, context: LinkTestContext): PuzzleSet {
+  const key = buildKey(test);
+  const cached = BUILT_TESTS.get(key);
+  if (cached?.complete) {
+    remember(key, cached);
+    return cached.puzzles as PuzzleSet;
+  }
+  const withdrawn = context.withdrawnFamilyIds ?? readWithdrawnFamilyIds();
+  const puzzles = buildPuzzles(test.seed, test.profile, test.source, withdrawn, () => context.bank ?? loadBank());
+  remember(key, { complete: true, puzzles });
+  return puzzles;
 }
 
 /** Open a link token and rebuild its test, exactly as it was first built. */
@@ -284,16 +339,58 @@ export function loadLinkTest(
   context: LinkTestContext = {},
 ): { test: LinkTest; puzzles: PuzzleSet } {
   const test = openLinkToken(token, context);
+  return { test, puzzles: wholeTest(test, context) };
+}
+
+/** How many questions an opened test has. */
+export function linkTestLength(test: Pick<LinkTest, "profile">): number {
+  return questionCount(test.profile);
+}
+
+/**
+ * Question `number` (1-based) of an opened test, or undefined past its end.
+ * Builds only that question when the test records its kept attempts, so a page
+ * or picture never waits for the other questions; otherwise builds them all.
+ */
+export function linkTestQuestion(
+  test: LinkTest,
+  number: number,
+  context: LinkTestContext = {},
+): Puzzle | undefined {
+  if (!Number.isInteger(number) || number < 1 || number > linkTestLength(test)) return undefined;
   const key = buildKey(test);
   const cached = BUILT_TESTS.get(key);
-  if (cached) {
+  const known = cached?.puzzles[number - 1];
+  if (cached && known) {
     remember(key, cached);
-    return { test, puzzles: cached };
+    return known;
   }
+  if (test.source !== "generated" || !test.attempts) return wholeTest(test, context)[number - 1];
   const withdrawn = context.withdrawnFamilyIds ?? readWithdrawnFamilyIds();
-  const puzzles = buildPuzzles(test.seed, test.profile, test.source, withdrawn, () => context.bank ?? loadBank());
-  remember(key, puzzles);
-  return { test, puzzles };
+  const puzzle = buildExpandedQuestion(
+    test.seed, test.profile, number - 1, test.attempts[number - 1], CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn,
+  );
+  const built = cached ?? { complete: false, puzzles: [] };
+  built.puzzles[number - 1] = puzzle;
+  remember(key, built);
+  return puzzle;
+}
+
+/**
+ * What scoring needs, from a test and its rebuilt questions: the answers, the
+ * times and what was sealed at the start. Both flows score through this.
+ */
+export function scoringPayload(test: LinkTest, puzzles: PuzzleSet): QuizTokenPayload {
+  return {
+    version: 1,
+    issuedAt: test.issuedAt,
+    expiresAt: test.expiresAt,
+    answerDeadline: test.answerDeadline,
+    appVersion: test.appVersion,
+    leaderboardAllowed: test.rankAllowed === true,
+    leaderboardScope: test.leaderboardScope,
+    items: answerKeyItems(puzzles),
+  };
 }
 
 /** Forget every built test. For tests that need a cold rebuild. */
@@ -349,6 +446,19 @@ export function resultPath(token: string, answers: readonly (number | null)[]): 
 /** The path of question `n`'s puzzle image. */
 export function puzzleImagePath(token: string, n: number): string {
   return `/t/${token}/${n}/puzzle.png`;
+}
+
+/**
+ * The path of one picture of question `n`: a stem panel (`s<i>`), an option
+ * (`o<k>`), or a gate's jigsaw strip (`g<i>-right`, `g<i>-down`).
+ */
+export function pictureImagePath(token: string, n: number, part: string): string {
+  return `/t/${token}/${n}/board/${part}.png`;
+}
+
+/** The path that publishes a link test's saved result under one agent name. */
+export function publishPath(token: string, agent: string): string {
+  return `/t/${token}/publish/${agent}`;
 }
 
 /** Where a new test of this length starts. */

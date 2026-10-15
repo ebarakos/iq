@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { PublicPuzzle } from "@/items/schema";
-import type { LeaderboardEntry } from "@/lib/leaderboard-types";
+import { picturePaths, withPictureAttempt, type PicturePuzzle } from "@/items/picture-puzzle";
+import type { LeaderboardEntry, TakerKind } from "@/lib/leaderboard-types";
 import { SceneGraphic, StemView } from "@/items/render";
 import { sampleGuide } from "@/items/sample-guides";
 import {
@@ -25,7 +26,8 @@ const PROFILE_LABELS: Record<TestProfile, string> = {
 };
 
 interface GenerateResponse {
-  puzzles: PublicPuzzle[];
+  /** Pictures only: layout and image paths, no scene data, until the test is scored. */
+  puzzles: PicturePuzzle[];
   quizToken: string;
   profile?: TestProfile;
   /** Server-issued end of the test, in epoch seconds. The browser only displays it. */
@@ -61,6 +63,8 @@ interface SubmitResponse {
   leaderboardEligible?: boolean;
   /** Client-side publication receipt, kept with the result across reloads. */
   leaderboardEntry?: LeaderboardEntry;
+  /** The full questions, sent only after the first result is saved; the review draws them. */
+  puzzles?: PublicPuzzle[];
   breakdown?: {
     bands: Array<{ key: string; correct: number; attempted: number }>;
     families: Array<{ key: string; correct: number; attempted: number }>;
@@ -136,7 +140,7 @@ function formatClock(seconds: number): string {
 
 // Bump when the default test shape changes so an old in-progress quiz cannot
 // hide the new start experience after a reload.
-const SESSION_KEY = "aiq-test-v5";
+const SESSION_KEY = "aiq-test-v6";
 
 type TestMeta = {
   profile: TestProfile;
@@ -146,11 +150,11 @@ type TestMeta = {
   notice?: string;
 };
 
-type SavedSession = StoredSession<PublicPuzzle, SubmitResponse, Partial<TestMeta>>;
+type SavedSession = StoredSession<PicturePuzzle, SubmitResponse, Partial<TestMeta>>;
 
 export default function Quiz({ leaderboardEnabled, leaderboardLabel }: { leaderboardEnabled: boolean; leaderboardLabel: string }) {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [puzzles, setPuzzles] = useState<PublicPuzzle[]>([]);
+  const [puzzles, setPuzzles] = useState<PicturePuzzle[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [quizToken, setQuizToken] = useState("");
   const [review, setReview] = useState<SubmitResponse | null>(null);
@@ -202,13 +206,14 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: { leaderb
 
   function isTokenFailureMessage(message: string): boolean {
     return message.startsWith("This quiz has expired") || message.startsWith("This quiz token is invalid") ||
+      message.startsWith("This quiz has changed") ||
       message === "This quiz was already submitted with different answers. Start a new test.";
   }
 
   // Restore in-progress session on mount (client-only; avoids hydration mismatch).
   useEffect(() => {
     try {
-      const restored = parseStoredSession<PublicPuzzle, SubmitResponse, Partial<TestMeta>>(
+      const restored = parseStoredSession<PicturePuzzle, SubmitResponse, Partial<TestMeta>>(
         sessionStorage.getItem(SESSION_KEY),
       );
       if (!restored) return;
@@ -324,6 +329,18 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: { leaderb
       if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
+
+  // Fetch the next question's pictures while this one is solved, so moving on
+  // never waits on the server's drawing.
+  useEffect(() => {
+    if (phase !== "active") return;
+    const next = puzzles[current + 1];
+    if (!next) return;
+    for (const path of picturePaths(next)) {
+      const image = new Image();
+      image.src = path;
+    }
+  }, [phase, puzzles, current]);
 
   // One countdown for the whole test, driven by the wall clock so a paused tab
   // or a slow render cannot slow it down.
@@ -472,6 +489,9 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: { leaderb
 
       {phase === "active" && puzzles[current] && (
         <Solver
+          // A fresh Solver for every question: its pictures are new image
+          // elements, so the last question's pixels never show under this one's.
+          key={current}
           puzzle={puzzles[current]}
           index={current}
           total={puzzles.length}
@@ -495,7 +515,6 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: { leaderb
 
       {phase === "result" && review && (
         <Result
-          puzzles={puzzles}
           review={review}
           quizToken={quizToken}
           leaderboardEnabled={leaderboardEnabled}
@@ -589,6 +608,7 @@ function ErrorView({
   onStartNew: () => void;
 }) {
   const isTokenError = message.includes("quiz token") || message.includes("quiz has expired") ||
+    message.includes("quiz has changed") ||
     message.includes("already submitted with different answers");
   return (
     <section className="rounded-2xl border border-red-200 bg-red-50 p-8 shadow-sm">
@@ -709,7 +729,7 @@ function Solver({
   onGoTo,
   onFinish,
 }: {
-  puzzle: PublicPuzzle;
+  puzzle: PicturePuzzle;
   index: number;
   total: number;
   selected: number | null;
@@ -726,6 +746,34 @@ function Solver({
   onFinish: () => void;
 }) {
   const isLast = index === total - 1;
+  // Choices wait until every picture of the question has drawn: until then the
+  // taker cannot see what they would be choosing. A failed picture offers a
+  // retry; answers and the server's deadline stay as they are.
+  const [attempt, setAttempt] = useState(0);
+  const [pictures, setPictures] = useState<"loading" | "ready" | "failed">("loading");
+  const picturesRef = useRef<HTMLDivElement>(null);
+  const ready = pictures === "ready";
+  const shown = withPictureAttempt(puzzle, attempt);
+
+  useEffect(() => {
+    const images = [...(picturesRef.current?.querySelectorAll("img") ?? [])];
+    const settle = () => {
+      if (images.some((image) => image.complete && image.naturalWidth === 0)) setPictures("failed");
+      else if (images.every((image) => image.complete)) setPictures("ready");
+      else setPictures("loading");
+    };
+    for (const image of images) {
+      image.addEventListener("load", settle);
+      image.addEventListener("error", settle);
+    }
+    settle();
+    return () => {
+      for (const image of images) {
+        image.removeEventListener("load", settle);
+        image.removeEventListener("error", settle);
+      }
+    };
+  }, [attempt]);
   const optionCount = puzzle.options.length;
   const stickyRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -770,7 +818,7 @@ function Solver({
       const letterMatch = "abcdef".indexOf(key);
       const optIdx = digitMatch >= 0 ? digitMatch : letterMatch;
       if (optIdx >= 0 && optIdx < optionCount) {
-        onChoose(optIdx);
+        if (ready) onChoose(optIdx);
         return;
       }
 
@@ -794,7 +842,7 @@ function Solver({
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [index, total, selected, isLast, optionCount, onChoose, onPrev, onNext, onFinish]);
+  }, [index, total, selected, isLast, optionCount, ready, onChoose, onPrev, onNext, onFinish]);
 
   // Options grid: 4 options → 4-col, 5–6 → 3-col (at sm breakpoint) to avoid cramped tiles.
   const gridClass = optionCount <= 4
@@ -859,42 +907,51 @@ function Solver({
             <p className="mt-1">{guide}</p>
           </div>
         )}
-        {puzzle.stem.length > 0 ? (
-          <div className="mb-6 rounded-xl bg-gray-50 p-2 sm:p-4" aria-label="Puzzle diagram">
-            <StemView puzzle={puzzle} />
+        {pictures === "failed" ? (
+          <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p>Some pictures did not load. Your answers and the time limit are kept.</p>
+            <button
+              type="button"
+              onClick={() => setAttempt((value) => value + 1)}
+              className="mt-2 rounded-lg bg-red-700 px-3 py-1.5 font-medium text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
+            >
+              Load the pictures again
+            </button>
           </div>
-        ) : (
-          // Odd-one-out items carry their evidence in the options and have no
-          // stem. Without this line the question renders as bare option
-          // buttons and reads as missing. The line states the task form only —
-          // never the hidden relationship.
-          <p className="mb-6 rounded-xl bg-gray-50 p-4 text-center text-gray-700">
-            All options but one follow the same hidden rule. Pick the one that breaks it.
-          </p>
+        ) : !ready && (
+          <p role="status" className="mb-4 text-sm text-gray-500">Loading the pictures…</p>
         )}
+        <div key={attempt} ref={picturesRef}>
+          <div className="mb-6 rounded-xl bg-gray-50 p-2 sm:p-4" aria-label="Puzzle diagram">
+            <StemView puzzle={shown} />
+          </div>
 
-        <div className={gridClass}>
-          {puzzle.options.map((opt, i) => {
-            const isSel = selected === i;
-            return (
-              <button
-                key={i}
-                onClick={() => onChoose(i)}
-                aria-label={`Option ${LETTERS[i]}`}
-                aria-pressed={isSel}
-                className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
-                  isSel
-                    ? "border-gray-900 bg-gray-900/[0.08] ring-2 ring-gray-900 ring-offset-2"
-                    : "border-gray-200 hover:border-gray-400 hover:bg-gray-50"
-                }`}
-              >
-                <span className={`text-xs font-semibold ${isSel ? "text-gray-900" : "text-gray-400"}`}>
-                  Option {LETTERS[i]} {isSel ? "· selected" : ""}
-                </span>
-                <SceneGraphic scene={opt} className="h-20 w-20" />
-              </button>
-            );
-          })}
+          <div className={gridClass}>
+            {shown.options.map((picture, i) => {
+              const isSel = selected === i;
+              return (
+                <button
+                  key={i}
+                  onClick={() => onChoose(i)}
+                  disabled={!ready}
+                  aria-label={`Option ${LETTERS[i]}`}
+                  aria-pressed={isSel}
+                  className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 ${
+                    isSel
+                      ? "border-gray-900 bg-gray-900/[0.08] ring-2 ring-gray-900 ring-offset-2"
+                      : "border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className={`text-xs font-semibold ${isSel ? "text-gray-900" : "text-gray-400"}`}>
+                    Option {LETTERS[i]} {isSel ? "· selected" : ""}
+                  </span>
+                  {/* A server-rendered PNG: before scoring, options are pictures, never data. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={picture} alt="" draggable={false} className="h-20 w-20" />
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Keyboard hint — hidden on mobile to save space. */}
@@ -944,7 +1001,6 @@ function Solver({
 }
 
 function Result({
-  puzzles,
   review,
   quizToken,
   leaderboardEnabled,
@@ -954,7 +1010,6 @@ function Result({
   automatic,
   onRestart,
 }: {
-  puzzles: PublicPuzzle[];
   review: SubmitResponse;
   quizToken: string;
   leaderboardEnabled: boolean;
@@ -976,7 +1031,8 @@ function Result({
   const skipped = review.results.filter((result) => result.chosen === null).length;
   const wrong = review.total - review.score - skipped;
 
-  const length = meta ? PROFILE_LABELS[meta.profile] : `${puzzles.length}-question test`;
+  const puzzles = review.puzzles ?? [];
+  const length = meta ? PROFILE_LABELS[meta.profile] : `${review.total}-question test`;
   const attribution = meta?.source === "fallback"
     ? `${length} · from the verified reference set`
     : `${length} · freshly generated questions`;
@@ -987,7 +1043,7 @@ function Result({
         <p className="text-sm uppercase tracking-wide text-gray-400">Your score</p>
         <p className="mt-1 text-5xl font-bold">
           {review.score}
-          <span className="text-2xl font-normal text-gray-400"> / {puzzles.length}</span>
+          <span className="text-2xl font-normal text-gray-400"> / {review.total}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
         {review.total === 30 && typeof review.points === "number" && (
@@ -1078,6 +1134,7 @@ function LeaderboardPublication({
   onPublished: (entry: LeaderboardEntry) => void;
 }) {
   const [nickname, setNickname] = useState("");
+  const [kind, setKind] = useState<TakerKind | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
 
@@ -1085,8 +1142,12 @@ function LeaderboardPublication({
     event.preventDefault();
     if (publishing) return;
     const name = nickname.trim();
-    if (name.length === 0 || name.length > 32) {
-      setError("Enter a nickname between 1 and 32 characters.");
+    if (name.length < 2 || name.length > 24) {
+      setError("Enter a nickname between 2 and 24 characters.");
+      return;
+    }
+    if (!kind) {
+      setError("Choose whether you are a person or an AI agent.");
       return;
     }
     setPublishing(true);
@@ -1099,7 +1160,7 @@ function LeaderboardPublication({
     });
     try {
       const response = await Promise.race([
-        postJson<{ entry: LeaderboardEntry }>("/api/leaderboard", { quizToken, nickname: name }),
+        postJson<{ entry: LeaderboardEntry }>("/api/leaderboard", { quizToken, nickname: name, kind }),
         timeout,
       ]);
       onPublished(response.entry);
@@ -1118,7 +1179,9 @@ function LeaderboardPublication({
     <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       {entry ? (
         <div role="status">
-          <p className="font-medium text-green-700">Your score was published as {entry.nickname}.</p>
+          <p className="font-medium text-green-700">
+            Your score was published as {entry.nickname}{entry.kind === "agent" ? ", tagged AI agent" : ""}.
+          </p>
           <Link
             href="/leaderboard"
             className="mt-2 inline-block rounded-md text-sm text-gray-700 underline underline-offset-4 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
@@ -1130,8 +1193,28 @@ function LeaderboardPublication({
         <form onSubmit={publish}>
           <h3 className="text-lg font-semibold">Publish your score</h3>
           <p id="nickname-help" className="mt-2 text-sm text-gray-600">
-            Your nickname, score, time and app version will appear on the {leaderboardLabel.toLowerCase()}. Publishing is optional.
+            Your nickname, score, time and app version will appear on the {leaderboardLabel.toLowerCase()},
+            with a tag saying whether a person or an AI agent took the test. Publishing is optional.
           </p>
+          <fieldset className="mt-4" disabled={publishing}>
+            <legend className="text-sm font-medium text-gray-700">Who took this test?</legend>
+            <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-700">
+              {([["person", "A person"], ["agent", "An AI agent"]] as const).map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="taker-kind"
+                    value={value}
+                    checked={kind === value}
+                    onChange={() => setKind(value)}
+                    required
+                    className="h-4 w-4 accent-gray-900"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label htmlFor="leaderboard-nickname" className="mt-4 block text-sm font-medium text-gray-700">
             Nickname
           </label>
@@ -1142,8 +1225,8 @@ function LeaderboardPublication({
               type="text"
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
-              minLength={1}
-              maxLength={32}
+              minLength={2}
+              maxLength={24}
               required
               disabled={publishing}
               aria-describedby={error ? "nickname-help nickname-error" : "nickname-help"}

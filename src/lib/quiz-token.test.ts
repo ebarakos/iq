@@ -1,25 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assembleExpandedQuiz } from "@/items/expanded-quiz";
-import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
-import packageJson from "../../package.json";
 import {
   ACCEPTED_ITEM_COUNTS,
-  createQuizDelivery,
   GRACE_WINDOW_SECONDS,
-  openQuizToken,
-  QuizTokenError,
   QuizTokenPayloadSchema,
   resolveQuizTokenSecret,
-  sealQuizToken,
-  SECONDS_PER_QUESTION,
   submissionTiming,
 } from "./quiz-token";
 
 const SECRET = "test-only-quiz-token-secret-with-at-least-32-characters";
-
-function quiz() {
-  return assembleExpandedQuiz("quiz-token-test-seed", "short-5", CURRENT_FAMILY_PROMOTION_REGISTRY);
-}
 
 function payloadWith(itemCount: number) {
   return {
@@ -36,45 +24,15 @@ function payloadWith(itemCount: number) {
   };
 }
 
-describe("quiz token delivery", () => {
-  it("carries a full 30-question test", () => {
-    const long = assembleExpandedQuiz("token-long-30", "long-30", CURRENT_FAMILY_PROMOTION_REGISTRY);
-    const delivery = createQuizDelivery(long, { secret: SECRET, nowSeconds: 1_000 });
-
-    expect(delivery.puzzles).toHaveLength(30);
-    expect(openQuizToken(delivery.quizToken, SECRET, 1_001).items).toHaveLength(30);
-  });
-
-  it("sets the answer deadline at 60 seconds a question, apart from the token's own expiry", () => {
-    const long = assembleExpandedQuiz("token-deadline", "long-30", CURRENT_FAMILY_PROMOTION_REGISTRY);
-    const delivery = createQuizDelivery(long, { secret: SECRET, nowSeconds: 1_000 });
-
-    expect(SECONDS_PER_QUESTION).toBe(60);
-    expect(delivery.answerDeadline).toBe(1_000 + 30 * 60);
-
-    const payload = openQuizToken(delivery.quizToken, SECRET, 1_001);
-    expect(payload.appVersion).toBe(`v${packageJson.version}`);
-    expect(delivery.appVersion).toBe(payload.appVersion);
-    expect(payload.answerDeadline).toBe(delivery.answerDeadline);
-    // The two values answer different questions and must not be the same one.
-    expect(payload.expiresAt).toBeGreaterThan(payload.answerDeadline!);
-  });
-
-  it("refuses to issue a deadline that outlives the token", () => {
-    expect(() => createQuizDelivery(quiz(), { secret: SECRET, nowSeconds: 1_000, ttlSeconds: 60 }))
-      .toThrow(/answer deadline must fall inside the token lifetime/);
-  });
-
+describe("answer key", () => {
   it("treats the grace window as ordinary and marks anything later", () => {
-    const delivery = createQuizDelivery(quiz(), { secret: SECRET, nowSeconds: 1_000 });
-    const payload = openQuizToken(delivery.quizToken, SECRET, 1_001);
-    const deadline = payload.answerDeadline!;
+    const deadline = payloadWith(5).answerDeadline;
 
-    expect(submissionTiming(payload, deadline - 1)).toEqual({ late: false, secondsLate: 0 });
-    expect(submissionTiming(payload, deadline)).toEqual({ late: false, secondsLate: 0 });
-    expect(submissionTiming(payload, deadline + GRACE_WINDOW_SECONDS))
+    expect(submissionTiming({ answerDeadline: deadline }, deadline - 1)).toEqual({ late: false, secondsLate: 0 });
+    expect(submissionTiming({ answerDeadline: deadline }, deadline)).toEqual({ late: false, secondsLate: 0 });
+    expect(submissionTiming({ answerDeadline: deadline }, deadline + GRACE_WINDOW_SECONDS))
       .toEqual({ late: false, secondsLate: 0 });
-    expect(submissionTiming(payload, deadline + GRACE_WINDOW_SECONDS + 1))
+    expect(submissionTiming({ answerDeadline: deadline }, deadline + GRACE_WINDOW_SECONDS + 1))
       .toEqual({ late: true, secondsLate: GRACE_WINDOW_SECONDS + 1 });
   });
 
@@ -86,89 +44,6 @@ describe("quiz token delivery", () => {
     for (const count of [0, 4, 6, 12, 13, 29, 31]) {
       expect(QuizTokenPayloadSchema.safeParse(payloadWith(count)).success).toBe(false);
     }
-  });
-
-  it("serves an answer-free DTO and recovers its answer key only from the token", () => {
-    const canonical = quiz();
-    const delivery = createQuizDelivery(canonical, {
-      secret: SECRET,
-      nowSeconds: 1_000,
-      ttlSeconds: 600,
-    });
-
-    expect(delivery.puzzles).toHaveLength(5);
-    for (const puzzle of delivery.puzzles) {
-      expect(puzzle).not.toHaveProperty("answerIndex");
-      expect(puzzle).not.toHaveProperty("rule");
-      expect(puzzle).not.toHaveProperty("explanation");
-      expect(puzzle).not.toHaveProperty("generation");
-    }
-    // Neither field names nor answer explanations are visible in an opaque token.
-    expect(delivery.quizToken).not.toContain("answerIndex");
-    expect(delivery.quizToken).not.toContain(canonical[0].explanation);
-
-    const payload = openQuizToken(delivery.quizToken, SECRET, 1_001);
-    expect(payload.items.map((item) => item.answerIndex)).toEqual(
-      canonical.map((puzzle) => puzzle.answerIndex),
-    );
-  });
-
-  it("uses a fresh nonce so the same quiz does not produce the same token", () => {
-    const canonical = quiz();
-    const first = createQuizDelivery(canonical, { secret: SECRET, nowSeconds: 1_000 });
-    const second = createQuizDelivery(canonical, { secret: SECRET, nowSeconds: 1_000 });
-    expect(first.quizToken).not.toBe(second.quizToken);
-  });
-
-  it("rejects tampering and the wrong secret", () => {
-    const { quizToken } = createQuizDelivery(quiz(), { secret: SECRET, nowSeconds: 1_000 });
-    const replacement = quizToken.endsWith("A") ? "B" : "A";
-    const tampered = `${quizToken.slice(0, -1)}${replacement}`;
-
-    expect(() => openQuizToken(tampered, SECRET, 1_001)).toThrowError(QuizTokenError);
-    expect(() => openQuizToken(quizToken, `${SECRET}-wrong`, 1_001)).toThrowError(QuizTokenError);
-  });
-
-  it("rejects expired tokens", () => {
-    const { quizToken } = createQuizDelivery(quiz(), {
-      secret: SECRET,
-      nowSeconds: 1_000,
-      ttlSeconds: 10,
-      secondsPerQuestion: 1,
-    });
-
-    try {
-      openQuizToken(quizToken, SECRET, 1_010);
-      throw new Error("expected token to be rejected");
-    } catch (error) {
-      expect(error).toBeInstanceOf(QuizTokenError);
-      expect((error as QuizTokenError).code).toBe("expired");
-    }
-  });
-});
-
-describe("quiz token deployment scope", () => {
-  afterEach(() => vi.unstubAllEnvs());
-
-  it("opens deployed production tokens with either leaderboard selected", () => {
-    const payload = { ...payloadWith(5), leaderboardScope: "aiq:production" };
-    const token = sealQuizToken(payload, SECRET);
-    vi.stubEnv("VERCEL_ENV", "production");
-    for (const board of [undefined, "dev", "production", "dev"]) {
-      vi.stubEnv("LEADERBOARD_ENV", board);
-      expect(openQuizToken(token, SECRET, 1_001)).toEqual(payload);
-    }
-    vi.stubEnv("VERCEL_ENV", "preview");
-    expect(() => openQuizToken(token, SECRET, 1_001)).toThrow("another environment");
-  });
-
-  it("issues production tokens with stable scope even while showing the dev board", () => {
-    vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("LEADERBOARD_ENV", "dev");
-    const delivery = createQuizDelivery(quiz(), { secret: SECRET, nowSeconds: 1_000 });
-    expect(openQuizToken(delivery.quizToken, SECRET, 1_001).leaderboardScope).toBe("aiq:production");
-    vi.stubEnv("LEADERBOARD_ENV", "production");
-    expect(openQuizToken(delivery.quizToken, SECRET, 1_001).leaderboardScope).toBe("aiq:production");
   });
 });
 

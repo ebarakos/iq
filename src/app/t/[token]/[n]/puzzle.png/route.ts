@@ -1,6 +1,6 @@
 import { puzzleToPng } from "@/items/puzzle-png";
 import { LINK_TEST_HEADERS } from "@/lib/link-start";
-import { LinkTestError, loadLinkTest } from "@/lib/link-test";
+import { LinkTestError, linkTestQuestion, openLinkToken } from "@/lib/link-test";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,9 +18,9 @@ export async function GET(
 ) {
   const { token, n } = await params;
   const textHeaders = { ...LINK_TEST_HEADERS, "content-type": "text/plain; charset=utf-8" };
-  let puzzles;
+  let puzzle;
   try {
-    ({ puzzles } = loadLinkTest(token));
+    puzzle = /^[1-9]\d*$/.test(n) ? linkTestQuestion(openLinkToken(token), Number(n)) : undefined;
   } catch (error) {
     if (error instanceof LinkTestError && error.code !== "configuration") {
       return new Response(error.message, { status: error.code === "invalid" ? 404 : 410, headers: textHeaders });
@@ -28,8 +28,6 @@ export async function GET(
     console.error("link-test: puzzle image failed —", error);
     return new Response("The puzzle image is temporarily unavailable.", { status: 500, headers: textHeaders });
   }
-  const index = /^[1-9]\d*$/.test(n) ? Number(n) - 1 : -1;
-  const puzzle = puzzles[index];
   if (!puzzle) return new Response("No such question.", { status: 404, headers: textHeaders });
 
   const png = await puzzleToPng(puzzle);

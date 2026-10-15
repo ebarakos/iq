@@ -1,13 +1,16 @@
-import { answerKeyItems } from "@/lib/quiz-token";
 import {
   loadLinkTest,
   OPTION_LETTERS,
   parseLinkAnswers,
+  publishPath,
   puzzleImagePath,
   questionPath,
   resultPath,
+  scoringPayload,
 } from "@/lib/link-test";
-import { submitQuizOnce, SubmissionConflictError } from "@/lib/leaderboard";
+import { MIN_RANKED_SECONDS, submitQuizOnce, SubmissionConflictError } from "@/lib/leaderboard";
+import { leaderboardEnabled } from "@/lib/leaderboard-config";
+import { AGENT_NAMES } from "@/lib/leaderboard-types";
 import { clockTime, LinkPage, LinkProblem, PROFILE_NAMES, StartLink } from "../../link-views";
 
 export const dynamic = "force-dynamic";
@@ -51,17 +54,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
 
   let scored;
   try {
-    scored = await submitQuizOnce(token, {
-      version: 1,
-      issuedAt: test.issuedAt,
-      expiresAt: test.expiresAt,
-      answerDeadline: test.answerDeadline,
-      appVersion: test.appVersion,
-      // Link results never rank: publication opens only the in-page quiz token.
-      leaderboardAllowed: false,
-      leaderboardScope: test.leaderboardScope,
-      items: answerKeyItems(puzzles),
-    }, answers, Math.floor(Date.now() / 1000));
+    scored = await submitQuizOnce(token, scoringPayload(test, puzzles), answers, Math.floor(Date.now() / 1000));
   } catch (error) {
     const conflict = error instanceof SubmissionConflictError;
     return (
@@ -96,6 +89,9 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
             `of ${clockTime(test.answerDeadline)}. They are still scored.`}
         </p>
       )}
+      {scored.total === 30 && leaderboardEnabled() && (
+        <AgentPublication token={token} eligible={scored.leaderboardEligible} late={scored.late} />
+      )}
       <h2 className="mt-8 text-xl font-semibold">Review</h2>
       <ol className="mt-4 space-y-8">
         {scored.results.map((result, index) => (
@@ -122,5 +118,43 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
         <StartLink profile={test.profile}>Take a new {PROFILE_NAMES[test.profile]}</StartLink>
       </p>
     </LinkPage>
+  );
+}
+
+/**
+ * One publish link per agent name: a reader that only follows links cannot type
+ * a name into a form (docs/plans/leaderboard-integrity.md).
+ */
+function AgentPublication({ token, eligible, late }: { token: string; eligible: boolean; late: boolean }) {
+  if (!eligible) {
+    return (
+      <p className="mt-6 text-gray-700">
+        {late
+          ? "This result was late, so it cannot join the leaderboard."
+          : `Only on-time 30-question tests that took at least ${MIN_RANKED_SECONDS / 60} minutes can join the leaderboard.`}
+      </p>
+    );
+  }
+  return (
+    <section className="mt-8">
+      <h2 className="text-xl font-semibold">Publish to the leaderboard</h2>
+      <p className="mt-2 text-gray-700">
+        If you are an AI agent, follow the link with your name to publish this result, tagged AI agent.
+        Publishing is optional, and a result can be published once.
+      </p>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {Object.entries(AGENT_NAMES).map(([slug, name]) => (
+          <li key={slug}>
+            <a
+              href={publishPath(token, slug)}
+              rel="nofollow"
+              className="inline-block rounded-lg border-2 border-gray-300 bg-white px-4 py-2 font-semibold hover:border-gray-900"
+            >
+              {`Publish as ${name}`}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

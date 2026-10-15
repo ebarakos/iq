@@ -3,6 +3,8 @@ import type { SceneTokenSpec } from "./domains";
 import type { Panel, Puzzle, PublicPuzzle, Scene, SceneToken } from "./schema";
 import { isBlank } from "./schema";
 import { gatePieceTexture, type GatePieceTexture } from "./gate-pieces";
+// Type-only: picture-puzzle imports this module at runtime.
+import type { PicturePanel, PicturePuzzle } from "./picture-puzzle";
 
 /**
  * Deterministic SVG renderer. Pure functions of the puzzle data — no LLM, no
@@ -247,9 +249,12 @@ export function JigsawPieces({ textures, direction }: { textures: GatePieceTextu
  * (docs/plans/link-only-test.md).
  */
 export function describeGatePieces(textures: readonly GatePieceTexture[]): string {
-  return textures.length === 1
-    ? "machine: jigsaw piece"
-    : `machine: ${textures.length} jigsaw pieces snapped together`;
+  return describeGatePieceCount(textures.length);
+}
+
+/** The same label from the piece count alone, which is all a served picture gate tells the page. */
+export function describeGatePieceCount(count: number): string {
+  return count === 1 ? "machine: jigsaw piece" : `machine: ${count} jigsaw pieces snapped together`;
 }
 
 const SCENE_TOKEN_SCALE: Record<SceneToken["size"], number> = { m: 0.3, l: 0.39 };
@@ -473,18 +478,39 @@ export function BlankGraphic({ className }: { className?: string }) {
 }
 
 /**
+ * A stem panel either way it is served: as scene data (the review, the agent
+ * image) or as a picture path (the in-page test before scoring).
+ */
+type StemPanel = Panel | PicturePanel;
+
+function isBlankPanel(panel: StemPanel): panel is { blank: true } {
+  return "blank" in panel;
+}
+
+/** One board, drawn from its scene or shown as its served picture. */
+function Board({ panel, className }: { panel: Exclude<StemPanel, { blank: true }>; className?: string }) {
+  if ("board" in panel) {
+    // A server-rendered PNG at a fixed URL; next/image would only add a resizing hop.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={panel.board} alt="board" draggable={false} className={className ?? "block h-auto w-full"} />;
+  }
+  if ("gate" in panel) return null;
+  return <SceneGraphic scene={panel} className={className} />;
+}
+
+/**
  * One stem picture in its frame. The frame's inner padding is 3px on a phone
  * and `CELL_CANVAS_PADDING` (6px) from `sm:` up: a phone row can need its
  * boards a little narrower than 80px, and the thinner padding hands most of
  * that back to the drawing.
  */
-function PanelBox({ panel }: { panel: Panel }) {
+function PanelBox({ panel }: { panel: StemPanel }) {
   return (
     <div className="box-border flex aspect-square items-center justify-center rounded-md border border-gray-200 bg-white p-[3px] sm:p-1.5">
-      {"blank" in panel ? (
+      {isBlankPanel(panel) ? (
         <BlankGraphic className="h-full w-full" />
       ) : (
-        <SceneGraphic scene={panel} className="h-full w-full" />
+        <Board panel={panel} className="h-full w-full" />
       )}
     </div>
   );
@@ -544,7 +570,24 @@ function JigsawStrip({ textures, direction, className }: {
  * docs/plans/gate-order-and-labels.md). The pieces carry the order themselves,
  * tab into notch, so no arrows sit between them.
  */
-function GateBox({ panel }: { panel: Panel }) {
+function GateBox({ panel }: { panel: StemPanel }) {
+  if ("gate" in panel) {
+    // A served picture gate: the same two strips as below, as PNGs.
+    const { pieces, right, down } = panel.gate;
+    const stacked = pieces > 1 && down !== undefined;
+    return (
+      <div className="flex shrink-0 items-center justify-center" role="img" aria-label={describeGatePieceCount(pieces)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={stacked ? down : right} alt="" draggable={false} className={`h-auto sm:hidden ${stacked ? "w-10" : "w-14"}`} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={right} alt="" draggable={false}
+          className={`hidden h-auto sm:block ${WIDE_GATE_STRIP_WIDTHS[pieces] ?? WIDE_GATE_STRIP_WIDTHS[3]}`} />
+      </div>
+    );
+  }
+  if (isBlankPanel(panel) || "board" in panel) {
+    return <div className="w-14 shrink-0 sm:w-20"><PanelBox panel={panel} /></div>;
+  }
   const textures = gatePieces(panel);
   // Every served gate glyph has a piece; anything else is a data error, and it
   // draws as an ordinary panel rather than disappearing.
@@ -663,15 +706,15 @@ function FlowArrow({ direction = "right", className = "" }: { direction?: "right
 }
 
 /** Render a puzzle's stem (the question) according to its layout. */
-export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
+export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle | PicturePuzzle }) {
   if (puzzle.layout === "assembly") return (
     <div className="flex flex-col items-center gap-3" data-layout="assembly">
       <div className="w-full max-w-[280px]"><AssemblyLegend /></div>
       <div className="grid w-full max-w-[320px] grid-cols-3 gap-3">
-        {puzzle.stem.slice(0, 3).map((panel, index) => <div key={index}>{!isBlank(panel) && <SceneGraphic scene={panel} />}</div>)}
+        {(puzzle.stem as StemPanel[]).slice(0, 3).map((panel, index) => <div key={index}>{!isBlankPanel(panel) && <Board panel={panel} />}</div>)}
       </div>
       <FlowArrow direction="down" className="h-6 w-6 shrink-0" />
-      <div className="w-[116px]">{!isBlank(puzzle.stem[3]) && <SceneGraphic scene={puzzle.stem[3]} className="h-auto w-full" />}</div>
+      <div className="w-[116px]">{!isBlankPanel(puzzle.stem[3]) && <Board panel={puzzle.stem[3]} className="h-auto w-full" />}</div>
     </div>
   );
   if (puzzle.layout === "grid3x3") {
@@ -709,8 +752,9 @@ export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
   }
 
   if (puzzle.layout === "machineTable") {
-    const rows = Array.from({ length: puzzle.stem.length / 3 }, (_, index) =>
-      puzzle.stem.slice(index * 3, index * 3 + 3),
+    const stem: StemPanel[] = puzzle.stem;
+    const rows = Array.from({ length: stem.length / 3 }, (_, index) =>
+      stem.slice(index * 3, index * 3 + 3),
     );
     // Every row is one line at every width: input → gate → output. On a phone
     // a multi-gate strip stacks its pieces instead of widening the row
@@ -736,8 +780,8 @@ export function StemView({ puzzle }: { puzzle: Puzzle | PublicPuzzle }) {
     // [A, B, C] rendered as two aligned rows: "A → B" over "C → ?". The old
     // "A : B :: C : ?" line folded at "::" on a phone, and its notation was
     // unfamiliar; stacked rows say "the same change, again" at every width.
-    const [a, b, c] = puzzle.stem;
-    const pairs: [Panel | undefined, Panel][] = [[a, b ?? { blank: true }], [c, { blank: true }]];
+    const [a, b, c]: StemPanel[] = puzzle.stem;
+    const pairs: [StemPanel | undefined, StemPanel][] = [[a, b ?? { blank: true }], [c, { blank: true }]];
     return (
       <div
         className="mx-auto flex w-max flex-col gap-2"

@@ -107,17 +107,25 @@ then removes its unique test key. The connection uses native `fetch`, with no ne
 Server code can call `redisCommand` in `src/lib/redis.ts`. Both in-page and link-test submissions save
 its first result before revealing answers. Identical retries return that result; changed
 answers are refused. Redis failures leave the test retryable and reveal no answer key.
-These private receipts expire with the two-hour quiz token.
+These private receipts expire with the two-hour test token.
 New Vercel environment settings take effect on the next deployment.
 
 ### Leaderboard
 
-Run `npm run dev` and open `/leaderboard` to see the top 20 published attempts. After an
-on-time 30-question test in the in-page app, the result offers an optional nickname and a Publish score button.
-The 5-question sample and late results cannot be published. One test creates at most one
-entry, including simultaneous requests and retries. Entries keep the score, elapsed time,
-submission date and the app version sealed when the test started (for example, `v0.1.2`).
-Older tokens without this version cannot join the leaderboard.
+Run `npm run dev` and open `/leaderboard` to see the top 20 published attempts, by people and
+AI agents. After an on-time 30-question test in the in-page app, the result offers an optional
+nickname, a Person / AI agent choice and a Publish score button. A link-test result offers one
+publish link per agent name (Claude, ChatGPT, Gemini, …), for agents that cannot type into a
+form. The tag is self-declared. The 5-question sample, late results and tests finished in under
+2 minutes cannot be published. One test creates at most one entry, including simultaneous
+requests and retries. Entries keep the score, elapsed time, submission date and the app version
+sealed when the test started (for example, `v0.1.2`). Older tokens without this version cannot
+join the leaderboard.
+
+Nicknames are 2–24 letters, digits, spaces and `. - _ '`, never a web address, and pass a
+profanity filter. One address may start 60 tests and publish 20 scores an hour. To take a row
+down, `npm run leaderboard:remove -- --board production --list`, then the same with the row's id
+prefix or nickname and `--yes`; a removed test cannot be published again.
 
 Points are `round(100 × correct × (1 + 0.25 × fraction of time remaining))`. For example,
 28/30 in 20 minutes earns 3,033 points; 30/30 in 30 minutes earns 3,000. Equal points rank
@@ -185,8 +193,8 @@ public puzzle → agent harness → vision model via relay → bucketed attempt 
 - `src/items/schema.ts` / `src/items/render.tsx` — puzzle spec (Zod) and deterministic SVG
   renderer shared by generated and reference items.
 - `src/items/bank.ts` + `data/bank/items.json` — regression corpus and emergency fallback.
-- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` + `src/lib/scoring.ts` — answer-free
-  delivery and authenticated, encrypted server-side scoring.
+- `src/lib/link-test.ts` + `src/app/api/generate`, `src/app/api/submit` + `src/lib/scoring.ts` —
+  one sealed seed token per test; questions served as PNGs only; server-side scoring.
 - `src/lib/link-test.ts` + `src/app/sample`, `src/app/test`, `src/app/t/` — the link test: the
   same test taken by fetching pages and following links, for agents that run no JavaScript.
 - `src/lib/model.ts` — the relay-routed model client for the offline agent harness; nothing in

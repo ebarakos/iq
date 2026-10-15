@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { openQuizToken, QuizTokenError } from "@/lib/quiz-token";
+import { toPublicPuzzleSet } from "@/items/schema";
 import { SubmissionConflictError, submitQuizOnce } from "@/lib/leaderboard";
+import { LinkTestError, loadLinkTest, scoringPayload } from "@/lib/link-test";
 import { ScoringError } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,17 @@ const SubmissionSchema = z.object({
   answers: z.array(z.number().int().min(0).nullable()).max(100),
 });
 
-/** POST /api/submit — score an opaque quiz token without trusting the browser. */
+const TOKEN_MESSAGES: Record<Exclude<LinkTestError["code"], "configuration">, string> = {
+  invalid: "This quiz token is invalid. Start a new test.",
+  expired: "This quiz has expired. Start a new test.",
+  changed: "This quiz has changed since it started. Start a new test.",
+};
+
+/**
+ * POST /api/submit — score a test on the server without trusting the browser.
+ * The test is rebuilt from its seed token; the first result is saved before any
+ * answer leaves, and only then do the full puzzles go back for the review.
+ */
 export async function POST(req: Request) {
   const parsed = SubmissionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -20,23 +31,23 @@ export async function POST(req: Request) {
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
-  let quiz;
+  let loaded;
   try {
-    quiz = openQuizToken(parsed.data.quizToken, undefined, nowSeconds);
+    loaded = loadLinkTest(parsed.data.quizToken, { nowSeconds });
   } catch (error) {
-    if (error instanceof QuizTokenError && error.code === "configuration") {
-      console.error("submit: quiz token configuration error —", error.message);
-      return NextResponse.json({ message: "Scoring is temporarily unavailable." }, { status: 500 });
+    if (error instanceof LinkTestError && error.code !== "configuration") {
+      return NextResponse.json({ message: TOKEN_MESSAGES[error.code] }, { status: 400 });
     }
-    const message = error instanceof QuizTokenError && error.code === "expired"
-      ? "This quiz has expired. Start a new test."
-      : "This quiz token is invalid. Start a new test.";
-    return NextResponse.json({ message }, { status: 400 });
+    console.error("submit: test could not be loaded —", error);
+    return NextResponse.json({ message: "Scoring is temporarily unavailable." }, { status: 500 });
   }
 
+  const { test, puzzles } = loaded;
   try {
-    const result = await submitQuizOnce(parsed.data.quizToken, quiz, parsed.data.answers, nowSeconds);
-    return NextResponse.json(result);
+    const result = await submitQuizOnce(
+      parsed.data.quizToken, scoringPayload(test, puzzles), parsed.data.answers, nowSeconds,
+    );
+    return NextResponse.json({ ...result, puzzles: toPublicPuzzleSet(puzzles) });
   } catch (error) {
     // A wrong number of answers, or one outside a question's options.
     if (error instanceof ScoringError) {

@@ -14,6 +14,7 @@ import {
   type SceneFamilyId,
 } from "./scene-families";
 import {
+  PuzzleSchema,
   PuzzleSetSchema,
   type Puzzle,
   type PuzzleSet,
@@ -488,10 +489,27 @@ export function assembleExpandedQuiz(
   registry: FamilyPromotionRegistry,
   withdrawnFamilyIds: ReadonlySet<string> = new Set(),
 ): PuzzleSet {
+  return assembleExpandedTest(seed, profile, registry, withdrawnFamilyIds).puzzles;
+}
+
+/** A test, and for each question the attempt its slot kept: enough to rebuild any one question alone. */
+export interface AssembledTest {
+  puzzles: PuzzleSet;
+  attempts: number[];
+}
+
+/** `assembleExpandedQuiz`, also saying which attempt filled each slot. */
+export function assembleExpandedTest(
+  seed: Seed,
+  profile: ExpandedProfile,
+  registry: FamilyPromotionRegistry,
+  withdrawnFamilyIds: ReadonlySet<string> = new Set(),
+): AssembledTest {
   if (String(seed).length === 0) throw new Error("seed must not be empty");
   const schedule = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds);
 
   const puzzles: Puzzle[] = [];
+  const attempts: number[] = [];
   // A program fingerprint names a family's rule structure, not one instance, so
   // it cannot be unique across a 30-question test that reuses families. What
   // must be unique is the question: no two may ask the same thing.
@@ -501,6 +519,7 @@ export function assembleExpandedQuiz(
     const rejections: string[] = [];
     let accepted: Puzzle | undefined;
     let acceptedQuestion = "";
+    let acceptedAttempt = -1;
 
     for (let attempt = 0; attempt < EXPANDED_SLOT_RETRY_BUDGET && !accepted; attempt++) {
       const draw = drawExpandedSlot(seed, profile, slotIndex, attempt, selected);
@@ -515,6 +534,7 @@ export function assembleExpandedQuiz(
       }
       accepted = draw.puzzle;
       acceptedQuestion = question;
+      acceptedAttempt = attempt;
     }
 
     if (!accepted) {
@@ -525,7 +545,32 @@ export function assembleExpandedQuiz(
     }
     askedQuestions.add(acceptedQuestion);
     puzzles.push(accepted);
+    attempts.push(acceptedAttempt);
   }
 
-  return PuzzleSetSchema.parse(puzzles) as PuzzleSet;
+  return { puzzles: PuzzleSetSchema.parse(puzzles) as PuzzleSet, attempts };
+}
+
+/**
+ * Rebuild one question of a test without the others, from the attempt its slot
+ * kept (`assembleExpandedTest`). It is the very item the whole test holds: each
+ * slot draws from its own child seed, and the attempt already records the one
+ * thing that depends on earlier questions, which draws repeated one of them.
+ */
+export function buildExpandedQuestion(
+  seed: Seed,
+  profile: ExpandedProfile,
+  slotIndex: number,
+  attempt: number,
+  registry: FamilyPromotionRegistry,
+  withdrawnFamilyIds: ReadonlySet<string> = new Set(),
+): Puzzle {
+  if (String(seed).length === 0) throw new Error("seed must not be empty");
+  const selected = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds)[slotIndex];
+  if (!selected) throw new Error(`the ${profile} test has no question ${slotIndex + 1}`);
+  const draw = drawExpandedSlot(seed, profile, slotIndex, attempt, selected);
+  if (!draw.accepted) {
+    throw new Error(`attempt ${attempt} does not fill slot ${slotIndex + 1} of the ${profile} test: ${draw.rejection}`);
+  }
+  return PuzzleSchema.parse(draw.puzzle) as Puzzle;
 }

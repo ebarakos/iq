@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { sampleGuide } from "@/items/sample-guides";
 import {
-  loadLinkTest,
+  linkTestLength,
+  linkTestQuestion,
   OPTION_LETTERS,
+  openLinkToken,
   parseLinkAnswers,
   puzzleImagePath,
   questionPath,
@@ -27,14 +29,13 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
   const { token, n } = await params;
   const { a } = await searchParams;
 
-  let loaded;
+  let test;
   try {
-    loaded = loadLinkTest(token);
+    test = openLinkToken(token);
   } catch (error) {
     return <LinkProblem error={error} />;
   }
-  const { test, puzzles } = loaded;
-  const total = puzzles.length;
+  const total = linkTestLength(test);
   const number = /^[1-9]\d*$/.test(n) ? Number(n) : NaN;
   if (!(number >= 1 && number <= total)) notFound();
 
@@ -55,7 +56,6 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
   if (answers.length === total) redirect(resultPath(token, answers));
   if (answers.length !== number - 1) redirect(questionPath(token, answers.length + 1, answers));
 
-  const puzzle = puzzles[number - 1];
   const now = Math.floor(Date.now() / 1000);
   const secondsLeft = test.answerDeadline - now;
   const next = (choice: number | null) => number < total
@@ -78,6 +78,15 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
     );
   }
 
+  // Only this question is built: a server that did not start the test does
+  // not wait for the other questions.
+  let puzzle;
+  try {
+    puzzle = linkTestQuestion(test, number);
+  } catch (error) {
+    return <LinkProblem error={error} />;
+  }
+  if (!puzzle) notFound();
   const letters = OPTION_LETTERS.slice(0, puzzle.options.length);
   const guide = test.profile === "short-5" ? sampleGuide(puzzle) : undefined;
   return (

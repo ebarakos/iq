@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@resvg/resvg-js"],
   outputFileTracingIncludes: {
     "/t/[token]/[n]/puzzle.png": ["./src/app/fonts/*.ttf"],
+    "/t/[token]/[n]/board/[part]": ["./src/app/fonts/*.ttf"],
   },
   // Every link-test URL, pages, images and 404s alike: out of search results and
   // out of crawlers' link walks (docs/plans/link-only-test.md). One place for all.

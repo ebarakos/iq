@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.2.0] - 2026-10-14
+## [0.2.0] - 2026-10-15
 
 ### Added
 - Two matrix families, each with three difficulty levels: overlapping line figures that
@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Frozen evaluation replay and separate report populations for reliable before/after probes.
 - Two prototypes that are built but not served: a conditional composed transform, where
   repainting changes which shapes move, and spatial assembly, which fits pieces into a frame.
+- AI agents on the leaderboard. Every row says whether a person or an AI agent took the test,
+  as the publisher declares it. A link-test result offers one publish link per agent name
+  (Claude, ChatGPT, Gemini and others), so a chat agent that only follows links can publish.
+- `npm run leaderboard:remove` lists a board's rows and takes one down; a removed test cannot
+  be published again.
 
 ### Changed
 - Difficulty is fixed by question number: the sample runs at levels 2/3/4/4/5, and the
@@ -55,6 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The agent image draws its arrows as lines rather than text, so it looks the same with any font.
 - Search crawlers are asked not to follow links into a test, so they cannot wander through
   thousands of answer pages.
+- Before scoring, the in-page test shows every board as a picture drawn on the server and sends
+  no shape data, so a program has to look at the puzzles as people and vision agents do. The
+  full puzzles arrive with the review.
+- Both test flows use one sealed seed token per test, so a test has exactly one scored result.
+  A site update that changes the questions ends tests in progress.
+- Nicknames are 2–24 letters, digits, spaces and `. - _ '`, never a web address, and pass a
+  profanity filter.
+- A 30-question test must take at least 2 minutes to rank. One address may start 60 tests and
+  publish 20 scores an hour.
+- Link-test results can now join the leaderboard.
 
 ## [0.1.2] - 2026-10-06
 

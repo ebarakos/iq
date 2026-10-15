@@ -1,15 +1,18 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { PuzzleSet, PublicPuzzleSet } from "@/items/schema";
-import { GenerationMetadataSchema, REASONING_BANDS, toPublicPuzzleSet } from "@/items/schema";
-import packageJson from "../../package.json";
-import { leaderboardEnabled, quizNamespace } from "./leaderboard-config";
+import type { PuzzleSet } from "@/items/schema";
+import { GenerationMetadataSchema, REASONING_BANDS } from "@/items/schema";
 
-const TOKEN_VERSION = "v1";
-const TOKEN_AAD = "aiq.quiz-token.v1";
+/**
+ * Token sealing shared by the test token (`src/lib/link-test.ts`), and the
+ * answer key a test is scored against. Until 2026-10-14 the in-page test
+ * carried that key inside its own encrypted token; both flows now rebuild it
+ * from the seed token on the server (docs/plans/leaderboard-integrity.md).
+ */
+
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
-/** How long a token opens at all: two hours, well past any test's deadline. */
+/** How long a test token opens at all: two hours, well past any test's deadline. */
 export const QUIZ_TOKEN_TTL_SECONDS = 2 * 60 * 60;
 const MIN_SECRET_LENGTH = 32;
 
@@ -38,9 +41,10 @@ const TokenItemSchema = z.object({
   path: ["answerIndex"],
 });
 
-/** Lengths a token may hold: 5 and 30, the two current public test lengths. */
+/** Lengths an answer key may hold: 5 and 30, the two current public test lengths. */
 export const ACCEPTED_ITEM_COUNTS = [5, 30] as const;
 
+/** The answer key and times one test is scored against, rebuilt on the server for each submission. */
 export const QuizTokenPayloadSchema = z.object({
   version: z.literal(1),
   /** Sealed at issue time; older tokens cannot acquire a newer version or ranking eligibility. */
@@ -66,18 +70,6 @@ export const QuizTokenPayloadSchema = z.object({
   path: ["answerDeadline"],
 });
 export type QuizTokenPayload = z.infer<typeof QuizTokenPayloadSchema>;
-
-export type QuizDelivery = {
-  puzzles: PublicPuzzleSet;
-  quizToken: string;
-  appVersion: string;
-  /**
-   * The same deadline the token seals, in plain epoch seconds, so the browser
-   * can run a countdown without reading token contents. The sealed copy is the
-   * one scoring trusts.
-   */
-  answerDeadline: number;
-};
 
 /** How a submission stands against the deadline the server issued. */
 export interface SubmissionTiming {
@@ -177,8 +169,8 @@ function decode(value: string): Buffer {
  * Encrypt and authenticate any JSON value as `<version>.<iv>.<ciphertext>.<tag>`.
  *
  * The version names the envelope and the AAD binds the ciphertext to one kind
- * of token, so a token of one kind never opens as another. Shared by the quiz
- * token here and the link token (`src/lib/link-test.ts`).
+ * of token, so a token of one kind never opens as another. Used by the test
+ * token (`src/lib/link-test.ts`).
  */
 export function sealTokenJson(
   value: unknown,
@@ -223,35 +215,7 @@ export function openTokenJson(
   return JSON.parse(plaintext.toString("utf8"));
 }
 
-const QUIZ_TOKEN_ENVELOPE = { version: TOKEN_VERSION, aad: TOKEN_AAD } as const;
-
-/** Encrypt and authenticate a token payload. The result reveals no answer data. */
-export function sealQuizToken(payload: QuizTokenPayload, secret = resolveQuizTokenSecret()): string {
-  return sealTokenJson(QuizTokenPayloadSchema.parse(payload), QUIZ_TOKEN_ENVELOPE, secret);
-}
-
-/** Authenticate, decrypt, validate, and expiry-check an opaque quiz token. */
-export function openQuizToken(
-  token: string,
-  secret = resolveQuizTokenSecret(),
-  nowSeconds = Math.floor(Date.now() / 1000),
-): QuizTokenPayload {
-  try {
-    const payload = QuizTokenPayloadSchema.parse(openTokenJson(token, QUIZ_TOKEN_ENVELOPE, secret));
-    if (payload.leaderboardScope !== undefined && payload.leaderboardScope !== quizNamespace()) {
-      throw new QuizTokenError("invalid", "quiz token belongs to another environment");
-    }
-    if (payload.expiresAt <= nowSeconds) {
-      throw new QuizTokenError("expired", "quiz token has expired");
-    }
-    return payload;
-  } catch (error) {
-    if (error instanceof QuizTokenError) throw error;
-    throw new QuizTokenError("invalid", "quiz token is invalid");
-  }
-}
-
-/** What a token keeps about each question: the answer, its review, and where it came from. */
+/** What scoring keeps about each question: the answer, its review, and where it came from. */
 export function answerKeyItems(puzzles: PuzzleSet): QuizTokenPayload["items"] {
   return puzzles.map((puzzle) => ({
     id: puzzle.id,
@@ -262,42 +226,4 @@ export function answerKeyItems(puzzles: PuzzleSet): QuizTokenPayload["items"] {
     band: puzzle.band,
     generation: puzzle.generation,
   }));
-}
-
-/** Build the public response and opaque answer key for a generated quiz. */
-export function createQuizDelivery(
-  puzzles: PuzzleSet,
-  options: {
-    secret?: string;
-    nowSeconds?: number;
-    ttlSeconds?: number;
-    secondsPerQuestion?: number;
-  } = {},
-): QuizDelivery {
-  const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
-  const ttl = options.ttlSeconds ?? QUIZ_TOKEN_TTL_SECONDS;
-  if (!Number.isInteger(ttl) || ttl <= 0) {
-    throw new Error("ttlSeconds must be a positive integer");
-  }
-  const perQuestion = options.secondsPerQuestion ?? SECONDS_PER_QUESTION;
-  const answerDeadline = now + perQuestion * puzzles.length;
-  if (answerDeadline > now + ttl) {
-    throw new Error("the answer deadline must fall inside the token lifetime");
-  }
-  const payload: QuizTokenPayload = {
-    version: 1,
-    appVersion: `v${packageJson.version}`,
-    leaderboardAllowed: leaderboardEnabled(),
-    leaderboardScope: quizNamespace(),
-    issuedAt: now,
-    expiresAt: now + ttl,
-    answerDeadline,
-    items: answerKeyItems(puzzles),
-  };
-  return {
-    puzzles: toPublicPuzzleSet(puzzles),
-    quizToken: sealQuizToken(payload, options.secret),
-    appVersion: payload.appVersion!,
-    answerDeadline,
-  };
 }

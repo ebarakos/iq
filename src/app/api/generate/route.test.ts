@@ -1,7 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
-import { openQuizToken } from "@/lib/quiz-token";
+import { loadLinkTest } from "@/lib/link-test";
+
+const SECRET = "test-only-secret-that-is-at-least-32-characters-long";
+
+/** Every key a served picture question may hold: layout and picture paths, never scene data. */
+const PICTURE_KEYS = new Set(["layout", "gridFlow", "stem", "options", "blank", "board", "gate", "pieces", "right", "down"]);
+
+/** Every key and string value anywhere in a served question. */
+function walk(value: unknown, keys: Set<string>, strings: string[]): void {
+  if (typeof value === "string") strings.push(value);
+  else if (Array.isArray(value)) value.forEach((item) => walk(item, keys, strings));
+  else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      keys.add(key);
+      walk(item, keys, strings);
+    }
+  }
+}
 import { SCENE_FAMILY_IDS } from "@/items/scene-families";
 
 function generateRequest(body: Record<string, unknown>, from: string) {
@@ -29,13 +46,40 @@ describe("POST /api/generate", () => {
     expect(body.generatorVersion).toBe(EXPANDED_GENERATOR_VERSION);
     expect(body).not.toHaveProperty("notice");
     expect(body.puzzles).toHaveLength(30);
-    expect(body.quizToken).toMatch(/^v1\./);
-    for (const puzzle of body.puzzles) {
-      expect(puzzle).not.toHaveProperty("answerIndex");
-      expect(puzzle).not.toHaveProperty("rule");
-      expect(puzzle).not.toHaveProperty("explanation");
-      expect(puzzle.options.length).toBeGreaterThanOrEqual(4);
+    expect(body.quizToken).toMatch(/^l1\./);
+    for (const puzzle of body.puzzles) expect(puzzle.options.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("serves pictures only: layout and picture paths, with no scene data before scoring", async () => {
+    vi.stubEnv("QUIZ_TOKEN_SECRET", SECRET);
+    vi.resetModules();
+    const { POST } = await import("./route");
+
+    const body = await (await POST(generateRequest({}, "generate-route-pictures"))).json();
+    const keys = new Set<string>();
+    const strings: string[] = [];
+    walk(body.puzzles, keys, strings);
+    expect([...keys].filter((key) => !PICTURE_KEYS.has(key))).toEqual([]);
+    const layouts = new Set(["grid3x3", "row", "analogy", "machineTable", "assembly", "rows", "rowsAndColumns"]);
+    for (const value of strings.filter((text) => !layouts.has(text))) {
+      expect(value).toMatch(new RegExp(`^/t/${body.quizToken.replaceAll(".", "\\.")}/\\d+/board/[a-z0-9-]+\\.png$`));
     }
+    // The pictures the page shows are the questions the token rebuilds.
+    const { puzzles } = loadLinkTest(body.quizToken, { secret: SECRET });
+    expect(body.puzzles.map((puzzle: { options: string[] }) => puzzle.options.length))
+      .toEqual(puzzles.map((puzzle) => puzzle.options.length));
+  });
+
+  it("refuses a flood of starts from one address", async () => {
+    vi.stubEnv("QUIZ_TOKEN_SECRET", SECRET);
+    vi.stubEnv("KV_REST_API_URL", "https://example.upstash.io");
+    vi.stubEnv("KV_REST_API_TOKEN", "token");
+    vi.resetModules();
+    vi.doMock("@/lib/redis", () => ({ redisCommand: vi.fn(async () => 61) }));
+    const { POST } = await import("./route");
+    const response = await POST(generateRequest({ profile: "short-5" }, "generate-route-flood"));
+    expect(response.status).toBe(429);
+    vi.doUnmock("@/lib/redis");
   });
 
   it("returns the answer deadline beside the opaque token", async () => {
@@ -77,8 +121,8 @@ describe("POST /api/generate", () => {
       expect(puzzle).not.toHaveProperty("band");
       expect(puzzle).not.toHaveProperty("difficulty");
     }
-    const sealed = openQuizToken(body.quizToken, "test-only-secret-that-is-at-least-32-characters-long");
-    expect(new Set(sealed.items.map((item) => item.familyId)).size).toBe(5);
+    const { puzzles } = loadLinkTest(body.quizToken, { secret: "test-only-secret-that-is-at-least-32-characters-long" });
+    expect(new Set(puzzles.map((puzzle) => puzzle.familyId)).size).toBe(5);
     // Nowhere else either: not in an id, not in any nested field. The ids once
     // ended in the family name, which undid removing the field itself.
     const served = JSON.stringify(body.puzzles);
@@ -108,7 +152,7 @@ describe("POST /api/generate", () => {
     vi.resetModules();
     vi.doMock("@/items/expanded-quiz", async (importOriginal) => ({
       ...(await importOriginal<typeof import("@/items/expanded-quiz")>()),
-      assembleExpandedQuiz: vi.fn(() => {
+      assembleExpandedTest: vi.fn(() => {
         throw new Error("forced fail");
       }),
     }));
@@ -120,15 +164,13 @@ describe("POST /api/generate", () => {
     expect(response.status).toBe(200);
     expect(body.source).toBe("fallback");
     expect(body.notice).toMatch(/verified reference set/);
-    // The fallback path issues its own quiz delivery, so serverNow must ride
-    // along here too, not only on the happy path.
+    // The fallback path issues its own token, so serverNow must ride along
+    // here too, not only on the happy path.
     expect(typeof body.serverNow).toBe("number");
     expect(body.answerDeadline - body.serverNow).toBeGreaterThan(0);
     expect(body.puzzles).toHaveLength(expectedCount);
-    expect(body.puzzles.some((puzzle: { type?: string }) => puzzle.type === "operatorInduction")).toBe(false);
     for (const puzzle of body.puzzles) {
       expect(puzzle).not.toHaveProperty("answerIndex");
-      expect(puzzle).not.toHaveProperty("rule");
       expect(puzzle).not.toHaveProperty("explanation");
     }
     vi.doUnmock("@/items/expanded-quiz");
@@ -150,10 +192,10 @@ describe("POST /api/generate", () => {
       const original = await importOriginal<typeof import("@/items/expanded-quiz")>();
       return {
         ...original,
-        assembleExpandedQuiz: vi.fn((...args: Parameters<typeof original.assembleExpandedQuiz>) => {
+        assembleExpandedTest: vi.fn((...args: Parameters<typeof original.assembleExpandedTest>) => {
           vi.setSystemTime(Date.now() + 15_000);
           if (failAssembly) throw new Error("forced fail");
-          return original.assembleExpandedQuiz(...args);
+          return original.assembleExpandedTest(...args);
         }),
       };
     });

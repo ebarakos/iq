@@ -81,16 +81,30 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   then whether another option was also defensible. The scored turn is unchanged.
   A turn that completes is kept even if a later one fails, and a reply from any
   model other than the one that answered is dropped, with an error naming both.
-- `src/lib/quiz-token.ts` + `src/app/api/submit/route.ts` — encrypted answer
-  token, the answer deadline (separate from the token's own expiry), and
-  server-side scoring with a late marker. The token seals the app release and
-  leaderboard eligibility/deployment when issued; selecting a board does not change its scope. Legacy tokens cannot rank. Link tokens
-  (`src/lib/link-test.ts`) seal the release and environment only: link results never rank.
+- `src/lib/quiz-token.ts` — token sealing (AES-GCM envelopes), the answer deadline (separate
+  from the token's own expiry) and grace window, and the answer-key shape scoring reads. The
+  answer key is rebuilt from the seed token for every submission; no token carries it.
+- `src/app/api/generate/route.ts` + `src/app/api/submit/route.ts` — the in-page test on the
+  seed token (`docs/plans/leaderboard-integrity.md`). Generate returns each question as a
+  `PicturePuzzle` (`src/items/picture-puzzle.ts`): layout, grid flow and PNG paths, no scenes,
+  instruction or ids. Submit rebuilds the test, scores it through `submitQuizOnce`, and returns
+  the full puzzles for the review in the response only, never in the receipt.
+- `src/app/t/[token]/[n]/board/[part]` — one picture of a question: stem board `s<i>`, option
+  `o<k>`, gate strip `g<i>-right`/`g<i>-down`, drawn from `SceneGraphic`'s own SVG
+  (`pictureToSvg` in `compose-image.tsx`, `pictureToPng`). `StemView` lays out either scenes or
+  pictures with the same markup, so the phone-width tests cover both.
 - `src/lib/quiz-scoring.ts` — elapsed time and the bounded speed bonus over shared `src/lib/scoring.ts`;
   `src/lib/leaderboard.ts` — Redis first-submission receipts (atomic `SET NX`, retained
   until token expiry) in the deployment namespace, identical-retry recovery, changed-answer rejection and atomic
   publication of one persistent leaderboard entry per test. The first receipt binds publication
-  to the selected board; older receipts use their original deployment's board.
+  to the selected board; older receipts use their original deployment's board. A result ranks
+  only when 30 questions, on time, sealed with a release and `r` (ranking on at issue), and at
+  least `MIN_RANKED_SECONDS` (120) long. Rows carry a self-declared `kind` (person or agent).
+  `removeLeaderboardEntry` leaves a tombstone so a removed test cannot publish again; the owner
+  runs it through `scripts/leaderboard-remove.ts` (`npm run leaderboard:remove`).
+- `src/lib/nickname.ts` — NFKC, 2–24 letters/digits/spaces/`. - _ '`, no web addresses, and the
+  `obscenity` matcher on the name and its joined form. `src/lib/rate-limit.ts` — one-hour Redis
+  windows per hashed IP: 60 starts (fail open) and 20 publications.
 - `src/lib/leaderboard-config.ts` — local development default, explicit deployment opt-in
   through `LEADERBOARD_ENABLED=true`, and two namespaces: shared dev (`aiq:local`) and
   production (`aiq:production`). Selecting the production board requires both `LEADERBOARD_ENV=production`
@@ -103,14 +117,19 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   `KV_REST_API_URL` and `KV_REST_API_TOKEN`; `scripts/redis-verify.ts` checks the connection
   with a temporary key. All scoring now requires Redis so answers never leave before
   the first submission is stored, even when the leaderboard is disabled.
-- `src/lib/link-test.ts` — the link test (`docs/plans/link-only-test.md`): a
+- `src/lib/link-test.ts` — the test token for both flows (`docs/plans/link-only-test.md`): a
   short sealed token holding the seed, length, source, generator version,
   withdrawn-family hash (and bank hash for a fallback test), app release, leaderboard
   settings and deadline; every
-  page rebuilds the test from it, and refuses it once any of those changed.
+  page rebuilds the test from it, and refuses it once any of those changed. A generated test
+  also seals the attempt each slot kept (`assembleExpandedTest`), so `linkTestQuestion` builds
+  only the question a page or picture asks for (`buildExpandedQuestion`, about 50 ms) on a
+  server that does not hold the test; building all 30 takes about 4 seconds.
+  `scoringPayload` turns a rebuilt test into the answer key both flows score against.
   `src/app/sample` and `src/app/test` mint one and redirect;
   `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
-  `src/app/t/[token]/result` the scored review. All plain HTML and links.
+  `src/app/t/[token]/result` the scored review, with one `…/publish/<agent>` link per fixed
+  agent name (`AGENT_NAMES`) when the result ranks. All plain HTML and links.
 - `src/items/puzzle-png.ts` — `puzzleToPng`, the agent channel's SVG rasterized by
   `@resvg/resvg-js` with the bundled Noto Sans fonts: the harness, `render:item`
   and the link test's puzzle image all draw the same pixels.

@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY, EXPANDED_PROFILE_BANDS, type FamilyPromotionRegistry } from "./family-promotion";
 import {
-  assembleExpandedQuiz, assertProfilesRemainBuildable, bucketDifficulty, drawExpandedSlot,
+  assembleExpandedQuiz, assembleExpandedTest, assertProfilesRemainBuildable, bucketDifficulty,
+  buildExpandedQuestion, drawExpandedSlot, type AssembledTest,
   EXPANDED_GENERATOR_VERSION, EXPANDED_PROFILES, EXPANDED_SLOT_RETRY_BUDGET,
   eligibleFamiliesForBand, eligibleFamiliesForDifficulty, isAnalogyLayoutFamily,
   maximumDistinctFamilies, MAXIMUM_FAMILY_QUESTIONS, MINIMUM_DISTINCT_FAMILIES,
   planExpandedSchedule, questionCount, questionFingerprint, sceneFamilyLayout, SLOT_DIFFICULTIES,
   type ExpandedProfile,
 } from "./expanded-quiz";
-import { OPTIONS_PER_ITEM, PuzzleSetSchema, sceneSignature, type PuzzleSet } from "./schema";
+import { OPTIONS_PER_ITEM, PuzzleSchema, PuzzleSetSchema, sceneSignature, type PuzzleSet } from "./schema";
 import { generateSceneFamilyCandidate, requireSceneFamilyBucket, sceneFamilyBucketsFor, type SceneFamilyId } from "./scene-families";
 import { seededRng } from "../lib/rng";
 
@@ -24,14 +25,17 @@ function expectIncreasingDifficulty(items: readonly { difficulty: number }[]): v
   expect(items.at(-1)!.difficulty).toBe(Math.max(...difficulties));
 }
 const SHARED_SEED = "0123456789abcdef0123456789abcdef";
-const sharedQuizzes = new Map<ExpandedProfile, PuzzleSet>();
-function sharedQuiz(profile: ExpandedProfile): PuzzleSet {
-  let quiz = sharedQuizzes.get(profile);
-  if (!quiz) {
-    quiz = assembleExpandedQuiz(SHARED_SEED, profile, REGISTRY);
-    sharedQuizzes.set(profile, quiz);
+const sharedTests = new Map<ExpandedProfile, AssembledTest>();
+function sharedTest(profile: ExpandedProfile): AssembledTest {
+  let test = sharedTests.get(profile);
+  if (!test) {
+    test = assembleExpandedTest(SHARED_SEED, profile, REGISTRY);
+    sharedTests.set(profile, test);
   }
-  return quiz;
+  return test;
+}
+function sharedQuiz(profile: ExpandedProfile): PuzzleSet {
+  return sharedTest(profile).puzzles;
 }
 
 describe("validated family pools and generated questions", () => {
@@ -335,7 +339,31 @@ describe("validated family pools and generated questions", () => {
         difficulty: slot.difficulty,
       })));
     });
+
+    it(`rebuilds each ${profile} question alone, from the attempt its slot kept`, () => {
+      const { puzzles, attempts } = sharedTest(profile);
+      expect(attempts).toHaveLength(questionCount(profile));
+      attempts.forEach((attempt, slot) => {
+        expect(buildExpandedQuestion(SHARED_SEED, profile, slot, attempt, REGISTRY), `question ${slot + 1}`)
+          .toEqual(puzzles[slot]);
+      });
+    }, 60_000);
   }
+
+  it("builds the attempt it is given, and refuses a question the test does not have", () => {
+    // Every slot of the shared tests kept its first attempt, so take a later
+    // attempt that also passes: built alone, it must be that draw, not the first.
+    const schedule = planExpandedSchedule(SHARED_SEED, "short-5", REGISTRY);
+    const later = schedule.flatMap((selected, slot) => {
+      const draw = drawExpandedSlot(SHARED_SEED, "short-5", slot, 1, selected);
+      return draw.accepted ? [{ slot, puzzle: draw.puzzle }] : [];
+    })[0];
+    expect(later).toBeDefined();
+    const built = buildExpandedQuestion(SHARED_SEED, "short-5", later.slot, 1, REGISTRY);
+    expect(built).toEqual(PuzzleSchema.parse(later.puzzle));
+    expect(built).not.toEqual(sharedQuiz("short-5")[later.slot]);
+    expect(() => buildExpandedQuestion(SHARED_SEED, "short-5", 5, 0, REGISTRY)).toThrow(/no question 6/);
+  }, 30_000);
 
 });
 

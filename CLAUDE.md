@@ -53,9 +53,10 @@ Scoring, local included, needs Upstash `KV_REST_API_URL` and `KV_REST_API_TOKEN`
   so the test is fair across humans and vision-capable agents.
 - `OPTIONS_PER_ITEM` (`src/items/schema.ts`) is the one place the number of answer options
   is set, and every family, both renderers, and the assembler follow it.
-- The served puzzle is answer-free: answers ride in the encrypted quiz token (a link-test token
-  seals only a seed) and scoring is server-side. Both flows save the first scored result in Redis
-  before revealing any answer, and reveal none if that fails (`src/lib/leaderboard.ts`).
+- Before scoring, puzzles leave the server only as PNGs, never as scene data: the repo is public,
+  so shape data lets a script solve with its own solvers. One sealed seed token per test serves
+  both flows (`src/lib/link-test.ts`); the server rebuilds and scores it, saves the first result in
+  Redis before revealing any answer, and reveals none if that fails (`src/lib/leaderboard.ts`).
 - Production requires `QUIZ_TOKEN_SECRET` and the Upstash `KV_REST_API_*` settings; human tests
   make no model calls, so they never need relay env. See `.env.example`.
 - Nothing is locked except **JS/TS + Vercel + llm-relay** (explicit user requirements).
@@ -86,12 +87,7 @@ connect and the hosted OpenRouter line in `.env.example` is the fallback.
 - Production relay: `https://llm-relay.ebarakos.workers.dev/v1`
 - Local relay (running `../llm-relay` via `wrangler dev`): `http://localhost:8787/v1`
 - Allowed providers/models: see [`../llm-relay/allowed-models.json`](../llm-relay/allowed-models.json).
-- BYO keys (optional): per-provider keys (`CEREBRAS_API_KEY`, `OPENROUTER_API_KEY`,
-  `GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are forwarded as
-  `X-User-Api-Key` to bypass the relay's shared quota. `.env` only — never commit.
-- Local harness providers `claude-code` and `codex` route through the relay to the Claude Code / Codex CLIs signed in on this machine. They appear only when llm-relay is running on localhost (`npm run dev` there) — never in production — and every call spends the same subscription plan limits as using the CLIs interactively. Their
-  effort and thinking budget come from `agent:run`'s `--effort` (default `RELAY_EFFORT`) and
-  `--thinking-budget` flags and travel as body fields on the relay hop.
+- BYO provider keys and the local harness providers (`claude-code`, `codex`): see `docs/reference.md`.
 
 ## Where things live
 

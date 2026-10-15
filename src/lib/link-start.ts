@@ -1,5 +1,6 @@
 import type { ExpandedProfile } from "@/items/expanded-quiz";
 import { createLinkTest, LinkTestError, questionPath } from "./link-test";
+import { startAllowed } from "./rate-limit";
 
 /**
  * Headers every link-test response sets itself: never cached. `next.config.ts`
@@ -14,7 +15,13 @@ export const LINK_TEST_HEADERS = {
  * its first question. A plain redirect, so a fetcher that follows links and
  * runs no JavaScript can start a test (docs/plans/link-only-test.md).
  */
-export function startLinkTest(req: Request, profile: ExpandedProfile): Response {
+export async function startLinkTest(req: Request, profile: ExpandedProfile): Promise<Response> {
+  if (!(await startAllowed(req.headers))) {
+    return new Response("Too many tests started from this address. Please wait a few minutes and try again.", {
+      status: 429,
+      headers: { ...LINK_TEST_HEADERS, "content-type": "text/plain; charset=utf-8" },
+    });
+  }
   try {
     const { token } = createLinkTest(profile);
     return new Response(null, {

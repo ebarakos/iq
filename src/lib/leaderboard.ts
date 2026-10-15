@@ -1,14 +1,31 @@
 import { createHash } from "node:crypto";
 import { leaderboardEnabled, leaderboardNamespace, quizNamespace } from "./leaderboard-config";
-import type { LeaderboardEntry } from "./leaderboard-types";
+import type { LeaderboardEntry, TakerKind } from "./leaderboard-types";
 import type { QuizTokenPayload } from "./quiz-token";
 import { scoreQuiz } from "./quiz-scoring";
 import { redisCommand } from "./redis";
 
 export class SubmissionConflictError extends Error {}
+
+/**
+ * The fastest a 30-question test may finish and still rank: four seconds a
+ * question. No person reads 30 puzzles faster, and no agent observed so far
+ * comes close; a script that reads answers does (docs/plans/leaderboard-integrity.md).
+ */
+export const MIN_RANKED_SECONDS = 120;
 export class LeaderboardEligibilityError extends Error {}
 
 type ScoredResponse = ReturnType<typeof scoreQuiz> & { leaderboardEligible: boolean };
+/** A row as stored. The owner's removal keeps it as a tombstone, so its test cannot publish again. */
+type StoredEntry = LeaderboardEntry & { removed?: true };
+
+const REMOVED_MESSAGE = "This result was removed from the leaderboard.";
+
+function readEntry(raw: string): LeaderboardEntry {
+  const { removed, ...entry } = JSON.parse(raw) as StoredEntry;
+  if (removed) throw new LeaderboardEligibilityError(REMOVED_MESSAGE);
+  return entry;
+}
 interface SubmissionReceipt {
   answersHash: string;
   submittedAt: number;
@@ -64,7 +81,8 @@ export async function submitQuizOnce(
     ...scored,
     leaderboardEligible: leaderboardEnabled() && quiz.leaderboardAllowed === true &&
       quiz.leaderboardScope === scope &&
-      scored.total === 30 && !scored.late && scored.appVersion !== null,
+      scored.total === 30 && !scored.late && scored.appVersion !== null &&
+      scored.elapsedSeconds >= MIN_RANKED_SECONDS,
   };
   const receipt: SubmissionReceipt = {
     answersHash, submittedAt: nowSeconds, response,
@@ -93,14 +111,18 @@ return ARGV[1]
 `;
 
 /** Publish only the server's first scored result, never values supplied by the browser. */
-export async function publishLeaderboardEntry(token: string, nickname: string): Promise<LeaderboardEntry> {
+export async function publishLeaderboardEntry(
+  token: string,
+  nickname: string,
+  kind: TakerKind,
+): Promise<LeaderboardEntry> {
   if (!leaderboardEnabled()) throw new LeaderboardEligibilityError("The leaderboard is disabled.");
   const id = hash(token);
   const scope = quizNamespace();
   const namespace = leaderboardNamespace();
   const key = submissionKey(token, scope);
   const previous = await redisCommand<string | null>(["GET", entryKey(id, namespace)]);
-  if (previous !== null) return JSON.parse(previous) as LeaderboardEntry;
+  if (previous !== null) return readEntry(previous);
 
   const raw = await redisCommand<string | null>(["GET", key]);
   if (raw === null) throw new LeaderboardEligibilityError("This result has expired or has not been submitted. Take a new test.");
@@ -110,11 +132,14 @@ export async function publishLeaderboardEntry(token: string, nickname: string): 
   }
   const result = receipt.response;
   if (!result.leaderboardEligible || result.total !== 30 || result.late || !result.appVersion) {
-    throw new LeaderboardEligibilityError("Only eligible, on-time 30-question tests can join the leaderboard.");
+    throw new LeaderboardEligibilityError(
+      "Only on-time 30-question tests that took at least 2 minutes can join the leaderboard.",
+    );
   }
   const entry: LeaderboardEntry = {
     id,
     nickname,
+    kind,
     points: result.points,
     correct: result.score,
     total: 30,
@@ -129,14 +154,41 @@ export async function publishLeaderboardEntry(token: string, nickname: string): 
     JSON.stringify(entry), rankScore, id,
   ]);
   if (saved === null) throw new LeaderboardEligibilityError("This result has expired. Take a new test.");
-  return JSON.parse(saved) as LeaderboardEntry;
+  return readEntry(saved);
+}
+
+/** Ranked rows as stored, best first; a tombstone never reaches a reader, even mid-removal. */
+async function rankedEntries(namespace: string, last: number): Promise<LeaderboardEntry[]> {
+  const ids = await redisCommand<string[]>(["ZREVRANGE", boardKey(namespace), 0, last]);
+  if (ids.length === 0) return [];
+  const rows = await redisCommand<(string | null)[]>(["MGET", ...ids.map((id) => entryKey(id, namespace))]);
+  return rows.filter((row): row is string => row !== null)
+    .map((row) => JSON.parse(row) as StoredEntry)
+    .filter((entry) => !entry.removed);
 }
 
 export async function listLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!leaderboardEnabled()) return [];
-  const namespace = leaderboardNamespace();
-  const ids = await redisCommand<string[]>(["ZREVRANGE", boardKey(namespace), 0, 19]);
-  if (ids.length === 0) return [];
-  const rows = await redisCommand<(string | null)[]>(["MGET", ...ids.map((id) => entryKey(id, namespace))]);
-  return rows.filter((row): row is string => row !== null).map((row) => JSON.parse(row) as LeaderboardEntry);
+  // A few spare rows, so a tombstone still in the ranking cannot shorten the top 20.
+  return (await rankedEntries(leaderboardNamespace(), 39)).slice(0, 20);
+}
+
+/** Every ranked row on one board, best first. For the owner's removal script. */
+export async function listBoardEntries(namespace: string): Promise<LeaderboardEntry[]> {
+  return rankedEntries(namespace, -1);
+}
+
+// The tombstone and the ranking change together, so no reader sees one without the other.
+const REMOVE_ENTRY = `
+redis.call('SET', KEYS[1], ARGV[1])
+redis.call('ZREM', KEYS[2], ARGV[2])
+return 1
+`;
+
+/** Take a row off one board, leaving a tombstone so its test cannot be published again. */
+export async function removeLeaderboardEntry(namespace: string, entry: LeaderboardEntry): Promise<void> {
+  const tombstone: StoredEntry = { ...entry, removed: true };
+  await redisCommand([
+    "EVAL", REMOVE_ENTRY, 2, entryKey(entry.id, namespace), boardKey(namespace), JSON.stringify(tombstone), entry.id,
+  ]);
 }

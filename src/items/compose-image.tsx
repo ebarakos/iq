@@ -3,6 +3,7 @@ import React, { type ReactElement } from "react";
 import type { Panel, Puzzle, PublicPuzzle, Scene } from "./schema";
 import { isBlank } from "./schema";
 import type { GatePieceTexture } from "./gate-pieces";
+import { isGatePanel, type PicturePart } from "./picture-puzzle";
 import {
   AssemblyLegend,
   CELL_CANVAS_PADDING,
@@ -355,6 +356,48 @@ export function PuzzleImage({
       {elems}
     </svg>
   );
+}
+
+/** Pixel size of one served board picture: sharp at 2–3× on the largest board the page draws. */
+export const PICTURE_BOARD_PX = 240;
+/** Pixels per jigsaw unit in a served gate picture. */
+const PICTURE_PIECE_SCALE = 4;
+
+/**
+ * One picture of a question as a standalone SVG string: a stem board, an
+ * option, or a gate's jigsaw strip (`src/items/picture-puzzle.ts`). Null for a
+ * part the question does not have, or one it never serves as a picture.
+ */
+export function pictureToSvg(puzzle: Puzzle, part: PicturePart): string | null {
+  let picture: ReactElement | null = null;
+  if (part.kind === "gate") {
+    const panel = puzzle.stem[part.index];
+    const textures = panel && isGatePanel(puzzle, part.index) ? gatePieces(panel) : null;
+    if (textures && (part.direction === "right" || textures.length > 1)) {
+      const { width, height } = jigsawStripSize(textures.length, part.direction);
+      picture = (
+        <svg xmlns="http://www.w3.org/2000/svg" width={width * PICTURE_PIECE_SCALE}
+          height={height * PICTURE_PIECE_SCALE} viewBox={`0 0 ${width} ${height}`}>
+          <JigsawPieces textures={textures} direction={part.direction} />
+        </svg>
+      );
+    }
+  } else {
+    const panel = part.kind === "stem" ? puzzle.stem[part.index] : puzzle.options[part.index];
+    const servedAsBoard = part.kind === "option" || !isGatePanel(puzzle, part.index);
+    if (panel && !isBlank(panel) && servedAsBoard) {
+      picture = (
+        <svg xmlns="http://www.w3.org/2000/svg" width={PICTURE_BOARD_PX} height={PICTURE_BOARD_PX}
+          viewBox={`0 0 ${CELL_VIEWBOX} ${CELL_VIEWBOX}`}>
+          <SceneGraphic scene={panel} />
+        </svg>
+      );
+    }
+  }
+  if (!picture) return null;
+  const require = createRequire(import.meta.url);
+  const { renderToStaticMarkup } = require("react-dom/server") as typeof import("react-dom/server");
+  return renderToStaticMarkup(picture);
 }
 
 /**

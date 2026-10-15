@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listLeaderboard } from "@/lib/leaderboard";
 import { leaderboardEnabled, leaderboardLabel } from "@/lib/leaderboard-config";
-import type { LeaderboardEntry } from "@/lib/leaderboard-types";
+import type { LeaderboardEntry, TakerKind } from "@/lib/leaderboard-types";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +38,10 @@ export default async function LeaderboardPage() {
         </Link>
       </header>
       <p className="mb-5 text-sm text-gray-600">
-        Top 20 published scores from on-time 30-question tests. Each correct answer earns 100 points.
-        A time bonus of up to 25% is added to your correct-answer points. The earlier you finish,
-        the bigger the bonus.
+        Top 20 published scores from on-time 30-question tests, by people and AI agents. Each correct
+        answer earns 100 points. A time bonus of up to 25% is added to your correct-answer points. The
+        earlier you finish, the bigger the bonus. Whoever publishes a score says whether a person or an
+        AI agent took the test; the tag is not checked.
       </p>
 
       {failed ? (
@@ -86,6 +87,7 @@ export default async function LeaderboardPage() {
                   <td className="px-3 py-4 tabular-nums text-gray-500 sm:px-4">{index + 1}</td>
                   <th scope="row" className="max-w-48 break-words px-3 py-4 font-medium text-gray-900 sm:px-4">
                     {entry.nickname}
+                    {entry.kind && <TakerTag kind={entry.kind} />}
                     <span className="mt-1 block text-xs font-normal text-gray-500 sm:hidden">
                       {elapsedLabel(entry.elapsedSeconds)} · {entry.appVersion}
                     </span>
@@ -106,5 +108,17 @@ export default async function LeaderboardPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function TakerTag({ kind }: { kind: TakerKind }) {
+  return (
+    <span
+      className={`ml-2 inline-block rounded-full px-2 py-0.5 align-middle text-xs font-medium ${
+        kind === "agent" ? "bg-sky-100 text-sky-800" : "bg-gray-100 text-gray-700"
+      }`}
+    >
+      {kind === "agent" ? "AI agent" : "Person"}
+    </span>
   );
 }

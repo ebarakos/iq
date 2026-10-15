@@ -2,27 +2,49 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OPTIONS_PER_ITEM } from "@/items/schema";
 import { GRACE_WINDOW_SECONDS } from "@/lib/quiz-token";
-import { loadLinkTest, OPTION_LETTERS } from "@/lib/link-test";
+import { parsePicturePart, picturePaths, toPicturePuzzle } from "@/items/picture-puzzle";
+import { pictureToPng } from "@/items/puzzle-png";
+import { listLeaderboard } from "@/lib/leaderboard";
+import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } from "@/lib/link-test";
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
 import QuestionPage from "./[token]/[n]/page";
 import { GET as puzzleImage } from "./[token]/[n]/puzzle.png/route";
+import { GET as pictureImage } from "./[token]/[n]/board/[part]/route";
+import PublishPage from "./[token]/publish/[agent]/page";
 import ResultPage from "./[token]/result/page";
 import { metadata } from "./layout";
+import { POST as publishFromForm } from "../api/leaderboard/route";
 
-const storage = vi.hoisted(() => ({ values: new Map<string, string>() }));
+const storage = vi.hoisted(() => ({ values: new Map<string, string>(), ranks: new Map<string, number>() }));
 vi.mock("@/lib/redis", () => ({
   redisCommand: vi.fn(async (command: (string | number)[]) => {
     const key = String(command[1]);
-    if (command[0] === "GET") return storage.values.get(key) ?? null;
-    if (command[0] === "SET") {
-      if (storage.values.has(key)) return null;
-      storage.values.set(key, String(command[2]));
-      return "OK";
+    switch (command[0]) {
+      case "GET": return storage.values.get(key) ?? null;
+      case "SET":
+        if (storage.values.has(key)) return null;
+        storage.values.set(key, String(command[2]));
+        return "OK";
+      case "EVAL": {
+        const [receiptKey, entryKey] = [String(command[3]), String(command[4])];
+        if (storage.values.has(entryKey)) return storage.values.get(entryKey);
+        if (!storage.values.has(receiptKey)) return null;
+        storage.values.set(entryKey, String(command[6]));
+        storage.ranks.set(`${command[5]}|${command[8]}`, Number(command[7]));
+        return String(command[6]);
+      }
+      case "ZREVRANGE": return [...storage.ranks].filter(([id]) => id.startsWith(`${key}|`))
+        .sort((a, b) => b[1] - a[1]).map(([id]) => id.split("|")[1]);
+      case "MGET": return command.slice(1).map((item) => storage.values.get(String(item)) ?? null);
+      case "INCR": return 1;
+      case "EXPIRE": return 1;
+      default: throw new Error("Unexpected Redis command");
     }
-    throw new Error("Unexpected Redis command");
   }),
 }));
+// The publish page reads the caller's address; outside a request there is none.
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
 /**
  * The link test as a fetcher meets it: start at /sample, read each page as
@@ -49,8 +71,16 @@ async function fetchPath(path: string): Promise<Fetched> {
       bytes,
     };
   };
-  if (url.pathname === "/sample") return asResponse(startSample(new Request(url)));
-  if (url.pathname === "/test") return asResponse(startTest(new Request(url)));
+  if (url.pathname === "/sample") return asResponse(await startSample(new Request(url)));
+  if (url.pathname === "/test") return asResponse(await startTest(new Request(url)));
+  if (segments[0] === "t" && segments.length === 5 && segments[3] === "board") {
+    return asResponse(await pictureImage(new Request(url), {
+      params: Promise.resolve({ token: segments[1], n: segments[2], part: segments[4] }),
+    }));
+  }
+  if (segments[0] === "t" && segments.length === 4 && segments[2] === "publish") {
+    return renderPage(() => PublishPage({ params: Promise.resolve({ token: segments[1], agent: segments[3] }) }));
+  }
   if (segments[0] === "t" && segments.length === 4 && segments[3] === "puzzle.png") {
     return asResponse(await puzzleImage(new Request(url), {
       params: Promise.resolve({ token: segments[1], n: segments[2] }),
@@ -98,9 +128,12 @@ function text(html: string): string {
   return decodeEntities(html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " "));
 }
 
-describe("the link test, followed link by link", () => {
+// Each walk renders real pictures or builds a 30-question test, which can pass
+// 5 s when the whole suite shares the machine.
+describe("the link test, followed link by link", { timeout: 30_000 }, () => {
   beforeEach(() => {
     storage.values.clear();
+    storage.ranks.clear();
     vi.clearAllMocks();
     vi.stubEnv("QUIZ_TOKEN_SECRET", SECRET);
     vi.stubEnv("WITHDRAWN_FAMILY_IDS", "");
@@ -121,6 +154,8 @@ describe("the link test, followed link by link", () => {
     // first question right, the second skipped, the third wrong, the rest right.
     const { puzzles } = loadLinkTest(token);
     expect(puzzles).toHaveLength(5);
+    // As on a server that did not start the test: each page builds its own question.
+    clearBuiltLinkTests();
     const plan = puzzles.map((puzzle, index) =>
       index === 1 ? null : index === 2 ? (puzzle.answerIndex + 1) % puzzle.options.length : puzzle.answerIndex);
 
@@ -193,7 +228,7 @@ describe("the link test, followed link by link", () => {
     expect(text((await fetchPath(path)).body)).toContain("0 of 5 correct");
   });
 
-  it.each(["true", "false"])("shows link-result points without ranking when LEADERBOARD_ENABLED=%s", async (flag) => {
+  it.each(["true", "false"])("shows link-result points, ranking them only while the board is on (LEADERBOARD_ENABLED=%s)", async (flag) => {
     vi.stubEnv("LEADERBOARD_ENABLED", flag);
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -207,8 +242,87 @@ describe("the link test, followed link by link", () => {
     expect(result).toContain("3,250 points");
     expect(result).toContain("A time bonus of up to 25% is added to your correct-answer points.");
     const [receipt] = [...storage.values.values()].map((raw) => JSON.parse(raw));
-    expect(receipt.response.leaderboardEligible).toBe(false);
+    expect(receipt.response.leaderboardEligible).toBe(flag === "true");
   });
+
+  it("publishes a 30-question link result as an agent by following its name's link, once", async () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const { puzzles } = loadLinkTest(token);
+    const answers = puzzles.map((puzzle, index) => OPTION_LETTERS[index < 27 ? puzzle.answerIndex : (puzzle.answerIndex + 1) % 6]).join("");
+    vi.setSystemTime((issuedAt + 900) * 1000);
+    const result = await fetchPath(`/t/${token}/result?a=${answers}`);
+    expect(text(result.body)).toContain("27 of 30 correct");
+    const publishLinks = links(result.body).filter(([label]) => label.startsWith("Publish as "));
+    expect(publishLinks.map(([label]) => label)).toContain("Publish as Claude");
+    expect(followable(result.body)).toEqual(["/"]);
+
+    const [, claude] = publishLinks.find(([label]) => label === "Publish as Claude")!;
+    const published = text((await fetchPath(claude)).body);
+    expect(published).toContain("Published as Claude");
+    expect(published).toContain("27 of 30 correct");
+    const [, chatgpt] = publishLinks.find(([label]) => label === "Publish as ChatGPT")!;
+    expect(text((await fetchPath(chatgpt)).body)).toContain("already published");
+    expect((await listLeaderboard()).map(({ nickname, kind, correct }) => ({ nickname, kind, correct })))
+      .toEqual([{ nickname: "Claude", kind: "agent", correct: 27 }]);
+    expect(text((await fetchPath(`/t/${token}/publish/someone-else`)).body)).toContain("cannot be published here");
+  });
+
+  it("reports the saved row's own tag when the form published the result first", async () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const { puzzles } = loadLinkTest(token);
+    vi.setSystemTime((issuedAt + 900) * 1000);
+    await fetchPath(`/t/${token}/result?a=${puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("")}`);
+    const form = await publishFromForm(new Request("http://localhost/api/leaderboard", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ quizToken: token, nickname: "Claude", kind: "person" }),
+    }));
+    expect(form.status).toBe(200);
+    const page = text((await fetchPath(`/t/${token}/publish/claude`)).body);
+    expect(page).toContain("already published");
+    expect(page).toContain("as Claude, tagged Person");
+    expect(page).not.toContain("tagged AI agent");
+  });
+
+  it("offers no publication for a 30-question test finished in under two minutes", async () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const { puzzles } = loadLinkTest(token);
+    const answers = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    const result = await fetchPath(`/t/${token}/result?a=${answers}`);
+    expect(text(result.body)).toContain("took at least 2 minutes");
+    expect(links(result.body).some(([label]) => label.startsWith("Publish as "))).toBe(false);
+  });
+
+  it("draws every picture the in-page test names, and nothing it does not", async () => {
+    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const { puzzles } = loadLinkTest(token);
+    // As on a server that did not start the test: each question is built alone
+    // when its pictures are asked for, and must draw exactly what the test holds.
+    clearBuiltLinkTests();
+    const layouts = new Set<string>();
+    for (const [index, puzzle] of puzzles.entries()) {
+      layouts.add(puzzle.layout);
+      const picture = toPicturePuzzle(puzzle, (part) => pictureImagePath(token, index + 1, part));
+      for (const path of picturePaths(picture)) {
+        const image = await fetchPath(path);
+        expect(image.status, path).toBe(200);
+        expect(image.contentType).toBe("image/png");
+        const expected = await pictureToPng(puzzle, parsePicturePart(path.split("/").pop()!)!);
+        expect(Buffer.from(image.bytes!).equals(Buffer.from(expected!)), path).toBe(true);
+      }
+    }
+    expect(layouts.size).toBeGreaterThan(2);
+    for (const part of ["s99.png", "o6.png", "x1.png", "s1.svg"]) {
+      expect((await fetchPath(`/t/${token}/1/board/${part}`)).status).toBe(404);
+    }
+  }, 120_000);
 
   it("starts a 30-question test at /test", async () => {
     const start = await fetchPath("/test");

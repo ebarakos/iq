@@ -20,3 +20,14 @@ requirements). Framework and libraries are proposals open to revision.
 
 The relay section the table points at lives in `CLAUDE.md` (env vars, rules) and
 `docs/architecture.md` (integration files).
+
+## Relay: BYO keys and local harness providers
+
+Moved verbatim from `CLAUDE.md` (2026-10-15).
+
+- BYO keys (optional): per-provider keys (`CEREBRAS_API_KEY`, `OPENROUTER_API_KEY`,
+  `GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are forwarded as
+  `X-User-Api-Key` to bypass the relay's shared quota. `.env` only — never commit.
+- Local harness providers `claude-code` and `codex` route through the relay to the Claude Code / Codex CLIs signed in on this machine. They appear only when llm-relay is running on localhost (`npm run dev` there) — never in production — and every call spends the same subscription plan limits as using the CLIs interactively. Their
+  effort and thinking budget come from `agent:run`'s `--effort` (default `RELAY_EFFORT`) and
+  `--thinking-budget` flags and travel as body fields on the relay hop.
