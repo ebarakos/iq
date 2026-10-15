@@ -52,9 +52,11 @@ respectively. No new human results have been collected.
 
 ## Pilot v3 manifests — what each generator population held
 
-`pilot-v3-manifest-scene-families-v38.json` is the current 36-item record, requiring every machine transformation to distinguish six choices.
-Its packets retain the same 24 new-mechanism and 12 familiar-item design. Earlier manifests remain
-the records of their original populations; no timed human results have been collected for v38.
+`pilot-v3-manifest-scene-families-v39.json` is the current 37-item record. The one-gate machine
+(`composed-transform-d2`) adds a 13th familiar item, and the growing-jump ring sequence is now
+level 3. Earlier manifests remain the records of their original populations, among them the
+36-item v38 record, which required every machine transformation to distinguish six choices. No
+timed human results have been collected for v38 or v39.
 
 The answer-free record of every pilot-v3 packet: item identity, difficulty, and
 band time budget, plus each packet's content fingerprint. No puzzle, no answer,

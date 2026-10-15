@@ -279,7 +279,7 @@ semantics requires a new generator version.
 
 `assembleExpandedQuiz(seed, profile, registry)` is a pure function.
 `profile` is `long-30` or `short-5`, and the generator version for both is
-`scene-families-v38`. The same seed, profile, generator version, and withdrawal
+`scene-families-v39`. The same seed, profile, generator version, and withdrawal
 list reproduce the
 same items, the same family order, and the same option order on every machine.
 Assembly uses stable child seeds for the schedule, each slot, candidate retries,

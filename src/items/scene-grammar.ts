@@ -134,6 +134,11 @@ export type SceneCompositionPrimitive =
       quarterTurns: 1 | 3;
     };
 
+/** A one-gate program: the gentlest machine table, one worked row (owner, 2026-10-15). */
+export interface SceneSingleStepComposition {
+  first: SceneCompositionPrimitive;
+}
+
 export interface SceneOrderedComposition {
   first: SceneCompositionPrimitive;
   second: SceneCompositionPrimitive;
@@ -145,8 +150,9 @@ export interface SceneOrderedThreeStepComposition {
   third: SceneCompositionPrimitive;
 }
 
-/** Any composed program a machine table displays: two or three gates. */
+/** Any composed program a machine table displays: one, two or three gates. */
 export type SceneComposedProgram =
+  | SceneSingleStepComposition
   | SceneOrderedComposition
   | SceneOrderedThreeStepComposition;
 
@@ -157,22 +163,23 @@ export type SceneComposedProgram =
  * adds procedure, not reasoning. The four- and five-gate programs behind the
  * withdrawn d6 buckets were deleted on 2026-09-28.
  */
-export type SceneComposedProgramLength = 2 | 3;
+export type SceneComposedProgramLength = 1 | 2 | 3;
 
 /** The gates of a composed program, in the order the query strip shows them. */
 export function sceneComposedProgramSteps(program: SceneComposedProgram): SceneCompositionPrimitive[] {
-  return "third" in program
-    ? [program.first, program.second, program.third]
-    : [program.first, program.second];
+  if ("third" in program) return [program.first, program.second, program.third];
+  if ("second" in program) return [program.first, program.second];
+  return [program.first];
 }
 
-/** Rebuild a composed program from its ordered gates. Two or three. */
+/** Rebuild a composed program from its ordered gates. One, two or three. */
 export function sceneComposedProgramFromSteps(
   steps: readonly SceneCompositionPrimitive[],
 ): SceneComposedProgram {
+  if (steps.length === 1) return { first: steps[0] };
   if (steps.length === 2) return { first: steps[0], second: steps[1] };
   if (steps.length === 3) return { first: steps[0], second: steps[1], third: steps[2] };
-  throw new Error(`a composed program shows two or three gates, not ${steps.length}`);
+  throw new Error(`a composed program shows one, two or three gates, not ${steps.length}`);
 }
 
 export interface ScenePosition {
@@ -717,6 +724,8 @@ export function sceneComposedPrimitives(): SceneCompositionPrimitive[] {
  * `SceneComposedProgramLength`).
  */
 export function isSceneComposedProgram(steps: readonly SceneCompositionPrimitive[]): boolean {
+  // One gate is any primitive: its single worked row is the whole rule.
+  if (steps.length === 1) return true;
   if (steps.length !== 2 && steps.length !== 3) return false;
   const keys = steps.map((primitive) => JSON.stringify(primitive));
   if (new Set(keys).size !== keys.length) return false;
@@ -754,6 +763,11 @@ export function enumerateSceneOrderedCompositions(): SceneOrderedComposition[] {
     { first: spatialPrimitive, second: attributePrimitive },
     { first: attributePrimitive, second: spatialPrimitive },
   ]));
+}
+
+/** Every one-gate program: each primitive on its own. */
+export function enumerateSceneSingleStepCompositions(): SceneSingleStepComposition[] {
+  return enumerateComposedPrograms(1).map((steps) => ({ first: steps[0] }));
 }
 
 /** Every ordered triple of distinct primitives that is not three board moves. */

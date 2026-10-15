@@ -50,8 +50,8 @@ first scored submission in Redis before revealing answers. Both flows reuse
 `src/lib/quiz-scoring.ts` and the single-use receipt logic in `src/lib/leaderboard.ts`.
 Identical retries recover the first result; changed answers are refused. Link tokens
 also seal the app version and deployment when issued, independently of `LEADERBOARD_ENV`; changing
-the selected board does not invalidate a link. Link results never rank, since
-publication opens only the in-page quiz token. The quiz UI moved to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
+the selected board does not invalidate a link. Since 2026-10-14 link results rank and publish
+through one fixed agent-name link each (`docs/plans/leaderboard-integrity.md`). The quiz UI moved to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
 
 ## The puzzle is a picture
 
@@ -158,5 +158,15 @@ Everything above except the chat-LLM check, which waits for a deploy.
 
 ## Chat LLM check
 
-Not yet run: it needs the deploy. Give a chat LLM only `https://iq.ebarakos.com/sample` and
-record here what it saw and how it scored.
+Run 2026-10-15 on the v0.2.0 deploy, in ChatGPT (the owner's account, default model):
+
+- **Given only the home page and "take the test"** (the owner's run): it read the page and the
+  public repository, took the start links for JavaScript buttons, said `/sample` was
+  "inaccessible through my web tool", and stopped without a score.
+- **Given `https://iq.ebarakos.com/sample` and told to follow each chosen option's link**: it
+  opened all five pictures, followed the redirect and every option link, and reached the
+  result: 5 of 5 correct in 2 min 3 s, with no blocked link or image.
+
+So `nofollow`, the redirect and the long token links do not stop its tool; knowing that links
+alone take the test does. The home page now says so in plain text for AI agents, with the full
+`/test` and `/sample` addresses (`src/app/quiz.tsx`, `Intro`).

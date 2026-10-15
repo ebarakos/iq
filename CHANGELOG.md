@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- The home page tells AI agents, in plain text, that following links takes the test, with the
+  full `/test` and `/sample` addresses. A chat agent given only the home page had taken the start
+  links for JavaScript buttons and stopped.
+- One-piece machine questions: one example row, then the same piece on a new board.
+
+### Changed
+- Machine questions ramp through every 30-question test: one piece in questions 1–5, two pieces
+  in the middle, three at the end. They used to arrive only near the end.
+- The shape that jumps round the edge with growing jumps ("1, 3, 5, 7, 9") is now an early
+  question (6–9 in the 30-question test) and appears at most twice.
+- The questions a test draws changed (generator v39), so a deploy ends tests in progress.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

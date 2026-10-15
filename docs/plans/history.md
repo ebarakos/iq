@@ -485,3 +485,12 @@ Ignoring any one transform must leave at least two choices possible from the rem
 The rule covers both d4 transforms and all three d5 transforms, including emergency fallback items.
 The old symbol-level checks missed this shortcut in 14 of 15 stored machine examples.
 Selection balances the necessary comparisons with compound errors while retaining the existing options-only limit.
+
+`v39` (2026-10-15) applies the owner's ordering feedback. The growing-jump ring sequence
+(`second-order-sequence-v2`, "1, 3, 5, 7, 9") read as easy and repetitive: it moves from level 4 to
+level 3, so it serves only in questions 6–9 of the long test, and `FAMILY_QUESTION_LIMITS` caps it at
+two a test. Machine tables used to arrive only near the end: a new one-gate bucket,
+`composed-transform-d2`, shows one worked row, and the planner's `RAMPED_FAMILIES` rule makes every
+long test use the composed machine at each level it serves: one gate in questions 1–5, two gates in
+the middle, three at the end. The d4 and d5 machine items are byte-identical to v38. The reference
+bank and pilot manifest are regenerated.

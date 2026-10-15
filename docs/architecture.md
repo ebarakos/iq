@@ -63,11 +63,13 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   Collection placement varies independently; the oracle matches a unique attribute completion.
   Every intended attribute must have an omission witness among the six choices.
   The shared renderer draws line figures and uniform collections without internal board grids.
-- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v38`):
+- `src/items/expanded-quiz.ts` — the live assembler (`scene-families-v39`):
   `SLOT_DIFFICULTIES` fixes each question number's level. Families are shuffled independently per slot,
   with one chance per family even when multiple bands offer it. Long tests cover every enabled family;
-  samples use five different families. Backtracking preserves coverage, a five-question family cap,
-  and no adjacent family repeats without changing a slot's difficulty.
+  samples use five different families. Backtracking preserves coverage, a five-question family cap
+  (lower for families in `FAMILY_QUESTION_LIMITS`), and no adjacent family repeats without changing a
+  slot's difficulty. `RAMPED_FAMILIES` makes each long test use the composed machine at every level it
+  serves, so machine tables go from one gate (level 2) to two (level 4) and three (level 5).
   Both served level-5 machine families use three gates in a non-default order.
   Their worked rows, visible query, solver and explanations agree on that order.
   `machineGateNecessity` re-reads the examples and query, then hides each transform in turn.

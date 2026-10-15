@@ -245,11 +245,12 @@ export const GRID_FLOWS = ["rows", "rowsAndColumns"] as const;
 export type GridFlow = (typeof GRID_FLOWS)[number];
 /**
  * Legal stem lengths for a `machineTable`: one triple per worked (input, gate,
- * output) row, plus the query triple whose output is the blank. Two or three
- * worked rows: no item shows more than three gates (owner, 2026-08-27), and
- * every gate a row shows is one the query runs.
+ * output) row, plus the query triple whose output is the blank. One to three
+ * worked rows: no item shows more than three gates (owner, 2026-08-27), one
+ * gate opens the ramp (owner, 2026-10-15), and every gate a row shows is one
+ * the query runs.
  */
-export const MACHINE_TABLE_PANEL_COUNTS: readonly number[] = [9, 12];
+export const MACHINE_TABLE_PANEL_COUNTS: readonly number[] = [6, 9, 12];
 
 export const REASONING_BANDS = ["warmup", "composition", "constraint-spatial", "induction-transfer"] as const;
 export type ReasoningBand = (typeof REASONING_BANDS)[number];
@@ -315,8 +316,8 @@ export const PuzzleSchema = z
     const blanks = p.stem.filter(isBlank).length;
     if (p.type === "matrix") {
       const grid = p.layout === "grid3x3" && p.stem.length === 9 && blanks === 1;
-      // 9 or 12 panels: two or three worked (input, gate, output) rows plus the
-      // query row. The 15- and 18-panel forms of the four- and five-gate
+      // 6, 9 or 12 panels: one to three worked (input, gate, output) rows plus
+      // the query row. The 15- and 18-panel forms of the four- and five-gate
       // buckets left with the d6 tail.
       const machine = p.layout === "machineTable" &&
         MACHINE_TABLE_PANEL_COUNTS.includes(p.stem.length) && blanks === 1 &&

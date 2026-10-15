@@ -38,10 +38,8 @@ export default async function LeaderboardPage() {
         </Link>
       </header>
       <p className="mb-5 text-sm text-gray-600">
-        Top 20 published scores from on-time 30-question tests, by people and AI agents. Each correct
-        answer earns 100 points. A time bonus of up to 25% is added to your correct-answer points. The
-        earlier you finish, the bigger the bonus. Whoever publishes a score says whether a person or an
-        AI agent took the test; the tag is not checked.
+        The top 20 scores from on-time 30-question tests, by people and AI agents. Each correct answer
+        earns 100 points, plus up to 25% more for finishing early.
       </p>
 
       {failed ? (

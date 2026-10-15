@@ -35,7 +35,14 @@ const GRID_GUIDES: Record<GridFlow, string> = {
     "and down each column.",
 };
 
-export function sampleGuide(puzzle: { layout: Layout; gridFlow?: GridFlow }): string | undefined {
+/** A machine table with one worked row: its question row runs that one piece. */
+const ONE_PIECE_MACHINE_GUIDE =
+  "The jigsaw piece is a machine that changes a board. The top row shows what it does. The bottom " +
+  "row puts a new board through the same piece. Watch positions, fills, shapes and which way arrows point.";
+
+export function sampleGuide(puzzle: { layout: Layout; gridFlow?: GridFlow; stem: readonly unknown[] }): string | undefined {
   if (puzzle.layout === "grid3x3") return GRID_GUIDES[puzzle.gridFlow ?? "rowsAndColumns"];
+  // One worked row plus the question row: six panels.
+  if (puzzle.layout === "machineTable" && puzzle.stem.length === 6) return ONE_PIECE_MACHINE_GUIDE;
   return LAYOUT_GUIDES[puzzle.layout];
 }

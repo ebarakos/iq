@@ -92,8 +92,8 @@ describe("loadBank", () => {
     expect(coverage.short).toEqual([]);
     expect(coverage.strays).toEqual([]);
     expect([...coverage.countsByKey.values()].every((have) => have === BANK_ITEMS_PER_KEY)).toBe(true);
-    // V34 adds seven matrix keys to the thirteen retained keys.
-    expect(coverage.countsByKey.size).toBe(20);
+    // V34 adds seven matrix keys to the thirteen retained keys; v39 the one-gate machine.
+    expect(coverage.countsByKey.size).toBe(21);
     expect(loadBank()).toHaveLength(coverage.countsByKey.size * BANK_ITEMS_PER_KEY);
   });
 });

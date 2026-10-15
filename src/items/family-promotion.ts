@@ -85,11 +85,14 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     bands: [codeValidBand("composition", ["compositional-analogy-d3", "compositional-analogy-d4"])],
   },
   {
-    // d4 demonstrates and applies two gates. d5 demonstrates and applies all
-    // three, with the query order varied so its extra depth is meaningful.
+    // d2 demonstrates and applies one gate, so machine questions start gently
+    // (owner, 2026-10-15). d4 demonstrates and applies two gates. d5
+    // demonstrates and applies all three, with the query order varied so its
+    // extra depth is meaningful.
     familyId: "composed-transform-v2",
     primaryReasoningFamily: "ordered-composition",
     bands: [
+      codeValidBand("warmup", ["composed-transform-d2"]),
       codeValidBand("composition", ["composed-transform-d4"]),
       codeValidBand("induction-transfer", ["composed-transform-d5"]),
     ],
@@ -146,9 +149,12 @@ export const CURRENT_FAMILY_PROMOTION_REGISTRY: FamilyPromotionRegistry = [
     ],
   },
   {
+    // Level 3 since 2026-10-15 (owner): the growing jump reads as easy, so it
+    // serves among the first ten questions, and at most twice a test
+    // (`FAMILY_QUESTION_LIMITS`).
     familyId: "second-order-sequence-v2",
     primaryReasoningFamily: "sequential-relation",
-    bands: [codeValidBand("composition", ["second-order-sequence-d4"])],
+    bands: [codeValidBand("composition", ["second-order-sequence-d3"])],
   },
   {
     familyId: "inverse-analogy-v2",

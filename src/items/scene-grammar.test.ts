@@ -6,6 +6,7 @@ import {
   applySceneCompositionPrimitive,
   applySceneUnary,
   enumerateSceneOrderedCompositions,
+  enumerateSceneSingleStepCompositions,
   enumerateSceneOrderedThreeStepCompositions,
   enumerateSceneUnaryOperations,
   isSceneComposedProgram,
@@ -611,7 +612,7 @@ describe("composed program lengths", () => {
     }
   });
 
-  it("round-trips two and three gates and refuses a fourth", () => {
+  it("round-trips one, two and three gates and refuses a fourth", () => {
     // The owner's three-gate ceiling of 2026-08-27, held in the grammar itself
     // since the four- and five-gate programs were deleted on 2026-09-28.
     const pool = sceneComposedPrimitives();
@@ -620,10 +621,14 @@ describe("composed program lengths", () => {
     expect(sceneComposedProgramSteps(program)).toEqual(steps);
     expect(Object.keys(program)).toEqual(["first", "second", "third"]);
     expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps(steps.slice(0, 2)))).toHaveLength(2);
-    expect(() => sceneComposedProgramFromSteps([...steps, pool[5]])).toThrow(/two or three gates/);
+    expect(() => sceneComposedProgramFromSteps([...steps, pool[5]])).toThrow(/one, two or three gates/);
     expect(isSceneComposedProgram([...steps, pool[5]])).toBe(false);
     const pair = enumerateSceneOrderedCompositions()[0];
     expect(isSceneComposedProgram([pair.first, pair.second])).toBe(true);
     expect(isSceneComposedProgram([pool[0], pool[1]])).toBe(false);
+    // One gate (owner, 2026-10-15): any primitive alone, and nothing shorter.
+    expect(sceneComposedProgramSteps(sceneComposedProgramFromSteps([pool[2]]))).toEqual([pool[2]]);
+    expect(enumerateSceneSingleStepCompositions().map((program) => program.first)).toEqual(pool);
+    expect(isSceneComposedProgram([])).toBe(false);
   });
 });

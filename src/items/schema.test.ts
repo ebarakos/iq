@@ -351,7 +351,7 @@ describe("PuzzleSchema — scene-specific layouts", () => {
     expect(PuzzleSchema.safeParse({ ...machine, stem: machine.stem.slice(0, 8) }).success).toBe(false);
   });
 
-  it("keeps every board 2–3 by 2–3 and a machine table to two or three worked rows", () => {
+  it("keeps every board 2–3 by 2–3 and a machine table to one to three worked rows", () => {
     // The one-row strip that four- and five-gate questions needed left with the
     // d6 buckets, and with it the four- and five-row machine tables.
     const oneRow = (columns: number): Scene => ({
@@ -365,7 +365,8 @@ describe("PuzzleSchema — scene-specific layouts", () => {
       expect(SceneSchema.safeParse(oneRow(columns)).success, `1x${columns}`).toBe(false);
     }
     expect(SceneSchema.safeParse({ ...board(0, 0), columns: 4 }).success).toBe(false);
-    expect(MACHINE_TABLE_PANEL_COUNTS).toEqual([9, 12]);
+    // One worked row since 2026-10-15: the one-gate machine opens the ramp.
+    expect(MACHINE_TABLE_PANEL_COUNTS).toEqual([6, 9, 12]);
 
     const gate = (...shapes: SceneToken["shape"][]): Scene => ({
       kind: "scene",

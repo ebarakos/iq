@@ -4,6 +4,7 @@ import {
   areScenesCategoricallyDistinct,
   DISTRACTORS_PER_ITEM,
   FILL_LOOP,
+  MACHINE_TABLE_PANEL_COUNTS,
   OPTIONS_PER_ITEM,
   PuzzleSchema,
   SceneSchema,
@@ -26,6 +27,7 @@ import {
   applySceneUnary,
   enumerateSceneOrderedCompositions,
   enumerateSceneOrderedThreeStepCompositions,
+  enumerateSceneSingleStepCompositions,
   isSceneComposedProgram,
   partialSceneExecutions,
   SCENE_BINARY_OPERATIONS,
@@ -218,7 +220,7 @@ export function sceneFamilyClueCheck(puzzle: Puzzle): SceneFamilyClueCheck {
   const assembly = familyId === "spatial-assembly-v1";
   const expectedLayout = assembly ? "assembly" : sequence ? "row" : grid ? "grid3x3" : machine ? "machineTable" : "analogy";
   const stemLengthValid = sequence ? value.stem.length === (familyId === "relational-sequence-v2" ? 5 : 6)
-    : assembly ? value.stem.length === 4 : grid ? value.stem.length === 9 : machine ? [9, 12].includes(value.stem.length) : value.stem.length === 3;
+    : assembly ? value.stem.length === 4 : grid ? value.stem.length === 9 : machine ? MACHINE_TABLE_PANEL_COUNTS.includes(value.stem.length) : value.stem.length === 3;
   const answer = options[answerIndex];
   const targetCountValid = familyId === "attribute-pairing-v1" || familyId === "second-order-sequence-v2"
     ? answer.objects.length === 1 : assembly ? answer.objects.length === 9 : machine
@@ -313,6 +315,7 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
   // sometimes in a different order from the worked rows. No worked example is
   // irrelevant to the requested result.
   "composed-transform-v2": [
+    { bucket: "composed-transform-d2", difficulty: 2, programDepth: 1 },
     { bucket: "composed-transform-d4", difficulty: 4, programDepth: 2 },
     { bucket: "composed-transform-d5", difficulty: 5, programDepth: 3 },
   ],
@@ -355,7 +358,7 @@ export const SCENE_FAMILY_BUCKETS: Readonly<Record<SceneFamilyId, readonly Scene
     { bucket: "attribute-matrix-d4", difficulty: 4, programDepth: 3 },
   ],
   // A step rule plus the rule governing how that step grows.
-  "second-order-sequence-v2": [{ bucket: "second-order-sequence-d4", difficulty: 4, programDepth: 2 }],
+  "second-order-sequence-v2": [{ bucket: "second-order-sequence-d3", difficulty: 3, programDepth: 2 }],
   // Two changes, run in reverse to recover the missing input.
   "inverse-analogy-v2": [{ bucket: "inverse-analogy-d4", difficulty: 4, programDepth: 2 }],
 };
@@ -3875,11 +3878,17 @@ function interactingMachine(rng: Rng, bucket: SceneFamilyBucket): SceneFamilyCan
 /** How many worked gates a composed-transform item shows. */
 export type ComposedGateCount = SceneComposedProgramLength;
 
+/**
+ * d2 shows one gate: the machine table's gentlest form, so machine questions
+ * ramp from one gate early to three at the end (owner, 2026-10-15).
+ */
+const COMPOSED_TRANSFORM_D2_BUCKET = "composed-transform-d2";
 const COMPOSED_TRANSFORM_D4_BUCKET = "composed-transform-d4";
 const COMPOSED_TRANSFORM_D5_BUCKET = "composed-transform-d5";
 
 /** The displayed gate count each named bucket draws at. */
 const COMPOSED_TRANSFORM_BUCKET_GATES: Readonly<Record<string, ComposedGateCount>> = {
+  [COMPOSED_TRANSFORM_D2_BUCKET]: 1,
   [COMPOSED_TRANSFORM_D4_BUCKET]: 2,
   [COMPOSED_TRANSFORM_D5_BUCKET]: 3,
 };
@@ -3906,9 +3915,11 @@ const composedTransformGrammars = new Map<ComposedGateCount, readonly SceneCompo
 function composedTransformGrammarFor(gateCount: ComposedGateCount): readonly SceneComposedProgram[] {
   const cached = composedTransformGrammars.get(gateCount);
   if (cached) return cached;
-  const grammar: readonly SceneComposedProgram[] = gateCount === 2
-    ? enumerateSceneOrderedCompositions()
-    : enumerateSceneOrderedThreeStepCompositions();
+  const grammar: readonly SceneComposedProgram[] = gateCount === 1
+    ? enumerateSceneSingleStepCompositions()
+    : gateCount === 2
+      ? enumerateSceneOrderedCompositions()
+      : enumerateSceneOrderedThreeStepCompositions();
   composedTransformGrammars.set(gateCount, grammar);
   return grammar;
 }
@@ -3916,6 +3927,7 @@ function composedTransformGrammarFor(gateCount: ComposedGateCount): readonly Sce
 /** Gate labels, in the order the query strip shows them. */
 const COMPOSED_GATE_LETTERS = ["A", "B", "C"] as const;
 const COMPOSED_GATE_COUNT_WORDS: Readonly<Record<ComposedGateCount, string>> = {
+  1: "one",
   2: "two",
   3: "three",
 };
@@ -4336,6 +4348,26 @@ function composedProgramIsServable(program: SceneComposedProgram, apply: Compose
 }
 
 /**
+ * Is this one-gate program servable?
+ *
+ * Its one worked row is the whole rule, so there is no order to vary and no
+ * gate to skip. The gate must visibly change the canonical query, no fill may
+ * land on the arrow (`composedFillLandsOnArrow`), and reading the gate as any
+ * other primitive must leave enough distinct boards to fill the option list.
+ */
+function composedSingleGateIsServable(program: SceneComposedProgram): boolean {
+  const steps = sceneComposedProgramSteps(program);
+  const query = composedTransformQuery(CANONICAL_COMPOSED_SHAPES);
+  const answer = runComposedGates(query, steps, [0], applySceneCompositionPrimitive);
+  if (!answer || sceneSignature(answer) === sceneSignature(query)) return false;
+  if (composedFillLandsOnArrow(query, steps, [0], applySceneCompositionPrimitive)) return false;
+  const wrongBoards = distinctOutputs(
+    composedReadingErrors(query, steps, applySceneCompositionPrimitive, [0]).map((execution) => execution.output),
+  ).filter((candidate) => sceneSignature(candidate) !== sceneSignature(answer));
+  return wrongBoards.length >= DISTRACTORS_PER_ITEM;
+}
+
+/**
  * A held-out program moves the board twice and then only touches tokens.
  *
  * The committed split (raise-the-ceiling plan, Lever 2): a program is HELD OUT
@@ -4347,7 +4379,7 @@ function composedProgramIsServable(program: SceneComposedProgram, apply: Compose
  */
 function composedProgramIsHeldOut(program: SceneComposedProgram): boolean {
   const steps = sceneComposedProgramSteps(program);
-  return steps[0].kind === "spatial" && steps[1].kind === "spatial" &&
+  return steps.length >= 2 && steps[0].kind === "spatial" && steps[1].kind === "spatial" &&
     steps.slice(2).every((step) => step.kind !== "spatial");
 }
 
@@ -4373,9 +4405,11 @@ export function partitionComposedTransformPrograms(
   if (cached) return cached;
   const apply = memoizedComposedStepper();
   const servable = composedTransformGrammarFor(gateCount)
-    .filter((program) => gateCount === 2
-      ? composedRecombinedOrderIsServable(program, COMPOSED_TRANSFORM_PAIR_ORDER)
-      : composedProgramIsServable(program, apply));
+    .filter((program) => gateCount === 1
+      ? composedSingleGateIsServable(program)
+      : gateCount === 2
+        ? composedRecombinedOrderIsServable(program, COMPOSED_TRANSFORM_PAIR_ORDER)
+        : composedProgramIsServable(program, apply));
   const partition: ComposedTransformPartition = {
     publicPrograms: servable.filter((program) => !composedProgramIsHeldOut(program)),
     heldOutPrograms: servable.filter(composedProgramIsHeldOut),
@@ -4447,7 +4481,7 @@ interface MachineWitnesses {
  */
 function machineGateWitnessGroups(familyId: SceneFamilyId, stem: Puzzle["stem"]): MachineWitnesses | null {
   const gateCount = (stem.length - 3) / 3;
-  if (gateCount !== 2 && gateCount !== 3) return null;
+  if (gateCount !== 1 && gateCount !== 2 && gateCount !== 3) return null;
   const panels = stem.map(scenePanel);
   const worked = composedGateIndexes(gateCount).map((index) => ({
     input: panels[index * 3], output: panels[index * 3 + 2],
@@ -4617,9 +4651,10 @@ function composedTransformForProgram(
   });
   const query = composedTransformQuery(shapes);
   const answer = runComposedGates(query, steps, queryOrder, applySceneCompositionPrimitive);
-  const otherDirection = runComposedGates(
+  // A one-gate query has no other direction to run in.
+  const otherDirection = gateCount === 1 ? null : runComposedGates(
     query, steps, [...queryOrder].reverse(), applySceneCompositionPrimitive);
-  if (!answer || !otherDirection || sceneSignature(otherDirection) === sceneSignature(answer)) {
+  if (!answer || (gateCount > 1 && (!otherDirection || sceneSignature(otherDirection) === sceneSignature(answer)))) {
     throw new Error(`composed transform needs a servable ${queryOrder.length}-gate query`);
   }
   // One stepper for the whole pool: the runs share most of their prefixes.
@@ -4649,18 +4684,22 @@ function composedTransformForProgram(
   const gateWord = COMPOSED_GATE_COUNT_WORDS[gateCount];
   const cueIds = [
     ...gateIds.map((gateId) => `worked-gate-${gateId}`),
-    "query-gate-order",
+    ...(gateCount > 1 ? ["query-gate-order"] : []),
     ...(steps.some((step) => step.kind === "setFillAt") ? ["targeted-fill-slot"] : []),
     ...(steps.some((step) => step.kind === "turn") ? ["token-orientation"] : []),
   ];
-  const instruction = `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`;
+  const instruction = gateCount === 1
+    ? "Infer the worked gate, then apply it to the query board."
+    : `Infer each worked gate, then apply the ${gateWord} query gates from left to right.`;
   const gateEffects = steps
     .map((step, index) => `The ${gatePieceName(gateIds[index])} ${compositionPrimitiveDescription(step)}.`)
     .join(" ");
   const arrowNote = steps.some((step) => step.kind === "spatial")
     ? " A piece that rotates or mirrors the board moves the shapes to new squares, but the arrows keep pointing the same way."
     : "";
-  const explanation = `Each example row shows one jigsaw piece changing a board. ${gateEffects}${arrowNote} In the question the pieces snap together as ${gatePieceRun(queryOrder.map((index) => gateIds[index]))}, and the board goes through them in that order. The board after the last piece is the missing one.`;
+  const explanation = gateCount === 1
+    ? `The example row shows a jigsaw piece changing a board. ${gateEffects}${arrowNote} In the question the same piece changes a new board. The board it makes is the missing one.`
+    : `Each example row shows one jigsaw piece changing a board. ${gateEffects}${arrowNote} In the question the pieces snap together as ${gatePieceRun(queryOrder.map((index) => gateIds[index]))}, and the board goes through them in that order. The board after the last piece is the missing one.`;
   const puzzle = makePuzzle(
     "prototype-composed-transform",
     "matrix",
@@ -5049,7 +5088,7 @@ function secondOrderSequence(rng: Rng): SceneFamilyCandidate {
     "sequence",
     "row",
     "Track how the perimeter jump changes. Where does the token land next?",
-    4,
+    3,
     [...shown, { blank: true }],
     answer,
     distractorIndexes.map(atIndex),

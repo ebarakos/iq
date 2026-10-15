@@ -4,8 +4,8 @@ import {
   assembleExpandedQuiz, assembleExpandedTest, assertProfilesRemainBuildable, bucketDifficulty,
   buildExpandedQuestion, drawExpandedSlot, type AssembledTest,
   EXPANDED_GENERATOR_VERSION, EXPANDED_PROFILES, EXPANDED_SLOT_RETRY_BUDGET,
-  eligibleFamiliesForBand, eligibleFamiliesForDifficulty, isAnalogyLayoutFamily,
-  maximumDistinctFamilies, MAXIMUM_FAMILY_QUESTIONS, MINIMUM_DISTINCT_FAMILIES,
+  eligibleFamiliesForBand, eligibleFamiliesForDifficulty, familyQuestionLimit, isAnalogyLayoutFamily,
+  maximumDistinctFamilies, MAXIMUM_FAMILY_QUESTIONS, MINIMUM_DISTINCT_FAMILIES, RAMPED_FAMILIES,
   planExpandedSchedule, questionCount, questionFingerprint, sceneFamilyLayout, SLOT_DIFFICULTIES,
   type ExpandedProfile,
 } from "./expanded-quiz";
@@ -25,6 +25,11 @@ function expectIncreasingDifficulty(items: readonly { difficulty: number }[]): v
   expect(items.at(-1)!.difficulty).toBe(Math.max(...difficulties));
 }
 const SHARED_SEED = "0123456789abcdef0123456789abcdef";
+/** Every level a family has a validated bucket at. */
+function servedLevels(familyId: string): number[] {
+  return [2, 3, 4, 5].filter((difficulty) =>
+    eligibleFamiliesForDifficulty(REGISTRY, difficulty).some((slot) => slot.familyId === familyId));
+}
 const sharedTests = new Map<ExpandedProfile, AssembledTest>();
 function sharedTest(profile: ExpandedProfile): AssembledTest {
   let test = sharedTests.get(profile);
@@ -66,15 +71,15 @@ describe("validated family pools and generated questions", () => {
       .toContain("spatial-transform-v2");
   });
 
-  it("holds exactly the twenty family/band/bucket keys the battery serves", () => {
-    // v34 adds six matrix buckets and a d5 spatial overlap ramp.
+  it("holds exactly the twenty-one family/band/bucket keys the battery serves", () => {
+    // v34 adds six matrix buckets and a d5 spatial overlap ramp; v39 the one-gate machine.
     const keys = EXPANDED_PROFILE_BANDS.flatMap((band) =>
       eligibleFamiliesForBand(REGISTRY, band).flatMap((family) =>
         family.bandBuckets.map((bucket) => `${family.familyId}:${band}:${bucket.bucket}`)));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(20);
+    expect(keys).toHaveLength(21);
     expect(EXPANDED_PROFILE_BANDS.map((band) => eligibleFamiliesForBand(REGISTRY, band).length))
-      .toEqual([4, 6, 4, 3]);
+      .toEqual([5, 6, 4, 3]);
     expect(keys.some((key) => key.startsWith("spatial-assembly-v1:"))).toBe(false);
     // No key is d6 any more. The two that were are withdrawn, so the ladder
     // tops out at d5 until a mechanism earns a sixth rung some way other than
@@ -126,7 +131,7 @@ describe("validated family pools and generated questions", () => {
   it("drops withdrawn families", () => {
     const withdrawn = new Set(["attribute-pairing-v1"]);
     expect(eligibleFamiliesForBand(REGISTRY, "warmup", withdrawn).map((f) => f.familyId))
-      .toEqual(["attribute-matrix-v1", "relational-sequence-v2", "spatial-transform-v2"]);
+      .toEqual(["attribute-matrix-v1", "composed-transform-v2", "relational-sequence-v2", "spatial-transform-v2"]);
   });
 
   it("serves the configured number of options on every question", () => {
@@ -350,6 +355,20 @@ describe("validated family pools and generated questions", () => {
     }, 60_000);
   }
 
+  it("ramps machine tables through a 30-question test: one gate, then two, then three", () => {
+    // Owner, 2026-10-15: machine questions used to arrive only near the end.
+    expect(servedLevels("composed-transform-v2")).toEqual([2, 4, 5]);
+    const machines = sharedQuiz("long-30").flatMap((puzzle, index) =>
+      puzzle.generation!.familyId === "composed-transform-v2"
+        ? [{ question: index + 1, difficulty: puzzle.difficulty, gates: puzzle.stem.length / 3 - 1 }]
+        : []);
+    for (const machine of machines) expect(machine.gates).toBe({ 2: 1, 4: 2, 5: 3 }[machine.difficulty]);
+    const firstWith = (gates: number) => machines.find((machine) => machine.gates === gates)!.question;
+    expect(firstWith(1)).toBeLessThanOrEqual(5);
+    expect(firstWith(1)).toBeLessThan(firstWith(2));
+    expect(firstWith(2)).toBeLessThan(firstWith(3));
+  });
+
   it("builds the attempt it is given, and refuses a question the test does not have", () => {
     // Every slot of the shared tests kept its first attempt, so take a later
     // attempt that also passes: built alone, it must be that draw, not the first.
@@ -369,7 +388,7 @@ describe("validated family pools and generated questions", () => {
 
 describe("fixed difficulty slots", () => {
   it("hardcodes both difficulty curves independently of the seed", () => {
-    expect(EXPANDED_GENERATOR_VERSION).toBe("scene-families-v38");
+    expect(EXPANDED_GENERATOR_VERSION).toBe("scene-families-v39");
     expect(SLOT_DIFFICULTIES["short-5"]).toEqual([2, 3, 4, 4, 5]);
     expect(SLOT_DIFFICULTIES["long-30"]).toEqual([
       ...Array(5).fill(2), ...Array(4).fill(3), ...Array(13).fill(4), ...Array(8).fill(5),
@@ -416,6 +435,18 @@ describe("fixed difficulty slots", () => {
           if (index > 0) expect(slot.familyId).not.toBe(schedule[index - 1].familyId);
         });
         expect(Math.max(...counts.values())).toBeLessThanOrEqual(MAXIMUM_FAMILY_QUESTIONS[profile]);
+        for (const [familyId, count] of counts) expect(count).toBeLessThanOrEqual(familyQuestionLimit(profile, familyId));
+        // The owner's order of 2026-10-15: the growing-jump sequence only among
+        // the first ten questions, and machine tables at every level they serve.
+        schedule.forEach((slot, index) => {
+          if (slot.familyId === "second-order-sequence-v2") expect(index).toBeLessThan(10);
+        });
+        if (profile === "long-30") {
+          for (const familyId of RAMPED_FAMILIES) {
+            expect(new Set(schedule.filter((slot) => slot.familyId === familyId).map((slot) => slot.difficulty)))
+              .toEqual(new Set(servedLevels(familyId)));
+          }
+        }
         firstFamilies.set(families[0], (firstFamilies.get(families[0]) ?? 0) + 1);
       }
       for (const [index, families] of positions.entries()) {
@@ -423,7 +454,7 @@ describe("fixed difficulty slots", () => {
           .map((slot) => slot.familyId));
         expect(families, `${profile} slot ${index + 1}`).toEqual(eligible);
       }
-      expect(firstFamilies.size).toBe(4);
+      expect(firstFamilies.size).toBe(new Set(eligibleFamiliesForDifficulty(REGISTRY, 2).map((slot) => slot.familyId)).size);
       for (const count of firstFamilies.values()) {
         expect(count).toBeGreaterThan(1500);
         expect(count).toBeLessThan(3500);
@@ -481,7 +512,8 @@ describe("fixed difficulty slots", () => {
   }, 60_000);
 
   it("refuses an empty difficulty pool rather than filling its slots at another level", () => {
-    const withdrawn = new Set(["attribute-matrix-v1", "overlapping-figures-v1", "compositional-analogy-v2"]);
+    const withdrawn = new Set(["attribute-matrix-v1", "overlapping-figures-v1", "compositional-analogy-v2",
+      "second-order-sequence-v2"]);
     expect(() => planExpandedSchedule("missing-d3", "short-5", REGISTRY, withdrawn))
       .toThrow(/needs at least 1 eligible d3 families but has 0/);
     expect(() => assertProfilesRemainBuildable(REGISTRY, withdrawn))
@@ -489,7 +521,7 @@ describe("fixed difficulty slots", () => {
   });
 
   it("refuses a repeated difficulty tier that has only one family instead of moving a harder question forward", () => {
-    const withdrawn = new Set(["attribute-matrix-v1", "overlapping-figures-v1"]);
+    const withdrawn = new Set(["attribute-matrix-v1", "overlapping-figures-v1", "second-order-sequence-v2"]);
     expect(() => planExpandedSchedule("one-d3-family", "long-30", REGISTRY, withdrawn))
       .toThrow(/needs at least 2 eligible d3 families but has 1/);
   });

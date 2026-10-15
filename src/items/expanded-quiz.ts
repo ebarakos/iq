@@ -28,7 +28,7 @@ import {
  * versions are different populations and must never be pooled. What each
  * version changed is in docs/plans/history.md.
  */
-export const EXPANDED_GENERATOR_VERSION = "scene-families-v38" as const;
+export const EXPANDED_GENERATOR_VERSION = "scene-families-v39" as const;
 
 export const EXPANDED_PROFILES = ["short-5", "long-30"] as const;
 export type ExpandedProfile = (typeof EXPANDED_PROFILES)[number];
@@ -55,6 +55,27 @@ export const MAXIMUM_FAMILY_QUESTIONS: Readonly<Record<ExpandedProfile, number>>
   "long-30": 5,
   "short-5": 1,
 };
+
+/**
+ * Families held below `MAXIMUM_FAMILY_QUESTIONS` (owner, 2026-10-15): the
+ * growing-jump ring sequence reads as easy and repetitive, so at most two a test.
+ */
+export const FAMILY_QUESTION_LIMITS: Readonly<Record<string, number>> = {
+  "second-order-sequence-v2": 2,
+};
+
+/**
+ * Families whose questions ramp up through a 30-question test (owner,
+ * 2026-10-15): each fills at least one slot at every level it serves. Machine
+ * tables go from one gate early (level 2) to two mid-test (level 4) and three
+ * at the end (level 5), instead of appearing only at the end.
+ */
+export const RAMPED_FAMILIES: readonly string[] = ["composed-transform-v2"];
+
+/** The most questions one family may fill in one test of this length. */
+export function familyQuestionLimit(profile: ExpandedProfile, familyId: string): number {
+  return Math.min(MAXIMUM_FAMILY_QUESTIONS[profile], FAMILY_QUESTION_LIMITS[familyId] ?? Infinity);
+}
 
 /**
  * Seeds used to read a family's layout off a generated question.
@@ -335,9 +356,20 @@ export function planExpandedSchedule(
     [difficulty, [...new Set(choices.map((choice) => choice.familyId))]]));
   const counts = new Map<string, number>();
   const refused = new Set<string>();
+  // Each ramped family at each level it serves: one slot there is required.
+  const ramp = profile === "long-30"
+    ? RAMPED_FAMILIES.flatMap((familyId) => [...pool]
+      .filter(([, families]) => families.some((family) => family.familyId === familyId))
+      .map(([difficulty]) => ({ key: `${familyId}@${difficulty}`, difficulty })))
+    : [];
+  const rampFilled = new Map<string, number>();
+  const rampMissing = () => ramp.filter(({ key }) => !rampFilled.get(key));
   const complete = (index: number, previous?: string): EligibleFamily[] | null => {
-    if (index === difficulties.length) return counts.size >= requiredDistinct ? [] : null;
+    if (index === difficulties.length) {
+      return counts.size >= requiredDistinct && rampMissing().length === 0 ? [] : null;
+    }
     if (requiredDistinct - counts.size > difficulties.length - index) return null;
+    if (rampMissing().some(({ difficulty }) => !suffixCounts[index].get(difficulty))) return null;
     if (profile === "long-30" && eligibleIds.some((id) => !counts.has(id) && (lastSlot.get(id) ?? -1) < index)) {
       return null;
     }
@@ -347,7 +379,7 @@ export function planExpandedSchedule(
       const capacity = idsByDifficulty.get(difficulty)!.reduce((total, id) => {
         const alternating = difficulty === difficulties[index] && id === previous
           ? Math.floor(needed / 2) : Math.ceil(needed / 2);
-        return total + Math.min(MAXIMUM_FAMILY_QUESTIONS[profile] - (counts.get(id) ?? 0), alternating);
+        return total + Math.min(familyQuestionLimit(profile, id) - (counts.get(id) ?? 0), alternating);
       }, 0);
       if (capacity < needed) return null;
     }
@@ -358,13 +390,17 @@ export function planExpandedSchedule(
         if (unseen > end - index + 1) return null;
       }
     }
-    const state = `${index}|${previous ?? ""}|${eligibleIds.map((id) => counts.get(id) ?? 0).join(",")}`;
+    const state = `${index}|${previous ?? ""}|${eligibleIds.map((id) => counts.get(id) ?? 0).join(",")}|` +
+      ramp.map(({ key }) => (rampFilled.get(key) ? 1 : 0)).join("");
     if (refused.has(state)) return null;
     for (const choice of candidates[index]) {
       const count = counts.get(choice.familyId) ?? 0;
-      if (choice.familyId === previous || count >= MAXIMUM_FAMILY_QUESTIONS[profile]) continue;
+      if (choice.familyId === previous || count >= familyQuestionLimit(profile, choice.familyId)) continue;
       counts.set(choice.familyId, count + 1);
+      const rampKey = `${choice.familyId}@${difficulties[index]}`;
+      rampFilled.set(rampKey, (rampFilled.get(rampKey) ?? 0) + 1);
       const tail = complete(index + 1, choice.familyId);
+      rampFilled.set(rampKey, rampFilled.get(rampKey)! - 1);
       if (count === 0) counts.delete(choice.familyId);
       else counts.set(choice.familyId, count);
       if (tail) return [choice, ...tail];

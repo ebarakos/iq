@@ -47,6 +47,26 @@ run_suite() {
 }
 
 # --------------------------------------------------------------------------
+# Suite: build — run in a copy of the project
+# Rationale: `next build` rewrites .next, the folder a running `npm run dev`
+# serves from, and that breaks the dev server. The copy skips .git and every
+# path .gitignore lists (.env.local included), so it builds without local
+# secrets, as Vercel does. rsync leaves the copy's own .next in place between
+# runs, so the build cache still helps.
+# --------------------------------------------------------------------------
+run_build_suite() {
+  local copy="${TMPDIR:-/tmp}/aiq-qa-build"
+  mkdir -p "$copy"
+  if ! rsync -a --delete --exclude=/.git --filter=':- .gitignore' ./ "$copy/"; then
+    echo "--- suite: build (could not copy the project to $copy) ---"
+    suite_fail build
+    return 1
+  fi
+  ln -sfn "$PROJECT_ROOT/node_modules" "$copy/node_modules"
+  (cd "$copy" && run_suite build 600)
+}
+
+# --------------------------------------------------------------------------
 # Suite: agent:smoke — SKIP
 # Rationale: sends real vision-model requests through the relay to multiple
 # providers (openrouter/gemini-3-flash, openai/gpt-4o-mini, openai/gpt-4.1-mini,
@@ -75,7 +95,7 @@ run_suite lint            300 || FAIL=1
 run_suite test            1500 || FAIL=1
 run_suite families:verify 2400 || FAIL=1
 run_suite bank:verify     300 || FAIL=1
-run_suite build           600 || FAIL=1
+run_build_suite                || FAIL=1
 run_agent_smoke_skip
 
 echo ""

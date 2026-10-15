@@ -512,17 +512,20 @@ describe("scene family prototypes", () => {
     // from each served item's own worked rows instead (see "shows every gate of
     // a served machine item doing visible work"). rule-switching-v2 left it on
     // 2026-09-29, when the family was retired.
+    // Named buckets: since v39 the family's first bucket shows one gate, whose
+    // eight programs each serve.
     const families = [
-      { familyId: "composed-transform-v2", queryIndex: 6, expectedPrograms: 12 },
+      { familyId: "composed-transform-v2", bucket: "composed-transform-d4", queryIndex: 6, expectedPrograms: 12 },
+      { familyId: "composed-transform-v2", bucket: "composed-transform-d2", queryIndex: 3, expectedPrograms: 8 },
     ] as const;
     for (const family of families) {
-      const { familyId, queryIndex } = family;
+      const { familyId, bucket, queryIndex } = family;
       const effectByFingerprint = new Map<string, string>();
       for (let seed = 0; seed < 200; seed++) {
         const candidate = generateSceneFamilyCandidate(
           familyId,
           seededRng("scene-family-verify-v1", `${familyId}:${seed}`),
-          entryBucket(familyId),
+          bucket,
         );
         const query = candidate.puzzle.stem[queryIndex];
         if ("blank" in query) throw new Error(`${familyId} needs a visible query`);
@@ -543,7 +546,7 @@ describe("scene family prototypes", () => {
         expect(effectByFingerprint.get(fingerprint!) ?? effect).toBe(effect);
         effectByFingerprint.set(fingerprint!, effect);
       }
-      expect(effectByFingerprint.size, familyId).toBe(family.expectedPrograms);
+      expect(effectByFingerprint.size, bucket).toBe(family.expectedPrograms);
     }
   });
 
@@ -728,7 +731,7 @@ describe("scene family prototypes", () => {
     // Guard the guard: a typo in the table names would make the filter vacuous.
     expect(Object.keys(declared).filter((bucket) => drawable.has(bucket)).sort())
       .toEqual([
-        "composed-transform-d4", "composed-transform-d5", "transformation-machine-v4-d5",
+        "composed-transform-d2", "composed-transform-d4", "composed-transform-d5", "transformation-machine-v4-d5",
       ]);
   });
 
@@ -814,6 +817,10 @@ describe("scene family prototypes", () => {
     expect(partitionComposedTransformPrograms(2).heldOutPrograms).toHaveLength(0);
     expect(partitionComposedTransformPrograms(3).publicPrograms).toHaveLength(128);
     expect(partitionComposedTransformPrograms(3).heldOutPrograms).toHaveLength(24);
+    // One gate (2026-10-15): every primitive alone changes the query visibly and
+    // leaves five wrong readings, so all eight serve, and none is held out.
+    expect(partitionComposedTransformPrograms(1).publicPrograms).toHaveLength(8);
+    expect(partitionComposedTransformPrograms(1).heldOutPrograms).toHaveLength(0);
 
     // The headline number from the plan's diagnosis. Before turns existed the
     // three-gate public pool was 56 programs, and 16 of them painted the
@@ -831,7 +838,7 @@ describe("scene family prototypes", () => {
     // servability against. Removing any one gate has to change the answer, or
     // the item shows a step a solver could skip.
     const query = canonicalComposedTransformQuery();
-    for (const gateCount of [2, 3] as const) {
+    for (const gateCount of [1, 2, 3] as const) {
       for (const program of servableComposedTransformPrograms(gateCount)) {
         const steps = sceneComposedProgramSteps(program);
         const answer = applySceneComposedProgram(query, program);
@@ -850,11 +857,11 @@ describe("scene family prototypes", () => {
 
   it("partitions every composed grammar into disjoint, exhaustive public and held-out halves", () => {
     const primitiveKeys = sceneComposedPrimitives().map((primitive) => JSON.stringify(primitive));
-    for (const gateCount of [2, 3] as const) {
+    for (const gateCount of [1, 2, 3] as const) {
       const { publicPrograms, heldOutPrograms } = partitionComposedTransformPrograms(gateCount);
       expect(publicPrograms.length, `${gateCount} gates`).toBeGreaterThan(0);
-      // Three gates reserve a real population. Two cannot begin with two board
-      // moves.
+      // Three gates reserve a real population. One or two cannot begin with two
+      // board moves.
       if (gateCount === 3) {
         expect(heldOutPrograms.length, `${gateCount} gates`).toBeGreaterThan(0);
       } else {
@@ -884,7 +891,7 @@ describe("scene family prototypes", () => {
       }
       for (const program of publicPrograms) {
         const steps = sceneComposedProgramSteps(program);
-        const heldOutShape = steps[0].kind === "spatial" && steps[1].kind === "spatial" &&
+        const heldOutShape = steps.length >= 2 && steps[0].kind === "spatial" && steps[1].kind === "spatial" &&
           steps.slice(2).every((step) => step.kind !== "spatial");
         expect(heldOutShape, sceneComposedProgramKey(program)).toBe(false);
       }
@@ -985,7 +992,9 @@ describe("scene family prototypes", () => {
     // REISSUED again in v38: every worked transformation must distinguish
     // the six choices. Both d4 and d5 now use necessity witnesses and complete
     // compound mistakes, while retaining the options-only acceptance limit.
+    // d2 (v39) is new: one worked gate, and the d4 and d5 digests did not move.
     const digests: Record<string, string> = {
+      "composed-transform-d2": "9921d8fdcc1cce7321b7eaedd7fed50c9123672dc31129c31cacc033bcb194b6",
       "composed-transform-d4": "989fe83232e8b2f2244ffbcf370973eaec90f24134e3ea859c48efbb6c2d5519",
       "composed-transform-d5": "3ba9187f609d109141daefd5e15e8d8c6aa57761ee1399cd99bcf5a9b17bb73a",
     };
@@ -1005,6 +1014,7 @@ describe("scene family prototypes", () => {
       createHash("sha256").update(`composed-transform-v2:${sceneComposedProgramKey(program)}`)
         .digest("hex").slice(0, 16);
     const buckets = [
+      { bucket: "composed-transform-d2", gateCount: 1, stemPanels: 6 },
       { bucket: "composed-transform-d4", gateCount: 2, stemPanels: 9 },
       { bucket: "composed-transform-d5", gateCount: 3, stemPanels: 12 },
     ] as const;
@@ -1053,6 +1063,7 @@ describe("scene family prototypes", () => {
     const pool = sceneComposedPrimitives();
     const demonstrated = new Set<string>();
     for (const { bucket, gateCount, queryGateCount } of [
+      { bucket: "composed-transform-d2", gateCount: 1, queryGateCount: 1 },
       { bucket: "composed-transform-d4", gateCount: 2, queryGateCount: 2 },
       { bucket: "composed-transform-d5", gateCount: 3, queryGateCount: 3 },
     ] as const) {

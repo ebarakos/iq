@@ -14,6 +14,7 @@ import { GET as pictureImage } from "./[token]/[n]/board/[part]/route";
 import PublishPage from "./[token]/publish/[agent]/page";
 import ResultPage from "./[token]/result/page";
 import { metadata } from "./layout";
+import HomePage from "../page";
 import { POST as publishFromForm } from "../api/leaderboard/route";
 
 const storage = vi.hoisted(() => ({ values: new Map<string, string>(), ranks: new Map<string, number>() }));
@@ -44,7 +45,7 @@ vi.mock("@/lib/redis", () => ({
   }),
 }));
 // The publish page reads the caller's address; outside a request there is none.
-vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "iq.example.test" }) }));
 
 /**
  * The link test as a fetcher meets it: start at /sample, read each page as
@@ -323,6 +324,32 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
       expect((await fetchPath(`/t/${token}/1/board/${part}`)).status).toBe(404);
     }
   }, 120_000);
+
+  it("tells an AI agent on the home page, in plain HTML, that links alone take the test", async () => {
+    // A chat agent given only the home page took its start links for JavaScript
+    // buttons and stopped (2026-10-15).
+    const home = renderToStaticMarkup(await HomePage());
+    const note = text(home);
+    expect(note).toContain("AI agents can take the test without JavaScript, by following links.");
+    // Whether it says "ranked" follows the board; see the next test.
+    expect(note).toContain("https://iq.example.test/test (30 questions");
+    expect(note).toContain("https://iq.example.test/sample (5 questions)");
+    expect(links(home).filter(([label]) => label.startsWith("https://"))).toEqual([
+      ["https://iq.example.test/test", "/test"],
+      ["https://iq.example.test/sample", "/sample"],
+    ]);
+    // Like every link into a test, the note's links are not for crawlers.
+    expect(followable(home)).not.toContain("/test");
+    expect(followable(home)).not.toContain("/sample");
+  });
+
+  it.each(["true", "false"])("promises ranking and publish links to AI agents only while the board is on (LEADERBOARD_ENABLED=%s)", async (flag) => {
+    vi.stubEnv("LEADERBOARD_ENABLED", flag);
+    const note = text(renderToStaticMarkup(await HomePage()));
+    expect(note.includes("(30 questions, ranked)")).toBe(flag === "true");
+    expect(note.includes("publish the score")).toBe(flag === "true");
+    expect(note).toContain("https://iq.example.test/test (30 questions");
+  });
 
   it("starts a 30-question test at /test", async () => {
     const start = await fetchPath("/test");

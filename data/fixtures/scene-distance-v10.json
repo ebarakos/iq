@@ -19,7 +19,8 @@
   "keysNotCarried": {
     "composed-transform-v2:composition:composed-transform-d4": "No v10 baseline. At 72ffdb3 the family is composed-transform-v1. The current d4 population was reissued in v17 as a two-step spatial-and-fill composition, so it is not the same population. For the record, v10's composed-transform-v1 measured p50 (2, 2) and p90 (5, 21).",
     "visual-set-algebra-v2:constraint-spatial:visual-set-algebra-d4": "Moved out of \"keys\" on 2026-09-29 (owner's decision). The v10 baseline predates the 2026-08-27 redesign of visual-set-algebra: at v10 its two input boards were a fixed diagonal of two tokens that could never disagree, while today's rows are three-token boards built from four roles including a clash, so it is not the same population. Since scene-families-v19 the family serves option lists that keep the answer from being picked without the question (docs/plans/blind-answer-leak.md), and where those balance rules and closeness conflict the balance rules win: even the closest balanced lists put p90 at (4, 12). For the record, v10 measured p50 (2, 10) and p90 (3, 15) over 200 seeds.",
-    "every other key the current registry serves": "compositional-analogy-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10. The verifier reports their percentiles with comparable: false and invents no baseline for them. (parallel-evolution-d3 and -d4, added after v10 and retired on 2026-09-28, never had a baseline either, so their retirement leaves no withdrawn row; nor did the two combining-machine buckets, promoted in v18, out of the band from 2026-09-29 to 2026-09-30 and served again since.)"
+    "every other key the current registry serves": "compositional-analogy-d4, visual-set-algebra-d5 and composed-transform-d5 did not exist at v10. The verifier reports their percentiles with comparable: false and invents no baseline for them. (parallel-evolution-d3 and -d4, added after v10 and retired on 2026-09-28, never had a baseline either, so their retirement leaves no withdrawn row; nor did the two combining-machine buckets, promoted in v18, out of the band from 2026-09-29 to 2026-09-30 and served again since.)",
+    "composed-transform-v2:warmup:composed-transform-d2": "No v10 baseline. The one-gate machine bucket was added on 2026-10-15 (scene-families-v39); nothing at 72ffdb3 served one gate. Its first run measured p50 (2, 10) and p90 (4, 12)."
   },
   "withdrawnKeysNote": "Keys that once had a v10 baseline and are no longer served, kept with the numbers they were recorded with. A withdrawal is a normal event and must leave a record: deleting the row would make the gate green by forgetting, and the aggregate no-regression comparison runs over the keys still in \"keys\" either way. scripts/scene-family-verify.ts fails if a key appears in both objects, or if a key listed here turns up in a run.",
   "withdrawnKeys": {
@@ -155,7 +156,7 @@
         "atoms": 10
       }
     },
-    "second-order-sequence-v2:composition:second-order-sequence-d4": {
+    "second-order-sequence-v2:composition:second-order-sequence-d3": {
       "seeds": 200,
       "servedDistances": 1000,
       "p50": {
@@ -165,7 +166,9 @@
       "p90": {
         "positions": 2,
         "atoms": 10
-      }
+      },
+      "v10Key": "second-order-sequence-v2:composition:second-order-sequence-d4",
+      "note": "Same family, same generator path, same answer-to-distractor distances: on 2026-10-15 (scene-families-v39) the owner moved this bucket from level 4 to level 3, which renamed it from second-order-sequence-d4. The v39 run measured p50 (2, 10) and p90 (2, 10) under the new name, exactly as recorded here."
     },
     "spatial-transform-v2:warmup:spatial-transform-d2": {
       "seeds": 200,
