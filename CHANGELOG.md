@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   question (6–9 in the 30-question test) and appears at most twice.
 - The questions a test draws changed (generator v39), so a deploy ends tests in progress.
 
+### Fixed
+- Chat agents can start the 30-question test. Building it took 7–9 s, longer than ChatGPT's
+  fetch tool waits, so `/test` now answers within a few seconds with a page saying how many
+  questions are built and a link that builds the rest. The questions are the same, and the
+  clock starts only when the first question opens. `/sample` usually still opens at once.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

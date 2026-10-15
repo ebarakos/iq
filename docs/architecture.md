@@ -128,7 +128,9 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   only the question a page or picture asks for (`buildExpandedQuestion`, about 50 ms) on a
   server that does not hold the test; building all 30 takes about 4 seconds.
   `scoringPayload` turns a rebuilt test into the answer key both flows score against.
-  `src/app/sample` and `src/app/test` mint one and redirect;
+  `src/app/sample` and `src/app/test` mint one and redirect (`src/lib/link-start.ts`); with
+  Redis a request builds for about 1.5 s, and a longer build continues at `src/app/t/start/[id]`,
+  one part per request (`continueLinkTest`, `fillExpandedSlots`);
   `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
   `src/app/t/[token]/result` the scored review, with one `…/publish/<agent>` link per fixed
   agent name (`AGENT_NAMES`) when the result ranks. All plain HTML and links.

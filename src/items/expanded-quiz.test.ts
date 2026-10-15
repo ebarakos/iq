@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CURRENT_FAMILY_PROMOTION_REGISTRY, EXPANDED_PROFILE_BANDS, type FamilyPromotionRegistry } from "./family-promotion";
 import {
-  assembleExpandedQuiz, assembleExpandedTest, assertProfilesRemainBuildable, bucketDifficulty,
+  assembleExpandedQuiz, assembleExpandedTest, assertProfilesRemainBuildable, bucketDifficulty, fillExpandedSlots,
   buildExpandedQuestion, drawExpandedSlot, type AssembledTest,
   EXPANDED_GENERATOR_VERSION, EXPANDED_PROFILES, EXPANDED_SLOT_RETRY_BUDGET,
   eligibleFamiliesForBand, eligibleFamiliesForDifficulty, familyQuestionLimit, isAnalogyLayoutFamily,
@@ -352,6 +352,27 @@ describe("validated family pools and generated questions", () => {
         expect(buildExpandedQuestion(SHARED_SEED, profile, slot, attempt, REGISTRY), `question ${slot + 1}`)
           .toEqual(puzzles[slot]);
       });
+    }, 60_000);
+
+    it(`fills the ${profile} test over several sittings into the very test built at once`, () => {
+      // Each sitting resumes from what the earlier ones kept, as across requests.
+      const progress = { attempts: [] as number[], questions: [] as string[] };
+      const puzzles: unknown[] = [];
+      let sittings = 0;
+      while (progress.attempts.length < questionCount(profile)) {
+        sittings += 1;
+        const resumed = JSON.parse(JSON.stringify(progress)) as typeof progress;
+        let filledThisSitting = 0;
+        for (const filled of fillExpandedSlots(SHARED_SEED, profile, REGISTRY, new Set(), resumed)) {
+          progress.attempts.push(filled.attempt);
+          progress.questions.push(filled.question);
+          puzzles.push(filled.puzzle);
+          if (++filledThisSitting === 2) break;
+        }
+      }
+      expect(sittings).toBe(Math.ceil(questionCount(profile) / 2));
+      expect(progress.attempts).toEqual(sharedTest(profile).attempts);
+      expect(PuzzleSetSchema.parse(puzzles)).toEqual(sharedTest(profile).puzzles);
     }, 60_000);
   }
 

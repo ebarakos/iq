@@ -8,6 +8,7 @@ import {
   buildExpandedQuestion,
   EXPANDED_GENERATOR_VERSION,
   EXPANDED_PROFILES,
+  fillExpandedSlots,
   questionCount,
   type ExpandedProfile,
 } from "@/items/expanded-quiz";
@@ -273,6 +274,28 @@ function remember(key: string, built: BuiltTest): void {
   }
 }
 
+/** A new test before its clock starts: everything its token seals but the times. */
+export type LinkTestDraft = Omit<LinkTest, "issuedAt" | "answerDeadline" | "expiresAt">;
+
+function newDraft(
+  seed: string,
+  profile: ExpandedProfile,
+  withdrawn: ReadonlySet<string>,
+  built: { source: "generated"; attempts: number[] } | { source: "fallback"; bank: readonly BankItem[] },
+): LinkTestDraft {
+  return {
+    appVersion: `v${packageJson.version}`,
+    leaderboardScope: quizNamespace(),
+    rankAllowed: leaderboardEnabled(),
+    seed,
+    profile,
+    source: built.source,
+    generatorVersion: EXPANDED_GENERATOR_VERSION,
+    withdrawnHash: withdrawnFamilyHash(withdrawn),
+    ...(built.source === "fallback" ? { bankHash: bankHash(built.bank) } : { attempts: built.attempts }),
+  };
+}
+
 /**
  * Make a fresh link test. Generation runs first, here, so a seed that cannot
  * build is never handed out; if it fails, the test comes from the reference
@@ -288,36 +311,102 @@ export function createLinkTest(
   const bank = () => context.bank ?? loadBank();
   const assemble = context.assemble ?? assembleExpandedTest;
 
-  let source: LinkTestSource = "generated";
+  let draft: LinkTestDraft;
   let puzzles: PuzzleSet;
-  let attempts: number[] | undefined;
   try {
-    ({ puzzles, attempts } = assemble(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn));
+    const assembled = assemble(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn);
+    puzzles = assembled.puzzles;
+    draft = newDraft(seed, profile, withdrawn, { source: "generated", attempts: assembled.attempts });
   } catch (error) {
     console.error(`link-test: ${profile} assembly failed —`, error);
-    source = "fallback";
-    puzzles = buildPuzzles(seed, profile, source, withdrawn, bank);
+    puzzles = buildPuzzles(seed, profile, "fallback", withdrawn, bank);
+    draft = newDraft(seed, profile, withdrawn, { source: "fallback", bank: bank() });
   }
+  remember(buildKey(draft), { complete: true, puzzles });
+  return { ...issueLinkTest(draft, { ...context, secret }), puzzles };
+}
 
+/**
+ * A test being built over several requests (`src/lib/link-start.ts`): its seed
+ * and the slots filled so far. It never leaves the server.
+ */
+export const LinkTestProgressSchema = z.object({
+  seed: z.string().min(1).max(64),
+  profile: z.enum(EXPANDED_PROFILES),
+  generatorVersion: z.string().min(1),
+  withdrawnHash: z.string().min(1),
+  attempts: z.array(z.number().int().min(0).max(9)),
+  questions: z.array(z.string()),
+}).refine((progress) => progress.attempts.length === progress.questions.length, {
+  message: "every filled slot has an attempt and a question",
+});
+export type LinkTestProgress = z.infer<typeof LinkTestProgressSchema>;
+
+/** A test with nothing built yet. */
+export function beginLinkTest(
+  profile: ExpandedProfile,
+  context: Pick<LinkTestContext, "withdrawnFamilyIds"> & { seed?: string } = {},
+): LinkTestProgress {
+  return {
+    seed: context.seed ?? randomBytes(16).toString("base64url"),
+    profile,
+    generatorVersion: EXPANDED_GENERATOR_VERSION,
+    withdrawnHash: withdrawnFamilyHash(context.withdrawnFamilyIds ?? readWithdrawnFamilyIds()),
+    attempts: [],
+    questions: [],
+  };
+}
+
+/**
+ * Build more of a test: at least one question, then more until `budgetMs` has
+ * passed. Returns the finished draft once every question is built, otherwise
+ * how far it got. The questions are the ones `createLinkTest` builds from the
+ * same seed, and generation that fails falls back to the reference bank the
+ * same way. Throws `changed` when the site now builds other questions from it.
+ */
+export function continueLinkTest(
+  progress: LinkTestProgress,
+  budgetMs: number,
+  context: LinkTestContext = {},
+): { draft: LinkTestDraft } | { progress: LinkTestProgress } {
+  const { seed, profile } = progress;
+  const withdrawn = context.withdrawnFamilyIds ?? readWithdrawnFamilyIds();
+  if (progress.generatorVersion !== EXPANDED_GENERATOR_VERSION || progress.withdrawnHash !== withdrawnFamilyHash(withdrawn)) {
+    throw new LinkTestError("changed", "The site has changed since this test started.", profile);
+  }
+  const deadline = Date.now() + budgetMs;
+  const attempts = [...progress.attempts];
+  const questions = [...progress.questions];
+  try {
+    for (const filled of fillExpandedSlots(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn, progress)) {
+      attempts.push(filled.attempt);
+      questions.push(filled.question);
+      if (attempts.length < questionCount(profile) && Date.now() >= deadline) {
+        return { progress: { ...progress, attempts, questions } };
+      }
+    }
+  } catch (error) {
+    console.error(`link-test: ${profile} assembly failed —`, error);
+    const bank = () => context.bank ?? loadBank();
+    const draft = newDraft(seed, profile, withdrawn, { source: "fallback", bank: bank() });
+    remember(buildKey(draft), { complete: true, puzzles: buildPuzzles(seed, profile, "fallback", withdrawn, bank) });
+    return { draft };
+  }
+  return { draft: newDraft(seed, profile, withdrawn, { source: "generated", attempts }) };
+}
+
+/** Start a drafted test's clock and seal its token. */
+export function issueLinkTest(draft: LinkTestDraft, context: LinkTestContext = {}): { token: string; test: LinkTest } {
   // The clock is read after the questions exist: building them never comes
   // out of the taker's time.
   const issuedAt = context.nowSeconds ?? Math.floor(Date.now() / 1000);
   const test: LinkTest = {
-    appVersion: `v${packageJson.version}`,
-    leaderboardScope: quizNamespace(),
-    rankAllowed: leaderboardEnabled(),
-    seed,
-    profile,
-    source,
-    generatorVersion: EXPANDED_GENERATOR_VERSION,
-    withdrawnHash: withdrawnFamilyHash(withdrawn),
-    ...(source === "fallback" ? { bankHash: bankHash(bank()) } : { attempts }),
+    ...draft,
     issuedAt,
-    answerDeadline: issuedAt + SECONDS_PER_QUESTION * puzzles.length,
+    answerDeadline: issuedAt + SECONDS_PER_QUESTION * questionCount(draft.profile),
     expiresAt: issuedAt + QUIZ_TOKEN_TTL_SECONDS,
   };
-  remember(buildKey(test), { complete: true, puzzles });
-  return { token: sealLinkToken(test, secret), test, puzzles };
+  return { token: sealLinkToken(test, context.secret), test };
 }
 
 function wholeTest(test: LinkTest, context: LinkTestContext): PuzzleSet {

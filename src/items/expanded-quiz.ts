@@ -541,17 +541,51 @@ export function assembleExpandedTest(
   registry: FamilyPromotionRegistry,
   withdrawnFamilyIds: ReadonlySet<string> = new Set(),
 ): AssembledTest {
+  const puzzles: Puzzle[] = [];
+  const attempts: number[] = [];
+  for (const filled of fillExpandedSlots(seed, profile, registry, withdrawnFamilyIds)) {
+    puzzles.push(filled.puzzle);
+    attempts.push(filled.attempt);
+  }
+  return { puzzles: PuzzleSetSchema.parse(puzzles) as PuzzleSet, attempts };
+}
+
+/** The slots of a test filled so far, in order: each one's kept attempt and `questionFingerprint`. */
+export interface ExpandedTestProgress {
+  attempts: readonly number[];
+  questions: readonly string[];
+}
+
+/** One newly filled slot. */
+export interface ExpandedSlotFill {
+  puzzle: Puzzle;
+  attempt: number;
+  question: string;
+}
+
+/**
+ * Fill a test's slots in order, one per step, after those `progress` already
+ * filled. All a slot takes from earlier ones is which questions they ask, so a
+ * test filled over several sittings is exactly the test `assembleExpandedTest`
+ * builds at once.
+ */
+export function* fillExpandedSlots(
+  seed: Seed,
+  profile: ExpandedProfile,
+  registry: FamilyPromotionRegistry,
+  withdrawnFamilyIds: ReadonlySet<string> = new Set(),
+  progress: ExpandedTestProgress = { attempts: [], questions: [] },
+): Generator<ExpandedSlotFill, void, void> {
   if (String(seed).length === 0) throw new Error("seed must not be empty");
   const schedule = planExpandedSchedule(seed, profile, registry, withdrawnFamilyIds);
 
-  const puzzles: Puzzle[] = [];
-  const attempts: number[] = [];
   // A program fingerprint names a family's rule structure, not one instance, so
   // it cannot be unique across a 30-question test that reuses families. What
   // must be unique is the question: no two may ask the same thing.
-  const askedQuestions = new Set<string>();
+  const askedQuestions = new Set<string>(progress.questions);
 
-  for (const [slotIndex, selected] of schedule.entries()) {
+  for (let slotIndex = progress.attempts.length; slotIndex < schedule.length; slotIndex++) {
+    const selected = schedule[slotIndex];
     const rejections: string[] = [];
     let accepted: Puzzle | undefined;
     let acceptedQuestion = "";
@@ -580,11 +614,8 @@ export function assembleExpandedTest(
       );
     }
     askedQuestions.add(acceptedQuestion);
-    puzzles.push(accepted);
-    attempts.push(acceptedAttempt);
+    yield { puzzle: accepted, attempt: acceptedAttempt, question: acceptedQuestion };
   }
-
-  return { puzzles: PuzzleSetSchema.parse(puzzles) as PuzzleSet, attempts };
 }
 
 /**

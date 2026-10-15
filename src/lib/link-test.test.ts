@@ -5,10 +5,14 @@ import { CURRENT_FAMILY_PROMOTION_REGISTRY } from "@/items/family-promotion";
 import { OPTIONS_PER_ITEM } from "@/items/schema";
 import {
   clearBuiltLinkTests,
+  beginLinkTest,
+  continueLinkTest,
   createLinkTest,
   formatLinkAnswers,
+  issueLinkTest,
   LinkTestError,
   linkTestQuestion,
+  LinkTestProgressSchema,
   loadLinkTest,
   OPTION_LETTERS,
   openLinkToken,
@@ -49,6 +53,40 @@ describe("link test token", () => {
     expect(rebuilt.test).toEqual(created.test);
     expect(rebuilt.puzzles).toEqual(created.puzzles);
   });
+
+  it("builds the same test over many requests, one question at a time", () => {
+    const seed = "link-built-in-parts";
+    const created = createLinkTest("long-30", { ...context, seed });
+    clearBuiltLinkTests();
+
+    // A zero budget still builds one question per request; the progress goes
+    // through storage as text between requests.
+    let step = continueLinkTest(beginLinkTest("long-30", { ...context, seed }), 0, context);
+    let requests = 1;
+    while ("progress" in step) {
+      expect(step.progress.attempts).toHaveLength(requests);
+      const stored = LinkTestProgressSchema.parse(JSON.parse(JSON.stringify(step.progress)));
+      step = continueLinkTest(stored, 0, context);
+      requests += 1;
+    }
+    expect(requests).toBe(30);
+
+    const { issuedAt, answerDeadline, expiresAt, ...unclocked } = created.test;
+    expect(step.draft).toEqual(unclocked);
+    // The clock starts when the test is issued, not when it was built.
+    const now = issuedAt + 120;
+    const issued = issueLinkTest(step.draft, { ...context, nowSeconds: now });
+    expect(issued.test).toEqual({ ...created.test, issuedAt: now, answerDeadline: answerDeadline + 120, expiresAt: expiresAt + 120 });
+    clearBuiltLinkTests();
+    expect(loadLinkTest(issued.token, { ...context, nowSeconds: now }).puzzles).toEqual(created.puzzles);
+
+    // Finished in one request when the budget allows.
+    expect(continueLinkTest(beginLinkTest("short-5", context), 60_000, context)).toHaveProperty("draft");
+    // Progress made before the site changed what it builds cannot be finished.
+    const started = beginLinkTest("short-5", context);
+    expect(errorCode(() => continueLinkTest(started, 0, { ...context, withdrawnFamilyIds: new Set(["some-family"]) })))
+      .toBe("changed");
+  }, 60_000);
 
   it("builds one question alone on a server that does not hold the test", () => {
     const created = createLinkTest("short-5", { ...context, seed: "link-one-question" });

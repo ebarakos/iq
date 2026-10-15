@@ -8,6 +8,7 @@ import { listLeaderboard } from "@/lib/leaderboard";
 import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } from "@/lib/link-test";
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
+import { GET as openStarted } from "./start/[id]/route";
 import QuestionPage from "./[token]/[n]/page";
 import { GET as puzzleImage } from "./[token]/[n]/puzzle.png/route";
 import { GET as pictureImage } from "./[token]/[n]/board/[part]/route";
@@ -18,13 +19,20 @@ import HomePage from "../page";
 import { POST as publishFromForm } from "../api/leaderboard/route";
 
 const storage = vi.hoisted(() => ({ values: new Map<string, string>(), ranks: new Map<string, number>() }));
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/lib/redis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/redis")>()),
   redisCommand: vi.fn(async (command: (string | number)[]) => {
     const key = String(command[1]);
     switch (command[0]) {
       case "GET": return storage.values.get(key) ?? null;
+      case "GETDEL": {
+        const value = storage.values.get(key) ?? null;
+        storage.values.delete(key);
+        return value;
+      }
       case "SET":
-        if (storage.values.has(key)) return null;
+        if (command.includes("NX") && storage.values.has(key)) return null;
+        if (command.includes("XX") && !storage.values.has(key)) return null;
         storage.values.set(key, String(command[2]));
         return "OK";
       case "EVAL": {
@@ -74,6 +82,9 @@ async function fetchPath(path: string): Promise<Fetched> {
   };
   if (url.pathname === "/sample") return asResponse(await startSample(new Request(url)));
   if (url.pathname === "/test") return asResponse(await startTest(new Request(url)));
+  if (segments[0] === "t" && segments[1] === "start" && segments.length === 3) {
+    return asResponse(await openStarted(new Request(url), { params: Promise.resolve({ id: segments[2] }) }));
+  }
   if (segments[0] === "t" && segments.length === 5 && segments[3] === "board") {
     return asResponse(await pictureImage(new Request(url), {
       params: Promise.resolve({ token: segments[1], n: segments[2], part: segments[4] }),
@@ -198,6 +209,34 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     for (const puzzle of puzzles) expect(resultText).toContain(puzzle.explanation);
     expect(links(result.body).some(([label, href]) => label.startsWith("Take a new") && href === "/sample")).toBe(true);
     expect(followable(result.body)).toEqual(["/"]);
+  });
+
+  it("builds a 30-question test over several short requests, then opens its first question", async () => {
+    // A 30-question build outlasted ChatGPT's fetch tool (2026-10-15). With
+    // Redis, each request builds for a moment and links to the next part.
+    vi.stubEnv("KV_REST_API_URL", "https://redis.example.test");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
+    let response = await fetchPath("/test");
+    expect(response.status).toBe(200);
+    const [[label, href], ...others] = links(response.body);
+    expect(others).toEqual([]);
+    expect(label).toBe("Continue to the test");
+    expect(href).toMatch(/^\/t\/start\/[A-Za-z0-9_-]{22}$/);
+    expect(followable(response.body)).toEqual([]);
+
+    const built: number[] = [];
+    while (response.status === 200) {
+      built.push(Number(text(response.body).match(/(\d+) of 30 questions so far/)![1]));
+      expect(links(response.body)).toEqual([["Continue to the test", href]]);
+      response = await fetchPath(href);
+    }
+    expect(built.length).toBeGreaterThan(1);
+    expect(built).toEqual([...built].sort((a, b) => a - b));
+    expect(response.status).toBe(303);
+    const first = new URL(response.location!);
+    const page = await fetchPath(first.pathname + first.search);
+    expect(page.status).toBe(200);
+    expect(text(page.body)).toContain("Question 1 of 30");
   });
 
   it("keeps the first result on retries and rejects changed answers after revealing the review", async () => {
@@ -334,6 +373,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     // Whether it says "ranked" follows the board; see the next test.
     expect(note).toContain("https://iq.example.test/test (30 questions");
     expect(note).toContain("https://iq.example.test/sample (5 questions)");
+    expect(note).toContain("While a test is being built, a page says how far it has got; follow its link until the first question opens.");
     expect(links(home).filter(([label]) => label.startsWith("https://"))).toEqual([
       ["https://iq.example.test/test", "/test"],
       ["https://iq.example.test/sample", "/sample"],

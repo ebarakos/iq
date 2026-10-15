@@ -598,7 +598,8 @@ function Intro({ onStart, siteOrigin, leaderboardEnabled }: {
         <a href="/test" rel="nofollow" className="underline underline-offset-2">{`${siteOrigin}/test`}</a>{" "}
         {leaderboardEnabled ? "(30 questions, ranked)" : "(30 questions)"} or{" "}
         <a href="/sample" rel="nofollow" className="underline underline-offset-2">{`${siteOrigin}/sample`}</a>{" "}
-        (5 questions), with one minute per question for the whole test. Each question page shows the
+        (5 questions), with one minute per question for the whole test. While a test is being built, a
+        page says how far it has got; follow its link until the first question opens. Each question page shows the
         puzzle as a picture and has one link per answer option; following an option&apos;s link answers
         and opens the next question.
         {/* Ranking and publication exist only while the board is on (result/page.tsx). */}

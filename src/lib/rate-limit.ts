@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { quizNamespace } from "./leaderboard-config";
-import { redisCommand } from "./redis";
+import { redisCommand, redisConfigured } from "./redis";
 
 /**
  * Per-address limits in one-hour Redis windows (docs/plans/leaderboard-integrity.md).
@@ -49,7 +49,7 @@ export async function withinRateLimit(
  */
 export async function startAllowed(headers: Headers): Promise<boolean> {
   // No Redis configured: a development server without scoring, nothing to count against.
-  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) return true;
+  if (!redisConfigured()) return true;
   try {
     return await withinRateLimit("start", clientAddress(headers));
   } catch (error) {

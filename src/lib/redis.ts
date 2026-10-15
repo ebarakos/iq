@@ -1,3 +1,8 @@
+/** Whether this server has Redis. A development server may run without it, and without scoring. */
+export function redisConfigured(): boolean {
+  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+}
+
 /** Server-side Upstash connection using the Vercel integration's environment variables. */
 export async function redisCommand<T>(command: readonly (string | number)[]): Promise<T> {
   if (typeof window !== "undefined") {

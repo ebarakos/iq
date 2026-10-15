@@ -12,7 +12,10 @@ apart from the start links and the labels below.
 ## The flow
 
 1. `GET /sample` or `GET /test` makes a fresh test and redirects to its first
-   question: `/t/<token>/1`.
+   question: `/t/<token>/1`. With Redis, a request builds for about 1.5 s only (see
+   "Built over several requests" below); a test not finished by then answers with a
+   page that says how many questions are built and links to `/t/start/<id>`, which
+   builds the next part. The request that finishes it starts the clock and redirects.
 2. A question page shows "Question 2 of 5", the deadline as a clock time and the
    seconds left, the puzzle as an image, and one link per option plus Skip. Each
    link carries the answers so far: on question 2, option C links to
@@ -170,3 +173,28 @@ Run 2026-10-15 on the v0.2.0 deploy, in ChatGPT (the owner's account, default mo
 So `nofollow`, the redirect and the long token links do not stop its tool; knowing that links
 alone take the test does. The home page now says so in plain text for AI agents, with the full
 `/test` and `/sample` addresses (`src/app/quiz.tsx`, `Intro`).
+
+On the v0.2.1 deploy, given the home page, ChatGPT's tool gave up on `/test` ("Timeout
+fetching", then "URL is not accessible via this tool"): building 30 questions took 7–9 s
+there, `/sample` 2–3 s. The server refused nothing (at most 4 starts per address that hour).
+
+## Built over several requests (2026-10-15)
+
+A fetch tool waits only a few seconds for a page, so no request may build for long. Every
+link-test start with Redis builds for about 1.5 s (`BUILD_BUDGET_MS`, `src/lib/link-start.ts`).
+If the test is not finished, its progress (seed, and each filled slot's kept attempt and
+question fingerprint) goes to Redis for 10 minutes under a random id, and the page links to
+`/t/start/<id>`, which builds the next part on whichever server instance gets it. A slot
+depends on earlier ones only through the questions they ask (`fillExpandedSlots`), so the
+test is the one `createLinkTest` builds at once from the same seed; the tests prove it.
+
+- **No background work.** A build left running after a response (`after`) was tried first:
+  the follow-up request waited behind it for 6 s on the same process, because a question
+  takes 0.3–0.5 s to build and only then lets other work in.
+- **The clock starts when the last part is built**, so building never uses the taker's time.
+- **One link, one test.** The finishing request takes the progress with `GETDEL`; a later
+  follow gets "expired". Progress saved with `XX` cannot revive an opened link.
+- **Unchanged without Redis** (a development server): the start builds everything and
+  redirects. The in-page test (`POST /api/generate`) still builds at once; people wait there.
+- Measured on a development server: `/test` answered in 2.4 s (15 of 30 built), the follows in
+  2.2 s and 1.4 s, the last one redirecting; `/sample` redirected at once in 0.7 s.

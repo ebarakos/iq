@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clientAddress, RATE_LIMITS, startAllowed, withinRateLimit } from "./rate-limit";
 
 const store = vi.hoisted(() => ({ counts: new Map<string, number>(), expiries: new Map<string, number>() }));
-vi.mock("./redis", () => ({
+vi.mock("./redis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./redis")>()),
   redisCommand: vi.fn(async (command: (string | number)[]) => {
     const key = String(command[1]);
     if (command[0] === "INCR") {

@@ -75,7 +75,10 @@ describe("POST /api/generate", () => {
     vi.stubEnv("KV_REST_API_URL", "https://example.upstash.io");
     vi.stubEnv("KV_REST_API_TOKEN", "token");
     vi.resetModules();
-    vi.doMock("@/lib/redis", () => ({ redisCommand: vi.fn(async () => 61) }));
+    vi.doMock("@/lib/redis", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("@/lib/redis")>()),
+      redisCommand: vi.fn(async () => 61),
+    }));
     const { POST } = await import("./route");
     const response = await POST(generateRequest({ profile: "short-5" }, "generate-route-flood"));
     expect(response.status).toBe(429);
