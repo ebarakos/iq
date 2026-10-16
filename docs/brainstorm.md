@@ -41,28 +41,6 @@ Reintroduce it once the test families are settled, meaning the human pilot has
 run and the enabled family list has stopped moving. Until then, mobile coverage
 is the `/ui-qa` browser pass and manual spot checks.
 
-**HTTP agent mode, both the server-run and the external-client version.** Moved
-here from `TODO.md` on 2026-08-16, before any of it was built.
-
-The decision not to store attempt records removes the reason to build either
-one. A server-run call would take a test, call the model, return a score, and
-forget it, so nothing reaches the family report. An external-client protocol
-would return a score its caller cannot prove and we do not keep. Neither feeds
-the human–agent gap, which is the thing that makes aiq worth building. The
-offline harness already measures agents reliably and writes a real corpus, so
-nothing is lost today by not having an endpoint.
-
-There is also an unresolved technical doubt: a synchronous 30-item run means 30
-model calls inside one serverless request, and `scripts/agent-run.ts` defaults
-to concurrency 2 and aborts the whole run on a single relay rate-limit error.
-That behaviour is fine in a script you can rerun and wrong in a request someone
-is waiting on.
-
-Bring this back when there is somewhere to put the results — that is, once
-attempts are persisted for humans, agents, or both. At that point the storage
-decision, the concurrency ceiling, and the trust model all need answering
-together rather than one at a time.
-
 **LLM rule-proposal path.** Kept as a dormant alternative rather than deleted.
 It is not on the roadmap and is not being developed, but the idea — letting a
 model propose a rule program that pure code then validates, builds, and scores —
@@ -129,8 +107,6 @@ storing an account or exposing the seed.
 
 Short dated notes, appended as they come up: what and why, no proof needed.
 
-- 2026-08-24: the odd-one-out format has now failed the human gate twice — `-v2` with no worked evidence, `-v3` with three demonstrated example boards. A third attempt should change the presentation (e.g. label the examples as belonging together, or show one counter-example) rather than just the evidence count.
-- 2026-08-24: `interleaved-sequence-v3` was withdrawn on a right-answer-wrong-reading pilot result. If the alternation notation itself is the problem, a redesign could mark the two strands visually (alternating panel backgrounds) instead of asking the solver to discover the interleaving.
 - 2026-09-28: before the next pilot sitting, fix two things on the pilot page: it shows each item's family, band and bucket above the puzzle while the participant solves it (`src/app/prototypes/prototype-pilot.tsx:393`), and the recorded responses live only in React state, so a reload loses the sitting (`:157`). Sittings are scarce.
 - 2026-10-04: Opus 5.5 scored 29/30 on one 30-question test (23/24 on the hard bands), so the ladder no longer separates the strongest models from each other. The ladder exists to separate human-hard from agent-hard items, and at 97% its hard end is not agent-hard for this model. Worth a look before more families: which mechanisms the strongest models still miss (Opus's one miss was a reading the evidence allowed, not a rule it failed to see).
 - 2026-10-04: a grey arrow shows less grey than a grey triangle of the same size (about 30 against 38 square pixels for a large token on a 64px review board), for the same reason stars did: a thin stem under a thick outline. Composed transform's near misses still colour arrows grey, so a slightly wider stem would help takers compare those options.
