@@ -590,7 +590,9 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(note).not.toContain("can take the test without JavaScript");
     expect(note).not.toContain("While a test is being built");
     expect(note).not.toMatch(/[\d,]+ points/);
-    expect(note).toContain("Elapsed time only breaks ties.");
+    expect(note).not.toContain("More correct answers rank first on the leaderboard.");
+    expect(note).not.toContain("Elapsed time only breaks ties.");
+    expect(note).toContain("If time runs out, only the answers you submitted before count.");
     expect(note).not.toContain("bonus");
     // Like every link into a test, the note's links are not for crawlers.
     expect(followable(home)).not.toContain("/test");

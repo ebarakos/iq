@@ -595,10 +595,7 @@ function Intro({ onStart }: {
       </p>
       <p className="mt-3 text-gray-600">
         The timer gives one minute per question in a single countdown. Unanswered questions
-        count as incorrect. If time runs out, only the answers you submitted before then count.
-      </p>
-      <p className="mt-3 text-gray-600">
-        More correct answers rank first on the leaderboard. Elapsed time only breaks ties.
+        count as incorrect. If time runs out, only the answers you submitted before count.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
