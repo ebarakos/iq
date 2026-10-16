@@ -193,12 +193,15 @@ test is the one `createLinkTest` builds at once from the same seed; the tests pr
   the follow-up request waited behind it for 6 s on the same process, because a question
   takes 0.3–0.5 s to build and only then lets other work in.
 - **The clock starts when the last part is built**, so building never uses the taker's time.
-- **One link, one test.** The finishing request takes the progress with `GETDEL`; a later
-  follow gets "expired". Progress saved with `XX` cannot revive an opened link.
+- **One link, one test.** The finishing request saves its issued token until that token
+  expires. A retry recovers the same token and deadline, even if the first redirect was
+  lost. An atomic compare-and-save returns the newest saved state, so overlapping requests
+  cannot move progress backward or replace an opened test.
 - **Unchanged without Redis** (a development server): the start builds everything and
   redirects. The in-page test (`POST /api/generate`) still builds at once; people wait there.
 - **A new address at every step.** `<built>` is there only so each page links somewhere new;
-  the server ignores it.
+  the server ignores it. The earlier `/t/start/<id>` route remains usable. Temporary
+  failures return a readable page with a fresh retry address for the same test.
 
 First ChatGPT run on production (2026-10-16), with a 1.5 s budget and one fixed `/t/start/<id>`
 link: its tool timed out on the first requests (one follow took 3.3 s there), then showed

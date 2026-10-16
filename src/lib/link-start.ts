@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import { questionCount, type ExpandedProfile } from "@/items/expanded-quiz";
 import { quizNamespace } from "./leaderboard-config";
 import {
@@ -8,6 +9,7 @@ import {
   issueLinkTest,
   LinkTestError,
   LinkTestProgressSchema,
+  openLinkToken,
   questionPath,
   type LinkTestProgress,
 } from "./link-test";
@@ -38,6 +40,22 @@ export const LINK_TEST_HEADERS = {
 const BUILD_BUDGET_MS = 1_200;
 /** How long a test being built waits for its next request. */
 const PROGRESS_SECONDS = 600;
+
+const StartedTestSchema = z.union([
+  LinkTestProgressSchema,
+  z.object({ token: z.string().min(1) }),
+]);
+
+// Concurrent or retried requests may read the same progress. Save only if
+// nothing newer was saved; return the winner, including its one issued token.
+const SAVE_START = `
+local current = redis.call('GET', KEYS[1])
+if current == ARGV[1] then
+  redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
+  return ARGV[2]
+end
+return current
+`;
 
 /** A seam for tests. A server uses the default. */
 export interface StartOptions {
@@ -86,15 +104,18 @@ function buildingPage(progress: LinkTestProgress, id: string): Response {
 
 function expiredPage(): Response {
   return htmlPage(200, "This start link has expired", [
-    "<p>Its test was already opened, waited more than 10 minutes, or the site changed while it was being built.</p>",
+    "<p>It waited more than 10 minutes while building, its test expired, or the site changed.</p>",
     `<p>Start a new test: <a href="/test" rel="nofollow">30 questions</a> or <a href="/sample" rel="nofollow">5 questions</a>.</p>`,
   ].join("\n"));
 }
 
-function failedPage(): Response {
-  return htmlPage(500, "Could not create a test", [
-    "<p>Something went wrong while building it.</p>",
-    `<p>Please start again: <a href="/test" rel="nofollow">30 questions</a> or <a href="/sample" rel="nofollow">5 questions</a>.</p>`,
+function failedPage(id: string): Response {
+  // A fetcher must be able to read the retry link, even after a transient
+  // failure. Give it a fresh address so a cached failure cannot repeat forever.
+  const retry = `/t/start/${id}/retry-${randomBytes(8).toString("base64url")}`;
+  return htmlPage(200, "Could not continue this test", [
+    "<p>Something went wrong while building it. Try continuing this test again.</p>",
+    `<p><a href="${retry}" rel="nofollow">Continue to the test</a></p>`,
   ].join("\n"));
 }
 
@@ -103,6 +124,19 @@ function firstQuestion(req: Request, token: string): Response {
     status: 303,
     headers: { ...LINK_TEST_HEADERS, location: new URL(questionPath(token, 1, []), req.url).toString() },
   });
+}
+
+function savedStartResponse(req: Request, id: string, stored: string | null): Response {
+  if (stored === null) return expiredPage();
+  const parsed = StartedTestSchema.safeParse(JSON.parse(stored));
+  if (!parsed.success) return expiredPage();
+  if ("token" in parsed.data) {
+    // Check expiry and site changes, without rebuilding any questions. A retry
+    // reuses the exact token, so it cannot reset the clock or get a new score.
+    openLinkToken(parsed.data.token);
+    return firstQuestion(req, parsed.data.token);
+  }
+  return buildingPage(parsed.data, id);
 }
 
 function logStartError(error: unknown): void {
@@ -146,8 +180,8 @@ export async function startLinkTest(req: Request, profile: ExpandedProfile, opti
 
 /**
  * `GET /t/start/<id>/<built>`: build more of a started test. Once it is complete,
- * start its clock and redirect to its first question; each start link opens
- * one test, once.
+ * start its clock and redirect to its first question. Retries recover the
+ * same token and deadline, including when the first redirect was lost.
  */
 export async function openStartedTest(req: Request, id: string, options: StartOptions = {}): Promise<Response> {
   if (!/^[A-Za-z0-9_-]{22}$/.test(id) || !redisConfigured()) return expiredPage();
@@ -155,20 +189,24 @@ export async function openStartedTest(req: Request, id: string, options: StartOp
   try {
     const stored = await redisCommand<string | null>(["GET", key]);
     if (stored === null) return expiredPage();
-    const progress = LinkTestProgressSchema.safeParse(JSON.parse(stored));
+    const progress = StartedTestSchema.safeParse(JSON.parse(stored));
     if (!progress.success) return expiredPage();
+    if ("token" in progress.data) return savedStartResponse(req, id, stored);
     const step = continueLinkTest(progress.data, options.budgetMs ?? BUILD_BUDGET_MS);
+    let next: string;
+    let ttl = PROGRESS_SECONDS;
     if ("draft" in step) {
-      // Only the request that takes the link opens its test.
-      if (await redisCommand<string | null>(["GETDEL", key]) === null) return expiredPage();
-      return firstQuestion(req, issueLinkTest(step.draft).token);
+      const issued = issueLinkTest(step.draft);
+      next = JSON.stringify({ token: issued.token });
+      ttl = Math.max(1, issued.test.expiresAt - Math.floor(Date.now() / 1000));
+    } else {
+      next = JSON.stringify(step.progress);
     }
-    // XX: a link another request has already opened stays opened.
-    await redisCommand(["SET", key, JSON.stringify(step.progress), "EX", PROGRESS_SECONDS, "XX"]);
-    return buildingPage(step.progress, id);
+    const saved = await redisCommand<string | null>(["EVAL", SAVE_START, 1, key, stored, next, ttl]);
+    return savedStartResponse(req, id, saved);
   } catch (error) {
-    if (error instanceof LinkTestError && error.code === "changed") return expiredPage();
+    if (error instanceof LinkTestError && error.code !== "configuration") return expiredPage();
     logStartError(error);
-    return failedPage();
+    return failedPage(id);
   }
 }

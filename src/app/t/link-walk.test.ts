@@ -9,6 +9,7 @@ import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } f
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
 import { GET as openStarted } from "./start/[id]/[built]/route";
+import { GET as openLegacyStart } from "./start/[id]/route";
 import QuestionPage from "./[token]/[n]/page";
 import { GET as puzzleImage } from "./[token]/[n]/puzzle.png/route";
 import { GET as pictureImage } from "./[token]/[n]/board/[part]/route";
@@ -36,6 +37,12 @@ vi.mock("@/lib/redis", async (importOriginal) => ({
         storage.values.set(key, String(command[2]));
         return "OK";
       case "EVAL": {
+        // Startup uses compare-and-set; leaderboard publication uses its own script.
+        if (String(command[1]).includes("local current = redis.call('GET', KEYS[1])")) {
+          const stateKey = String(command[3]);
+          if (storage.values.get(stateKey) === command[4]) storage.values.set(stateKey, String(command[5]));
+          return storage.values.get(stateKey) ?? null;
+        }
         const [receiptKey, entryKey] = [String(command[3]), String(command[4])];
         if (storage.values.has(entryKey)) return storage.values.get(entryKey);
         if (!storage.values.has(receiptKey)) return null;
@@ -82,6 +89,9 @@ async function fetchPath(path: string): Promise<Fetched> {
   };
   if (url.pathname === "/sample") return asResponse(await startSample(new Request(url)));
   if (url.pathname === "/test") return asResponse(await startTest(new Request(url)));
+  if (segments[0] === "t" && segments[1] === "start" && segments.length === 3) {
+    return asResponse(await openLegacyStart(new Request(url), { params: Promise.resolve({ id: segments[2] }) }));
+  }
   if (segments[0] === "t" && segments[1] === "start" && segments.length === 4) {
     return asResponse(await openStarted(new Request(url), {
       params: Promise.resolve({ id: segments[2], built: segments[3] }),
@@ -213,12 +223,17 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(followable(result.body)).toEqual(["/"]);
   });
 
-  it("builds a 30-question test over several short requests, then opens its first question", async () => {
+  it("takes a 30-question test through a URL-caching fetcher, including an older start link", async () => {
     // A 30-question build outlasted ChatGPT's fetch tool (2026-10-15). With
     // Redis, each request builds for a moment and links to the next part.
     vi.stubEnv("KV_REST_API_URL", "https://redis.example.test");
     vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
-    let response = await fetchPath("/test");
+    const cache = new Map<string, Fetched>();
+    const cachedFetch = async (path: string) => {
+      if (!cache.has(path)) cache.set(path, await fetchPath(path));
+      return cache.get(path)!;
+    };
+    let response = await cachedFetch("/test");
     expect(response.status).toBe(200);
     const [[label, firstHref], ...others] = links(response.body);
     expect(others).toEqual([]);
@@ -228,6 +243,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     const id = firstHref.split("/")[3];
 
     const built: number[] = [];
+    let lastHref = "";
     while (response.status === 200) {
       const count = Number(text(response.body).match(/(\d+) of 30 questions so far/)![1]);
       built.push(count);
@@ -235,16 +251,31 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
       // showed ChatGPT the same page again and again (2026-10-16).
       const [[, href]] = links(response.body);
       expect(href).toBe(`/t/start/${id}/${count}`);
-      response = await fetchPath(href);
+      expect(cache.has(href)).toBe(false);
+      // Sessions issued before the last fix used this shorter path, including
+      // the reported /t/start/LTeIwVLO3ONw0CIMMqWo2g?utm_source=chatgpt.com.
+      lastHref = built.length === 1 ? `/t/start/${id}?utm_source=chatgpt.com` : href;
+      response = await cachedFetch(lastHref);
+      expect(built.length).toBeLessThan(30);
     }
     expect(built.length).toBeGreaterThan(1);
     expect(new Set(built).size).toBe(built.length);
     expect(built).toEqual([...built].sort((a, b) => a - b));
     expect(response.status).toBe(303);
+    // A timeout after opening the test can safely retry either start address.
+    expect((await fetchPath(lastHref)).location).toBe(response.location);
+    expect((await fetchPath(`/t/start/${id}`)).location).toBe(response.location);
     const first = new URL(response.location!);
-    const page = await fetchPath(first.pathname + first.search);
-    expect(page.status).toBe(200);
-    expect(text(page.body)).toContain("Question 1 of 30");
+    let path = first.pathname + first.search;
+    for (let question = 1; question <= 30; question++) {
+      const page = await cachedFetch(path);
+      expect(page.status).toBe(200);
+      expect(text(page.body)).toContain(`Question ${question} of 30`);
+      path = links(page.body).find(([label]) => label === "Skip")![1];
+    }
+    const result = await cachedFetch(path);
+    expect(result.status).toBe(200);
+    expect(text(result.body)).toContain("0 of 30 correct");
   });
 
   it("keeps the first result on retries and rejects changed answers after revealing the review", async () => {
