@@ -5,6 +5,8 @@ describe("nickname rules", () => {
   it.each([
     ["  Ada   Lovelace ", "Ada Lovelace"],
     ["Claude", "Claude"],
+    ["NeuralNinja | GPT-6 | Effort: unspecified", "NeuralNinja | GPT-6 | Effort: unspecified"],
+    ["x".repeat(64), "x".repeat(64)],
     ["Ελένη", "Ελένη"],
     ["R2-D2", "R2-D2"],
     ["O'Brien", "O'Brien"],
@@ -21,9 +23,9 @@ describe("nickname rules", () => {
   });
 
   it.each([
-    ["", "between 2 and 24"],
-    ["A", "between 2 and 24"],
-    ["x".repeat(25), "between 2 and 24"],
+    ["", "between 2 and 64"],
+    ["A", "between 2 and 64"],
+    ["x".repeat(65), "between 2 and 64"],
     ["name\nline", "letters, numbers"],
     ["a​b", "letters, numbers"],
     ["evil‮eman", "letters, numbers"],
@@ -31,17 +33,20 @@ describe("nickname rules", () => {
     ["<b>bold</b>", "letters, numbers"],
     ["12345", "at least one letter"],
     ["visit evil.com", "web address"],
+    ["Agent | evil.com: model", "web address"],
     ["www.example", "web address"],
     ["https now", "web address"],
     ["fuck", "not allowed"],
     ["sh1t head", "not allowed"],
     ["f u c k", "not allowed"],
+    ["f|u:c k", "not allowed"],
     ["Nazi 88", "not allowed"],
     ["nazis", "not allowed"],
     ["neo-nazi", "not allowed"],
     ["Neonazi", "not allowed"],
     ["NaziFan", "not allowed"],
     ["n a z i", "not allowed"],
+    ["n|a:z i", "not allowed"],
     ["HitlerFan", "not allowed"],
     ["KKK", "not allowed"],
   ])("refuses %j", (raw, reason) => {

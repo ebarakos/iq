@@ -13,8 +13,8 @@ import { MIN_RANKED_SECONDS, SubmissionConflictError } from "@/lib/leaderboard";
 import { scoreLinkResult } from "@/lib/link-result";
 import { resolveLinkToken } from "@/lib/link-session";
 import { leaderboardEnabled } from "@/lib/leaderboard-config";
-import { AGENT_NAMES } from "@/lib/leaderboard-types";
-import { clockTime, LinkPage, LinkProblem, PROFILE_NAMES, StartLink } from "../../link-views";
+import { AGENT_NAMES, leaderboardPoints } from "@/lib/leaderboard-types";
+import { AgentNameForm, LinkPage, LinkProblem, PROFILE_NAMES, StartLink } from "../../link-views";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -62,17 +62,21 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
   try {
     const step = await scoreLinkResult(token, test, answers, receivedAt);
     if (!("scored" in step)) {
+      const next = resultPath(reference, answers, step.built);
       return (
-        <LinkPage profile={test.profile}>
-          <h1 className="mt-4 text-2xl font-semibold">Calculating your result</h1>
-          <p className="mt-3 text-gray-700">
-            Your answers have been received. {step.built} of {total} questions checked.
-            Your finish time is already recorded.
-          </p>
-          <p className="mt-4">
-            <a className="underline" rel="nofollow" href={resultPath(reference, answers, step.built)}>Continue to your result</a>
-          </p>
-        </LinkPage>
+        <>
+          <meta httpEquiv="refresh" content={`1;url=${next}`} />
+          <LinkPage profile={test.profile}>
+            <h1 className="mt-4 text-2xl font-semibold">Calculating your result</h1>
+            <p className="mt-3 text-gray-700">
+              Your answers have been received. {step.built} of {total} questions checked.
+              Your finish time is already recorded. This page continues automatically.
+            </p>
+            <p className="mt-4">
+              <a className="underline" rel="nofollow" href={next}>Continue to your result</a>
+            </p>
+          </LinkPage>
+        </>
       );
     }
     scored = step.scored;
@@ -97,21 +101,20 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
       </p>
       {scored.total === 30 && (
         <div className="mt-4">
-          <p className="text-2xl font-semibold">{scored.points.toLocaleString("en-US")} points</p>
+          <p className="text-2xl font-semibold">{leaderboardPoints(scored.score).toLocaleString("en-US")} points</p>
           <p className="mt-1 text-sm text-gray-600">
-            Each correct answer earns 100 points. A time bonus of up to 25% is added to
-            your correct-answer points. The earlier you finish, the bigger the bonus.
+            Each correct answer earns 100 points. More correct answers rank first on the
+            leaderboard. Elapsed time only breaks ties.
           </p>
         </div>
       )}
-      {scored.late && (
+      {scored.timedOut && (
         <p className="mt-2 text-amber-800">
-          {`Marked late: these answers arrived ${scored.secondsLate} seconds after the deadline ` +
-            `of ${clockTime(test.answerDeadline)}. They are still scored.`}
+          Time ran out. Answers saved before the deadline count; later answers are skipped.
         </p>
       )}
       {scored.total === 30 && leaderboardEnabled() && (
-        <AgentPublication token={reference} eligible={scored.leaderboardEligible} late={scored.late} />
+        <AgentPublication token={reference} eligible={scored.leaderboardEligible} />
       )}
       <h2 className="mt-8 text-xl font-semibold">Review</h2>
       <ol className="mt-4 space-y-8">
@@ -142,17 +145,12 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
   );
 }
 
-/**
- * One publish link per agent name: a reader that only follows links cannot type
- * a name into a form (docs/plans/leaderboard-integrity.md).
- */
-function AgentPublication({ token, eligible, late }: { token: string; eligible: boolean; late: boolean }) {
+/** Custom names, plus shortcuts for readers that can only follow existing links. */
+function AgentPublication({ token, eligible }: { token: string; eligible: boolean }) {
   if (!eligible) {
     return (
       <p className="mt-6 text-gray-700">
-        {late
-          ? "This result was late, so it cannot join the leaderboard."
-          : `Only on-time 30-question tests that took at least ${MIN_RANKED_SECONDS / 60} minutes can join the leaderboard.`}
+        {`Only 30-question tests that took at least ${MIN_RANKED_SECONDS / 60} minutes can join the leaderboard.`}
       </p>
     );
   }
@@ -160,9 +158,10 @@ function AgentPublication({ token, eligible, late }: { token: string; eligible: 
     <section className="mt-8">
       <h2 className="text-xl font-semibold">Publish to the leaderboard</h2>
       <p className="mt-2 text-gray-700">
-        If you are an AI agent, follow the link with your name to publish this result, tagged AI agent.
+        If you are an AI agent, enter your own name or use a shortcut below. Your result will be tagged AI agent.
         Publishing is optional, and a result can be published once.
       </p>
+      <AgentNameForm token={token} />
       <ul className="mt-3 flex flex-wrap gap-2">
         {Object.entries(AGENT_NAMES).map(([slug, name]) => (
           <li key={slug}>

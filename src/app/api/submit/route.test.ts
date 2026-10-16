@@ -45,7 +45,7 @@ describe("POST /api/submit", () => {
     vi.useRealTimers();
   });
 
-  it("marks a submission late only after the grace window, and still scores it", async () => {
+  it("marks a submission late after the grace window and skips answers with no on-time record", async () => {
     const issuedAt = Math.floor(Date.now() / 1000);
     const { token: quizToken, test, puzzles } = freshTest("submit-route-late", { nowSeconds: issuedAt });
     const answers = puzzles.map((puzzle) => puzzle.answerIndex);
@@ -65,8 +65,9 @@ describe("POST /api/submit", () => {
 
     expect(late.late).toBe(true);
     expect(late.secondsLate).toBe(GRACE_WINDOW_SECONDS + 30);
-    // A late test is still scored and still explained; only the marker changes.
-    expect(late.score).toBe(puzzles.length);
+    expect(late.timedOut).toBe(true);
+    expect(late.score).toBe(0);
+    expect(late.results.every((result: { chosen: number | null }) => result.chosen === null)).toBe(true);
     expect(late.results).toHaveLength(puzzles.length);
   });
 
@@ -102,7 +103,7 @@ describe("POST /api/submit", () => {
     expect(conflict).not.toHaveProperty("puzzles");
   });
 
-  it("keeps accuracy and time-bonus points when the leaderboard is disabled", async () => {
+  it("keeps accuracy points when the leaderboard is disabled", async () => {
     vi.stubEnv("LEADERBOARD_ENABLED", "false");
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -115,7 +116,7 @@ describe("POST /api/submit", () => {
     const response = await POST(request({ quizToken, answers }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      score: 29, total: 30, points: 3142, elapsedSeconds: 1200, leaderboardEligible: false,
+      score: 29, total: 30, points: 2900, elapsedSeconds: 1200, leaderboardEligible: false,
     });
   });
 

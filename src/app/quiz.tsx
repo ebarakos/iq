@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { PublicPuzzle } from "@/items/schema";
 import { picturePaths, withPictureAttempt, type PicturePuzzle } from "@/items/picture-puzzle";
-import type { LeaderboardEntry, TakerKind } from "@/lib/leaderboard-types";
+import { leaderboardPoints, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH, type LeaderboardEntry, type TakerKind } from "@/lib/leaderboard-types";
 import { SceneGraphic, StemView } from "@/items/render";
 import { sampleGuide } from "@/items/sample-guides";
 import {
@@ -56,6 +56,7 @@ interface SubmitResponse {
   total: number;
   results: ReviewResult[];
   late?: boolean;
+  timedOut?: boolean;
   secondsLate?: number;
   points?: number;
   elapsedSeconds?: number;
@@ -88,11 +89,12 @@ const LETTERS = ["A", "B", "C", "D", "E", "F"];
  * never loads that widget (it has no model picker), so it only ever needs a
  * fetch that reads the API routes' own `{ message }` error body.
  */
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) throw new Error(await readErrorMessage(res));
   return (await res.json()) as T;
@@ -183,6 +185,8 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
   const [wasAutomaticSubmit, setWasAutomaticSubmit] = useState(false);
   const startRequestId = useRef(0);
   const requestedProfile = useRef<TestProfile>("long-30");
+  const answerSaves = useRef(Promise.resolve());
+  const [answerSaveError, setAnswerSaveError] = useState("");
 
   function clearStoredSession() {
     try {
@@ -204,6 +208,7 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
     setSecondsLeft(null);
     setCanRetrySubmit(false);
     setWasAutomaticSubmit(false);
+    setAnswerSaveError("");
     autoSubmitted.current = false;
   }
 
@@ -345,6 +350,30 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
     }
   }, [phase, puzzles, current]);
 
+  // Serialize saves and skip superseded queued snapshots so a slow older save
+  // cannot undo a more recent choice. Failed saves retry while the test is open.
+  useEffect(() => {
+    if (phase !== "active" || !quizToken || answers.length === 0) return;
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const save = () => {
+      answerSaves.current = answerSaves.current.then(async () => {
+        if (cancelled) return;
+        try {
+          await postJson("/api/answers", { quizToken, answers }, AbortSignal.timeout(8_000));
+          if (!cancelled) setAnswerSaveError("");
+        } catch {
+          if (!cancelled) {
+            setAnswerSaveError("Your latest answers have not been saved. Retrying… Keep this page open.");
+            retry = setTimeout(save, 1_000);
+          }
+        }
+      });
+    };
+    save();
+    return () => { cancelled = true; if (retry) clearTimeout(retry); };
+  }, [phase, quizToken, answers]);
+
   // One countdown for the whole test, driven by the wall clock so a paused tab
   // or a slow render cannot slow it down.
   useEffect(() => {
@@ -404,8 +433,16 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
     });
 
     try {
+      const submit = async () => {
+        // A save in flight may have arrived before the deadline. Let it finish
+        // before the server scores the saved answers at time-up.
+        if (automatic || (answerDeadline !== null && Date.now() / 1000 + clockOffset >= answerDeadline)) {
+          await answerSaves.current;
+        }
+        return postJson<SubmitResponse>("/api/submit", { quizToken, answers });
+      };
       const result = await Promise.race([
-        postJson<SubmitResponse>("/api/submit", { quizToken, answers }),
+        submit(),
         timeout,
       ]);
       setReview(result);
@@ -436,6 +473,7 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
   }
 
   function choose(optionIndex: number) {
+    if (answerDeadline !== null && Date.now() / 1000 + clockOffset >= answerDeadline) return;
     setAnswers((prev) => {
       const next = [...prev];
       next[current] = optionIndex;
@@ -490,6 +528,9 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
         />
       )}
 
+      {phase === "active" && answerSaveError && (
+        <p role="status" className="mb-3 text-sm text-amber-800">{answerSaveError}</p>
+      )}
       {phase === "active" && puzzles[current] && (
         <Solver
           // A fresh Solver for every question: its pictures are new image
@@ -555,11 +596,11 @@ function Intro({ onStart }: {
       </p>
       <p className="mt-3 text-gray-600">
         The timer gives one minute per question in a single countdown. Unanswered questions
-        count as incorrect.
+        count as incorrect. Answers saved before time runs out still count if you finish late.
       </p>
       <p className="mt-3 text-gray-600">
-        Each correct answer earns 100 points. A time bonus of up to
-        25% is added to your correct-answer points. The earlier you finish, the bigger the bonus.
+        Each correct answer earns 100 points. More correct answers rank first on the
+        leaderboard. Elapsed time only breaks ties.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
@@ -1055,12 +1096,12 @@ function Result({
           <span className="text-2xl font-normal text-gray-400"> / {review.total}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
-        {review.total === 30 && typeof review.points === "number" && (
+        {review.total === 30 && (
           <div className="mt-4 border-t border-gray-100 pt-4">
-            <p className="text-2xl font-semibold">{review.points.toLocaleString("en-US")} points</p>
+            <p className="text-2xl font-semibold">{leaderboardPoints(review.score).toLocaleString("en-US")} points</p>
             <p className="mt-1 text-xs text-gray-500">
-              Each correct answer earns 100 points. A time bonus of up to 25% is added to
-              your correct-answer points. The earlier you finish, the bigger the bonus.
+              Each correct answer earns 100 points. More correct answers rank first on the
+              leaderboard. Elapsed time only breaks ties.
             </p>
           </div>
         )}
@@ -1076,15 +1117,14 @@ function Result({
           <span className="text-red-700">{wrong} wrong</span>
           <span className="text-gray-500">{skipped} skipped</span>
         </div>
-        {automatic && (
+        {automatic && !review.timedOut && (
           <p className="mt-3 text-sm text-amber-700">
             Time ran out; unanswered questions count as wrong.
           </p>
         )}
-        {review.late && (
+        {review.timedOut && (
           <p className="mt-2 text-sm text-amber-700">
-            Submitted {formatClock(review.secondsLate ?? 0)} after time ran out. Your answers were
-            still scored.
+            Time ran out. Answers saved before the deadline count; later answers are skipped.
           </p>
         )}
         <div className="mt-3 text-xs text-gray-400">{attribution}</div>
@@ -1099,7 +1139,7 @@ function Result({
         </button>
       </div>
 
-      {leaderboardEnabled && review.total === 30 && !review.late && review.leaderboardEligible === true && (
+      {leaderboardEnabled && review.total === 30 && review.leaderboardEligible === true && (
         <LeaderboardPublication
           quizToken={quizToken}
           leaderboardLabel={leaderboardLabel}
@@ -1151,8 +1191,8 @@ function LeaderboardPublication({
     event.preventDefault();
     if (publishing) return;
     const name = nickname.trim();
-    if (name.length < 2 || name.length > 24) {
-      setError("Enter a nickname between 2 and 24 characters.");
+    if ([...name].length < NICKNAME_MIN_LENGTH || [...name].length > NICKNAME_MAX_LENGTH) {
+      setError(`Enter a nickname between ${NICKNAME_MIN_LENGTH} and ${NICKNAME_MAX_LENGTH} characters.`);
       return;
     }
     if (!kind) {
@@ -1234,8 +1274,8 @@ function LeaderboardPublication({
               type="text"
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
-              minLength={2}
-              maxLength={24}
+              minLength={NICKNAME_MIN_LENGTH}
+              maxLength={NICKNAME_MAX_LENGTH}
               required
               disabled={publishing}
               aria-describedby={error ? "nickname-help nickname-error" : "nickname-help"}

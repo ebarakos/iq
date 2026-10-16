@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { sampleGuide } from "@/items/sample-guides";
 import { resolveLinkToken } from "@/lib/link-session";
+import { recordQuizAnswers } from "@/lib/leaderboard";
 import {
   linkTestLength,
   linkTestQuestion,
@@ -27,12 +28,15 @@ type Props = {
  * far plus its own letter.
  */
 export default async function LinkQuestionPage({ params, searchParams }: Props) {
-  const { token, n } = await params;
+  const receivedAtMs = Date.now();
+  const { token: reference, n } = await params;
   const { a } = await searchParams;
 
   let test;
+  let token;
   try {
-    test = openLinkToken(await resolveLinkToken(token));
+    token = await resolveLinkToken(reference);
+    test = openLinkToken(token);
   } catch (error) {
     return <LinkProblem error={error} />;
   }
@@ -47,21 +51,21 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
         <h1 className="mt-4 text-2xl font-semibold">These answers cannot be read</h1>
         <p className="mt-3 text-gray-700">
           The link&apos;s answers are not in the form this test writes them.{" "}
-          <a className="underline" rel="nofollow" href={questionPath(token, 1, [])}>Start this test again from question 1</a>.
+          <a className="underline" rel="nofollow" href={questionPath(reference, 1, [])}>Start this test again from question 1</a>.
         </p>
       </LinkPage>
     );
   }
   // Each page belongs to one point in the test: the answers so far decide which
   // question comes next.
-  if (answers.length === total) redirect(resultPath(token, answers));
-  if (answers.length !== number - 1) redirect(questionPath(token, answers.length + 1, answers));
+  if (answers.length === total) redirect(resultPath(reference, answers));
+  if (answers.length !== number - 1) redirect(questionPath(reference, answers.length + 1, answers));
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.floor(receivedAtMs / 1000);
   const secondsLeft = test.answerDeadline - now;
   const next = (choice: number | null) => number < total
-    ? questionPath(token, number + 1, [...answers, choice])
-    : resultPath(token, [...answers, choice]);
+    ? questionPath(reference, number + 1, [...answers, choice])
+    : resultPath(reference, [...answers, choice]);
 
   if (secondsLeft <= 0) {
     const padded = [...answers, ...Array<null>(total - answers.length).fill(null)];
@@ -73,10 +77,24 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
           answered by then count as incorrect.
         </p>
         <p className="mt-6">
-          <a className="underline" rel="nofollow" href={resultPath(token, padded)}>See your result</a>
+          <a className="underline" rel="nofollow" href={resultPath(reference, padded)}>See your result</a>
         </p>
       </LinkPage>
     );
+  }
+
+  if (answers.length > 0) {
+    try {
+      await recordQuizAnswers(token, test, answers, receivedAtMs);
+    } catch {
+      return (
+        <LinkPage profile={test.profile}>
+          <h1 className="mt-4 text-2xl font-semibold">Your answers could not be saved</h1>
+          <p className="mt-3 text-gray-700">They are kept in this link. Retry before continuing.</p>
+          <p className="mt-4"><a className="underline" rel="nofollow" href={questionPath(reference, number, answers)}>Retry saving your answers</a></p>
+        </LinkPage>
+      );
+    }
   }
 
   // Only this question is built: a server that did not start the test does
@@ -116,7 +134,7 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
       {/* A server-rendered PNG at a fixed URL: next/image would only add a resizing hop. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={puzzleImagePath(token, number)}
+        src={puzzleImagePath(reference, number)}
         alt={`Question ${number} puzzle`}
         width={800}
         className="mt-4 h-auto w-full rounded-xl border border-gray-200 bg-white"

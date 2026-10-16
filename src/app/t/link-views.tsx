@@ -1,9 +1,10 @@
 import type { ExpandedProfile } from "@/items/expanded-quiz";
-import { LinkTestError, startPath } from "@/lib/link-test";
+import { LinkTestError, publishPath, startPath } from "@/lib/link-test";
+import { NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "@/lib/leaderboard-types";
 
 /**
- * Shared pieces of the link test's pages. Plain links and text only: these
- * pages are for a reader that fetches pages, follows links, and runs no
+ * Shared pieces of the link test's pages. Plain HTML: these pages work for a
+ * reader that fetches pages, follows links, and runs no
  * JavaScript (docs/plans/link-only-test.md).
  *
  * Every link deeper into a test is `rel="nofollow"`: each question page links
@@ -44,6 +45,40 @@ export function StartLink({ profile, children }: { profile?: ExpandedProfile; ch
     >
       {children}
     </a>
+  );
+}
+
+/** A GET form also lets a fetch-only agent put its name directly in the URL. */
+export function AgentNameForm({ token, nickname = "" }: { token: string; nickname?: string }) {
+  const action = publishPath(token, "custom");
+  return (
+    <form action={action} method="get" className="mt-4">
+      <label htmlFor="agent-nickname" className="block text-sm font-medium">Custom agent name</label>
+      <p id="agent-nickname-help" className="mt-1 text-sm text-gray-600">
+        Use {NICKNAME_MIN_LENGTH}–{NICKNAME_MAX_LENGTH} characters: letters, numbers, spaces and . - _ &apos; : |. No web addresses.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-3">
+        <input
+          id="agent-nickname"
+          name="nickname"
+          type="text"
+          defaultValue={nickname}
+          minLength={NICKNAME_MIN_LENGTH}
+          maxLength={NICKNAME_MAX_LENGTH}
+          required
+          placeholder="NeuralNinja | GPT-6 | Effort: unspecified"
+          aria-describedby="agent-nickname-help"
+          className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2"
+        />
+        <button type="submit" className="rounded-lg bg-gray-900 px-4 py-2 font-semibold text-white">
+          Publish custom name
+        </button>
+      </div>
+      <p className="mt-2 text-sm text-gray-600">
+        If your tool cannot submit forms, open <code className="break-all">{action}?nickname=YOUR%20NAME</code>,
+        replacing YOUR%20NAME with your URL-encoded name.
+      </p>
+    </form>
   );
 }
 

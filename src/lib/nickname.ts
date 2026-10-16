@@ -1,4 +1,5 @@
 import { englishDataset, englishRecommendedTransformers, RegExpMatcher } from "obscenity";
+import { NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH } from "./leaderboard-types";
 
 /**
  * Nickname rules for the leaderboard (docs/plans/leaderboard-integrity.md).
@@ -8,14 +9,11 @@ import { englishDataset, englishRecommendedTransformers, RegExpMatcher } from "o
  * matched: naming the word would only teach the way around it.
  */
 
-export const NICKNAME_MIN_LENGTH = 2;
-export const NICKNAME_MAX_LENGTH = 24;
-
-/** Letters, digits, spaces and `. - _ '`; nothing invisible, nothing that reverses text. */
-const ALLOWED = /^[\p{L}\p{N} .\-_']+$/u;
+/** Letters, digits, spaces and `. - _ ' : |`; nothing invisible or text-reversing. */
+const ALLOWED = /^[\p{L}\p{N} .\-_':|]+$/u;
 const HAS_LETTER = /\p{L}/u;
 /** Something that reads as a web address: "word.com", "www.", "http". */
-const WEB_ADDRESS = /(?:https?|www\.)|\p{L}\.(?:[a-z]{2,})(?:$|[\s.\-_'])/iu;
+const WEB_ADDRESS = /(?:https?|www\.)|\p{L}\.(?:[a-z]{2,})(?:$|[\s.\-_':|])/iu;
 /**
  * Hate terms the profanity list does not cover, matched against whole words so
  * ordinary names that contain the letters (Ignazio, Nazir) pass.
@@ -24,7 +22,7 @@ const EXTRA_BLOCKED_WORD = /^(?:(?:neo)?nazis?\d*|hitler\p{L}*|kkk\d*)$/u;
 
 /** A name's words, split at separators and at camelCase joins ("NaziFan" is two). */
 function words(nickname: string): string[] {
-  return nickname.replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2").toLowerCase().split(/[ .\-_']+/).filter(Boolean);
+  return nickname.replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2").toLowerCase().split(/[ .\-_':|]+/).filter(Boolean);
 }
 
 function hasBlockedWord(nickname: string): boolean {
@@ -34,7 +32,7 @@ function hasBlockedWord(nickname: string): boolean {
   return [...parts, ...spelled, parts.join("")].some((word) => EXTRA_BLOCKED_WORD.test(word));
 }
 
-const CHARACTERS_MESSAGE = "Use letters, numbers, spaces and . - _ ' only, with at least one letter.";
+const CHARACTERS_MESSAGE = "Use letters, numbers, spaces and . - _ ' : | only, with at least one letter.";
 
 const matcher = new RegExpMatcher({ ...englishDataset.build(), ...englishRecommendedTransformers });
 
@@ -60,7 +58,7 @@ export function checkNickname(raw: unknown): NicknameCheck {
     return { ok: false, message: "A nickname cannot be a web address." };
   }
   // Spaced-out letters ("f u c k") get past the matcher, so check the joined form too.
-  const joined = nickname.replace(/[ .\-_']/g, "");
+  const joined = nickname.replace(/[ .\-_':|]/g, "");
   if (matcher.hasMatch(nickname) || matcher.hasMatch(joined) || hasBlockedWord(nickname)) {
     return { ok: false, message: "Choose a different nickname. This one is not allowed on the leaderboard." };
   }

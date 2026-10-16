@@ -45,8 +45,8 @@ export class ScoringError extends Error {
  * app (`POST /api/submit`) and the link test (`/t/<token>/result`).
  *
  * `answers` holds one entry per question, null for a skip. `timing` is the
- * server's own judgment of the deadline; a late test is still scored and
- * explained, and only the marker changes.
+ * server's own judgment of the deadline. The caller supplies only the saved
+ * on-time answers when a final submission arrives after time-up.
  */
 export function scoreAnswers(
   items: readonly AnswerKeyItem[],

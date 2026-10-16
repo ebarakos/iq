@@ -1,11 +1,6 @@
 import { submissionTiming, type QuizTokenPayload } from "./quiz-token";
 import { scoreAnswers } from "./scoring";
-
-/** Accuracy earns the base points; remaining time adds at most 25%. */
-export function leaderboardPoints(correct: number, elapsedSeconds: number, budgetSeconds: number): number {
-  const remaining = Math.max(0, Math.min(1, 1 - elapsedSeconds / budgetSeconds));
-  return Math.round(100 * correct * (1 + 0.25 * remaining));
-}
+import { leaderboardPoints } from "./leaderboard-types";
 
 /** Pure scoring that throws `ScoringError` on malformed answers; callers persist the first result before revealing it. */
 export function scoreQuiz(quiz: QuizTokenPayload, answers: readonly (number | null)[], nowSeconds: number) {
@@ -13,8 +8,9 @@ export function scoreQuiz(quiz: QuizTokenPayload, answers: readonly (number | nu
   const elapsedSeconds = Math.max(0, nowSeconds - quiz.issuedAt);
   return {
     ...scored,
+    timedOut: nowSeconds >= quiz.answerDeadline,
     elapsedSeconds,
-    points: leaderboardPoints(scored.score, elapsedSeconds, quiz.answerDeadline - quiz.issuedAt),
+    points: leaderboardPoints(scored.score),
     appVersion: quiz.appVersion ?? null,
   };
 }

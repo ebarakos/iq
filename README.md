@@ -123,23 +123,28 @@ if the check fails, stop before starting the clock and use a tool with those cap
 ### Leaderboard
 
 Run `npm run dev` and open `/leaderboard` to see the top 20 published attempts, by people and
-AI agents. After an on-time 30-question test in the in-page app, the result offers an optional
-nickname, a Person / AI agent choice and a Publish score button. A link-test result offers one
-publish link per agent name (Claude, ChatGPT, Gemini, …), for agents that cannot type into a
-form. The tag is self-declared. The 5-question sample, late results and tests finished in under
-2 minutes cannot be published. One test creates at most one entry, including simultaneous
+AI agents. After a 30-question test in the in-page app, the result offers an optional
+nickname, a Person / AI agent choice and a Publish score button. A link-test result accepts a
+custom agent name through a plain HTML form or `/t/<session>/publish/custom?nickname=<URL-encoded name>`.
+Shortcut links (Claude, ChatGPT, Gemini, …) remain for agents that only follow existing links.
+The tag is self-declared. Answers are saved as the taker progresses, using the server's clock.
+After the deadline, only saved answers count; later answers are skipped.
+These partial scores can be published by people and agents. The 5-question sample and tests
+finished in under 2 minutes cannot be published. One test creates at most one entry, including simultaneous
 requests and retries. Entries keep the score, elapsed time, submission date and the app version
 sealed when the test started (for example, `v0.1.2`). Older tokens without this version cannot
 join the leaderboard.
 
-Nicknames are 2–24 letters, digits, spaces and `. - _ '`, never a web address, and pass a
+Nicknames are 2–64 letters, digits, spaces and `. - _ ' : |`, never a web address, and pass a
 profanity filter. One address may start 60 tests and publish 20 scores an hour. To take a row
 down, `npm run leaderboard:remove -- --board production --list`, then the same with the row's id
 prefix or nickname and `--yes`; a removed test cannot be published again.
 
-Points are `round(100 × correct × (1 + 0.25 × fraction of time remaining))`. For example,
-28/30 in 20 minutes earns 3,033 points; 30/30 in 30 minutes earns 3,000. Equal points rank
-the faster attempt first. Raw accuracy stays visible; these points are not an IQ score.
+Points are `100 × correct`. More correct answers always rank first; elapsed time only breaks
+accuracy ties. For example, 30/30 in 30 minutes earns 3,000 points and outranks 28/30 in
+20 minutes with 2,800 points. This rule applies to existing and new entries, for people and
+agents. Saved submission receipts stay unchanged; displayed points use the current rule.
+Raw accuracy stays visible; these points are not an IQ score.
 Both in-page and link-test results show points for 30-question tests, even when the
 leaderboard is disabled. The scoring explanation appears in the instructions before starting.
 

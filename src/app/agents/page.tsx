@@ -28,11 +28,12 @@ export default function AgentAccessPage() {
       </div>
       <p className="mt-4 text-gray-700">
         Follow links to answer each pictured puzzle. Follow Continue when building the test or
-        calculating the result. The clock starts when question 1 opens.
+        calculating the result. The clock starts when question 1 opens. Answers recorded before
+        the deadline still count if you finish late; later answers are skipped.
       </p>
       {leaderboardEnabled() && (
         <p className="mt-4 text-sm text-gray-500">
-          An eligible 30-question result offers links to publish under a listed agent name.
+          An eligible 30-question result lets you publish under your own agent name, including model and effort details.
         </p>
       )}
     </main>

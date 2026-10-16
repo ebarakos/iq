@@ -95,16 +95,22 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   `o<k>`, gate strip `g<i>-right`/`g<i>-down`, drawn from `SceneGraphic`'s own SVG
   (`pictureToSvg` in `compose-image.tsx`, `pictureToPng`). `StemView` lays out either scenes or
   pictures with the same markup, so the phone-width tests cover both.
-- `src/lib/quiz-scoring.ts` — elapsed time and the bounded speed bonus over shared `src/lib/scoring.ts`;
+- `src/lib/quiz-scoring.ts` — elapsed time and accuracy points over shared `src/lib/scoring.ts`;
+  `src/lib/leaderboard-types.ts` defines points as `100 × correct`. The leaderboard ranks
+  correct answers descending, then elapsed time ascending, for existing and new rows. Reads
+  project old points onto this rule without rewriting immutable submission receipts;
   `src/lib/leaderboard.ts` — Redis first-submission receipts (atomic `SET NX`, retained
   until token expiry) in the deployment namespace, identical-retry recovery, changed-answer rejection and atomic
   publication of one persistent leaderboard entry per test. The first receipt binds publication
   to the selected board; older receipts use their original deployment's board. A result ranks
-  only when 30 questions, on time, sealed with a release and `r` (ranking on at issue), and at
-  least `MIN_RANKED_SECONDS` (120) long. Rows carry a self-declared `kind` (person or agent).
+  only when 30 questions, sealed with a release and `r` (ranking on at issue), and at
+  least `MIN_RANKED_SECONDS` (120) long. `recordQuizAnswers` saves snapshots on the server clock,
+  through `POST /api/answers` for the in-page app and each link question's answered prefix.
+  At the deadline, scoring uses only that saved snapshot, with later answers skipped.
+  Late finishes may publish these partial scores. Rows carry a self-declared `kind` (person or agent).
   `removeLeaderboardEntry` leaves a tombstone so a removed test cannot publish again; the owner
   runs it through `scripts/leaderboard-remove.ts` (`npm run leaderboard:remove`).
-- `src/lib/nickname.ts` — NFKC, 2–24 letters/digits/spaces/`. - _ '`, no web addresses, and the
+- `src/lib/nickname.ts` — NFKC, 2–64 letters/digits/spaces/`. - _ ' : |`, no web addresses, and the
   `obscenity` matcher on the name and its joined form. `src/lib/rate-limit.ts` — one-hour Redis
   windows per hashed IP: 60 starts (fail open) and 20 publications.
 - `src/lib/leaderboard-config.ts` — local development default, explicit deployment opt-in
@@ -133,12 +139,13 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   Redis a request builds for about 1.2 s, and a longer build continues at `src/app/t/start/[id]/[built]`,
   one part per request (`continueLinkTest`, `fillExpandedSlots`);
   `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
-  `src/app/t/[token]/result` the scored review, with one `…/publish/<agent>` link per fixed
-  agent name (`AGENT_NAMES`) when the result ranks. All plain HTML and links.
+  `src/app/t/[token]/result` the scored review, with one `…/publish/<agent>` shortcut per listed
+  agent name (`AGENT_NAMES`) when the result ranks. A plain GET form and
+  `…/publish/custom?nickname=…` accept custom names through the same nickname filter.
 - `src/lib/link-result.ts` — reads saved scores without rebuilding. A cold link result
   rebuilds its server-only answer key over short requests at `…/result/<built>`, keeping
   the first answers and arrival time in Redis. It reveals the review only after the shared
-  submission receipt is saved; calculation time never changes the bonus or late marker.
+  submission receipt is saved; calculation time never changes the elapsed time or late marker.
 - `src/lib/link-session.ts` — resolves a short public session id to the original sealed
   token in Redis. The completed start record stores that mapping until token expiry.
   Agent pages, PNGs, results and publication links keep the short id; scoring and ranking

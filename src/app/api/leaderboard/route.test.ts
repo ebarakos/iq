@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listLeaderboard, removeLeaderboardEntry } from "@/lib/leaderboard";
+import { listBoardEntries, listLeaderboard, removeLeaderboardEntry } from "@/lib/leaderboard";
+import type { LeaderboardEntry } from "@/lib/leaderboard-types";
 import { createLinkTest, openLinkToken, sealLinkToken, type LinkTest } from "@/lib/link-test";
 import { POST as submit } from "../submit/route";
+import { POST as saveAnswers } from "../answers/route";
 import { POST } from "./route";
 
 const store = vi.hoisted(() => ({
@@ -20,6 +22,19 @@ vi.mock("@/lib/redis", () => ({
         return "OK";
       case "ZREM": return Number(store.ranks.delete(`${key}:${command[2]}`));
       case "EVAL": {
+        if (String(command[1]).includes("cjson.decode(current).receivedAtMs")) {
+          const [answerKey, receiptKey] = [String(command[3]), String(command[4])];
+          const previous = store.values.get(answerKey);
+          if (Number(command[6]) < Number(command[7]) && !store.values.has(receiptKey) &&
+            (!previous || JSON.parse(previous).receivedAtMs <= Number(command[6]))) {
+            const next = JSON.parse(String(command[5]));
+            const earlier = previous ? JSON.parse(previous).answers : [];
+            next.answers = Array.from({ length: Number(command[9]) }, (_, index) =>
+              index < next.answers.length ? next.answers[index] : earlier[index] ?? null);
+            store.values.set(answerKey, JSON.stringify(next));
+          }
+          return store.values.get(answerKey) ?? null;
+        }
         if (command[2] === 2) {
           // The removal script: tombstone the row and take it out of the ranking together.
           store.values.set(String(command[3]), String(command[5]));
@@ -37,7 +52,9 @@ vi.mock("@/lib/redis", () => ({
         return String(command[6]);
       }
       case "ZREVRANGE": return [...store.ranks.values()].filter((rank) => rank.board === key)
-        .sort((a, b) => b.score - a.score).slice(0, 20).map(({ id }) => id);
+        .sort((a, b) => b.score - a.score)
+        .slice(Number(command[2]), Number(command[3]) === -1 ? undefined : Number(command[3]) + 1)
+        .map(({ id }) => id);
       case "MGET": return command.slice(1).map((item) => store.values.get(String(item)) ?? null);
       case "INCR": {
         const count = (store.counts.get(key) ?? 0) + 1;
@@ -108,7 +125,7 @@ describe("leaderboard publication", () => {
       issuedAt: NOW, answerDeadline: NOW + 1800, leaderboardEligible: true,
     }));
     expect(submission.status).toBe(200);
-    expect(await submission.json()).toMatchObject({ score: 28, points: 3033, elapsedSeconds: 1200 });
+    expect(await submission.json()).toMatchObject({ score: 28, points: 2800, elapsedSeconds: 1200 });
     vi.setSystemTime((NOW + 100) * 1000);
     const published = await POST(request({
       quizToken, kind: "person", nickname: "  Taker  ", score: 30, correct: 30, total: 30,
@@ -116,7 +133,7 @@ describe("leaderboard publication", () => {
     }));
     expect(published.status).toBe(200);
     const { entry } = await published.json();
-    expect(entry).toMatchObject({ nickname: "Taker", kind: "person", correct: 28, total: 30, points: 3033, elapsedSeconds: 1200, appVersion: "v0.1.1", submittedAt: NOW });
+    expect(entry).toMatchObject({ nickname: "Taker", kind: "person", correct: 28, total: 30, points: 2800, elapsedSeconds: 1200, appVersion: "v0.1.1", submittedAt: NOW });
     const entries = await listLeaderboard();
     expect(entries).toEqual([entry]);
     expect(JSON.stringify(entries)).not.toContain(quizToken);
@@ -138,6 +155,80 @@ describe("leaderboard publication", () => {
     const retry = await POST(request({ ...forged, nickname: "Replacement", points: 3750 }));
     expect((await retry.json()).entry).toEqual(entry);
     expect(await listLeaderboard()).toEqual([entry]);
+  });
+
+  it("ranks accuracy before speed and uses elapsed time only for equal accuracy", async () => {
+    for (const [correct, elapsedSeconds, nickname, kind] of [
+      [28, 120, "Fast agent", "agent"],
+      [30, 1799, "Accurate person", "person"],
+      [30, 600, "Accurate agent", "agent"],
+    ] as const) {
+      const quizToken = token({ issuedAt: NOW - elapsedSeconds, answerDeadline: NOW - elapsedSeconds + 1800 });
+      expect((await submit(request({ quizToken, answers: answers(correct) }))).status).toBe(200);
+      expect((await POST(request({ quizToken, nickname, kind }))).status).toBe(200);
+    }
+    expect((await listLeaderboard()).map(({ nickname, correct, points, elapsedSeconds }) =>
+      ({ nickname, correct, points, elapsedSeconds }))).toEqual([
+      { nickname: "Accurate agent", correct: 30, points: 3000, elapsedSeconds: 600 },
+      { nickname: "Accurate person", correct: 30, points: 3000, elapsedSeconds: 1799 },
+      { nickname: "Fast agent", correct: 28, points: 2800, elapsedSeconds: 120 },
+    ]);
+  });
+
+  it("finds accurate legacy rows beyond the old index's first 40 and ranks them with new rows", async () => {
+    const board = "aiq:local:leaderboard";
+    const add = (entry: LeaderboardEntry & { removed?: true }, score: number) => {
+      store.values.set(`${board}:entry:${entry.id}`, JSON.stringify(entry));
+      store.ranks.set(`${board}:${entry.id}`, { id: entry.id, board, score });
+    };
+    const base: LeaderboardEntry = {
+      id: "legacy", nickname: "Legacy", kind: "agent", correct: 28, total: 30,
+      points: 3453, elapsedSeconds: 120, appVersion: "v0.1.1", submittedAt: NOW,
+    };
+    for (let index = 0; index < 45; index++) {
+      add({ ...base, id: `legacy-${index}` }, 34_530_000 + 1680);
+    }
+    add({ ...base, id: "late-perfect", correct: 30, points: 3000, elapsedSeconds: 2000 }, 30_000_000);
+    add({ ...base, id: "earlier-perfect", correct: 30, points: 3000, elapsedSeconds: 1900 }, 30_000_000);
+    add({ ...base, id: "removed", removed: true, correct: 30, elapsedSeconds: 0 }, 99_000_000);
+    store.ranks.set(`${board}:missing`, { id: "missing", board, score: 99_000_000 });
+
+    const quizToken = token();
+    await submit(request({ quizToken, answers: answers(29) }));
+    const { entry } = await (await POST(request({ quizToken, nickname: "New person", kind: "person" }))).json();
+    const entries = await listLeaderboard();
+    expect(entries).toHaveLength(20);
+    expect(entries.slice(0, 3).map(({ id }) => id)).toEqual(["earlier-perfect", "late-perfect", entry.id]);
+    expect(entries.every(({ points, correct }) => points === 100 * correct)).toBe(true);
+    expect(entries.some(({ id }) => id === "removed" || id === "missing")).toBe(false);
+    expect(await listBoardEntries("aiq:local")).toHaveLength(48);
+    // Listing old entries does not rewrite their original bonus points or index.
+    expect(JSON.parse(store.values.get(`${board}:entry:legacy-0`)!).points).toBe(3453);
+    expect(store.ranks.get(`${board}:legacy-0`)!.score).toBe(34_531_680);
+  });
+
+  it("projects current points from old receipts and entries without modifying either", async () => {
+    const quizToken = token();
+    await submit(request({ quizToken, answers: answers(28) }));
+    const receiptKey = [...store.values.keys()].find((key) => key.includes(":submission:"))!;
+    const receipt = JSON.parse(store.values.get(receiptKey)!);
+    receipt.response.points = 3033;
+    const legacyReceipt = JSON.stringify(receipt);
+    store.values.set(receiptKey, legacyReceipt);
+
+    expect(await (await submit(request({ quizToken, answers: answers(28) }))).json())
+      .toMatchObject({ score: 28, points: 2800, elapsedSeconds: 1200 });
+    const { entry } = await (await POST(request({ quizToken, nickname: "Existing", kind: "agent" }))).json();
+    expect(entry).toMatchObject({ correct: 28, points: 2800 });
+    const entryKey = `aiq:local:leaderboard:entry:${entry.id}`;
+    const legacyEntry = JSON.stringify({ ...entry, points: 3033 });
+    store.values.set(entryKey, legacyEntry);
+    const retry = await POST(request({ quizToken, nickname: "Replacement", kind: "person" }));
+    expect((await retry.json()).entry).toEqual(entry);
+    expect(await listLeaderboard()).toEqual([entry]);
+    expect(await listBoardEntries("aiq:local")).toEqual([entry]);
+    expect(store.values.get(receiptKey)).toBe(legacyReceipt);
+    expect(store.values.get(entryKey)).toBe(legacyEntry);
   });
 
   it("rejects tampered and attacker-signed tokens before reading or writing leaderboard storage", async () => {
@@ -211,7 +302,6 @@ describe("leaderboard publication", () => {
   });
 
   it.each([
-    ["late", { issuedAt: NOW - 2000, answerDeadline: NOW - 200 }],
     ["legacy", { appVersion: undefined, rankAllowed: undefined }],
     ["disabled at issue", { rankAllowed: false }],
     ["too fast", { issuedAt: NOW - 119, answerDeadline: NOW + 1681 }],
@@ -223,6 +313,112 @@ describe("leaderboard publication", () => {
     expect(scored.leaderboardEligible).toBe(false);
     expect((await POST(request({ kind: "person", quizToken, nickname: "Ineligible" }))).status).toBe(400);
     expect(store.ranks.size).toBe(0);
+  });
+
+  it.each(["person", "agent"])("publishes only saved on-time answers for a late %s", async (kind) => {
+    const quizToken = token();
+    const partial = KEY.map((answer, index) => index < 26 ? answer : null);
+    expect((await saveAnswers(request({ quizToken, answers: partial, receivedAtMs: 0 }))).status).toBe(200);
+    const record = [...store.values.values()].map((raw) => JSON.parse(raw)).find((value) => value.receivedAtMs);
+    expect(record.receivedAtMs).toBe(NOW * 1000);
+
+    vi.setSystemTime((NOW + 759) * 1000); // 159 seconds past this test's deadline.
+    const refusedUpdate = await saveAnswers(request({ quizToken, answers: ALL_RIGHT, receivedAtMs: 0 }));
+    expect(await refusedUpdate.json()).toEqual({ closed: true });
+    const result = await (await submit(request({ quizToken, answers: ALL_RIGHT }))).json();
+    expect(result).toMatchObject({ score: 26, points: 2600, timedOut: true, late: true, leaderboardEligible: true });
+    expect(result.results.slice(26).every((item: { chosen: number | null }) => item.chosen === null)).toBe(true);
+    const published = await POST(request({ quizToken, kind, nickname: "Late finisher" }));
+    expect(published.status).toBe(200);
+    expect((await published.json()).entry).toMatchObject({ correct: 26, points: 2600, kind });
+    expect((await submit(request({ quizToken, answers: ALL_RIGHT }))).status).toBe(200);
+    expect((await submit(request({ quizToken, answers: partial }))).status).toBe(409);
+  });
+
+  it("does not accept new answers at the deadline, even inside the timing grace window", async () => {
+    const quizToken = token();
+    const partial = KEY.map((answer, index) => index < 3 ? answer : null);
+    await saveAnswers(request({ quizToken, answers: partial }));
+    vi.setSystemTime((NOW + 600) * 1000);
+    expect(await (await saveAnswers(request({ quizToken, answers: ALL_RIGHT }))).json()).toEqual({ closed: true });
+    expect(await (await submit(request({ quizToken, answers: ALL_RIGHT }))).json())
+      .toMatchObject({ score: 3, timedOut: true, late: false, points: 300, leaderboardEligible: true });
+  });
+
+  it("updates choices on time and freezes them after submission", async () => {
+    const quizToken = token();
+    await saveAnswers(request({ quizToken, answers: ALL_RIGHT }));
+    vi.setSystemTime((NOW + 1) * 1000);
+    await saveAnswers(request({ quizToken, answers: answers(25) }));
+    await submit(request({ quizToken, answers: answers(25) }));
+    vi.setSystemTime((NOW + 2) * 1000);
+    await saveAnswers(request({ quizToken, answers: ALL_RIGHT }));
+    const record = [...store.values.values()].map((raw) => JSON.parse(raw)).find((value) => value.receivedAtMs);
+    expect(record.answers).toEqual(answers(25));
+    expect((await submit(request({ quizToken, answers: ALL_RIGHT }))).status).toBe(409);
+  });
+
+  it("rejects invalid progress and tokens without storing anything or exposing answers", async () => {
+    const quizToken = token();
+    for (const body of [
+      { quizToken, answers: [] },
+      { quizToken, answers: [...ALL_RIGHT.slice(1), 6] },
+      { quizToken: "forged", answers: ALL_RIGHT },
+    ]) {
+      const result = await saveAnswers(request(body));
+      expect(result.status).toBe(400);
+      expect(await result.json()).not.toHaveProperty("results");
+    }
+    expect(store.values.size).toBe(0);
+  });
+
+  it("timestamps progress after receiving the full body", async () => {
+    const quizToken = token();
+    const delayed = request({ quizToken, answers: ALL_RIGHT });
+    vi.spyOn(delayed, "json").mockImplementation(async () => {
+      vi.setSystemTime((NOW + 601) * 1000);
+      return { quizToken, answers: ALL_RIGHT };
+    });
+    expect(await (await saveAnswers(delayed)).json()).toEqual({ closed: true });
+    expect(store.values.size).toBe(0);
+  });
+
+  it("keeps newer saved answers when an older request finishes later", async () => {
+    const { redisCommand } = await import("@/lib/redis");
+    const original = vi.mocked(redisCommand).getMockImplementation()!;
+    let release!: () => void;
+    let reached!: () => void;
+    const delayed = new Promise<void>((resolve) => { release = resolve; });
+    const waiting = new Promise<void>((resolve) => { reached = resolve; });
+    const quizToken = token();
+    vi.mocked(redisCommand).mockImplementationOnce(async (command) => {
+      reached();
+      await delayed;
+      return original(command);
+    });
+    try {
+      const older = saveAnswers(request({ quizToken, answers: ALL_RIGHT }));
+      await waiting;
+      vi.setSystemTime((NOW + 1) * 1000);
+      await saveAnswers(request({ quizToken, answers: answers(24) }));
+      release();
+      expect((await older).status).toBe(200);
+      vi.setSystemTime((NOW + 759) * 1000);
+      expect(await (await submit(request({ quizToken, answers: ALL_RIGHT }))).json()).toMatchObject({ score: 24 });
+    } finally {
+      release();
+    }
+  });
+
+  it("returns a retryable failure when progress storage is unavailable", async () => {
+    const { redisCommand } = await import("@/lib/redis");
+    const quizToken = token();
+    vi.mocked(redisCommand).mockRejectedValueOnce(new Error("storage unavailable"));
+    const failed = await saveAnswers(request({ quizToken, answers: ALL_RIGHT }));
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).not.toHaveProperty("results");
+    expect(store.values.size).toBe(0);
+    expect((await saveAnswers(request({ quizToken, answers: ALL_RIGHT }))).status).toBe(200);
   });
 
   it("hides the leaderboard on deployments by default, before touching Redis", async () => {
@@ -362,9 +558,11 @@ describe("leaderboard publication", () => {
     await submit(request({ quizToken: person, answers: ALL_RIGHT }));
     await submit(request({ quizToken: agent, answers: answers(29) }));
     await POST(request({ quizToken: person, kind: "person", nickname: "Ada" }));
-    await POST(request({ quizToken: agent, kind: "agent", nickname: "Claude" }));
+    const nickname = "NeuralNinja | GPT-6 | Effort: unspecified";
+    const published = await POST(request({ quizToken: agent, kind: "agent", nickname }));
+    expect(published.status).toBe(200);
     expect((await listLeaderboard()).map(({ nickname, kind }) => [nickname, kind]))
-      .toEqual([["Ada", "person"], ["Claude", "agent"]]);
+      .toEqual([["Ada", "person"], [nickname, "agent"]]);
   });
 
   it("limits publications from one address to 20 an hour", async () => {

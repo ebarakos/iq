@@ -53,11 +53,13 @@ describe("a link result calculated over short requests", { timeout: 30_000 }, ()
   beforeAll(() => {
     environment();
     long = linkTests.createLinkTest("long-30", { ...context, seed: "link-result-long" });
-    short = linkTests.createLinkTest("short-5", { ...context, seed: "link-result-short" });
+    // Both test lengths are still open at ARRIVED_AT; these tests exercise result
+    // rebuilding and recovery, while deadline-specific tests cover saved progress.
+    short = linkTests.createLinkTest("short-5", { ...context, nowSeconds: ISSUED_AT + 700, seed: "link-result-short" });
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       fallback = linkTests.createLinkTest("short-5", {
-        ...context, seed: "link-result-fallback", assemble: () => { throw new Error("generation unavailable"); },
+        ...context, nowSeconds: ISSUED_AT + 700, seed: "link-result-fallback", assemble: () => { throw new Error("generation unavailable"); },
       });
     } finally {
       quiet.mockRestore();

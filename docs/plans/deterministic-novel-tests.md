@@ -6,6 +6,11 @@ reliability and reasoning-depth pass lives in [TODO.md](../../TODO.md).
 This plan supersedes the earlier choice to use an LLM as a live item writer. The
 existing rule validator, renderer, item bank, and agent harness remain useful.
 
+**Owner decision, 2026-10-16:** the owner and agents assess difficulty. Do not schedule
+the proposed multi-participant difficulty pilot. Prepared packets and previous pilot
+results remain reference material. Difficulty judgments remain provisional; they do not
+establish population-level human difficulty or an IQ scale.
+
 ## Decision
 
 Generate every test with deterministic code from a fresh random seed. Do not call
@@ -142,12 +147,13 @@ to reach real takers is to ship. The risk it accepts is that a confusing family
 is briefly public; the withdrawal list and continuing retention pilot are what
 contain that risk.
 
-Points use the existing calculation: `round(100 × correct × (1 + 0.25 × remaining / duration))`,
-with the remaining-time fraction clamped between zero and one. Each correct answer earns
-100 base points; unused test time adds at most 25%. Wrong and skipped answers earn no base points.
+Points use the owner's 2026-10-16 rule: `100 × correct`. More correct answers rank first;
+elapsed time only breaks accuracy ties. Wrong and skipped answers earn no points.
+The same rule applies to existing and new leaderboard entries, for people and agents.
+Saved submission receipts remain immutable; reads display their points under the current rule.
 Both result flows show points for 30-question tests, independently of `LEADERBOARD_ENABLED`.
 That setting controls the leaderboard and publication only. The introduction, results and
-leaderboard explain the same bonus; points remain a game score, not an IQ estimate.
+leaderboard explain the same ranking rule; points remain a game score, not an IQ estimate.
 
 ### Presentation contract
 
@@ -178,9 +184,9 @@ fallback changes a slot's level to complete the test.
 | 4 | 10–22 | 3–4 |
 | 5 | 23–30 | 5 |
 
-These are structural estimates, not measured human difficulty. Equal labels constrain which buckets may share
-a slot; they do not prove equal solve rates or times across families. Matched examples are prepared for owner
-feedback, followed by the existing multi-participant pilot before claiming comparable human difficulty.
+These are structural estimates, not measured population-level human difficulty. Equal labels constrain
+which buckets may share a slot; they do not prove equal solve rates or times across families.
+The owner assesses matched examples with agent evidence, without a multi-participant difficulty pilot.
 The previous 5/10/10/5 and 1/1/2/1 reasoning-band quotas are retired.
 
 The whole-test budget is 60 seconds per question: **5 minutes** for the short
@@ -371,9 +377,10 @@ the denominator is small, but they are descriptive and must not be presented as
 a standardized IQ subscore. Elapsed time is reported overall and by band; it
 does not change correctness.
 
-Owner-approved leaderboard addition, 2026-10-06: eligible on-time 30-question attempts may
-publish a nickname and `round(100 × correct × (1 + 0.25 × fraction of time remaining))`
-points. Raw accuracy stays visible; leaderboard points are not a standardized IQ scale.
+Owner-approved leaderboard addition, updated 2026-10-16: eligible 30-question attempts may
+publish a nickname and `100 × correct` points. Correct answers rank first; elapsed time only
+breaks ties. Results finishing late use only answers saved before the deadline.
+Raw accuracy stays visible; leaderboard points are not a standardized IQ scale.
 Each entry records the app version sealed at issue time, elapsed time and submission date.
 Local development enables this by default; deployments require `LEADERBOARD_ENABLED=true`.
 The 2026-10-08 owner decision replaces the per-environment rankings with two: dev for local,
@@ -393,10 +400,11 @@ result and changed answers are refused. Publication is also atomic and cannot du
 test or rename its first published entry. Private scoring receipts expire with the token;
 published leaderboard entries persist. Older unversioned tokens cannot rank.
 
-Owner decisions, 2026-10-06 review: the leaderboard stays local for now. Before setting
+Historical owner decisions, 2026-10-06 review (since superseded by the production launch and
+accuracy-first ranking): the leaderboard stayed local. Before setting
 `LEADERBOARD_ENABLED=true` on a deployment, settle three things: whether scripts and models may
-rank (the in-page test sends each puzzle as shape data a program can read, and a 30/30 in one
-minute earns about 3,725 points), how to handle abusive nicknames (free text, shown publicly),
+rank (the in-page test then sent each puzzle as shape data a program could read, and a 30/30 in one
+minute earned about 3,725 points under the former speed bonus), how to handle abusive nicknames (free text, shown publicly),
 and cut a release first so rows record the right version. Scoring keeps needing Redis while
 the leaderboard is off: every result stays single-use, at the cost of no scoring during an
 Upstash outage and a `.env.local` for local scoring.

@@ -7,6 +7,7 @@ import { pictureToPng } from "@/items/puzzle-png";
 import { listLeaderboard } from "@/lib/leaderboard";
 import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } from "@/lib/link-test";
 import * as linkTests from "@/lib/link-test";
+import * as linkResults from "@/lib/link-result";
 import { resolveLinkToken } from "@/lib/link-session";
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
@@ -40,6 +41,19 @@ vi.mock("@/lib/redis", async (importOriginal) => ({
         storage.values.set(key, String(command[2]));
         return "OK";
       case "EVAL": {
+        if (String(command[1]).includes("cjson.decode(current).receivedAtMs")) {
+          const [answerKey, receiptKey] = [String(command[3]), String(command[4])];
+          const previous = storage.values.get(answerKey);
+          if (Number(command[6]) < Number(command[7]) && !storage.values.has(receiptKey) &&
+            (!previous || JSON.parse(previous).receivedAtMs <= Number(command[6]))) {
+            const next = JSON.parse(String(command[5]));
+            const earlier = previous ? JSON.parse(previous).answers : [];
+            next.answers = Array.from({ length: Number(command[9]) }, (_, index) =>
+              index < next.answers.length ? next.answers[index] : earlier[index] ?? null);
+            storage.values.set(answerKey, JSON.stringify(next));
+          }
+          return storage.values.get(answerKey) ?? null;
+        }
         // Startup uses compare-and-set; leaderboard publication uses its own script.
         if (String(command[1]).includes("local current = redis.call('GET', KEYS[1])")) {
           const stateKey = String(command[3]);
@@ -108,7 +122,7 @@ async function fetchPath(path: string): Promise<Fetched> {
     }));
   }
   if (segments[0] === "t" && segments.length === 4 && segments[2] === "publish") {
-    return renderPage(() => PublishPage({ params: Promise.resolve({ token: segments[1], agent: segments[3] }) }));
+    return renderPage(() => PublishPage({ params: Promise.resolve({ token: segments[1], agent: segments[3] }), searchParams }));
   }
   if (segments[0] === "t" && segments.length === 4 && segments[3] === "puzzle.png") {
     return asResponse(await puzzleImage(new Request(url), {
@@ -390,10 +404,47 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.setSystemTime((issuedAt + 1200) * 1000);
     const result = text((await fetchPath(`/t/${token}/result?a=${answers}`)).body);
     expect(result).toContain("30 of 30 correct");
-    expect(result).toContain("3,250 points");
-    expect(result).toContain("A time bonus of up to 25% is added to your correct-answer points.");
+    expect(result).toContain("3,000 points");
+    expect(result).toContain("Elapsed time only breaks ties.");
+    expect(result).not.toContain("bonus");
     const receipt = [...storage.values.values()].map((raw) => JSON.parse(raw)).find((value) => value.response);
     expect(receipt.response.leaderboardEligible).toBe(flag === "true");
+  });
+
+  it("continues pending results automatically while keeping fetch-only links and the original finish time", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const token = new URL((await fetchPath("/sample?new=auto-result")).location!).pathname.split("/")[2];
+    const { test, puzzles } = loadLinkTest(token);
+    const answers = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    const original = linkResults.scoreLinkResult;
+    const calculate = vi.spyOn(linkResults, "scoreLinkResult").mockImplementation((token, test, answers, receivedAt) =>
+      original(token, test, answers, receivedAt, { budgetMs: -1 }));
+    try {
+      vi.setSystemTime((test.answerDeadline - 5) * 1000);
+      let response = await fetchPath(`/t/${token}/result?a=${answers}`);
+      let continuations = 0;
+      while (text(response.body).includes("Calculating your result")) {
+        const [, next] = links(response.body).find(([label]) => label === "Continue to your result")!;
+        const refresh = response.body.match(/<meta [^>]*http-equiv="refresh"[^>]*>/)![0];
+        expect(decodeEntities(refresh)).toContain(`content="1;url=${next}"`);
+        expect(followable(response.body)).toEqual(["/"]);
+        vi.setSystemTime(Date.now() + 60_000);
+        response = await fetchPath(next);
+        expect(++continuations).toBeLessThan(5);
+      }
+      expect(continuations).toBe(4);
+      expect(text(response.body)).toContain("5 of 5 correct");
+      expect(text(response.body)).not.toContain("Time ran out");
+      expect(response.body).not.toContain('http-equiv="refresh"');
+
+      const { redisCommand } = await import("@/lib/redis");
+      vi.mocked(redisCommand).mockRejectedValueOnce(new Error("storage unavailable"));
+      const failed = await fetchPath(`/t/${token}/result?a=${answers}`);
+      expect(text(failed.body)).toContain("Scoring is temporarily unavailable");
+      expect(failed.body).not.toContain('http-equiv="refresh"');
+    } finally {
+      calculate.mockRestore();
+    }
   });
 
   it("publishes a 30-question link result as an agent by following its name's link, once", async () => {
@@ -452,6 +503,52 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(page).not.toContain("tagged AI agent");
   });
 
+  it("publishes a custom agent name through the result's GET form, with the same single-use receipt", async () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    vi.stubEnv("KV_REST_API_URL", "https://redis.example.test");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const reference = new URL((await fetchPath("/test?new=custom")).location!).pathname.split("/")[2];
+    const token = await resolveLinkToken(reference);
+    const { puzzles } = loadLinkTest(token);
+    vi.setSystemTime((issuedAt + 900) * 1000);
+    const answers = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    const result = await fetchPath(`/t/${reference}/result?a=${answers}`);
+    const form = result.body.match(/<form\b[^>]*>/)![0];
+    expect(form).toContain('method="get"');
+    const action = decodeEntities(form.match(/action="([^"]+)"/)![1]);
+    expect(action).toBe(`/t/${reference}/publish/custom`);
+    expect(result.body).toContain('name="nickname"');
+    expect(result.body).toContain('maxLength="64"');
+    expect(text(result.body)).toContain(`${action}?nickname=YOUR%20NAME`);
+
+    // Invalid names do not consume the first publication, and the form remains usable.
+    for (const nickname of ["", "x".repeat(65), "<b>bad</b>", "f|u:c k", "Agent | evil.com: model"]) {
+      const refused = await fetchPath(`${action}?${new URLSearchParams({ nickname })}`);
+      expect(text(refused.body)).toContain("This result was not published");
+      expect(refused.body).toContain('name="nickname"');
+      expect(await listLeaderboard()).toEqual([]);
+    }
+    const repeatedName = await renderPage(() => PublishPage({
+      params: Promise.resolve({ token: reference, agent: "custom" }),
+      searchParams: Promise.resolve({ nickname: ["First", "Second"] }),
+    }));
+    expect(text(repeatedName.body)).toContain("Enter a nickname.");
+    expect(await listLeaderboard()).toEqual([]);
+
+    const nickname = "NeuralNinja | GPT-6 | Effort: unspecified";
+    const publication = `${action}?${new URLSearchParams({ nickname })}`;
+    expect(new URL(publication, "https://iq.ebarakos.com").href.length).toBeLessThanOrEqual(250);
+    expect(text((await fetchPath(publication)).body)).toContain(`Published as ${nickname}`);
+    expect(text((await fetchPath(publication)).body)).toContain(`Published as ${nickname}`);
+    expect(text((await fetchPath(`/t/${reference}/publish/chatgpt`)).body)).toContain(`as ${nickname}, tagged AI agent`);
+    expect(text((await fetchPath(`/t/${token}/publish/custom?${new URLSearchParams({ nickname })}`)).body))
+      .toContain(`Published as ${nickname}`);
+    expect((await listLeaderboard()).map(({ nickname, kind }) => ({ nickname, kind })))
+      .toEqual([{ nickname, kind: "agent" }]);
+  });
+
   it("offers no publication for a 30-question test finished in under two minutes", async () => {
     vi.stubEnv("LEADERBOARD_ENABLED", "true");
     const token = new URL((await fetchPath("/test?new=walk")).location!).pathname.split("/")[2];
@@ -492,6 +589,9 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(links(home)).toContainEqual(["Agent access", "/agents"]);
     expect(note).not.toContain("can take the test without JavaScript");
     expect(note).not.toContain("While a test is being built");
+    expect(note).toContain("Each correct answer earns 100 points.");
+    expect(note).toContain("Elapsed time only breaks ties.");
+    expect(note).not.toContain("bonus");
     // Like every link into a test, the note's links are not for crawlers.
     expect(followable(home)).not.toContain("/test");
     expect(followable(home)).not.toContain("/sample");
@@ -536,19 +636,46 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
-  it("ends the test at the deadline and marks a late result", async () => {
+  it("ends the test at the deadline and keeps only answers recorded before then", async () => {
     const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
-    const { test } = loadLinkTest(token);
+    const { test, puzzles } = loadLinkTest(token);
+    const prefix = puzzles.slice(0, 2).map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    await fetchPath(`/t/${token}/3?a=${prefix}`);
+    // Looking back at an earlier question must not erase later saved answers.
+    await fetchPath(`/t/${token}/2?a=${prefix[0]}`);
 
     vi.useFakeTimers();
     vi.setSystemTime((test.answerDeadline + GRACE_WINDOW_SECONDS + 5) * 1000);
-    const page = await fetchPath(`/t/${token}/3?a=AB`);
+    const page = await fetchPath(`/t/${token}/4?a=${prefix}A`);
     expect(text(page.body)).toContain("Time is up");
     const [, resultHref] = links(page.body).find(([label]) => label === "See your result")!;
-    expect(resultHref).toBe(`/t/${token}/result?a=AB---`);
+    expect(resultHref).toBe(`/t/${token}/result?a=${prefix}A--`);
     const result = text((await fetchPath(resultHref)).body);
-    expect(result).toContain(`Marked late: these answers arrived ${GRACE_WINDOW_SECONDS + 5} seconds after the deadline`);
+    expect(result).toContain("2 of 5 correct");
+    expect(result).toContain("Answers saved before the deadline count; later answers are skipped.");
+    expect(result).toContain("Skipped");
+  });
+
+  it("lets an agent publish its saved partial score after finishing late", async () => {
+    vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const reference = new URL((await fetchPath("/test?new=late-partial")).location!).pathname.split("/")[2];
+    const { test, puzzles } = loadLinkTest(reference);
+    const prefix = puzzles.slice(0, 2).map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    vi.setSystemTime((test.answerDeadline - 30) * 1000);
+    await fetchPath(`/t/${reference}/3?a=${prefix}`);
+    vi.setSystemTime((test.answerDeadline + 159) * 1000);
+    // Supplying every correct answer after time-up cannot improve the saved score.
+    const forged = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    const result = await fetchPath(`/t/${reference}/result?a=${forged}`);
+    expect(text(result.body)).toContain("2 of 30 correct");
+    expect(text(result.body)).toContain("200 points");
+    expect(text(result.body)).not.toContain("cannot join the leaderboard");
+    const [, publish] = links(result.body).find(([label]) => label === "Publish as ChatGPT")!;
+    expect(text((await fetchPath(publish)).body)).toContain("2 of 30 correct");
+    expect((await listLeaderboard()).map(({ correct, points, kind }) => ({ correct, points, kind })))
+      .toEqual([{ correct: 2, points: 200, kind: "agent" }]);
   });
 
   it("tells a taker when the site has changed under their test", async () => {

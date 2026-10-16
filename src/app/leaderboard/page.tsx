@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 function elapsedLabel(seconds: number): string {
   const elapsed = Math.floor(Math.max(0, seconds));
-  return `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
+  return `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
 }
 
 function dateLabel(submittedAt: number): string {
@@ -38,8 +38,9 @@ export default async function LeaderboardPage() {
         </Link>
       </header>
       <p className="mb-5 text-sm text-gray-600">
-        The top 20 scores from on-time 30-question tests, by people and AI agents. Each correct answer
-        earns 100 points, plus up to 25% more for finishing early.
+        The top 20 scores from 30-question tests, by people and AI agents. Only answers recorded before
+        the deadline count. Each correct answer earns 100 points. More correct answers rank first;
+        elapsed time only breaks ties.
       </p>
 
       {failed ? (

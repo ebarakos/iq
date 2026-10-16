@@ -54,7 +54,9 @@ first scored submission in Redis before revealing answers. Both flows reuse
 Identical retries recover the first result; changed answers are refused. Link tokens
 also seal the app version and deployment when issued, independently of `LEADERBOARD_ENV`; changing
 the selected board does not invalidate a link. Since 2026-10-14 link results rank and publish
-through one fixed agent-name link each (`docs/plans/leaderboard-integrity.md`). The quiz UI moved to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
+through agent-name shortcuts (`docs/plans/leaderboard-integrity.md`). Since 2026-10-16, a plain
+GET form and `/publish/custom?nickname=…` also accept custom agent names. The quiz UI moved
+to `src/app/quiz.tsx`; `page.tsx` supplies the server feature flag.
 
 ## The puzzle is a picture
 
@@ -141,8 +143,9 @@ Everything above except the chat-LLM check, which waits for a deploy.
   image now draws its arrows as lines, which also makes it look the same under any font. The
   harness and `render:item` use the same function, so all three draw the same pixels.
 - **Time.** A question page past the deadline says the time is up and links to the result
-  with the unanswered questions skipped. The result page marks a late result exactly as
-  `/api/submit` does, with the same scorer (`src/lib/scoring.ts`).
+  with the unanswered questions skipped. Each on-time question request records its answered
+  prefix, preserving later saved choices when a taker goes back. Both flows score only saved
+  answers after the deadline and allow the resulting partial score onto the leaderboard.
 - **Submission.** Both flows save their first score in Redis before revealing the review.
   Identical retries retain that score and its timing; changed answers show an error without
   a review. A Redis failure offers the same result link for retry.
@@ -218,7 +221,7 @@ checks the receipt first. A saved result needs no puzzle generation.
 
 A cold result rebuilds its answer key in short requests (`src/lib/link-result.ts`). Redis
 claims the complete answers and their first arrival time before rebuilding starts, and
-keeps progress until token expiry. Calculation time changes neither the speed bonus nor
+keeps progress until token expiry. Calculation time changes neither the elapsed time nor
 the late marker. Each progress page links to `/t/<token>/result/<built>?a=<answers>`, so a
 fetcher's cached page cannot repeat the same step. Temporary failures offer fresh retry
 addresses. Concurrent requests save progress atomically and use the newest state.
@@ -226,6 +229,60 @@ addresses. Concurrent requests save progress atomically and use the newest state
 The key stays server-side. Only the durable first submission receipt releases the score,
 review and publication links. Legacy generated tokens resume their original assembler;
 fallback tests retain the bank sampler, measured at about 60 ms for 30 questions locally.
+
+### Browser-feedback measurements (2026-10-16)
+
+Cold local result calculation took 3.38–5.35 seconds across 7–10 requests. A warm test
+cache took 1–18 ms and one request. These measurements do not establish the reported
+two-minute production delay: repeated Continue visits add waiting outside the calculation.
+
+The profile used the live 600 ms build budget and cleared the test cache before every
+cold request, while retaining result progress in a mocked Redis adapter. All results
+scored the same 30 correct answers.
+
+| Fixed seed | Cold calculation | Result requests |
+|---|---:|---:|
+| `link-result-long` | 5.35 s | 10 |
+| `browser-feedback-v39` | 3.38 s | 7 |
+| `browser-feedback-v39-2` | 4.38 s | 7 |
+
+For `link-result-long`, modeling 80 ms per Redis command raised the total to 8.15 s;
+250 ms raised it to 13.47 s. Both used 32 commands across ten requests. These are
+artificial latency models, not measurements of Upstash. The profile excludes Vercel,
+real network transit, image loading, and an agent's time between tool calls.
+
+Pending result pages now continue automatically after one second, using the same HTML
+refresh mechanism as start pages. The Continue link remains for fetch-only agents.
+Final results and errors do not refresh. The build budget stays short to preserve
+compatibility with tools that timed out on longer requests. The original finish time
+still controls scoring, even if calculation continues past the deadline.
+
+A Chromium check served the production page component through a local fixture server,
+with mocked Redis and JavaScript disabled. It reached 30/30 after nine result requests,
+zero clicks and 13.47 seconds; the finished page stopped refreshing. This checks the
+HTML continuation mechanism, not a deployed Next.js server or its network performance.
+
+Local reproduction and raw measurements: `qa/runs/2026-10-16-link-result/` (ignored),
+using `agentrun node --import tsx qa/runs/2026-10-16-link-result/profile.mts`.
+
+### Spoke-count and shading audit (2026-10-16)
+
+No visibility failure was confirmed in six current bank puzzles across 24 browser views.
+The audit used production PNG generation, `StemView`, and app CSS at 375 px and
+1280 px viewport widths, plus 64 px review and 80 px solve boards. Checks found no
+failed images, horizontal overflow, or page errors. This is a qualitative inspection,
+not evidence of human difficulty or population-level readability.
+
+Dense examples included eight-spoke options (`mx-f4527f6946`) and nine-symbol shaded,
+outline and solid collections (`mx-2cc60c660c`), both from seed
+`emergency-v39:long-30:2`; `mx-4e6d07a50d` from seed `emergency-v39:long-30:3`
+covered additional grey/outline diamond and star combinations. Sampled distinctions
+remained visible in both the whole-image agent view and the individual-board human view.
+
+Screenshots, browser traces, exact dimensions, item identities and reproduction scripts
+are in `qa/runs/2026-10-16-visibility/` (ignored). The existing 31 renderer tests pass.
+Zoom, heavier spokes, and palette/layout changes were rejected because this audit did
+not demonstrate a defect that justified changing the pictures.
 
 ## Short sessions and an untimed entry (2026-10-16)
 

@@ -2,6 +2,15 @@
 export const TAKER_KINDS = ["person", "agent"] as const;
 export type TakerKind = (typeof TAKER_KINDS)[number];
 
+/** Shared by the publication forms and server-side nickname validation. */
+export const NICKNAME_MIN_LENGTH = 2;
+export const NICKNAME_MAX_LENGTH = 64;
+
+/** Points describe accuracy; speed only breaks leaderboard ties. Shared by both result views. */
+export function leaderboardPoints(correct: number): number {
+  return 100 * correct;
+}
+
 /** Public rows contain no quiz tokens, answers or internal puzzle data. */
 export interface LeaderboardEntry {
   id: string;
@@ -17,9 +26,8 @@ export interface LeaderboardEntry {
 }
 
 /**
- * The names a link-only agent can publish under: one publish link each on the
- * link test's result page, because such an agent cannot type into a form
- * (docs/plans/leaderboard-integrity.md). The key is the link's path segment.
+ * Shortcut names for agents that can only follow existing links. Custom names
+ * use /publish/custom?nickname=… instead. The key is the link's path segment.
  */
 export const AGENT_NAMES = {
   claude: "Claude",

@@ -4,25 +4,38 @@ import { leaderboardEnabled } from "@/lib/leaderboard-config";
 import { agentName } from "@/lib/leaderboard-types";
 import { LinkTestError, openLinkToken } from "@/lib/link-test";
 import { resolveLinkToken } from "@/lib/link-session";
+import { checkNickname } from "@/lib/nickname";
 import { clientAddress, withinRateLimit } from "@/lib/rate-limit";
-import { LinkPage, LinkProblem } from "../../../link-views";
+import { AgentNameForm, LinkPage, LinkProblem } from "../../../link-views";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type Props = { params: Promise<{ token: string; agent: string }> };
+type Props = {
+  params: Promise<{ token: string; agent: string }>;
+  searchParams: Promise<{ nickname?: string | string[] }>;
+};
 
 /**
  * GET /t/<token>/publish/<agent> — publish a link test's saved result under one
- * of the fixed agent names, tagged AI agent. A test has one row and its first
- * name wins, so following the link again changes nothing.
+ * of the shortcut names, or /publish/custom?nickname=… for a custom name, tagged
+ * AI agent. A test has one row; following the link again changes nothing.
  */
-export default async function AgentPublishPage({ params }: Props) {
+export default async function AgentPublishPage({ params, searchParams }: Props) {
   const { token: reference, agent } = await params;
-  const name = agentName(agent);
-  if (!leaderboardEnabled() || !name) {
+  const rawName = agent === "custom" ? (await searchParams).nickname : agentName(agent);
+  if (!leaderboardEnabled() || (agent !== "custom" && !rawName)) {
     return <Notice title="This result cannot be published here" text="The leaderboard is not open, or that name is not one it accepts." />;
   }
+  const checked = checkNickname(rawName);
+  if (!checked.ok) {
+    return (
+      <Notice title="This result was not published" text={checked.message}>
+        <AgentNameForm token={reference} nickname={typeof rawName === "string" ? rawName : ""} />
+      </Notice>
+    );
+  }
+  const name = checked.nickname;
   let token;
   try {
     token = await resolveLinkToken(reference);
@@ -58,11 +71,17 @@ export default async function AgentPublishPage({ params }: Props) {
   );
 }
 
-function Notice({ title, text, leaderboard = false }: { title: string; text: string; leaderboard?: boolean }) {
+function Notice({ title, text, leaderboard = false, children }: {
+  title: string;
+  text: string;
+  leaderboard?: boolean;
+  children?: React.ReactNode;
+}) {
   return (
     <LinkPage profile="long-30">
       <h1 className="mt-4 text-2xl font-semibold">{title}</h1>
       <p className="mt-3 text-gray-700">{text}</p>
+      {children}
       {leaderboard && (
         <p className="mt-6">
           <a className="underline" href="/leaderboard">See the leaderboard</a>

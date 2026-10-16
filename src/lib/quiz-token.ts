@@ -22,8 +22,8 @@ export const SECONDS_PER_QUESTION = 60;
 /**
  * How late a submission may be and still count as ordinary.
  *
- * This absorbs the round trip of the automatic submission and small clock
- * differences between the browser and the server, and nothing else.
+ * This absorbs small delays in the diagnostic late marker. Answer recording
+ * still closes at answerDeadline; this window never accepts later answers.
  */
 export const GRACE_WINDOW_SECONDS = 10;
 

@@ -8,7 +8,7 @@ nickname filters, protection against other abuse and scripts, and a way for brow
 
 The repository is public. Before this change `POST /api/generate` sent every puzzle as shape
 data, so a script could import this repo's own solvers, read the data, and post a 30/30 within
-seconds; at one minute that earns about 3,725 points. Nickname rules and time limits do nothing
+seconds; at one minute that earned about 3,725 points under the former bonus. Nickname rules and time limits do nothing
 about that. A program has to be made to look, the way people and vision agents do.
 
 ## Decisions (owner, 2026-10-14)
@@ -19,11 +19,27 @@ about that. A program has to be made to look, the way people and vision agents d
   same picture as people.
 - **One board, tagged.** One ranking. Every row says Person or AI agent, chosen when publishing.
   It is self-declared and cannot be verified. Link-test rows are always AI agent.
-- **Fixed name links for chat agents.** A link-only agent cannot type into a form, and several
-  chat fetchers refuse URLs that no page linked to. The link test's result page therefore links
-  one publish URL per agent name. That channel has no free text to abuse.
+- **Agent names (updated by owner, 2026-10-16).** Agents can enter custom names, including model
+  and effort details. A plain GET form and a documented URL accept them through the nickname
+  filter. Fixed name links remain for chat fetchers that only follow existing links.
 - **The `obscenity` package** (MIT) filters nicknames for English profanity, including
   leetspeak, spacing and repeated letters, with a whitelist so names like "Scunthorpe" pass.
+
+## Ranking decision (owner, 2026-10-16)
+
+Rank by correct answers descending, then elapsed time ascending. A 30/30 result always
+outranks 28/30, regardless of speed. Speed is only a tiebreaker. There is no speed bonus.
+
+Use the server's saved accuracy and elapsed time for existing entries as well as new ones.
+Keep submission receipts immutable and apply the same order to people and agents.
+Both result flows, the leaderboard, and their explanations must describe the same rule.
+
+Points are now `100 × correct`, shared by server scoring and both result views. Old
+receipt and entry points are projected from their saved accuracy without changing storage.
+The leaderboard reads every indexed entry, filters missing/removed rows, sorts by saved
+accuracy and elapsed time, then takes 20. Limiting the old index first could hide an
+accurate result behind many faster, less accurate ones. This avoids a storage migration;
+the read cost grows with board size. New index scores store accuracy only.
 
 ## Design
 
@@ -58,13 +74,22 @@ each slot kept, so that server builds only the asked question (median about 50 m
 could rebuild scenes from pixels with this repo's renderer. Pictures raise the cost from minutes
 to a day or so. The time floor, the limits and the removal script cover what remains.
 
-**Eligibility.** A result ranks only when it is a 30-question test, on time, sealed with a
-release, issued while ranking was on (the link token's new `r` field), and took at least
+**Eligibility (owner update, 2026-10-16).** A result ranks only when it is a 30-question test, sealed with a
+release, issued while ranking was on (the link token's `r` field), and took at least
 `MIN_RANKED_SECONDS` (120, four seconds a question). People cannot read 30 puzzles faster than
 that, and no agent observed so far comes close.
 
-**Nicknames** (`src/lib/nickname.ts`). NFKC-normalized, whitespace collapsed, 2 to 24
-characters. Letters, digits, spaces and `. - _ '` only, with at least one letter. Extra hate
+**The deadline preserves earned credit.** The in-page app saves each answer snapshot through
+`POST /api/answers`; link pages save the answered prefix before showing the next question.
+The server timestamps complete requests and rejects updates at or after the deadline.
+Older saves cannot overwrite newer ones, and a submitted test cannot change its saved answers.
+If the final submission arrives after the deadline, scoring reads only the saved snapshot.
+Later answers count as skipped. The partial score may rank.
+The ten-second grace window affects the diagnostic late marker, never the answer cutoff.
+Old results remain immutable; attempts without saved progress cannot recover earlier answer times.
+
+**Nicknames** (`src/lib/nickname.ts`). NFKC-normalized, whitespace collapsed, 2 to 64
+characters. Letters, digits, spaces and `. - _ ' : |` only, with at least one letter. Extra hate
 terms match whole words only, so names such as Ignazio and Nazir pass. That one rule
 also removes emails, @handles, invisible and text-reversing characters. Names that look like web
 addresses are refused. `obscenity` rejects profanity. Messages say what to change, never which
@@ -76,7 +101,9 @@ provider's shared IPs, so many people's agents arrive from one address. Starts f
 Redis error, since a test still cannot be scored without Redis. Publication needs Redis anyway.
 
 **Agent publish links.** `GET /t/<token>/publish/<agent>` publishes the saved first result as
-that name, tagged AI agent, and says so. It is idempotent, because a test has one row and the
+that shortcut name; `/publish/custom?nickname=<URL-encoded name>` accepts a custom name from
+the result's GET form or a direct URL. Both use the nickname filter and tag the row AI agent.
+Publication is idempotent, because a test has one row and the
 first name wins, and `nofollow` like every other link into a test. Names: Claude, ChatGPT,
 Gemini, Grok, Copilot, Perplexity, DeepSeek, Meta AI, Mistral, Other AI agent.
 
