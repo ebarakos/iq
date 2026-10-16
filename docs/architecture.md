@@ -134,6 +134,10 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
   `src/app/t/[token]/result` the scored review, with one `…/publish/<agent>` link per fixed
   agent name (`AGENT_NAMES`) when the result ranks. All plain HTML and links.
+- `src/lib/link-result.ts` — reads saved scores without rebuilding. A cold link result
+  rebuilds its server-only answer key over short requests at `…/result/<built>`, keeping
+  the first answers and arrival time in Redis. It reveals the review only after the shared
+  submission receipt is saved; calculation time never changes the bonus or late marker.
 - `src/items/puzzle-png.ts` — `puzzleToPng`, the agent channel's SVG rasterized by
   `@resvg/resvg-js` with the bundled Noto Sans fonts: the harness, `render:item`
   and the link test's puzzle image all draw the same pixels.

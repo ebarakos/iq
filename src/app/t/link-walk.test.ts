@@ -6,6 +6,7 @@ import { parsePicturePart, picturePaths, toPicturePuzzle } from "@/items/picture
 import { pictureToPng } from "@/items/puzzle-png";
 import { listLeaderboard } from "@/lib/leaderboard";
 import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } from "@/lib/link-test";
+import * as linkTests from "@/lib/link-test";
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
 import { GET as openStarted } from "./start/[id]/[built]/route";
@@ -15,6 +16,7 @@ import { GET as puzzleImage } from "./[token]/[n]/puzzle.png/route";
 import { GET as pictureImage } from "./[token]/[n]/board/[part]/route";
 import PublishPage from "./[token]/publish/[agent]/page";
 import ResultPage from "./[token]/result/page";
+import ResultStepPage from "./[token]/result/[built]/page";
 import { metadata } from "./layout";
 import HomePage from "../page";
 import { POST as publishFromForm } from "../api/leaderboard/route";
@@ -40,7 +42,9 @@ vi.mock("@/lib/redis", async (importOriginal) => ({
         // Startup uses compare-and-set; leaderboard publication uses its own script.
         if (String(command[1]).includes("local current = redis.call('GET', KEYS[1])")) {
           const stateKey = String(command[3]);
-          if (storage.values.get(stateKey) === command[4]) storage.values.set(stateKey, String(command[5]));
+          if (storage.values.get(stateKey) === command[4] || (command[4] === "" && !storage.values.has(stateKey))) {
+            storage.values.set(stateKey, String(command[5]));
+          }
           return storage.values.get(stateKey) ?? null;
         }
         const [receiptKey, entryKey] = [String(command[3]), String(command[4])];
@@ -112,6 +116,9 @@ async function fetchPath(path: string): Promise<Fetched> {
   }
   if (segments[0] === "t" && segments.length === 3 && segments[2] === "result") {
     return renderPage(() => ResultPage({ params: Promise.resolve({ token: segments[1] }), searchParams }));
+  }
+  if (segments[0] === "t" && segments.length === 4 && segments[2] === "result") {
+    return renderPage(() => ResultStepPage({ params: Promise.resolve({ token: segments[1] }), searchParams }));
   }
   if (segments[0] === "t" && segments.length === 3) {
     return renderPage(() => QuestionPage({ params: Promise.resolve({ token: segments[1], n: segments[2] }), searchParams }));
@@ -273,7 +280,20 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
       expect(text(page.body)).toContain(`Question ${question} of 30`);
       path = links(page.body).find(([label]) => label === "Skip")![1];
     }
-    const result = await cachedFetch(path);
+    // A result may land on a different server from every question and image.
+    clearBuiltLinkTests();
+    let result = await cachedFetch(path);
+    const calculationPaths = new Set<string>([path]);
+    while (text(result.body).includes("Calculating your result")) {
+      expect(result.body).not.toContain("incorrect; the answer is");
+      const next = links(result.body).find(([label]) => label === "Continue to your result")![1];
+      expect(calculationPaths.has(next)).toBe(false);
+      calculationPaths.add(next);
+      expect(calculationPaths.size).toBeLessThanOrEqual(30);
+      clearBuiltLinkTests();
+      result = await cachedFetch(next);
+    }
+    expect(calculationPaths.size).toBeGreaterThan(1);
     expect(result.status).toBe(200);
     expect(text(result.body)).toContain("0 of 30 correct");
   });
@@ -292,6 +312,27 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(changed).toContain("already submitted with different answers");
     expect(changed).not.toContain("Review");
     expect(changed).not.toContain("the answer is");
+  });
+
+  it("recovers a saved result on a cold server without rebuilding the test", async () => {
+    const start = await fetchPath("/sample");
+    const token = new URL(start.location!).pathname.split("/")[2];
+    const path = `/t/${token}/result?a=-----`;
+    const original = text((await fetchPath(path)).body);
+    expect(original).toContain("0 of 5 correct");
+    clearBuiltLinkTests();
+    const rebuild = vi.spyOn(linkTests, "loadLinkTest").mockImplementation(() => {
+      throw new Error("A saved result must not rebuild the test");
+    });
+    const question = vi.spyOn(linkTests, "linkTestQuestion");
+    try {
+      expect(text((await fetchPath(path)).body)).toBe(original);
+      expect(rebuild).not.toHaveBeenCalled();
+      expect(question).not.toHaveBeenCalled();
+    } finally {
+      rebuild.mockRestore();
+      question.mockRestore();
+    }
   });
 
   it("reveals no review when Redis fails and recovers when retried", async () => {
@@ -320,7 +361,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(result).toContain("30 of 30 correct");
     expect(result).toContain("3,250 points");
     expect(result).toContain("A time bonus of up to 25% is added to your correct-answer points.");
-    const [receipt] = [...storage.values.values()].map((raw) => JSON.parse(raw));
+    const receipt = [...storage.values.values()].map((raw) => JSON.parse(raw)).find((value) => value.response);
     expect(receipt.response.leaderboardEligible).toBe(flag === "true");
   });
 

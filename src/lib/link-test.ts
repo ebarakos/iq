@@ -477,6 +477,11 @@ export function linkTestQuestion(
  * times and what was sealed at the start. Both flows score through this.
  */
 export function scoringPayload(test: LinkTest, puzzles: PuzzleSet): QuizTokenPayload {
+  return scoringPayloadFromItems(test, answerKeyItems(puzzles));
+}
+
+/** The same sealed scoring metadata, with a key rebuilt over several requests. */
+export function scoringPayloadFromItems(test: LinkTest, items: QuizTokenPayload["items"]): QuizTokenPayload {
   return {
     version: 1,
     issuedAt: test.issuedAt,
@@ -485,7 +490,7 @@ export function scoringPayload(test: LinkTest, puzzles: PuzzleSet): QuizTokenPay
     appVersion: test.appVersion,
     leaderboardAllowed: test.rankAllowed === true,
     leaderboardScope: test.leaderboardScope,
-    items: answerKeyItems(puzzles),
+    items,
   };
 }
 
@@ -535,8 +540,8 @@ export function questionPath(token: string, n: number, answers: readonly (number
 }
 
 /** The path of the result page for a full set of answers. */
-export function resultPath(token: string, answers: readonly (number | null)[]): string {
-  return `/t/${token}/result?a=${formatLinkAnswers(answers)}`;
+export function resultPath(token: string, answers: readonly (number | null)[], step?: number | string): string {
+  return `/t/${token}/result${step === undefined ? "" : `/${step}`}?a=${formatLinkAnswers(answers)}`;
 }
 
 /** The path of question `n`'s puzzle image. */

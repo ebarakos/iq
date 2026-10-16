@@ -209,3 +209,20 @@ link: its tool timed out on the first requests (one follow took 3.3 s there), th
 tool was serving its cached copy of the same address. Hence the new address per step and the
 shorter budget with a stop before an overrun. Measured on a development server afterwards:
 six requests of 0.6–1.5 s each, then the redirect to question 1.
+
+## Results over several requests (2026-10-16)
+
+A completed 30-question test still timed out: the result page rebuilt the whole test
+before checking its saved receipt, including on every retry. It now opens the token and
+checks the receipt first. A saved result needs no puzzle generation.
+
+A cold result rebuilds its answer key in short requests (`src/lib/link-result.ts`). Redis
+claims the complete answers and their first arrival time before rebuilding starts, and
+keeps progress until token expiry. Calculation time changes neither the speed bonus nor
+the late marker. Each progress page links to `/t/<token>/result/<built>?a=<answers>`, so a
+fetcher's cached page cannot repeat the same step. Temporary failures offer fresh retry
+addresses. Concurrent requests save progress atomically and use the newest state.
+
+The key stays server-side. Only the durable first submission receipt releases the score,
+review and publication links. Legacy generated tokens resume their original assembler;
+fallback tests retain the bank sampler, measured at about 60 ms for 30 questions locally.

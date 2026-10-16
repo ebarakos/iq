@@ -1,14 +1,16 @@
+import { randomBytes } from "node:crypto";
 import {
-  loadLinkTest,
+  linkTestLength,
+  openLinkToken,
   OPTION_LETTERS,
   parseLinkAnswers,
   publishPath,
   puzzleImagePath,
   questionPath,
   resultPath,
-  scoringPayload,
 } from "@/lib/link-test";
-import { MIN_RANKED_SECONDS, submitQuizOnce, SubmissionConflictError } from "@/lib/leaderboard";
+import { MIN_RANKED_SECONDS, SubmissionConflictError } from "@/lib/leaderboard";
+import { scoreLinkResult } from "@/lib/link-result";
 import { leaderboardEnabled } from "@/lib/leaderboard-config";
 import { AGENT_NAMES } from "@/lib/leaderboard-types";
 import { clockTime, LinkPage, LinkProblem, PROFILE_NAMES, StartLink } from "../../link-views";
@@ -26,26 +28,27 @@ type Props = {
  * the server, with the same scorer as `POST /api/submit`, and shows the review.
  */
 export default async function LinkResultPage({ params, searchParams }: Props) {
+  const receivedAt = Math.floor(Date.now() / 1000);
   const { token } = await params;
   const { a } = await searchParams;
 
-  let loaded;
+  let test;
   try {
-    loaded = loadLinkTest(token);
+    test = openLinkToken(token);
   } catch (error) {
     return <LinkProblem error={error} />;
   }
-  const { test, puzzles } = loaded;
+  const total = linkTestLength(test);
   const answers = parseLinkAnswers(a);
-  if (!answers || answers.length !== puzzles.length) {
-    const resume = answers && answers.length < puzzles.length
+  if (!answers || answers.length !== total) {
+    const resume = answers && answers.length < total
       ? questionPath(token, answers.length + 1, answers)
       : questionPath(token, 1, []);
     return (
       <LinkPage profile={test.profile}>
         <h1 className="mt-4 text-2xl font-semibold">This test is not finished</h1>
         <p className="mt-3 text-gray-700">
-          A result needs one answer or skip for each of the {puzzles.length} questions.{" "}
+          A result needs one answer or skip for each of the {total} questions.{" "}
           <a className="underline" rel="nofollow" href={resume}>Continue the test</a>.
         </p>
       </LinkPage>
@@ -54,7 +57,22 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
 
   let scored;
   try {
-    scored = await submitQuizOnce(token, scoringPayload(test, puzzles), answers, Math.floor(Date.now() / 1000));
+    const step = await scoreLinkResult(token, test, answers, receivedAt);
+    if (!("scored" in step)) {
+      return (
+        <LinkPage profile={test.profile}>
+          <h1 className="mt-4 text-2xl font-semibold">Calculating your result</h1>
+          <p className="mt-3 text-gray-700">
+            Your answers have been received. {step.built} of {total} questions checked.
+            Your finish time is already recorded.
+          </p>
+          <p className="mt-4">
+            <a className="underline" rel="nofollow" href={resultPath(token, answers, step.built)}>Continue to your result</a>
+          </p>
+        </LinkPage>
+      );
+    }
+    scored = step.scored;
   } catch (error) {
     const conflict = error instanceof SubmissionConflictError;
     return (
@@ -63,7 +81,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
         <p className="mt-3 text-gray-700">
           {conflict ? error.message : "Your answers are kept in this link. Try again to recover your result."}
         </p>
-        {!conflict && <p className="mt-4"><a className="underline" rel="nofollow" href={resultPath(token, answers)}>Retry submission</a></p>}
+        {!conflict && <p className="mt-4"><a className="underline" rel="nofollow" href={resultPath(token, answers, `retry-${randomBytes(8).toString("base64url")}`)}>Retry submission</a></p>}
         <p className="mt-6"><StartLink profile={test.profile}>Start a new {PROFILE_NAMES[test.profile]}</StartLink></p>
       </LinkPage>
     );

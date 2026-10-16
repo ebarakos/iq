@@ -15,7 +15,7 @@ export class SubmissionConflictError extends Error {}
 export const MIN_RANKED_SECONDS = 120;
 export class LeaderboardEligibilityError extends Error {}
 
-type ScoredResponse = ReturnType<typeof scoreQuiz> & { leaderboardEligible: boolean };
+export type ScoredResponse = ReturnType<typeof scoreQuiz> & { leaderboardEligible: boolean };
 /** A row as stored. The owner's removal keeps it as a tombstone, so its test cannot publish again. */
 type StoredEntry = LeaderboardEntry & { removed?: true };
 
@@ -58,18 +58,28 @@ function readReceipt(raw: string, answersHash: string): ScoredResponse {
   return receipt.response;
 }
 
+/** Recover the saved result without rebuilding its answer key. Callers validate the token first. */
+export async function readQuizSubmission(token: string, answers: readonly (number | null)[]): Promise<ScoredResponse | null> {
+  const raw = await redisCommand<string | null>(["GET", submissionKey(token, quizNamespace())]);
+  return raw === null ? null : readReceipt(raw, hash(JSON.stringify(answers)));
+}
+
 /**
  * Save before returning any answers. Identical retries recover the immutable original result.
  * Malformed answers throw `ScoringError` before any storage call, so they never cost a write
  * or read as a conflict with a stored result.
+ * `submittedAt` preserves an arrival recorded before incremental rebuilding;
+ * `nowSeconds` remains the current time for the receipt's expiry.
  */
 export async function submitQuizOnce(
   token: string,
   quiz: QuizTokenPayload,
   answers: readonly (number | null)[],
   nowSeconds: number,
+  options: { submittedAt?: number } = {},
 ): Promise<ScoredResponse> {
-  const scored = scoreQuiz(quiz, answers, nowSeconds);
+  const submittedAt = options.submittedAt ?? nowSeconds;
+  const scored = scoreQuiz(quiz, answers, submittedAt);
   const scope = quizNamespace();
   const namespace = leaderboardNamespace();
   const key = submissionKey(token, scope);
@@ -85,7 +95,7 @@ export async function submitQuizOnce(
       scored.elapsedSeconds >= MIN_RANKED_SECONDS,
   };
   const receipt: SubmissionReceipt = {
-    answersHash, submittedAt: nowSeconds, response,
+    answersHash, submittedAt, response,
     leaderboardNamespace: namespace,
   };
   const stored = await redisCommand<string | null>([
