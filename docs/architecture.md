@@ -128,7 +128,8 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   only the question a page or picture asks for (`buildExpandedQuestion`, about 50 ms) on a
   server that does not hold the test; building all 30 takes about 4 seconds.
   `scoringPayload` turns a rebuilt test into the answer key both flows score against.
-  `src/app/sample` and `src/app/test` mint one and redirect (`src/lib/link-start.ts`); with
+  `src/app/agents` checks image access without a timer. Canonical `/sample` and `/test`
+  redirect there; its fresh start links mint a test (`src/lib/link-start.ts`). With
   Redis a request builds for about 1.2 s, and a longer build continues at `src/app/t/start/[id]/[built]`,
   one part per request (`continueLinkTest`, `fillExpandedSlots`);
   `src/app/t/[token]/[n]` is a question, `…/[n]/puzzle.png` its picture, and
@@ -138,6 +139,10 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   rebuilds its server-only answer key over short requests at `…/result/<built>`, keeping
   the first answers and arrival time in Redis. It reveals the review only after the shared
   submission receipt is saved; calculation time never changes the bonus or late marker.
+- `src/lib/link-session.ts` — resolves a short public session id to the original sealed
+  token in Redis. The completed start record stores that mapping until token expiry.
+  Agent pages, PNGs, results and publication links keep the short id; scoring and ranking
+  always use the original token, including when an older token URL is opened directly.
 - `src/items/puzzle-png.ts` — `puzzleToPng`, the agent channel's SVG rasterized by
   `@resvg/resvg-js` with the bundled Noto Sans fonts: the harness, `render:item`
   and the link test's puzzle image all draw the same pixels.

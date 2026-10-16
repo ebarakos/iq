@@ -110,6 +110,16 @@ answers are refused. Redis failures leave the test retryable and reveal no answe
 These private receipts expire with the two-hour test token.
 New Vercel environment settings take effect on the next deployment.
 
+### Taking the test with a chat agent
+
+Give the agent `/agents` on this site. It first opens an untimed image check, then follows
+an explicit link to start 5 or 30 questions. `/test` and `/sample` also lead to that check.
+The test uses short session URLs for its pages, PNGs, answers, result and publication;
+no encrypted token needs to fit the agent tool's URL limit. Follow Continue when a test
+or result needs another short request. New-test links use fresh addresses to avoid cached
+starts. A tool must have network access to the site and be able to display PNG images;
+if the check fails, stop before starting the clock and use a tool with those capabilities.
+
 ### Leaderboard
 
 Run `npm run dev` and open `/leaderboard` to see the top 20 published attempts, by people and

@@ -1,9 +1,9 @@
-import { startLinkTest } from "@/lib/link-start";
+import { linkTestEntry } from "@/lib/link-start";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** GET /sample — a fresh 5-question test, taken by following links (`startLinkTest`). */
+/** GET /sample — image access first; the guide's fresh link starts five questions. */
 export function GET(req: Request) {
-  return startLinkTest(req, "short-5");
+  return linkTestEntry(req, "short-5");
 }

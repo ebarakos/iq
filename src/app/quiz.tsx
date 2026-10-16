@@ -152,11 +152,9 @@ type TestMeta = {
 
 type SavedSession = StoredSession<PicturePuzzle, SubmitResponse, Partial<TestMeta>>;
 
-export default function Quiz({ leaderboardEnabled, leaderboardLabel, siteOrigin = "" }: {
+export default function Quiz({ leaderboardEnabled, leaderboardLabel }: {
   leaderboardEnabled: boolean;
   leaderboardLabel: string;
-  /** This site's address, for the full start links in the note for AI agents. */
-  siteOrigin?: string;
 }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [puzzles, setPuzzles] = useState<PicturePuzzle[]>([]);
@@ -479,7 +477,7 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel, siteOrigin 
         </div>
       </header>
 
-      {phase === "intro" && <Intro onStart={start} siteOrigin={siteOrigin} leaderboardEnabled={leaderboardEnabled} />}
+      {phase === "intro" && <Intro onStart={start} />}
       {phase === "loading" && <Loading label="Creating a fresh test…" />}
       {phase === "submitting" && <Loading label="Scoring your answers…" />}
       {phase === "error" && (
@@ -536,10 +534,8 @@ export default function Quiz({ leaderboardEnabled, leaderboardLabel, siteOrigin 
   );
 }
 
-function Intro({ onStart, siteOrigin, leaderboardEnabled }: {
+function Intro({ onStart }: {
   onStart: (profile: TestProfile) => void;
-  siteOrigin: string;
-  leaderboardEnabled: boolean;
 }) {
   // Real links to /test and /sample, so a reader that runs no JavaScript can
   // still start a test (the link test, docs/plans/link-only-test.md). With
@@ -589,22 +585,8 @@ function Intro({ onStart, siteOrigin, leaderboardEnabled }: {
         </a>
       </div>
 
-      {/* A chat agent's fetch tool reads only this HTML. Given just the home page,
-          one took the start links for JavaScript buttons and stopped (2026-10-15),
-          so the page says in plain text that links alone take the test. */}
-      <p className="mt-6 border-t border-gray-100 pt-4 text-sm text-gray-500">
-        <span className="font-medium text-gray-700">AI agents</span> can take the test without
-        JavaScript, by following links. It starts at{" "}
-        <a href="/test" rel="nofollow" className="underline underline-offset-2">{`${siteOrigin}/test`}</a>{" "}
-        {leaderboardEnabled ? "(30 questions, ranked)" : "(30 questions)"} or{" "}
-        <a href="/sample" rel="nofollow" className="underline underline-offset-2">{`${siteOrigin}/sample`}</a>{" "}
-        (5 questions), with one minute per question for the whole test. While a test is being built, a
-        page says how far it has got; follow its link until the first question opens. Each question page shows the
-        puzzle as a picture and has one link per answer option; following an option&apos;s link answers
-        and opens the next question.
-        {/* Ranking and publication exist only while the board is on (result/page.tsx). */}
-        {leaderboardEnabled &&
-          " The 30-question result page has links that publish the score under the agent's name."}
+      <p className="mt-6 text-sm text-gray-500">
+        <a href="/agents" className="underline underline-offset-2">Agent access</a>
       </p>
     </section>
   );

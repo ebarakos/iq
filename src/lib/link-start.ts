@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { questionCount, type ExpandedProfile } from "@/items/expanded-quiz";
-import { quizNamespace } from "./leaderboard-config";
+import { linkSessionKey } from "./link-session";
 import {
   beginLinkTest,
   continueLinkTest,
@@ -11,6 +11,7 @@ import {
   LinkTestProgressSchema,
   openLinkToken,
   questionPath,
+  startPath,
   type LinkTestProgress,
 } from "./link-test";
 import { startAllowed } from "./rate-limit";
@@ -62,10 +63,6 @@ export interface StartOptions {
   budgetMs?: number;
 }
 
-function startKey(id: string): string {
-  return `${quizNamespace()}:start:${id}`;
-}
-
 /**
  * Where a test started at /test or /sample is built further, then opened. The
  * number of questions built so far is in the path only so each page links to a
@@ -105,7 +102,7 @@ function buildingPage(progress: LinkTestProgress, id: string): Response {
 function expiredPage(): Response {
   return htmlPage(200, "This start link has expired", [
     "<p>It waited more than 10 minutes while building, its test expired, or the site changed.</p>",
-    `<p>Start a new test: <a href="/test" rel="nofollow">30 questions</a> or <a href="/sample" rel="nofollow">5 questions</a>.</p>`,
+    `<p>Start a new test: <a href="${startPath("long-30")}" rel="nofollow">30 questions</a> or <a href="${startPath("short-5")}" rel="nofollow">5 questions</a>.</p>`,
   ].join("\n"));
 }
 
@@ -134,7 +131,7 @@ function savedStartResponse(req: Request, id: string, stored: string | null): Re
     // Check expiry and site changes, without rebuilding any questions. A retry
     // reuses the exact token, so it cannot reset the clock or get a new score.
     openLinkToken(parsed.data.token);
-    return firstQuestion(req, parsed.data.token);
+    return firstQuestion(req, id);
   }
   return buildingPage(parsed.data, id);
 }
@@ -147,8 +144,19 @@ function logStartError(error: unknown): void {
   }
 }
 
+/** Canonical entry links are untimed. Only an explicit fresh start leaves the image check. */
+export function linkTestEntry(req: Request, profile: ExpandedProfile): Promise<Response> | Response {
+  if (!new URL(req.url).searchParams.has("new")) {
+    return new Response(null, {
+      status: 303,
+      headers: { ...LINK_TEST_HEADERS, location: new URL("/agents", req.url).toString() },
+    });
+  }
+  return startLinkTest(req, profile);
+}
+
 /**
- * `GET /sample` and `GET /test`: make a fresh link test for a fetcher that
+ * The guide's explicit fresh start: make a link test for a fetcher that
  * follows links and runs no JavaScript (docs/plans/link-only-test.md), and
  * redirect to its first question, or to a page that builds the rest.
  */
@@ -160,21 +168,25 @@ export async function startLinkTest(req: Request, profile: ExpandedProfile, opti
     // Without Redis there is nowhere to keep a half-built test: build it all here.
     if (!redisConfigured()) return firstQuestion(req, createLinkTest(profile).token);
     const step = continueLinkTest(beginLinkTest(profile), options.budgetMs ?? BUILD_BUDGET_MS);
-    if ("draft" in step) return firstQuestion(req, issueLinkTest(step.draft).token);
     const id = randomBytes(16).toString("base64url");
-    try {
-      await redisCommand(["SET", startKey(id), JSON.stringify(step.progress), "EX", PROGRESS_SECONDS]);
-    } catch (error) {
-      console.error("link-test: could not keep a test being built, finishing it now —",
-        error instanceof Error ? error.message : error);
-      const rest = continueLinkTest(step.progress, Number.POSITIVE_INFINITY);
-      if ("draft" in rest) return firstQuestion(req, issueLinkTest(rest.draft).token);
-      throw new Error("an unlimited build left questions unbuilt");
+    if ("draft" in step) {
+      const issued = issueLinkTest(step.draft);
+      await redisCommand([
+        "SET", linkSessionKey(id), JSON.stringify({ token: issued.token }),
+        "EX", Math.max(1, issued.test.expiresAt - Math.floor(Date.now() / 1000)),
+      ]);
+      return firstQuestion(req, id);
     }
+    // A configured store is required for short URLs. Falling back to a long
+    // token here would reintroduce the fetch tools' image URL limit.
+    await redisCommand(["SET", linkSessionKey(id), JSON.stringify(step.progress), "EX", PROGRESS_SECONDS]);
     return buildingPage(step.progress, id);
   } catch (error) {
     logStartError(error);
-    return textResponse(500, "Could not create a test. Please try again.");
+    return htmlPage(200, "Could not start a test", [
+      "<p>Your test has not started. Please try again.</p>",
+      `<p><a href="${startPath(profile)}" rel="nofollow">Retry starting the test</a></p>`,
+    ].join("\n"));
   }
 }
 
@@ -185,7 +197,7 @@ export async function startLinkTest(req: Request, profile: ExpandedProfile, opti
  */
 export async function openStartedTest(req: Request, id: string, options: StartOptions = {}): Promise<Response> {
   if (!/^[A-Za-z0-9_-]{22}$/.test(id) || !redisConfigured()) return expiredPage();
-  const key = startKey(id);
+  const key = linkSessionKey(id);
   try {
     const stored = await redisCommand<string | null>(["GET", key]);
     if (stored === null) return expiredPage();

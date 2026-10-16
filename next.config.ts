@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
   // out of crawlers' link walks (docs/plans/link-only-test.md). One place for all.
   async headers() {
     const robots = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
-    return ["/sample", "/test", "/t/:path*"].map((source) => ({ source, headers: robots }));
+    return ["/sample", "/test", "/t/:path*", "/agents/:path*"].map((source) => ({ source, headers: robots }));
   },
 };
 

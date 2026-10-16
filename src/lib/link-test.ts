@@ -564,5 +564,7 @@ export function publishPath(token: string, agent: string): string {
 
 /** Where a new test of this length starts. */
 export function startPath(profile: ExpandedProfile | undefined): string {
-  return profile === "long-30" ? "/test" : "/sample";
+  const path = profile === "long-30" ? "/test" : "/sample";
+  // A deliberate new attempt must not replay a fetch tool's cached start.
+  return `${path}?new=${randomBytes(8).toString("base64url")}`;
 }

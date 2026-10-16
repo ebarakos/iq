@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { sampleGuide } from "@/items/sample-guides";
+import { resolveLinkToken } from "@/lib/link-session";
 import {
   linkTestLength,
   linkTestQuestion,
@@ -31,7 +32,7 @@ export default async function LinkQuestionPage({ params, searchParams }: Props) 
 
   let test;
   try {
-    test = openLinkToken(token);
+    test = openLinkToken(await resolveLinkToken(token));
   } catch (error) {
     return <LinkProblem error={error} />;
   }

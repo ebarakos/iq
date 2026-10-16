@@ -3,6 +3,7 @@ import { LeaderboardEligibilityError, publishLeaderboardEntry } from "@/lib/lead
 import { leaderboardEnabled } from "@/lib/leaderboard-config";
 import { agentName } from "@/lib/leaderboard-types";
 import { LinkTestError, openLinkToken } from "@/lib/link-test";
+import { resolveLinkToken } from "@/lib/link-session";
 import { clientAddress, withinRateLimit } from "@/lib/rate-limit";
 import { LinkPage, LinkProblem } from "../../../link-views";
 
@@ -17,12 +18,14 @@ type Props = { params: Promise<{ token: string; agent: string }> };
  * name wins, so following the link again changes nothing.
  */
 export default async function AgentPublishPage({ params }: Props) {
-  const { token, agent } = await params;
+  const { token: reference, agent } = await params;
   const name = agentName(agent);
   if (!leaderboardEnabled() || !name) {
     return <Notice title="This result cannot be published here" text="The leaderboard is not open, or that name is not one it accepts." />;
   }
+  let token;
   try {
+    token = await resolveLinkToken(reference);
     openLinkToken(token);
   } catch (error) {
     // Publication reads only the saved result, so a site change since the test does not matter.
@@ -33,7 +36,7 @@ export default async function AgentPublishPage({ params }: Props) {
     if (!(await withinRateLimit("publish", clientAddress(await headers())))) {
       return <Notice title="Too many publications" text="Too many scores were published from this address. Try again later." />;
     }
-    entry = await publishLeaderboardEntry(token, name, "agent");
+    entry = await publishLeaderboardEntry(token!, name, "agent");
   } catch (error) {
     const text = error instanceof LeaderboardEligibilityError
       ? error.message

@@ -11,6 +11,7 @@ import {
 } from "@/lib/link-test";
 import { MIN_RANKED_SECONDS, SubmissionConflictError } from "@/lib/leaderboard";
 import { scoreLinkResult } from "@/lib/link-result";
+import { resolveLinkToken } from "@/lib/link-session";
 import { leaderboardEnabled } from "@/lib/leaderboard-config";
 import { AGENT_NAMES } from "@/lib/leaderboard-types";
 import { clockTime, LinkPage, LinkProblem, PROFILE_NAMES, StartLink } from "../../link-views";
@@ -29,11 +30,13 @@ type Props = {
  */
 export default async function LinkResultPage({ params, searchParams }: Props) {
   const receivedAt = Math.floor(Date.now() / 1000);
-  const { token } = await params;
+  const { token: reference } = await params;
   const { a } = await searchParams;
 
   let test;
+  let token;
   try {
+    token = await resolveLinkToken(reference);
     test = openLinkToken(token);
   } catch (error) {
     return <LinkProblem error={error} />;
@@ -42,8 +45,8 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
   const answers = parseLinkAnswers(a);
   if (!answers || answers.length !== total) {
     const resume = answers && answers.length < total
-      ? questionPath(token, answers.length + 1, answers)
-      : questionPath(token, 1, []);
+      ? questionPath(reference, answers.length + 1, answers)
+      : questionPath(reference, 1, []);
     return (
       <LinkPage profile={test.profile}>
         <h1 className="mt-4 text-2xl font-semibold">This test is not finished</h1>
@@ -67,7 +70,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
             Your finish time is already recorded.
           </p>
           <p className="mt-4">
-            <a className="underline" rel="nofollow" href={resultPath(token, answers, step.built)}>Continue to your result</a>
+            <a className="underline" rel="nofollow" href={resultPath(reference, answers, step.built)}>Continue to your result</a>
           </p>
         </LinkPage>
       );
@@ -81,7 +84,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
         <p className="mt-3 text-gray-700">
           {conflict ? error.message : "Your answers are kept in this link. Try again to recover your result."}
         </p>
-        {!conflict && <p className="mt-4"><a className="underline" rel="nofollow" href={resultPath(token, answers, `retry-${randomBytes(8).toString("base64url")}`)}>Retry submission</a></p>}
+        {!conflict && <p className="mt-4"><a className="underline" rel="nofollow" href={resultPath(reference, answers, `retry-${randomBytes(8).toString("base64url")}`)}>Retry submission</a></p>}
         <p className="mt-6"><StartLink profile={test.profile}>Start a new {PROFILE_NAMES[test.profile]}</StartLink></p>
       </LinkPage>
     );
@@ -108,7 +111,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
         </p>
       )}
       {scored.total === 30 && leaderboardEnabled() && (
-        <AgentPublication token={token} eligible={scored.leaderboardEligible} late={scored.late} />
+        <AgentPublication token={reference} eligible={scored.leaderboardEligible} late={scored.late} />
       )}
       <h2 className="mt-8 text-xl font-semibold">Review</h2>
       <ol className="mt-4 space-y-8">
@@ -117,7 +120,7 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
             <h3 className="font-semibold">{`Question ${index + 1}`}</h3>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={puzzleImagePath(token, index + 1)}
+              src={puzzleImagePath(reference, index + 1)}
               alt={`Question ${index + 1} puzzle`}
               width={800}
               loading="lazy"

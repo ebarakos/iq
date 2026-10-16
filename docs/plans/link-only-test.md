@@ -226,3 +226,25 @@ addresses. Concurrent requests save progress atomically and use the newest state
 The key stays server-side. Only the durable first submission receipt releases the score,
 review and publication links. Legacy generated tokens resume their original assembler;
 fallback tests retain the bank sampler, measured at about 60 ms for 30 questions locally.
+
+## Short sessions and an untimed entry (2026-10-16)
+
+Claude Haiku reported a 250-character image URL limit. The sealed token made its PNG
+addresses too long. New agent links now carry a random 22-character session id. Redis
+keeps the original token in the completed start record until token expiry. Pages, images,
+answer links, result steps and publication links keep the id; scoring and publication
+resolve it to the original token, so both URLs share one receipt and leaderboard entry.
+Existing sealed-token URLs still open. Development without Redis keeps those older URLs;
+a configured store failure offers a fresh retry instead of falling back to oversized URLs.
+
+The home page now has a small Agent access link. `/agents` offers a fixed PNG image check
+before any timed test. Canonical `/test` and `/sample` redirect there without generation
+or storage work. The guide's explicit start links carry a fresh `new` nonce, as do new-test
+links after a result or error. This prevents cached canonical starts from opening an old
+test. The clock starts when the prepared test opens, as before; the in-page JS flow stays
+on its existing API. No test question is exposed by the untimed check.
+
+Public DNS checks through Google and Cloudflare and an HTTPS request outside the sandbox
+succeeded on 2026-10-16. A tool's DNS, egress or image restrictions require a tool that
+permits that access; changing the app cannot grant those permissions. No alternate hostname
+was verified, and no domain configuration was changed.

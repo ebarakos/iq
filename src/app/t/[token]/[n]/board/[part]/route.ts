@@ -1,6 +1,7 @@
 import { parsePicturePart } from "@/items/picture-puzzle";
 import { pictureToPng } from "@/items/puzzle-png";
 import { LINK_TEST_HEADERS } from "@/lib/link-start";
+import { resolveLinkToken } from "@/lib/link-session";
 import { LinkTestError, linkTestQuestion, openLinkToken } from "@/lib/link-test";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(
   const textHeaders = { ...LINK_TEST_HEADERS, "content-type": "text/plain; charset=utf-8" };
   let puzzle;
   try {
-    puzzle = /^[1-9]\d*$/.test(n) ? linkTestQuestion(openLinkToken(token), Number(n)) : undefined;
+    puzzle = /^[1-9]\d*$/.test(n) ? linkTestQuestion(openLinkToken(await resolveLinkToken(token)), Number(n)) : undefined;
   } catch (error) {
     if (error instanceof LinkTestError && error.code !== "configuration") {
       return new Response(error.message, { status: error.code === "invalid" ? 404 : 410, headers: textHeaders });

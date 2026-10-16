@@ -7,6 +7,7 @@ import { pictureToPng } from "@/items/puzzle-png";
 import { listLeaderboard } from "@/lib/leaderboard";
 import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } from "@/lib/link-test";
 import * as linkTests from "@/lib/link-test";
+import { resolveLinkToken } from "@/lib/link-session";
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
 import { GET as openStarted } from "./start/[id]/[built]/route";
@@ -174,8 +175,20 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.unstubAllEnvs();
   });
 
+  it("keeps canonical start links untimed until the agent chooses a fresh start", async () => {
+    vi.stubEnv("KV_REST_API_URL", "https://redis.example.test");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
+    const { redisCommand } = await import("@/lib/redis");
+    for (const path of ["/test", "/sample"]) {
+      const response = await fetchPath(path);
+      expect(response.status).toBe(303);
+      expect(response.location).toBe("http://localhost/agents");
+    }
+    expect(redisCommand).not.toHaveBeenCalled();
+  });
+
   it("walks /sample to a scored result", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     expect(start.status).toBe(303);
     const first = new URL(start.location!);
     expect(first.pathname).toMatch(/^\/t\/[A-Za-z0-9_.-]+\/1$/);
@@ -226,7 +239,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(resultText).toContain("Skipped");
     expect(resultText).toContain(`the answer is ${OPTION_LETTERS[puzzles[2].answerIndex]}`);
     for (const puzzle of puzzles) expect(resultText).toContain(puzzle.explanation);
-    expect(links(result.body).some(([label, href]) => label.startsWith("Take a new") && href === "/sample")).toBe(true);
+    expect(links(result.body).some(([label, href]) => label.startsWith("Take a new") && href.startsWith("/sample?new="))).toBe(true);
     expect(followable(result.body)).toEqual(["/"]);
   });
 
@@ -237,10 +250,19 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
     const cache = new Map<string, Fetched>();
     const cachedFetch = async (path: string) => {
+      expect(new URL(path, "https://iq.ebarakos.com").href.length).toBeLessThanOrEqual(250);
       if (!cache.has(path)) cache.set(path, await fetchPath(path));
-      return cache.get(path)!;
+      const response = cache.get(path)!;
+      if (!response.contentType?.startsWith("image/")) {
+        for (const href of [...links(response.body).map(([, href]) => href),
+          ...[...response.body.matchAll(/src="([^"]+)"/g)].map((match) => match[1])]) {
+          expect(new URL(href, "https://iq.ebarakos.com").href.length).toBeLessThanOrEqual(250);
+        }
+        expect(response.body).not.toContain("l1.");
+      }
+      return response;
     };
-    let response = await cachedFetch("/test");
+    let response = await cachedFetch("/test?new=walk");
     expect(response.status).toBe(200);
     const [[label, firstHref], ...others] = links(response.body);
     expect(others).toEqual([]);
@@ -273,11 +295,20 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect((await fetchPath(lastHref)).location).toBe(response.location);
     expect((await fetchPath(`/t/start/${id}`)).location).toBe(response.location);
     const first = new URL(response.location!);
+    expect(first.pathname.split("/")[2]).toMatch(/^[A-Za-z0-9_-]{22}$/);
     let path = first.pathname + first.search;
     for (let question = 1; question <= 30; question++) {
       const page = await cachedFetch(path);
       expect(page.status).toBe(200);
       expect(text(page.body)).toContain(`Question ${question} of 30`);
+      if ([1, 19, 30].includes(question)) {
+        const image = page.body.match(/src="([^"]+puzzle\.png)"/)![1];
+        const picture = await cachedFetch(image);
+        expect(picture.contentType).toBe("image/png");
+        expect([...picture.bytes!.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+        const board = await cachedFetch(image.replace("puzzle.png", "board/o0.png"));
+        expect(board.contentType).toBe("image/png");
+      }
       path = links(page.body).find(([label]) => label === "Skip")![1];
     }
     // A result may land on a different server from every question and image.
@@ -299,7 +330,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
   });
 
   it("keeps the first result on retries and rejects changed answers after revealing the review", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const { test } = loadLinkTest(token);
     const path = `/t/${token}/result?a=-----`;
@@ -315,7 +346,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
   });
 
   it("recovers a saved result on a cold server without rebuilding the test", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const path = `/t/${token}/result?a=-----`;
     const original = text((await fetchPath(path)).body);
@@ -337,7 +368,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
 
   it("reveals no review when Redis fails and recovers when retried", async () => {
     const { redisCommand } = await import("@/lib/redis");
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const path = `/t/${token}/result?a=-----`;
     vi.mocked(redisCommand).mockRejectedValueOnce(new Error("Redis is unavailable"));
@@ -352,7 +383,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.stubEnv("LEADERBOARD_ENABLED", flag);
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
-    const start = await fetchPath("/test");
+    const start = await fetchPath("/test?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const { puzzles } = loadLinkTest(token);
     const answers = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
@@ -367,15 +398,23 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
 
   it("publishes a 30-question link result as an agent by following its name's link, once", async () => {
     vi.stubEnv("LEADERBOARD_ENABLED", "true");
+    vi.stubEnv("KV_REST_API_URL", "https://redis.example.test");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
-    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const reference = new URL((await fetchPath("/test?new=walk")).location!).pathname.split("/")[2];
+    const token = await resolveLinkToken(reference);
+    expect(reference).toMatch(/^[A-Za-z0-9_-]{22}$/);
     const { puzzles } = loadLinkTest(token);
     const answers = puzzles.map((puzzle, index) => OPTION_LETTERS[index < 27 ? puzzle.answerIndex : (puzzle.answerIndex + 1) % 6]).join("");
     vi.setSystemTime((issuedAt + 900) * 1000);
-    const result = await fetchPath(`/t/${token}/result?a=${answers}`);
+    const result = await fetchPath(`/t/${reference}/result?a=${answers}`);
     expect(text(result.body)).toContain("27 of 30 correct");
     const publishLinks = links(result.body).filter(([label]) => label.startsWith("Publish as "));
+    for (const [, href] of publishLinks) {
+      expect(href).toContain(`/t/${reference}/publish/`);
+      expect(new URL(href, "https://iq.ebarakos.com").href.length).toBeLessThanOrEqual(250);
+    }
     expect(publishLinks.map(([label]) => label)).toContain("Publish as Claude");
     expect(followable(result.body)).toEqual(["/"]);
 
@@ -387,6 +426,9 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(text((await fetchPath(chatgpt)).body)).toContain("already published");
     expect((await listLeaderboard()).map(({ nickname, kind, correct }) => ({ nickname, kind, correct })))
       .toEqual([{ nickname: "Claude", kind: "agent", correct: 27 }]);
+    // The original token and the short reference share one receipt and publication.
+    expect(text((await fetchPath(`/t/${token}/publish/claude`)).body)).toContain("Published as Claude");
+    expect(text((await fetchPath(`/t/${token}/result?a=${"A".repeat(30)}`)).body)).toContain("already submitted with different answers");
     expect(text((await fetchPath(`/t/${token}/publish/someone-else`)).body)).toContain("cannot be published here");
   });
 
@@ -394,7 +436,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.stubEnv("LEADERBOARD_ENABLED", "true");
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
-    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const token = new URL((await fetchPath("/test?new=walk")).location!).pathname.split("/")[2];
     const { puzzles } = loadLinkTest(token);
     vi.setSystemTime((issuedAt + 900) * 1000);
     await fetchPath(`/t/${token}/result?a=${puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("")}`);
@@ -412,7 +454,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
 
   it("offers no publication for a 30-question test finished in under two minutes", async () => {
     vi.stubEnv("LEADERBOARD_ENABLED", "true");
-    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const token = new URL((await fetchPath("/test?new=walk")).location!).pathname.split("/")[2];
     const { puzzles } = loadLinkTest(token);
     const answers = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
     const result = await fetchPath(`/t/${token}/result?a=${answers}`);
@@ -421,7 +463,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
   });
 
   it("draws every picture the in-page test names, and nothing it does not", async () => {
-    const token = new URL((await fetchPath("/test")).location!).pathname.split("/")[2];
+    const token = new URL((await fetchPath("/test?new=walk")).location!).pathname.split("/")[2];
     const { puzzles } = loadLinkTest(token);
     // As on a server that did not start the test: each question is built alone
     // when its pictures are asked for, and must draw exactly what the test holds.
@@ -444,42 +486,26 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     }
   }, 120_000);
 
-  it("tells an AI agent on the home page, in plain HTML, that links alone take the test", async () => {
-    // A chat agent given only the home page took its start links for JavaScript
-    // buttons and stopped (2026-10-15).
+  it("keeps the agent entry discoverable without the long instructions on the home page", async () => {
     const home = renderToStaticMarkup(await HomePage());
     const note = text(home);
-    expect(note).toContain("AI agents can take the test without JavaScript, by following links.");
-    // Whether it says "ranked" follows the board; see the next test.
-    expect(note).toContain("https://iq.example.test/test (30 questions");
-    expect(note).toContain("https://iq.example.test/sample (5 questions)");
-    expect(note).toContain("While a test is being built, a page says how far it has got; follow its link until the first question opens.");
-    expect(links(home).filter(([label]) => label.startsWith("https://"))).toEqual([
-      ["https://iq.example.test/test", "/test"],
-      ["https://iq.example.test/sample", "/sample"],
-    ]);
+    expect(links(home)).toContainEqual(["Agent access", "/agents"]);
+    expect(note).not.toContain("can take the test without JavaScript");
+    expect(note).not.toContain("While a test is being built");
     // Like every link into a test, the note's links are not for crawlers.
     expect(followable(home)).not.toContain("/test");
     expect(followable(home)).not.toContain("/sample");
   });
 
-  it.each(["true", "false"])("promises ranking and publish links to AI agents only while the board is on (LEADERBOARD_ENABLED=%s)", async (flag) => {
-    vi.stubEnv("LEADERBOARD_ENABLED", flag);
-    const note = text(renderToStaticMarkup(await HomePage()));
-    expect(note.includes("(30 questions, ranked)")).toBe(flag === "true");
-    expect(note.includes("publish the score")).toBe(flag === "true");
-    expect(note).toContain("https://iq.example.test/test (30 questions");
-  });
-
   it("starts a 30-question test at /test", async () => {
-    const start = await fetchPath("/test");
+    const start = await fetchPath("/test?new=walk");
     expect(start.status).toBe(303);
     const page = await fetchPath(new URL(start.location!).pathname);
     expect(text(page.body)).toContain("Question 1 of 30");
   });
 
   it("sends a link with the wrong number of answers to the question they lead to", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     expect((await fetchPath(`/t/${token}/4?a=B`)).location).toBe(`/t/${token}/2?a=B`);
     expect((await fetchPath(`/t/${token}/2?a=BCDEA`)).location).toBe(`/t/${token}/result?a=BCDEA`);
@@ -491,13 +517,13 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     for (const path of ["/t/not-a-token/1", "/t/not-a-token/result?a=AAAAA"]) {
       const page = await fetchPath(path);
       expect(text(page.body)).toContain("This test link is not valid");
-      expect(links(page.body).some(([, href]) => href === "/sample")).toBe(true);
+      expect(links(page.body).some(([, href]) => href.startsWith("/sample?new="))).toBe(true);
       expect(followable(page.body)).toEqual(["/"]);
     }
   });
 
   it("says when a test has expired", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const { test } = loadLinkTest(token);
     vi.useFakeTimers();
@@ -511,7 +537,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
   });
 
   it("ends the test at the deadline and marks a late result", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const { test } = loadLinkTest(token);
 
@@ -526,11 +552,11 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
   });
 
   it("tells a taker when the site has changed under their test", async () => {
-    const start = await fetchPath("/sample");
+    const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     vi.stubEnv("WITHDRAWN_FAMILY_IDS", "some-withdrawn-family");
     const page = await fetchPath(`/t/${token}/1`);
     expect(text(page.body)).toContain("The site has changed since this test started");
-    expect(links(page.body).some(([, href]) => href === "/sample")).toBe(true);
+    expect(links(page.body).some(([, href]) => href.startsWith("/sample?new="))).toBe(true);
   });
 });

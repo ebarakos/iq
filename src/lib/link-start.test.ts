@@ -3,6 +3,7 @@ import { EXPANDED_GENERATOR_VERSION } from "@/items/expanded-quiz";
 import { SECONDS_PER_QUESTION } from "./quiz-token";
 import { clearBuiltLinkTests, loadLinkTest } from "./link-test";
 import { openStartedTest, startLinkTest } from "./link-start";
+import { resolveLinkToken } from "./link-session";
 
 const store = vi.hoisted(() => new Map<string, string>());
 vi.mock("./redis", async (importOriginal) => ({
@@ -86,8 +87,8 @@ describe("a link test built over several requests", { timeout: 30_000 }, () => {
     const opened = await follow(link);
     expect(opened.status).toBe(303);
     const question = new URL(opened.headers.get("location")!);
-    expect(question.pathname).toMatch(/^\/t\/[A-Za-z0-9_.-]+\/1$/);
-    const { test, puzzles } = loadLinkTest(question.pathname.split("/")[2]);
+    expect(question.pathname).toBe(`/t/${id}/1`);
+    const { test, puzzles } = loadLinkTest(await resolveLinkToken(question.pathname.split("/")[2]));
     expect(puzzles).toHaveLength(5);
     expect(test.issuedAt).toBe(Date.parse("2030-01-01T00:00:00Z") / 1000);
     expect(test.answerDeadline - test.issuedAt).toBe(5 * SECONDS_PER_QUESTION);
@@ -187,7 +188,9 @@ describe("a link test built over several requests", { timeout: 30_000 }, () => {
     const retry = read(await failed.text()).link!;
     const recovered = await follow(retry);
     expect(recovered.status).toBe(303);
-    expect(new URL(recovered.headers.get("location")!).pathname.split("/")[2]).toBe(JSON.parse(kept).token);
+    const reference = new URL(recovered.headers.get("location")!).pathname.split("/")[2];
+    expect(reference).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(await resolveLinkToken(reference)).toBe(JSON.parse(kept).token);
     expect([...store.values()][0]).toBe(kept);
   });
 
@@ -206,8 +209,26 @@ describe("a link test built over several requests", { timeout: 30_000 }, () => {
   it("redirects straight to the first question when the whole test builds in one request", async () => {
     const start = await startLinkTest(request("/sample"), "short-5", { budgetMs: 60_000 });
     expect(start.status).toBe(303);
-    expect(new URL(start.headers.get("location")!).pathname).toMatch(/^\/t\/[A-Za-z0-9_.-]+\/1$/);
-    expect(store.size).toBe(0);
+    const path = new URL(start.headers.get("location")!).pathname;
+    expect(path).toMatch(/^\/t\/[A-Za-z0-9_-]{22}\/1$/);
+    const token = await resolveLinkToken(path.split("/")[2]);
+    expect(store.size).toBe(1);
+    expect(JSON.parse([...store.values()][0])).toEqual({ token });
+    expect(loadLinkTest(token).puzzles).toHaveLength(5);
+  });
+
+  it("preserves legacy token URLs and refuses unknown, unfinished, or deleted sessions", async () => {
+    await expect(resolveLinkToken("A".repeat(22))).rejects.toMatchObject({ code: "expired" });
+    const building = await startLinkTest(request("/sample"), "short-5", { budgetMs: -1 });
+    const unfinished = read(await building.text()).link!.split("/")[3];
+    await expect(resolveLinkToken(unfinished)).rejects.toMatchObject({ code: "expired" });
+
+    const start = await startLinkTest(request("/sample"), "short-5", { budgetMs: Infinity });
+    const reference = new URL(start.headers.get("location")!).pathname.split("/")[2];
+    const token = await resolveLinkToken(reference);
+    expect(await resolveLinkToken(token)).toBe(token);
+    store.clear();
+    await expect(resolveLinkToken(reference)).rejects.toMatchObject({ code: "expired" });
   });
 
   it("refuses start links it never handed out, or made before the site changed", async () => {
@@ -223,14 +244,19 @@ describe("a link test built over several requests", { timeout: 30_000 }, () => {
     expect(read(await (await follow(start.link!)).text()).text).toContain("This start link has expired");
   });
 
-  it("finishes the test at once and redirects when Redis cannot keep it", async () => {
+  it.each([-1, Infinity])("offers a fresh start when Redis cannot keep a short session (budget %s)", async (budgetMs) => {
     const { redisCommand } = await import("./redis");
     vi.mocked(redisCommand)
       .mockImplementationOnce(async () => 1) // the start limit's INCR
       .mockImplementationOnce(async () => 1) // and its EXPIRE
       .mockRejectedValueOnce(new Error("Redis is unavailable"));
-    const start = await startLinkTest(request("/sample"), "short-5", { budgetMs: -1 });
-    expect(start.status).toBe(303);
-    expect(new URL(start.headers.get("location")!).pathname).toMatch(/^\/t\/[A-Za-z0-9_.-]+\/1$/);
+    const start = await startLinkTest(request("/sample"), "short-5", { budgetMs });
+    expect(start.status).toBe(200);
+    expect(start.headers.get("location")).toBeNull();
+    const html = await start.text();
+    expect(read(html).text).toContain("Could not start a test");
+    expect(html).toMatch(/href="\/sample\?new=[A-Za-z0-9_-]+"/);
+    expect(html).not.toContain("/t/");
+    expect(store.size).toBe(0);
   });
 });
