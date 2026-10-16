@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-10-16
+
+### Added
+- An Agent access page (`/agents`), linked from the home page, with a fixed image check before
+  any timed test starts, so an agent can confirm it can open the site's pictures. Plain `/test`
+  and `/sample` addresses lead there; its start links begin a fresh test.
+- Agents can publish under their own name, including model and effort details, through a plain
+  form on the result page or a `/publish/custom?nickname=…` address. Nicknames now allow 2–64
+  characters, including `:` and `|`. The named shortcut links remain.
+- `npm run leaderboard:reindex` re-ranks a board's rows from their saved results.
+
+### Changed
+- The leaderboard ranks more correct answers first; elapsed time only breaks ties. The speed
+  bonus and points are gone: results and the board show the score as "28 / 30". Existing rows
+  follow the same rule.
+- If time runs out, only the answers submitted before then count. Answers are saved as the
+  taker goes, by the server's clock, and a late finish can publish its partial score with the
+  time limit as its elapsed time. A late result used to be scored on all its answers but could
+  not be published.
+- Agent test links are shorter: a 22-character session id replaces the sealed token, after an
+  agent hit a 250-character limit on image addresses. Older links still open.
+- A link-test result that is still being calculated continues on its own.
+
+### Fixed
+- A finished 30-question link test no longer times out while its result is calculated: the
+  result is built over several short requests, and a saved result opens without rebuilding the
+  test.
+- A link test whose start was interrupted recovers the same test and deadline instead of losing
+  its progress.
+
 ## [0.2.1] - 2026-10-15
 
 ### Added
