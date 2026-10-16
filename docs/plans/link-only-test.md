@@ -12,9 +12,9 @@ apart from the start links and the labels below.
 ## The flow
 
 1. `GET /sample` or `GET /test` makes a fresh test and redirects to its first
-   question: `/t/<token>/1`. With Redis, a request builds for about 1.5 s only (see
+   question: `/t/<token>/1`. With Redis, a request builds for about 1.2 s only (see
    "Built over several requests" below); a test not finished by then answers with a
-   page that says how many questions are built and links to `/t/start/<id>`, which
+   page that says how many questions are built and links to `/t/start/<id>/<built>`, which
    builds the next part. The request that finishes it starts the clock and redirects.
 2. A question page shows "Question 2 of 5", the deadline as a clock time and the
    seconds left, the puzzle as an image, and one link per option plus Skip. Each
@@ -181,10 +181,11 @@ there, `/sample` 2–3 s. The server refused nothing (at most 4 starts per addre
 ## Built over several requests (2026-10-15)
 
 A fetch tool waits only a few seconds for a page, so no request may build for long. Every
-link-test start with Redis builds for about 1.5 s (`BUILD_BUDGET_MS`, `src/lib/link-start.ts`).
+link-test start with Redis builds for about 1.2 s (`BUILD_BUDGET_MS`, `src/lib/link-start.ts`),
+and stops before a question that would likely run past it (the slowest one so far).
 If the test is not finished, its progress (seed, and each filled slot's kept attempt and
 question fingerprint) goes to Redis for 10 minutes under a random id, and the page links to
-`/t/start/<id>`, which builds the next part on whichever server instance gets it. A slot
+`/t/start/<id>/<built>`, which builds the next part on whichever server instance gets it. A slot
 depends on earlier ones only through the questions they ask (`fillExpandedSlots`), so the
 test is the one `createLinkTest` builds at once from the same seed; the tests prove it.
 
@@ -196,5 +197,12 @@ test is the one `createLinkTest` builds at once from the same seed; the tests pr
   follow gets "expired". Progress saved with `XX` cannot revive an opened link.
 - **Unchanged without Redis** (a development server): the start builds everything and
   redirects. The in-page test (`POST /api/generate`) still builds at once; people wait there.
-- Measured on a development server: `/test` answered in 2.4 s (15 of 30 built), the follows in
-  2.2 s and 1.4 s, the last one redirecting; `/sample` redirected at once in 0.7 s.
+- **A new address at every step.** `<built>` is there only so each page links somewhere new;
+  the server ignores it.
+
+First ChatGPT run on production (2026-10-16), with a 1.5 s budget and one fixed `/t/start/<id>`
+link: its tool timed out on the first requests (one follow took 3.3 s there), then showed
+"19 of 30" over and over. The server held 19 and moved to 23 on the next real request, so the
+tool was serving its cached copy of the same address. Hence the new address per step and the
+shorter budget with a stop before an overrun. Measured on a development server afterwards:
+six requests of 0.6–1.5 s each, then the redirect to question 1.

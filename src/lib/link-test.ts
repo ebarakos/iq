@@ -358,8 +358,8 @@ export function beginLinkTest(
 }
 
 /**
- * Build more of a test: at least one question, then more until `budgetMs` has
- * passed. Returns the finished draft once every question is built, otherwise
+ * Build more of a test: at least one question, then more while the next one
+ * likely fits in `budgetMs`. Returns the finished draft once every question is built, otherwise
  * how far it got. The questions are the ones `createLinkTest` builds from the
  * same seed, and generation that fails falls back to the reference bank the
  * same way. Throws `changed` when the site now builds other questions from it.
@@ -374,14 +374,21 @@ export function continueLinkTest(
   if (progress.generatorVersion !== EXPANDED_GENERATOR_VERSION || progress.withdrawnHash !== withdrawnFamilyHash(withdrawn)) {
     throw new LinkTestError("changed", "The site has changed since this test started.", profile);
   }
-  const deadline = Date.now() + budgetMs;
+  const started = Date.now();
+  let slowest = 0;
+  let previous = started;
   const attempts = [...progress.attempts];
   const questions = [...progress.questions];
   try {
     for (const filled of fillExpandedSlots(seed, profile, CURRENT_FAMILY_PROMOTION_REGISTRY, withdrawn, progress)) {
       attempts.push(filled.attempt);
       questions.push(filled.question);
-      if (attempts.length < questionCount(profile) && Date.now() >= deadline) {
+      const now = Date.now();
+      slowest = Math.max(slowest, now - previous);
+      previous = now;
+      // Stop before a question that would likely run past the budget: one
+      // question can take most of a second on a slow server.
+      if (attempts.length < questionCount(profile) && now - started + slowest > budgetMs) {
         return { progress: { ...progress, attempts, questions } };
       }
     }

@@ -8,7 +8,7 @@ import { listLeaderboard } from "@/lib/leaderboard";
 import { clearBuiltLinkTests, loadLinkTest, OPTION_LETTERS, pictureImagePath } from "@/lib/link-test";
 import { GET as startSample } from "../sample/route";
 import { GET as startTest } from "../test/route";
-import { GET as openStarted } from "./start/[id]/route";
+import { GET as openStarted } from "./start/[id]/[built]/route";
 import QuestionPage from "./[token]/[n]/page";
 import { GET as puzzleImage } from "./[token]/[n]/puzzle.png/route";
 import { GET as pictureImage } from "./[token]/[n]/board/[part]/route";
@@ -82,8 +82,10 @@ async function fetchPath(path: string): Promise<Fetched> {
   };
   if (url.pathname === "/sample") return asResponse(await startSample(new Request(url)));
   if (url.pathname === "/test") return asResponse(await startTest(new Request(url)));
-  if (segments[0] === "t" && segments[1] === "start" && segments.length === 3) {
-    return asResponse(await openStarted(new Request(url), { params: Promise.resolve({ id: segments[2] }) }));
+  if (segments[0] === "t" && segments[1] === "start" && segments.length === 4) {
+    return asResponse(await openStarted(new Request(url), {
+      params: Promise.resolve({ id: segments[2], built: segments[3] }),
+    }));
   }
   if (segments[0] === "t" && segments.length === 5 && segments[3] === "board") {
     return asResponse(await pictureImage(new Request(url), {
@@ -218,19 +220,25 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.stubEnv("KV_REST_API_TOKEN", "test-only-token");
     let response = await fetchPath("/test");
     expect(response.status).toBe(200);
-    const [[label, href], ...others] = links(response.body);
+    const [[label, firstHref], ...others] = links(response.body);
     expect(others).toEqual([]);
     expect(label).toBe("Continue to the test");
-    expect(href).toMatch(/^\/t\/start\/[A-Za-z0-9_-]{22}$/);
+    expect(firstHref).toMatch(/^\/t\/start\/[A-Za-z0-9_-]{22}\/\d+$/);
     expect(followable(response.body)).toEqual([]);
+    const id = firstHref.split("/")[3];
 
     const built: number[] = [];
     while (response.status === 200) {
-      built.push(Number(text(response.body).match(/(\d+) of 30 questions so far/)![1]));
-      expect(links(response.body)).toEqual([["Continue to the test", href]]);
+      const count = Number(text(response.body).match(/(\d+) of 30 questions so far/)![1]);
+      built.push(count);
+      // Each page links to a new address: a fetch tool that caches by address
+      // showed ChatGPT the same page again and again (2026-10-16).
+      const [[, href]] = links(response.body);
+      expect(href).toBe(`/t/start/${id}/${count}`);
       response = await fetchPath(href);
     }
     expect(built.length).toBeGreaterThan(1);
+    expect(new Set(built).size).toBe(built.length);
     expect(built).toEqual([...built].sort((a, b) => a - b));
     expect(response.status).toBe(303);
     const first = new URL(response.location!);

@@ -59,8 +59,9 @@ describe("a link test built over several requests", { timeout: 30_000 }, () => {
     let page = read(await start.text());
     expect(page.text).toContain("Your 5-question test is being built: 1 of 5 questions so far.");
     expect(page.text).toContain("Your time starts only when the first question opens.");
-    const link = page.link!;
-    expect(link).toMatch(/^\/t\/start\/[A-Za-z0-9_-]{22}$/);
+    let link = page.link!;
+    expect(link).toMatch(/^\/t\/start\/[A-Za-z0-9_-]{22}\/1$/);
+    const id = link.split("/")[3];
     // What is kept between requests never leaves the server: no seed in the link.
     const [kept] = [...store.values()];
     expect(link).not.toContain(JSON.parse(kept).seed);
@@ -70,7 +71,9 @@ describe("a link test built over several requests", { timeout: 30_000 }, () => {
       expect(response.status).toBe(200);
       page = read(await response.text());
       expect(page.text).toContain(`${built} of 5 questions so far`);
-      expect(page.link).toBe(link);
+      // A new address at every step, so a fetch tool's cache never serves an old page.
+      expect(page.link).toBe(`/t/start/${id}/${built}`);
+      link = page.link!;
     }
 
     vi.useFakeTimers({ toFake: ["Date"] });

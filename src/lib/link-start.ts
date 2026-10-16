@@ -30,8 +30,12 @@ export const LINK_TEST_HEADERS = {
  * request that finishes it starts the clock and opens the first question. No
  * work runs after a response, so no request waits behind another's build.
  */
-/** How long one request builds before it answers: under what a fetch tool waits. */
-const BUILD_BUDGET_MS = 1_500;
+/**
+ * How long one request builds before it answers. With Redis and a cold start
+ * on top, a production request takes about a second more (a 1.5 s budget
+ * gave 3.3 s, 2026-10-16), and ChatGPT's tool gave up on some of those.
+ */
+const BUILD_BUDGET_MS = 1_200;
 /** How long a test being built waits for its next request. */
 const PROGRESS_SECONDS = 600;
 
@@ -44,9 +48,14 @@ function startKey(id: string): string {
   return `${quizNamespace()}:start:${id}`;
 }
 
-/** Where a test started at /test or /sample is built further, then opened. */
-export function startedTestPath(id: string): string {
-  return `/t/start/${id}`;
+/**
+ * Where a test started at /test or /sample is built further, then opened. The
+ * number of questions built so far is in the path only so each page links to a
+ * new address: a fetch tool that caches pages by address showed ChatGPT the
+ * same "19 of 30" page again and again (2026-10-16). The server ignores it.
+ */
+export function startedTestPath(id: string, built: number): string {
+  return `/t/start/${id}/${built}`;
 }
 
 function textResponse(status: number, body: string): Response {
@@ -66,7 +75,7 @@ ${body}
 }
 
 function buildingPage(progress: LinkTestProgress, id: string): Response {
-  const path = startedTestPath(id);
+  const path = startedTestPath(id, progress.attempts.length);
   const total = questionCount(progress.profile);
   return htmlPage(200, "Building your test", [
     `<p>Your ${total}-question test is being built: ${progress.attempts.length} of ${total} questions so far. ` +
@@ -136,7 +145,7 @@ export async function startLinkTest(req: Request, profile: ExpandedProfile, opti
 }
 
 /**
- * `GET /t/start/<id>`: build more of a started test. Once it is complete,
+ * `GET /t/start/<id>/<built>`: build more of a started test. Once it is complete,
  * start its clock and redirect to its first question; each start link opens
  * one test, once.
  */
