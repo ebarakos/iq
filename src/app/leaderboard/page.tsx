@@ -38,9 +38,8 @@ export default async function LeaderboardPage() {
         </Link>
       </header>
       <p className="mb-5 text-sm text-gray-600">
-        The top 20 scores from 30-question tests, by people and AI agents. Only answers recorded before
-        the deadline count. Each correct answer earns 100 points. More correct answers rank first;
-        elapsed time only breaks ties.
+        The top 20 results from 30-question tests, by people and AI agents. More correct answers
+        rank first; elapsed time only breaks ties. Only answers submitted before time runs out count.
       </p>
 
       {failed ? (
@@ -73,8 +72,7 @@ export default async function LeaderboardPage() {
               <tr>
                 <th scope="col" className="px-3 py-3 sm:px-4">Rank</th>
                 <th scope="col" className="px-3 py-3 sm:px-4">Nickname</th>
-                <th scope="col" className="px-3 py-3 text-right sm:px-4">Points</th>
-                <th scope="col" className="hidden whitespace-nowrap px-4 py-3 text-right sm:table-cell">Correct / 30</th>
+                <th scope="col" className="px-3 py-3 text-right sm:px-4">Correct</th>
                 <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Elapsed</th>
                 <th scope="col" className="hidden whitespace-nowrap px-4 py-3 sm:table-cell">App version</th>
                 <th scope="col" className="hidden whitespace-nowrap px-4 py-3 sm:table-cell">Date (UTC)</th>
@@ -92,11 +90,7 @@ export default async function LeaderboardPage() {
                     </span>
                     <span className="mt-1 block text-xs font-normal text-gray-500 sm:hidden">{dateLabel(entry.submittedAt)} UTC</span>
                   </th>
-                  <td className="px-3 py-4 text-right font-semibold tabular-nums sm:px-4">
-                    {entry.points.toLocaleString("en-US")}
-                    <span className="mt-1 block text-xs font-normal text-gray-500 sm:hidden">{entry.correct} / 30</span>
-                  </td>
-                  <td className="hidden whitespace-nowrap px-4 py-4 text-right tabular-nums text-gray-600 sm:table-cell">{entry.correct} / 30</td>
+                  <td className="whitespace-nowrap px-3 py-4 text-right font-semibold tabular-nums sm:px-4">{entry.correct} / 30</td>
                   <td className="hidden px-4 py-4 text-right font-mono tabular-nums text-gray-600 sm:table-cell">{elapsedLabel(entry.elapsedSeconds)}</td>
                   <td className="hidden px-4 py-4 text-gray-600 sm:table-cell">{entry.appVersion}</td>
                   <td className="hidden whitespace-nowrap px-4 py-4 text-gray-600 sm:table-cell">{dateLabel(entry.submittedAt)}</td>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listBoardEntries, listLeaderboard, removeLeaderboardEntry } from "@/lib/leaderboard";
+import { listBoardEntries, listLeaderboard, reindexBoard, removeLeaderboardEntry } from "@/lib/leaderboard";
 import type { LeaderboardEntry } from "@/lib/leaderboard-types";
 import { createLinkTest, openLinkToken, sealLinkToken, type LinkTest } from "@/lib/link-test";
 import { POST as submit } from "../submit/route";
@@ -21,6 +21,16 @@ vi.mock("@/lib/redis", () => ({
         store.values.set(key, String(command[2]));
         return "OK";
       case "ZREM": return Number(store.ranks.delete(`${key}:${command[2]}`));
+      case "ZADD": {
+        // Only the XX form (update rows already ranked) is used outside the publish script.
+        if (command[2] !== "XX") throw new Error("Unexpected ZADD");
+        const pairs = command.slice(3);
+        for (let index = 0; index < pairs.length; index += 2) {
+          const id = String(pairs[index + 1]);
+          if (store.ranks.has(`${key}:${id}`)) store.ranks.set(`${key}:${id}`, { id, board: key, score: Number(pairs[index]) });
+        }
+        return 0;
+      }
       case "EVAL": {
         if (String(command[1]).includes("cjson.decode(current).receivedAtMs")) {
           const [answerKey, receiptKey] = [String(command[3]), String(command[4])];
@@ -118,14 +128,16 @@ afterEach(() => {
 });
 
 describe("leaderboard publication", () => {
-  it("publishes server-scored points, original elapsed time and the sealed app version", async () => {
+  it("publishes the server-scored accuracy, original elapsed time and the sealed app version", async () => {
     const quizToken = token();
     const submission = await submit(request({
       quizToken, answers: answers(28), score: 30, points: 999999, elapsedSeconds: 0,
       issuedAt: NOW, answerDeadline: NOW + 1800, leaderboardEligible: true,
     }));
     expect(submission.status).toBe(200);
-    expect(await submission.json()).toMatchObject({ score: 28, points: 2800, elapsedSeconds: 1200 });
+    const scored = await submission.json();
+    expect(scored).toMatchObject({ score: 28, elapsedSeconds: 1200 });
+    expect(scored).not.toHaveProperty("points");
     vi.setSystemTime((NOW + 100) * 1000);
     const published = await POST(request({
       quizToken, kind: "person", nickname: "  Taker  ", score: 30, correct: 30, total: 30,
@@ -133,7 +145,7 @@ describe("leaderboard publication", () => {
     }));
     expect(published.status).toBe(200);
     const { entry } = await published.json();
-    expect(entry).toMatchObject({ nickname: "Taker", kind: "person", correct: 28, total: 30, points: 2800, elapsedSeconds: 1200, appVersion: "v0.1.1", submittedAt: NOW });
+    expect(entry).toEqual({ id: expect.any(String), nickname: "Taker", kind: "person", correct: 28, total: 30, elapsedSeconds: 1200, appVersion: "v0.1.1", submittedAt: NOW });
     const entries = await listLeaderboard();
     expect(entries).toEqual([entry]);
     expect(JSON.stringify(entries)).not.toContain(quizToken);
@@ -151,7 +163,7 @@ describe("leaderboard publication", () => {
     const response = await POST(request(forged));
     expect(response.status).toBe(200);
     const { entry } = await response.json();
-    expect(entry).toMatchObject({ points: 0, correct: 0, elapsedSeconds: 1200 });
+    expect(entry).toMatchObject({ correct: 0, elapsedSeconds: 1200 });
     const retry = await POST(request({ ...forged, nickname: "Replacement", points: 3750 }));
     expect((await retry.json()).entry).toEqual(entry);
     expect(await listLeaderboard()).toEqual([entry]);
@@ -167,47 +179,60 @@ describe("leaderboard publication", () => {
       expect((await submit(request({ quizToken, answers: answers(correct) }))).status).toBe(200);
       expect((await POST(request({ quizToken, nickname, kind }))).status).toBe(200);
     }
-    expect((await listLeaderboard()).map(({ nickname, correct, points, elapsedSeconds }) =>
-      ({ nickname, correct, points, elapsedSeconds }))).toEqual([
-      { nickname: "Accurate agent", correct: 30, points: 3000, elapsedSeconds: 600 },
-      { nickname: "Accurate person", correct: 30, points: 3000, elapsedSeconds: 1799 },
-      { nickname: "Fast agent", correct: 28, points: 2800, elapsedSeconds: 120 },
+    expect((await listLeaderboard()).map(({ nickname, correct, elapsedSeconds }) =>
+      ({ nickname, correct, elapsedSeconds }))).toEqual([
+      { nickname: "Accurate agent", correct: 30, elapsedSeconds: 600 },
+      { nickname: "Accurate person", correct: 30, elapsedSeconds: 1799 },
+      { nickname: "Fast agent", correct: 28, elapsedSeconds: 120 },
     ]);
   });
 
-  it("finds accurate legacy rows beyond the old index's first 40 and ranks them with new rows", async () => {
+  it("re-ranks rows indexed under the old points rule, then reads only the top rows", async () => {
     const board = "aiq:local:leaderboard";
-    const add = (entry: LeaderboardEntry & { removed?: true }, score: number) => {
+    type StoredRow = LeaderboardEntry & { removed?: true; points?: number };
+    const add = (entry: StoredRow, score: number) => {
       store.values.set(`${board}:entry:${entry.id}`, JSON.stringify(entry));
       store.ranks.set(`${board}:${entry.id}`, { id: entry.id, board, score });
     };
-    const base: LeaderboardEntry = {
+    // Old index scores: points with the speed bonus × 10,000, plus seconds left.
+    const base: StoredRow = {
       id: "legacy", nickname: "Legacy", kind: "agent", correct: 28, total: 30,
       points: 3453, elapsedSeconds: 120, appVersion: "v0.1.1", submittedAt: NOW,
     };
     for (let index = 0; index < 45; index++) {
       add({ ...base, id: `legacy-${index}` }, 34_530_000 + 1680);
     }
-    add({ ...base, id: "late-perfect", correct: 30, points: 3000, elapsedSeconds: 2000 }, 30_000_000);
-    add({ ...base, id: "earlier-perfect", correct: 30, points: 3000, elapsedSeconds: 1900 }, 30_000_000);
+    add({ ...base, id: "late-perfect", correct: 30, points: 3000, elapsedSeconds: 1805 }, 30_000_000);
+    add({ ...base, id: "earlier-perfect", correct: 30, points: 3000, elapsedSeconds: 1790 }, 30_000_010);
     add({ ...base, id: "removed", removed: true, correct: 30, elapsedSeconds: 0 }, 99_000_000);
+    add({ ...base, id: "taken-down", removed: true, correct: 30, elapsedSeconds: 0 }, 0);
+    store.ranks.delete(`${board}:taken-down`);
     store.ranks.set(`${board}:missing`, { id: "missing", board, score: 99_000_000 });
 
     const quizToken = token();
     await submit(request({ quizToken, answers: answers(29) }));
     const { entry } = await (await POST(request({ quizToken, nickname: "New person", kind: "person" }))).json();
-    const entries = await listLeaderboard();
-    expect(entries).toHaveLength(20);
-    expect(entries.slice(0, 3).map(({ id }) => id)).toEqual(["earlier-perfect", "late-perfect", entry.id]);
-    expect(entries.every(({ points, correct }) => points === 100 * correct)).toBe(true);
-    expect(entries.some(({ id }) => id === "removed" || id === "missing")).toBe(false);
+    // Until re-ranked, the old scale keeps every perfect and new row below the legacy 28s.
+    expect((await listLeaderboard()).some(({ correct }) => correct > 28)).toBe(false);
+
+    for (let run = 0; run < 2; run++) {
+      expect(await reindexBoard("aiq:local")).toBe(48);
+      const entries = await listLeaderboard();
+      expect(entries).toHaveLength(20);
+      expect(entries.slice(0, 4).map(({ id }) => id)).toEqual(["earlier-perfect", "late-perfect", entry.id, expect.stringMatching(/^legacy-/)]);
+      expect(entries.some((row) => "points" in row)).toBe(false);
+      expect(entries.some(({ id }) => id === "removed" || id === "missing")).toBe(false);
+    }
+    const { redisCommand } = await import("@/lib/redis");
+    const reads = vi.mocked(redisCommand).mock.calls.map(([command]) => command).filter((command) => command[0] === "ZREVRANGE");
+    expect(reads.at(-1)!.slice(2)).toEqual([0, 39]);
     expect(await listBoardEntries("aiq:local")).toHaveLength(48);
-    // Listing old entries does not rewrite their original bonus points or index.
+    // A row taken down stays off the board, and saved rows are not rewritten.
+    expect(store.ranks.has(`${board}:taken-down`)).toBe(false);
     expect(JSON.parse(store.values.get(`${board}:entry:legacy-0`)!).points).toBe(3453);
-    expect(store.ranks.get(`${board}:legacy-0`)!.score).toBe(34_531_680);
   });
 
-  it("projects current points from old receipts and entries without modifying either", async () => {
+  it("drops points from old receipts and entries without modifying either", async () => {
     const quizToken = token();
     await submit(request({ quizToken, answers: answers(28) }));
     const receiptKey = [...store.values.keys()].find((key) => key.includes(":submission:"))!;
@@ -216,10 +241,12 @@ describe("leaderboard publication", () => {
     const legacyReceipt = JSON.stringify(receipt);
     store.values.set(receiptKey, legacyReceipt);
 
-    expect(await (await submit(request({ quizToken, answers: answers(28) }))).json())
-      .toMatchObject({ score: 28, points: 2800, elapsedSeconds: 1200 });
+    const recovered = await (await submit(request({ quizToken, answers: answers(28) }))).json();
+    expect(recovered).toMatchObject({ score: 28, elapsedSeconds: 1200 });
+    expect(recovered).not.toHaveProperty("points");
     const { entry } = await (await POST(request({ quizToken, nickname: "Existing", kind: "agent" }))).json();
-    expect(entry).toMatchObject({ correct: 28, points: 2800 });
+    expect(entry).toMatchObject({ correct: 28 });
+    expect(entry).not.toHaveProperty("points");
     const entryKey = `aiq:local:leaderboard:entry:${entry.id}`;
     const legacyEntry = JSON.stringify({ ...entry, points: 3033 });
     store.values.set(entryKey, legacyEntry);
@@ -276,7 +303,7 @@ describe("leaderboard publication", () => {
     expect((await (await POST(request({ kind: "person", quizToken, nickname: "Third" }))).json()).entry).toEqual(entries[0]);
   });
 
-  it("sorts the faster 28/30 above the slower perfect result", async () => {
+  it("ranks an on-time 28/30 above a timed-out test with nothing saved", async () => {
     const fast = token();
     const slow = token({ issuedAt: NOW - 1800, answerDeadline: NOW });
     await submit(request({ quizToken: slow, answers: ALL_RIGHT }));
@@ -326,11 +353,12 @@ describe("leaderboard publication", () => {
     const refusedUpdate = await saveAnswers(request({ quizToken, answers: ALL_RIGHT, receivedAtMs: 0 }));
     expect(await refusedUpdate.json()).toEqual({ closed: true });
     const result = await (await submit(request({ quizToken, answers: ALL_RIGHT }))).json();
-    expect(result).toMatchObject({ score: 26, points: 2600, timedOut: true, late: true, leaderboardEligible: true });
+    // Elapsed time stops at the time limit, however late the result was opened.
+    expect(result).toMatchObject({ score: 26, elapsedSeconds: 1800, timedOut: true, late: true, leaderboardEligible: true });
     expect(result.results.slice(26).every((item: { chosen: number | null }) => item.chosen === null)).toBe(true);
     const published = await POST(request({ quizToken, kind, nickname: "Late finisher" }));
     expect(published.status).toBe(200);
-    expect((await published.json()).entry).toMatchObject({ correct: 26, points: 2600, kind });
+    expect((await published.json()).entry).toMatchObject({ correct: 26, elapsedSeconds: 1800, kind });
     expect((await submit(request({ quizToken, answers: ALL_RIGHT }))).status).toBe(200);
     expect((await submit(request({ quizToken, answers: partial }))).status).toBe(409);
   });
@@ -342,7 +370,7 @@ describe("leaderboard publication", () => {
     vi.setSystemTime((NOW + 600) * 1000);
     expect(await (await saveAnswers(request({ quizToken, answers: ALL_RIGHT }))).json()).toEqual({ closed: true });
     expect(await (await submit(request({ quizToken, answers: ALL_RIGHT }))).json())
-      .toMatchObject({ score: 3, timedOut: true, late: false, points: 300, leaderboardEligible: true });
+      .toMatchObject({ score: 3, timedOut: true, late: false, leaderboardEligible: true });
   });
 
   it("updates choices on time and freezes them after submission", async () => {

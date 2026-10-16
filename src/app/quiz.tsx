@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { PublicPuzzle } from "@/items/schema";
 import { picturePaths, withPictureAttempt, type PicturePuzzle } from "@/items/picture-puzzle";
-import { leaderboardPoints, NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH, type LeaderboardEntry, type TakerKind } from "@/lib/leaderboard-types";
+import { NICKNAME_MAX_LENGTH, NICKNAME_MIN_LENGTH, type LeaderboardEntry, type TakerKind } from "@/lib/leaderboard-types";
 import { SceneGraphic, StemView } from "@/items/render";
 import { sampleGuide } from "@/items/sample-guides";
 import {
@@ -58,7 +58,6 @@ interface SubmitResponse {
   late?: boolean;
   timedOut?: boolean;
   secondsLate?: number;
-  points?: number;
   elapsedSeconds?: number;
   appVersion?: string | null;
   leaderboardEligible?: boolean;
@@ -596,11 +595,10 @@ function Intro({ onStart }: {
       </p>
       <p className="mt-3 text-gray-600">
         The timer gives one minute per question in a single countdown. Unanswered questions
-        count as incorrect. Answers saved before time runs out still count if you finish late.
+        count as incorrect. If time runs out, only the answers you submitted before then count.
       </p>
       <p className="mt-3 text-gray-600">
-        Each correct answer earns 100 points. More correct answers rank first on the
-        leaderboard. Elapsed time only breaks ties.
+        More correct answers rank first on the leaderboard. Elapsed time only breaks ties.
       </p>
       <p className="mt-4 text-xs text-gray-500">
         Keyboard shortcuts: 1–6 or A–F to answer, ← → to move, Enter to continue.
@@ -1096,15 +1094,6 @@ function Result({
           <span className="text-2xl font-normal text-gray-400"> / {review.total}</span>
         </p>
         <p className="mt-2 text-gray-600">{pct}% correct</p>
-        {review.total === 30 && (
-          <div className="mt-4 border-t border-gray-100 pt-4">
-            <p className="text-2xl font-semibold">{leaderboardPoints(review.score).toLocaleString("en-US")} points</p>
-            <p className="mt-1 text-xs text-gray-500">
-              Each correct answer earns 100 points. More correct answers rank first on the
-              leaderboard. Elapsed time only breaks ties.
-            </p>
-          </div>
-        )}
         {(typeof review.elapsedSeconds === "number" || review.appVersion) && (
           <p className="mt-2 text-xs text-gray-500">
             {typeof review.elapsedSeconds === "number" && `${formatClock(review.elapsedSeconds)} elapsed`}
@@ -1124,7 +1113,7 @@ function Result({
         )}
         {review.timedOut && (
           <p className="mt-2 text-sm text-amber-700">
-            Time ran out. Answers saved before the deadline count; later answers are skipped.
+            Time ran out. Only the answers you submitted before then count.
           </p>
         )}
         <div className="mt-3 text-xs text-gray-400">{attribution}</div>

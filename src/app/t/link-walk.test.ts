@@ -393,7 +393,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(text((await fetchPath(path)).body)).toContain("0 of 5 correct");
   });
 
-  it.each(["true", "false"])("shows link-result points, ranking them only while the board is on (LEADERBOARD_ENABLED=%s)", async (flag) => {
+  it.each(["true", "false"])("shows the link-result score, ranking it only while the board is on (LEADERBOARD_ENABLED=%s)", async (flag) => {
     vi.stubEnv("LEADERBOARD_ENABLED", flag);
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -404,8 +404,8 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     vi.setSystemTime((issuedAt + 1200) * 1000);
     const result = text((await fetchPath(`/t/${token}/result?a=${answers}`)).body);
     expect(result).toContain("30 of 30 correct");
-    expect(result).toContain("3,000 points");
-    expect(result).toContain("Elapsed time only breaks ties.");
+    expect(result).not.toMatch(/[\d,]+ points/);
+    expect(result.includes("More correct answers rank first; elapsed time only breaks ties.")).toBe(flag === "true");
     expect(result).not.toContain("bonus");
     const receipt = [...storage.values.values()].map((raw) => JSON.parse(raw)).find((value) => value.response);
     expect(receipt.response.leaderboardEligible).toBe(flag === "true");
@@ -589,7 +589,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(links(home)).toContainEqual(["Agent access", "/agents"]);
     expect(note).not.toContain("can take the test without JavaScript");
     expect(note).not.toContain("While a test is being built");
-    expect(note).toContain("Each correct answer earns 100 points.");
+    expect(note).not.toMatch(/[\d,]+ points/);
     expect(note).toContain("Elapsed time only breaks ties.");
     expect(note).not.toContain("bonus");
     // Like every link into a test, the note's links are not for crawlers.
@@ -653,7 +653,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(resultHref).toBe(`/t/${token}/result?a=${prefix}A--`);
     const result = text((await fetchPath(resultHref)).body);
     expect(result).toContain("2 of 5 correct");
-    expect(result).toContain("Answers saved before the deadline count; later answers are skipped.");
+    expect(result).toContain("Time ran out. Only the answers you submitted before then count.");
     expect(result).toContain("Skipped");
   });
 
@@ -670,12 +670,11 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     const forged = puzzles.map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
     const result = await fetchPath(`/t/${reference}/result?a=${forged}`);
     expect(text(result.body)).toContain("2 of 30 correct");
-    expect(text(result.body)).toContain("200 points");
     expect(text(result.body)).not.toContain("cannot join the leaderboard");
     const [, publish] = links(result.body).find(([label]) => label === "Publish as ChatGPT")!;
     expect(text((await fetchPath(publish)).body)).toContain("2 of 30 correct");
-    expect((await listLeaderboard()).map(({ correct, points, kind }) => ({ correct, points, kind })))
-      .toEqual([{ correct: 2, points: 200, kind: "agent" }]);
+    expect((await listLeaderboard()).map(({ correct, elapsedSeconds, kind }) => ({ correct, elapsedSeconds, kind })))
+      .toEqual([{ correct: 2, elapsedSeconds: 1800, kind: "agent" }]);
   });
 
   it("tells a taker when the site has changed under their test", async () => {

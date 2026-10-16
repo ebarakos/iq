@@ -129,8 +129,8 @@ The 2026-08-16 decisions in full:
   the long one — not a per-question timer. A taker may spend the time unevenly.
 - **A hard deadline with a grace window and a late marker.** The countdown ends
   the test. "The answer deadline" below fixes the exact rule.
-- **Results show a raw score and a reasoning-family breakdown.** The owner's 2026-10-07
-  decision also keeps points on 30-question tests when the leaderboard is disabled.
+- **Results show a raw score and a reasoning-family breakdown.** Since the owner's 2026-10-16
+  decision there are no points; the score is the number of correct answers.
   No IQ number, percentile or normalized scale. [`docs/brainstorm.md`](../brainstorm.md) Q8
   records why an IQ figure is not available to us.
 - **Code-valid families ship publicly.** This reverses the earlier rule that a
@@ -147,13 +147,12 @@ to reach real takers is to ship. The risk it accepts is that a confusing family
 is briefly public; the withdrawal list and continuing retention pilot are what
 contain that risk.
 
-Points use the owner's 2026-10-16 rule: `100 × correct`. More correct answers rank first;
-elapsed time only breaks accuracy ties. Wrong and skipped answers earn no points.
-The same rule applies to existing and new leaderboard entries, for people and agents.
-Saved submission receipts remain immutable; reads display their points under the current rule.
-Both result flows show points for 30-question tests, independently of `LEADERBOARD_ENABLED`.
-That setting controls the leaderboard and publication only. The introduction, results and
-leaderboard explain the same ranking rule; points remain a game score, not an IQ estimate.
+Ranking follows the owner's 2026-10-16 rule: more correct answers rank first; elapsed time
+only breaks ties. There are no points and no speed bonus. Wrong and skipped answers count
+the same. A late result's elapsed time is the time limit. The same rule applies to existing
+and new leaderboard entries, for people and agents; saved submission receipts remain
+immutable. `LEADERBOARD_ENABLED` controls the leaderboard and publication only. The
+introduction, the link-test publication section and the leaderboard state the same rule.
 
 ### Presentation contract
 
@@ -378,9 +377,9 @@ a standardized IQ subscore. Elapsed time is reported overall and by band; it
 does not change correctness.
 
 Owner-approved leaderboard addition, updated 2026-10-16: eligible 30-question attempts may
-publish a nickname and `100 × correct` points. Correct answers rank first; elapsed time only
+publish a nickname with their correct-answer count. Correct answers rank first; elapsed time only
 breaks ties. Results finishing late use only answers saved before the deadline.
-Raw accuracy stays visible; leaderboard points are not a standardized IQ scale.
+The count is raw accuracy, not a standardized IQ scale.
 Each entry records the app version sealed at issue time, elapsed time and submission date.
 Local development enables this by default; deployments require `LEADERBOARD_ENABLED=true`.
 The 2026-10-08 owner decision replaces the per-environment rankings with two: dev for local,

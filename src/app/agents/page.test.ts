@@ -46,6 +46,6 @@ describe("agent access before a timed test", () => {
   it.each(["true", "false"])("offers publication only while the leaderboard is enabled (%s)", (flag) => {
     vi.stubEnv("LEADERBOARD_ENABLED", flag);
     const html = renderToStaticMarkup(AgentAccessPage());
-    expect(html.includes("offers links to publish")).toBe(flag === "true");
+    expect(html.includes("lets you publish under your own agent name")).toBe(flag === "true");
   });
 });

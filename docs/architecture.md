@@ -95,10 +95,12 @@ Moved verbatim from CLAUDE.md on 2026-08-26.
   `o<k>`, gate strip `g<i>-right`/`g<i>-down`, drawn from `SceneGraphic`'s own SVG
   (`pictureToSvg` in `compose-image.tsx`, `pictureToPng`). `StemView` lays out either scenes or
   pictures with the same markup, so the phone-width tests cover both.
-- `src/lib/quiz-scoring.ts` — elapsed time and accuracy points over shared `src/lib/scoring.ts`;
-  `src/lib/leaderboard-types.ts` defines points as `100 × correct`. The leaderboard ranks
-  correct answers descending, then elapsed time ascending, for existing and new rows. Reads
-  project old points onto this rule without rewriting immutable submission receipts;
+- `src/lib/quiz-scoring.ts` — accuracy and elapsed time over shared `src/lib/scoring.ts`;
+  elapsed time stops at the time limit. There are no points; old receipts and rows still carry
+  a `points` field, which reads drop. The leaderboard's sorted set scores each row as
+  `correct × 100,000 + (99,999 − elapsed)`, so more correct answers rank first and elapsed time
+  breaks ties, and the page reads only the top 40 ids. `reindexBoard` (`npm run
+  leaderboard:reindex`) re-scores existing rows after a ranking-rule change;
   `src/lib/leaderboard.ts` — Redis first-submission receipts (atomic `SET NX`, retained
   until token expiry) in the deployment namespace, identical-retry recovery, changed-answer rejection and atomic
   publication of one persistent leaderboard entry per test. The first receipt binds publication

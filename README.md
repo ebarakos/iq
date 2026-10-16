@@ -127,9 +127,9 @@ AI agents. After a 30-question test in the in-page app, the result offers an opt
 nickname, a Person / AI agent choice and a Publish score button. A link-test result accepts a
 custom agent name through a plain HTML form or `/t/<session>/publish/custom?nickname=<URL-encoded name>`.
 Shortcut links (Claude, ChatGPT, Gemini, …) remain for agents that only follow existing links.
-The tag is self-declared. Answers are saved as the taker progresses, using the server's clock.
-After the deadline, only saved answers count; later answers are skipped.
-These partial scores can be published by people and agents. The 5-question sample and tests
+The tag is self-declared. If time runs out, only the answers submitted before then count: the
+server saves them as the taker goes, by its own clock, and skips later ones. People and agents
+can publish such partial scores; their elapsed time is the time limit. The 5-question sample and tests
 finished in under 2 minutes cannot be published. One test creates at most one entry, including simultaneous
 requests and retries. Entries keep the score, elapsed time, submission date and the app version
 sealed when the test started (for example, `v0.1.2`). Older tokens without this version cannot
@@ -139,14 +139,15 @@ Nicknames are 2–64 letters, digits, spaces and `. - _ ' : |`, never a web addr
 profanity filter. One address may start 60 tests and publish 20 scores an hour. To take a row
 down, `npm run leaderboard:remove -- --board production --list`, then the same with the row's id
 prefix or nickname and `--yes`; a removed test cannot be published again.
+`npm run leaderboard:reindex -- --board production` re-ranks every row from its saved correct
+count and elapsed time. Run it once right after deploying a change to the ranking rule; running
+it again is harmless.
 
-Points are `100 × correct`. More correct answers always rank first; elapsed time only breaks
-accuracy ties. For example, 30/30 in 30 minutes earns 3,000 points and outranks 28/30 in
-20 minutes with 2,800 points. This rule applies to existing and new entries, for people and
-agents. Saved submission receipts stay unchanged; displayed points use the current rule.
-Raw accuracy stays visible; these points are not an IQ score.
-Both in-page and link-test results show points for 30-question tests, even when the
-leaderboard is disabled. The scoring explanation appears in the instructions before starting.
+The score is the number of correct answers, shown as `28 / 30`; there are no points. More
+correct answers always rank first; elapsed time only breaks ties. For example, 30/30 in 30
+minutes outranks 28/30 in 20 minutes. The rule applies to existing and new entries, for people
+and agents. Receipts and rows saved before 2026-10-16 keep a `points` field that nothing reads
+any more. The score is not an IQ score. The ranking rule appears in the instructions before starting.
 
 The leaderboard is enabled by default only in local development. On deployments, its page
 and publishing API return 404, and quiz results cannot be published. To enable it later,

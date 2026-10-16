@@ -6,18 +6,12 @@ export type TakerKind = (typeof TAKER_KINDS)[number];
 export const NICKNAME_MIN_LENGTH = 2;
 export const NICKNAME_MAX_LENGTH = 64;
 
-/** Points describe accuracy; speed only breaks leaderboard ties. Shared by both result views. */
-export function leaderboardPoints(correct: number): number {
-  return 100 * correct;
-}
-
 /** Public rows contain no quiz tokens, answers or internal puzzle data. */
 export interface LeaderboardEntry {
   id: string;
   nickname: string;
   /** Absent on rows published before the tag existed. */
   kind?: TakerKind;
-  points: number;
   correct: number;
   total: 30;
   elapsedSeconds: number;

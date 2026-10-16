@@ -13,7 +13,7 @@ import { MIN_RANKED_SECONDS, SubmissionConflictError } from "@/lib/leaderboard";
 import { scoreLinkResult } from "@/lib/link-result";
 import { resolveLinkToken } from "@/lib/link-session";
 import { leaderboardEnabled } from "@/lib/leaderboard-config";
-import { AGENT_NAMES, leaderboardPoints } from "@/lib/leaderboard-types";
+import { AGENT_NAMES } from "@/lib/leaderboard-types";
 import { AgentNameForm, LinkPage, LinkProblem, PROFILE_NAMES, StartLink } from "../../link-views";
 
 export const dynamic = "force-dynamic";
@@ -99,18 +99,9 @@ export default async function LinkResultPage({ params, searchParams }: Props) {
       <p className="mt-3 text-3xl font-semibold">
         {`${scored.score} of ${scored.total} correct`}
       </p>
-      {scored.total === 30 && (
-        <div className="mt-4">
-          <p className="text-2xl font-semibold">{leaderboardPoints(scored.score).toLocaleString("en-US")} points</p>
-          <p className="mt-1 text-sm text-gray-600">
-            Each correct answer earns 100 points. More correct answers rank first on the
-            leaderboard. Elapsed time only breaks ties.
-          </p>
-        </div>
-      )}
       {scored.timedOut && (
         <p className="mt-2 text-amber-800">
-          Time ran out. Answers saved before the deadline count; later answers are skipped.
+          Time ran out. Only the answers you submitted before then count.
         </p>
       )}
       {scored.total === 30 && leaderboardEnabled() && (
@@ -159,7 +150,8 @@ function AgentPublication({ token, eligible }: { token: string; eligible: boolea
       <h2 className="text-xl font-semibold">Publish to the leaderboard</h2>
       <p className="mt-2 text-gray-700">
         If you are an AI agent, enter your own name or use a shortcut below. Your result will be tagged AI agent.
-        Publishing is optional, and a result can be published once.
+        Publishing is optional, and a result can be published once. More correct answers rank first;
+        elapsed time only breaks ties.
       </p>
       <AgentNameForm token={token} />
       <ul className="mt-3 flex flex-wrap gap-2">

@@ -103,7 +103,7 @@ describe("POST /api/submit", () => {
     expect(conflict).not.toHaveProperty("puzzles");
   });
 
-  it("keeps accuracy points when the leaderboard is disabled", async () => {
+  it("scores a 30-question test without points when the leaderboard is disabled", async () => {
     vi.stubEnv("LEADERBOARD_ENABLED", "false");
     vi.useFakeTimers({ toFake: ["Date"] });
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -115,9 +115,9 @@ describe("POST /api/submit", () => {
 
     const response = await POST(request({ quizToken, answers }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      score: 29, total: 30, points: 2900, elapsedSeconds: 1200, leaderboardEligible: false,
-    });
+    const result = await response.json();
+    expect(result).toMatchObject({ score: 29, total: 30, elapsedSeconds: 1200, leaderboardEligible: false });
+    expect(result).not.toHaveProperty("points");
   });
 
   it("rejects malformed, incomplete, and out-of-range submissions", async () => {

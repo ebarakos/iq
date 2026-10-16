@@ -64,7 +64,7 @@ export default async function AgentPublishPage({ params, searchParams }: Props) 
     <Notice
       title={same ? `Published as ${name}` : "This result was already published"}
       text={same
-        ? `${entry.correct} of 30 correct, ${entry.points.toLocaleString("en-US")} points, tagged AI agent.`
+        ? `${entry.correct} of 30 correct, tagged AI agent.`
         : `It is on the leaderboard as ${entry.nickname}${tag}; a result can be published once.`}
       leaderboard
     />

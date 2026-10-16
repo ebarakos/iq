@@ -22,7 +22,8 @@
     "pilot:report": "tsx scripts/pilot-report.ts",
     "vercel:setup": "node --import tsx scripts/vercel-setup.ts",
     "redis:verify": "node --env-file=.env.local --import tsx scripts/redis-verify.ts",
-    "leaderboard:remove": "node --env-file=.env.local --import tsx scripts/leaderboard-remove.ts"
+    "leaderboard:remove": "node --env-file=.env.local --import tsx scripts/leaderboard-remove.ts",
+    "leaderboard:reindex": "node --env-file=.env.local --import tsx scripts/leaderboard-remove.ts --reindex"
   },
   "engines": {
     "node": ">=20"

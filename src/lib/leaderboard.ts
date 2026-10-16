@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { OPTIONS_PER_ITEM } from "@/items/schema";
 import { leaderboardEnabled, leaderboardNamespace, quizNamespace } from "./leaderboard-config";
 import { linkTestLength, type LinkTest } from "./link-test";
-import { leaderboardPoints, type LeaderboardEntry, type TakerKind } from "./leaderboard-types";
+import type { LeaderboardEntry, TakerKind } from "./leaderboard-types";
 import type { QuizTokenPayload } from "./quiz-token";
 import { scoreQuiz } from "./quiz-scoring";
 import { redisCommand } from "./redis";
@@ -19,14 +19,18 @@ export const MIN_RANKED_SECONDS = 120;
 export class LeaderboardEligibilityError extends Error {}
 
 export type ScoredResponse = ReturnType<typeof scoreQuiz> & { leaderboardEligible: boolean };
-/** A row as stored. The owner's removal keeps it as a tombstone, so its test cannot publish again. */
-type StoredEntry = LeaderboardEntry & { removed?: true };
+/**
+ * A row as stored. The owner's removal keeps it as a tombstone, so its test cannot publish again.
+ * Rows published before 2026-10-16 also carry points, which are no longer shown.
+ */
+type StoredEntry = LeaderboardEntry & { removed?: true; points?: number };
 
 const REMOVED_MESSAGE = "This result was removed from the leaderboard.";
 
-function publicEntry({ removed, ...entry }: StoredEntry): LeaderboardEntry {
-  if (removed) throw new LeaderboardEligibilityError(REMOVED_MESSAGE);
-  return { ...entry, points: leaderboardPoints(entry.correct) };
+function publicEntry(stored: StoredEntry): LeaderboardEntry {
+  if (stored.removed) throw new LeaderboardEligibilityError(REMOVED_MESSAGE);
+  const { id, nickname, kind, correct, total, elapsedSeconds, appVersion, submittedAt } = stored;
+  return { id, nickname, ...(kind && { kind }), correct, total, elapsedSeconds, appVersion, submittedAt };
 }
 
 function readEntry(raw: string): LeaderboardEntry {
@@ -104,8 +108,10 @@ function readReceipt(raw: string, answersHash: string): ScoredResponse {
   if (receipt.answersHash !== answersHash) {
     throw new SubmissionConflictError("This quiz was already submitted with different answers. Start a new test.");
   }
-  // Display the current accuracy points without rewriting an immutable receipt.
-  return { ...receipt.response, points: leaderboardPoints(receipt.response.score) };
+  // Receipts saved before 2026-10-16 also carry points; drop them without rewriting the receipt.
+  const response: ScoredResponse & { points?: number } = { ...receipt.response };
+  delete response.points;
+  return response;
 }
 
 /** Recover the saved result without rebuilding its answer key. Callers validate the token first. */
@@ -169,6 +175,17 @@ export async function submitQuizOnce(
   return readReceipt(winner, answersHash);
 }
 
+/** Elapsed seconds the ranking can tell apart; longer times tie at the slowest. */
+const RANK_TIME_SPAN = 100_000;
+
+/**
+ * The ranking's score: more correct answers first, then less elapsed time.
+ * Elapsed time is clamped so it never outweighs one correct answer.
+ */
+function rankScore({ correct, elapsedSeconds }: Pick<LeaderboardEntry, "correct" | "elapsedSeconds">): number {
+  return correct * RANK_TIME_SPAN + (RANK_TIME_SPAN - 1 - Math.min(Math.max(0, elapsedSeconds), RANK_TIME_SPAN - 1));
+}
+
 // The receipt, entry and ranking are checked/written together. A retry can never
 // create another row or rename an existing entry, including simultaneous requests.
 const PUBLISH_ENTRY = `
@@ -203,49 +220,60 @@ export async function publishLeaderboardEntry(
   const result = receipt.response;
   if (!result.leaderboardEligible || result.total !== 30 || !result.appVersion) {
     throw new LeaderboardEligibilityError(
-      "Only 30-question tests that took at least 2 minutes can join the leaderboard. Only answers recorded before the deadline count.",
+      "Only 30-question tests that took at least 2 minutes can join the leaderboard.",
     );
   }
   const entry: LeaderboardEntry = {
     id,
     nickname,
     kind,
-    points: leaderboardPoints(result.score),
     correct: result.score,
     total: 30,
     elapsedSeconds: result.elapsedSeconds,
     appVersion: result.appVersion,
     submittedAt: receipt.submittedAt,
   };
-  // Readers order saved accuracy and time, including entries with an older index score.
   const saved = await redisCommand<string | null>([
     "EVAL", PUBLISH_ENTRY, 3, key, entryKey(id, namespace), boardKey(namespace),
-    JSON.stringify(entry), entry.correct, id,
+    JSON.stringify(entry), rankScore(entry), id,
   ]);
   if (saved === null) throw new LeaderboardEligibilityError("This result has expired. Take a new test.");
   return readEntry(saved);
 }
 
-/** Sort all saved rows: the old points index can bury accurate results beyond the top 20. */
-async function rankedEntries(namespace: string): Promise<LeaderboardEntry[]> {
-  const ids = await redisCommand<string[]>(["ZREVRANGE", boardKey(namespace), 0, -1]);
+/** Ranked rows, best first; a tombstone never reaches a reader, even mid-removal. */
+async function rankedEntries(namespace: string, last: number): Promise<LeaderboardEntry[]> {
+  const ids = await redisCommand<string[]>(["ZREVRANGE", boardKey(namespace), 0, last]);
   if (ids.length === 0) return [];
   const rows = await redisCommand<(string | null)[]>(["MGET", ...ids.map((id) => entryKey(id, namespace))]);
   return rows.filter((row): row is string => row !== null)
     .map((row) => JSON.parse(row) as StoredEntry)
     .filter((entry) => !entry.removed)
-    .map(publicEntry)
-    .sort((left, right) => right.correct - left.correct || left.elapsedSeconds - right.elapsedSeconds);
+    .map(publicEntry);
 }
 
 export async function listLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!leaderboardEnabled()) return [];
-  return (await rankedEntries(leaderboardNamespace())).slice(0, 20);
+  // A few spare rows, so a missing or removed row cannot shorten the top 20.
+  return (await rankedEntries(leaderboardNamespace(), 39)).slice(0, 20);
 }
 
 /** Every ranked row on one board, best first. For the owner's removal script. */
 export async function listBoardEntries(namespace: string): Promise<LeaderboardEntry[]> {
-  return rankedEntries(namespace);
+  return rankedEntries(namespace, -1);
+}
+
+/**
+ * Re-score every ranked row from its saved entry, for rows ranked under an
+ * older rule (before 2026-10-16, points with a speed bonus). Safe to repeat.
+ * Returns the number of rows re-scored.
+ */
+export async function reindexBoard(namespace: string): Promise<number> {
+  const entries = await listBoardEntries(namespace);
+  if (entries.length === 0) return 0;
+  // XX only updates rows still ranked, so a row removed meanwhile stays off the board.
+  await redisCommand(["ZADD", boardKey(namespace), "XX", ...entries.flatMap((entry) => [rankScore(entry), entry.id])]);
+  return entries.length;
 }
 
 // The tombstone and the ranking change together, so no reader sees one without the other.

@@ -34,12 +34,19 @@ Use the server's saved accuracy and elapsed time for existing entries as well as
 Keep submission receipts immutable and apply the same order to people and agents.
 Both result flows, the leaderboard, and their explanations must describe the same rule.
 
-Points are now `100 × correct`, shared by server scoring and both result views. Old
-receipt and entry points are projected from their saved accuracy without changing storage.
-The leaderboard reads every indexed entry, filters missing/removed rows, sorts by saved
-accuracy and elapsed time, then takes 20. Limiting the old index first could hide an
-accurate result behind many faster, less accurate ones. This avoids a storage migration;
-the read cost grows with board size. New index scores store accuracy only.
+**No points (owner, 2026-10-16, later the same day).** Points had become `100 × correct`, the
+same number as the score under a second name, so they were dropped. Results and the board show
+`28 / 30`. Old receipts and rows keep their stored `points`; reads drop the field.
+
+**Ranking in Redis.** The sorted set scores a row `correct × 100,000 + (99,999 − elapsed)`, so
+Redis itself orders accuracy first and time second, and the page reads only the top 40 ids
+(spares for missing or removed rows). Rows published under the old points-with-bonus index
+keep their old, larger scores until `npm run leaderboard:reindex -- --board <board>` re-scores
+every row from its saved entry. Run it right after the deploy; it is safe to repeat.
+An earlier version of this change read and sorted every row on each page view instead.
+
+**Elapsed time of a late result** is the time limit, not the moment the taker opened the
+result. Otherwise that moment, which has nothing to do with the answers that count, broke ties.
 
 ## Design
 
@@ -107,7 +114,9 @@ Publication is idempotent, because a test has one row and the
 first name wins, and `nofollow` like every other link into a test. Names: Claude, ChatGPT,
 Gemini, Grok, Copilot, Perplexity, DeepSeek, Meta AI, Mistral, Other AI agent.
 
-**Removal.** `npm run leaderboard:remove -- --board production|dev [--list | <id prefix or
+**Removal and re-ranking.** `npm run leaderboard:reindex -- --board production|dev` re-scores
+every row; see the ranking decision above.
+`npm run leaderboard:remove -- --board production|dev [--list | <id prefix or
 nickname> --yes]` lists or deletes rows with the KV credentials in `.env.local`. One Redis script
 writes the tombstone and drops the ranking together, and public reads skip tombstones anyway. Filters always
 miss something; the owner needs a delete that costs one command.

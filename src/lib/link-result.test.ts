@@ -108,7 +108,7 @@ describe("a link result calculated over short requests", { timeout: 30_000 }, ()
     expect(whole).not.toHaveBeenCalled();
   });
 
-  it("keeps the first arrival for timing and points while storage expires on the real clock", async () => {
+  it("keeps the first arrival for timing while storage expires on the real clock", async () => {
     const answers = answersFor(long);
     const receivedAt = long.test.answerDeadline - 5;
     vi.setSystemTime(receivedAt * 1000);
