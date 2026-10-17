@@ -47,9 +47,11 @@ vi.mock("@/lib/redis", async (importOriginal) => ({
           if (Number(command[6]) < Number(command[7]) && !storage.values.has(receiptKey) &&
             (!previous || JSON.parse(previous).receivedAtMs <= Number(command[6]))) {
             const next = JSON.parse(String(command[5]));
+            // Upstash's Lua JSON decoder drops nulls and shifts later values.
+            next.answers = next.answers.filter((answer: number | null) => answer !== null);
             const earlier = previous ? JSON.parse(previous).answers : [];
             next.answers = Array.from({ length: Number(command[9]) }, (_, index) =>
-              index < next.answers.length ? next.answers[index] : earlier[index] ?? null);
+              index < next.answers.length ? next.answers[index] : earlier[index] ?? -1);
             storage.values.set(answerKey, JSON.stringify(next));
           }
           return storage.values.get(answerKey) ?? null;
@@ -638,11 +640,12 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
-  it("ends the test at the deadline and keeps only answers recorded before then", async () => {
+  it.each([false, true])("ends the test at the deadline and keeps only saved answers (first skipped: %s)", async (firstSkipped) => {
     const start = await fetchPath("/sample?new=walk");
     const token = new URL(start.location!).pathname.split("/")[2];
     const { test, puzzles } = loadLinkTest(token);
-    const prefix = puzzles.slice(0, 2).map((puzzle) => OPTION_LETTERS[puzzle.answerIndex]).join("");
+    const prefix = puzzles.slice(0, 2).map((puzzle, index) =>
+      firstSkipped && index === 0 ? "-" : OPTION_LETTERS[puzzle.answerIndex]).join("");
     await fetchPath(`/t/${token}/3?a=${prefix}`);
     // Looking back at an earlier question must not erase later saved answers.
     await fetchPath(`/t/${token}/2?a=${prefix[0]}`);
@@ -654,7 +657,7 @@ describe("the link test, followed link by link", { timeout: 30_000 }, () => {
     const [, resultHref] = links(page.body).find(([label]) => label === "See your result")!;
     expect(resultHref).toBe(`/t/${token}/result?a=${prefix}A--`);
     const result = text((await fetchPath(resultHref)).body);
-    expect(result).toContain("2 of 5 correct");
+    expect(result).toContain(`${firstSkipped ? 1 : 2} of 5 correct`);
     expect(result).toContain("Time ran out. Only the answers you submitted before then count.");
     expect(result).toContain("Skipped");
   });

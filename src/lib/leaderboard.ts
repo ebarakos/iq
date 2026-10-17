@@ -57,9 +57,13 @@ function answersKey(token: string): string {
 }
 
 interface AnswerProgress {
+  /** Skips are stored as -1; older records can contain null or be shortened. */
   answers: readonly (number | null)[];
   receivedAtMs: number;
 }
+
+// Upstash's Lua JSON decoder drops null array entries, shifting later answers.
+const STORED_SKIP = -1;
 
 // The server supplies the time. Older requests cannot overwrite newer answers,
 // and neither the deadline nor a submitted result can be reopened by a client.
@@ -70,7 +74,7 @@ if current and cjson.decode(current).receivedAtMs > tonumber(ARGV[2]) then retur
 local next = cjson.decode(ARGV[1])
 local previous = current and cjson.decode(current) or nil
 for i = #next.answers + 1, tonumber(ARGV[5]) do
-  next.answers[i] = previous and previous.answers[i] or cjson.null
+  next.answers[i] = previous and previous.answers[i] or ${STORED_SKIP}
 end
 local saved = cjson.encode(next)
 redis.call('SET', KEYS[1], saved, 'EX', ARGV[4])
@@ -90,7 +94,7 @@ export async function recordQuizAnswers(
   }
   await redisCommand<string | null>([
     "EVAL", SAVE_ANSWERS, 2, answersKey(token), submissionKey(token, quizNamespace()),
-    JSON.stringify({ answers, receivedAtMs } satisfies AnswerProgress), receivedAtMs,
+    JSON.stringify({ answers: answers.map((answer) => answer ?? STORED_SKIP), receivedAtMs } satisfies AnswerProgress), receivedAtMs,
     test.answerDeadline * 1000, Math.max(1, test.expiresAt - Math.floor(Date.now() / 1000)), linkTestLength(test),
   ]);
 }
@@ -150,8 +154,16 @@ export async function submitQuizOnce(
     if (progress && (!Number.isFinite(progress.receivedAtMs) || progress.receivedAtMs >= quiz.answerDeadline * 1000)) {
       throw new Error("Invalid saved answer timing.");
     }
+    const saved = progress?.answers ?? [];
+    if (!Array.isArray(saved) || saved.length > quiz.items.length || saved.some((answer) =>
+      answer !== null && (!Number.isInteger(answer) || answer < STORED_SKIP || answer >= OPTIONS_PER_ITEM))) {
+      throw new Error("Invalid saved answers.");
+    }
     // A late final request cannot supply new answers or change an earlier choice.
-    scored = scoreQuiz(quiz, progress?.answers ?? Array<null>(quiz.items.length).fill(null), submittedAt);
+    // Older shortened snapshots need their unanswered tail restored too.
+    const recorded = Array.from({ length: quiz.items.length }, (_, index) =>
+      saved[index] === STORED_SKIP ? null : saved[index] ?? null);
+    scored = scoreQuiz(quiz, recorded, submittedAt);
   }
   const response: ScoredResponse = {
     ...scored,

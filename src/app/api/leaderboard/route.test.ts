@@ -38,9 +38,11 @@ vi.mock("@/lib/redis", () => ({
           if (Number(command[6]) < Number(command[7]) && !store.values.has(receiptKey) &&
             (!previous || JSON.parse(previous).receivedAtMs <= Number(command[6]))) {
             const next = JSON.parse(String(command[5]));
+            // Upstash's Lua JSON decoder drops nulls and shifts later values.
+            next.answers = next.answers.filter((answer: number | null) => answer !== null);
             const earlier = previous ? JSON.parse(previous).answers : [];
             next.answers = Array.from({ length: Number(command[9]) }, (_, index) =>
-              index < next.answers.length ? next.answers[index] : earlier[index] ?? null);
+              index < next.answers.length ? next.answers[index] : earlier[index] ?? -1);
             store.values.set(answerKey, JSON.stringify(next));
           }
           return store.values.get(answerKey) ?? null;
@@ -371,6 +373,19 @@ describe("leaderboard publication", () => {
     expect(await (await saveAnswers(request({ quizToken, answers: ALL_RIGHT }))).json()).toEqual({ closed: true });
     expect(await (await submit(request({ quizToken, answers: ALL_RIGHT }))).json())
       .toMatchObject({ score: 3, timedOut: true, late: false, leaderboardEligible: true });
+  });
+
+  it.each(["mixed", "all"])("preserves %s skips when Lua drops JSON nulls", async (kind) => {
+    const quizToken = token();
+    const partial = KEY.map((answer, index) => kind === "all" || index % 3 === 0 || index === 29 ? null : answer);
+    expect((await saveAnswers(request({ quizToken, answers: partial }))).status).toBe(200);
+    vi.setSystemTime((NOW + 759) * 1000);
+    const response = await submit(request({ quizToken, answers: ALL_RIGHT }));
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.score).toBe(partial.filter((answer) => answer !== null).length);
+    expect(result.results.map((item: { chosen: number | null }) => item.chosen)).toEqual(partial);
+    expect((await submit(request({ quizToken, answers: ALL_RIGHT }))).status).toBe(200);
   });
 
   it("updates choices on time and freezes them after submission", async () => {

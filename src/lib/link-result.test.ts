@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as linkTests from "./link-test";
 import { readQuizSubmission, SubmissionConflictError } from "./leaderboard";
@@ -124,6 +125,24 @@ describe("a link result calculated over short requests", { timeout: 30_000 }, ()
       .find((command) => command[0] === "SET" && String(command[1]).includes(":submission:"))!;
     expect(JSON.parse(String(saved[2])).submittedAt).toBe(receivedAt);
     expect(saved[saved.indexOf("EX") + 1]).toBe(long.test.expiresAt - finishedAt);
+  });
+
+  it.each([0, 11])("recovers a shortened saved record with %s answers after time runs out", async (count) => {
+    const prefix = long.puzzles.slice(0, count).map((puzzle) => puzzle.answerIndex);
+    const expected = long.puzzles.map((_, index) => prefix[index] ?? null);
+    const submitted = long.puzzles.map((puzzle, index) => index < 12 ? puzzle.answerIndex : null);
+    const id = createHash("sha256").update(long.token).digest("hex");
+    store.set(`aiq:local:answers:${id}`, JSON.stringify({
+      answers: prefix, receivedAtMs: (long.test.answerDeadline - 30) * 1000,
+    }));
+    const receivedAt = long.test.answerDeadline + 79;
+    vi.setSystemTime(receivedAt * 1000);
+    const recovered = await scoreLinkResult(long.token, long.test, submitted, receivedAt, { budgetMs: Infinity });
+    expect(recovered).toEqual({ scored: {
+      ...scoreQuiz(linkTests.scoringPayload(long.test, long.puzzles), expected, receivedAt),
+      leaderboardEligible: true,
+    } });
+    expect(await scoreLinkResult(long.token, long.test, submitted, receivedAt + 60)).toEqual(recovered);
   });
 
   it("rejects changed answers while pending and after scoring, and malformed answers before storage", async () => {

@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - A link-test result that is still being calculated continues on its own.
 
 ### Fixed
+- Timed-out tests recover partial results when Redis saved fewer answer slots. Skipped
+  questions keep their positions when answers are saved.
 - A finished 30-question link test no longer times out while its result is calculated: the
   result is built over several short requests, and a saved result opens without rebuilding the
   test.
